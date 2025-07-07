@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -274,8 +273,10 @@ fun OnlineSearchResult(
         modifier =
         Modifier
             .background(MaterialTheme.colorScheme.surface)
-            .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
-            .padding(top = AppBarHeight)
+            .windowInsetsPadding(
+                WindowInsets.systemBars.only(WindowInsetsSides.Top)
+                    .add(WindowInsets(top = AppBarHeight))
+            )
             .fillMaxWidth()
     )
 }

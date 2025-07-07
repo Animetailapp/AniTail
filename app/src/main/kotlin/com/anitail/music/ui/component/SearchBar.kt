@@ -170,7 +170,7 @@ fun TopSearch(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(100.dp)
+                .height(88.dp)
                 .background(color = MaterialTheme.colorScheme.surface)
         )
 

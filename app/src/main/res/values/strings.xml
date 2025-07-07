@@ -661,4 +661,5 @@
     <string name="set_background_image">Set background image</string>
     <string name="remove_background_image">Remove background image</string>
     <string name="lyrics_romanize_japanese">Romanize Japanese Lyrics</string>
+    <string name="lyrics_romanize_korean">Romanize Korean Lyrics</string>
 </resources>

@@ -51,7 +51,6 @@ import com.anitail.music.constants.GridItemSize
 import com.anitail.music.constants.GridItemsSizeKey
 import com.anitail.music.constants.LibraryFilter
 import com.anitail.music.constants.LyricsClickKey
-import com.anitail.music.constants.LyricsRomanizeJapaneseKey
 import com.anitail.music.constants.LyricsScrollKey
 import com.anitail.music.constants.LyricsTextPositionKey
 import com.anitail.music.constants.PlayerBackgroundStyle
@@ -115,10 +114,6 @@ fun AppearanceSettings(
     )
     val (lyricsClick, onLyricsClickChange) = rememberPreference(LyricsClickKey, defaultValue = true)
     val (lyricsScroll, onLyricsScrollChange) = rememberPreference(LyricsScrollKey, defaultValue = true)
-    val (lyricsRomanizeJapanese, onLyricsRomanizeJapaneseChange) = rememberPreference(
-        LyricsRomanizeJapaneseKey,
-        defaultValue = true
-    )
     val (sliderStyle, onSliderStyleChange) = rememberEnumPreference(
         SliderStyleKey,
         defaultValue = SliderStyle.DEFAULT
@@ -388,11 +383,11 @@ fun AppearanceSettings(
         PreferenceEntry(
             title = { Text(stringResource(R.string.player_slider_style)) },
             description =
-            when (sliderStyle) {
-                SliderStyle.DEFAULT -> stringResource(R.string.default_)
-                SliderStyle.SQUIGGLY -> stringResource(R.string.squiggly)
-                SliderStyle.SLIM -> stringResource(R.string.slim)
-            },
+                when (sliderStyle) {
+                    SliderStyle.DEFAULT -> stringResource(R.string.default_)
+                    SliderStyle.SQUIGGLY -> stringResource(R.string.squiggly)
+                    SliderStyle.SLIM -> stringResource(R.string.slim)
+                },
             icon = { Icon(painterResource(R.drawable.sliders), null) },
             onClick = {
                 showSliderOptionDialog = true
@@ -434,13 +429,6 @@ fun AppearanceSettings(
             onCheckedChange = onLyricsScrollChange,
         )
 
-        SwitchPreference(
-            title = { Text(stringResource(R.string.lyrics_romanize_japanese)) },
-            icon = { Icon(painterResource(R.drawable.lyrics), null) },
-            checked = lyricsRomanizeJapanese,
-            onCheckedChange = onLyricsRomanizeJapaneseChange,
-        )
-
         PreferenceGroupTitle(
             title = stringResource(R.string.misc),
         )
@@ -480,11 +468,11 @@ fun AppearanceSettings(
         )
 
         SwitchPreference(
-             title = { Text(stringResource(R.string.swipe_song_to_add)) },
-             icon = { Icon(painterResource(R.drawable.swipe), null) },
-             checked = swipeToSong,
-             onCheckedChange = onSwipeToSongChange
-         )
+            title = { Text(stringResource(R.string.swipe_song_to_add)) },
+            icon = { Icon(painterResource(R.drawable.swipe), null) },
+            checked = swipeToSong,
+            onCheckedChange = onSwipeToSongChange
+        )
 
         SwitchPreference(
             title = { Text(stringResource(R.string.slim_navbar)) },

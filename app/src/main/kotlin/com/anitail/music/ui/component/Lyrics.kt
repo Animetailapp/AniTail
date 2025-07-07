@@ -94,6 +94,7 @@ import com.anitail.music.R
 import com.anitail.music.constants.DarkModeKey
 import com.anitail.music.constants.LyricsClickKey
 import com.anitail.music.constants.LyricsRomanizeJapaneseKey
+import com.anitail.music.constants.LyricsRomanizeKoreanKey
 import com.anitail.music.constants.LyricsScrollKey
 import com.anitail.music.constants.LyricsTextPositionKey
 import com.anitail.music.constants.PlayerBackgroundStyle
@@ -101,9 +102,12 @@ import com.anitail.music.constants.PlayerBackgroundStyleKey
 import com.anitail.music.db.entities.LyricsEntity.Companion.LYRICS_NOT_FOUND
 import com.anitail.music.lyrics.LyricsEntry
 import com.anitail.music.lyrics.LyricsUtils.findCurrentLineIndex
+import com.anitail.music.lyrics.LyricsUtils.isChinese
 import com.anitail.music.lyrics.LyricsUtils.isJapanese
+import com.anitail.music.lyrics.LyricsUtils.isKorean
 import com.anitail.music.lyrics.LyricsUtils.parseLyrics
 import com.anitail.music.lyrics.LyricsUtils.romanizeJapanese
+import com.anitail.music.lyrics.LyricsUtils.romanizeKorean
 import com.anitail.music.ui.component.shimmer.ShimmerHost
 import com.anitail.music.ui.component.shimmer.TextPlaceholder
 import com.anitail.music.ui.menu.LyricsMenu
@@ -142,6 +146,7 @@ fun Lyrics(
     val changeLyrics by rememberPreference(LyricsClickKey, true)
     val scrollLyrics by rememberPreference(LyricsScrollKey, true)
     val romanizeJapaneseLyrics by rememberPreference(LyricsRomanizeJapaneseKey, true)
+    val romanizeKoreanLyrics by rememberPreference(LyricsRomanizeKoreanKey, true)
     val scope = rememberCoroutineScope()
 
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
@@ -167,9 +172,16 @@ fun Lyrics(
             parsedLines.map { entry ->
                 val newEntry = LyricsEntry(entry.time, entry.text)
                 if (romanizeJapaneseLyrics) {
-                    if (isJapanese(entry.text)) {
+                    if (isJapanese(entry.text) && !isChinese(entry.text)) {
                         scope.launch {
                             newEntry.romanizedTextFlow.value = romanizeJapanese(entry.text)
+                        }
+                    }
+                }
+                if (romanizeKoreanLyrics) {
+                    if (isKorean(entry.text)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeKorean(entry.text)
                         }
                     }
                 }
@@ -181,9 +193,16 @@ fun Lyrics(
             lyrics.lines().mapIndexed { index, line ->
                 val newEntry = LyricsEntry(index * 100L, line)
                 if (romanizeJapaneseLyrics) {
-                    if (isJapanese(line)) {
+                    if (isJapanese(line) && !isChinese(line)) {
                         scope.launch {
                             newEntry.romanizedTextFlow.value = romanizeJapanese(line)
+                        }
+                    }
+                }
+                if (romanizeKoreanLyrics) {
+                    if (isKorean(line)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeKorean(line)
                         }
                     }
                 }
@@ -525,8 +544,8 @@ fun Lyrics(
                             },
                             fontWeight = FontWeight.Bold
                         )
-                        if (romanizeJapaneseLyrics) {
-                            // Show japanese romanized text if available
+                        if (romanizeJapaneseLyrics || romanizeKoreanLyrics) {
+                            // Show romanized text if available
                             val romanizedText by item.romanizedTextFlow.collectAsState()
                             romanizedText?.let { romanized ->
                                 Text(
