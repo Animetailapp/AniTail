@@ -236,7 +236,7 @@ class MainActivity : ComponentActivity() {
         bindService(
             Intent(this, MusicService::class.java),
             serviceConnection,
-            Context.BIND_AUTO_CREATE
+            BIND_AUTO_CREATE
         )
     }
 
@@ -642,7 +642,7 @@ class MainActivity : ComponentActivity() {
                         onDispose { removeOnNewIntentListener(listener) }
                     }
 
-                    val currentTitle = remember(navBackStackEntry) {
+                    remember(navBackStackEntry) {
                         when (navBackStackEntry?.destination?.route) {
                             Screens.Home.route -> R.string.home
                             Screens.Explore.route -> R.string.explore
@@ -683,6 +683,18 @@ class MainActivity : ComponentActivity() {
                                             }
                                         },
                                         actions = {
+                                            IconButton(onClick = { navController.navigate("history") }) {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.history),
+                                                    contentDescription = stringResource(R.string.history)
+                                                )
+                                            }
+                                            IconButton(onClick = { navController.navigate("stats") }) {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.stats),
+                                                    contentDescription = stringResource(R.string.stats)
+                                                )
+                                            }
                                             IconButton(onClick = { onActiveChange(true) }) {
                                                 Icon(
                                                     painter = painterResource(R.drawable.search),

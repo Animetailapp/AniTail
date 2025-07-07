@@ -67,6 +67,7 @@ import com.anitail.music.constants.SliderStyleKey
 import com.anitail.music.constants.SlimNavBarKey
 import com.anitail.music.constants.SwipeThumbnailKey
 import com.anitail.music.constants.SwipeToSongKey
+import com.anitail.music.constants.UseNewPlayerDesignKey
 import com.anitail.music.ui.component.DefaultDialog
 import com.anitail.music.ui.component.EnumListPreference
 import com.anitail.music.ui.component.IconButton
@@ -93,6 +94,10 @@ fun AppearanceSettings(
     val (darkMode, onDarkModeChange) = rememberEnumPreference(
         DarkModeKey,
         defaultValue = DarkMode.AUTO
+    )
+    val (useNewPlayerDesign, onUseNewPlayerDesignChange) = rememberPreference(
+        UseNewPlayerDesignKey,
+        defaultValue = true
     )
     val (playerBackground, onPlayerBackgroundChange) =
         rememberEnumPreference(
@@ -351,6 +356,13 @@ fun AppearanceSettings(
 
         PreferenceGroupTitle(
             title = stringResource(R.string.player),
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.new_player_design)) },
+            icon = { Icon(painterResource(R.drawable.palette), null) },
+            checked = useNewPlayerDesign,
+            onCheckedChange = onUseNewPlayerDesignChange,
         )
 
         EnumListPreference(

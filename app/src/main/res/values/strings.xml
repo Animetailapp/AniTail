@@ -662,4 +662,8 @@
     <string name="remove_background_image">Remove background image</string>
     <string name="lyrics_romanize_japanese">Romanize Japanese Lyrics</string>
     <string name="lyrics_romanize_korean">Romanize Korean Lyrics</string>
+    <string name="lyrics_romanize_chinese">Romanize Chinese Lyrics</string>
+    <string name="new_player_design">New player design</string>
+
+
 </resources>

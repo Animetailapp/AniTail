@@ -640,6 +640,7 @@
     <string name="ok">Aceptar</string>
     <string name="lyrics_romanize_japanese">Romanizar letras japonesas</string>
     <string name="lyrics_romanize_korean">Romanizar letras coreanas</string>
+    <string name="new_player_design">Nuevo diseño del reproductor</string>
 
 
 </resources>
