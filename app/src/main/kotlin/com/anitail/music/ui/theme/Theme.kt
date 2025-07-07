@@ -19,8 +19,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.palette.graphics.Palette
 import com.anitail.music.ui.screens.settings.DarkMode
 import com.materialkolor.PaletteStyle
+import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
 import com.materialkolor.score.Score
+
 import java.util.Calendar
 
 fun isNight(): Boolean {
@@ -62,6 +64,7 @@ fun AnitailTheme(
         rememberDynamicColorScheme(
             seedColor = themeColor, // themeColor is guaranteed non-default here
             isDark = useDarkTheme,
+            specVersion = ColorSpec.SpecVersion.SPEC_2025,
             style = PaletteStyle.TonalSpot // Keep existing style
         )
     }
@@ -85,10 +88,9 @@ fun AnitailTheme(
     )
 }
 
-// Keep helper functions as they are likely still needed
 fun Bitmap.extractThemeColor(): Color {
     val colorsToPopulation = Palette.from(this)
-        .maximumColorCount(64)
+        .maximumColorCount(8)
         .generate()
         .swatches
         .associate { it.rgb to it.population }

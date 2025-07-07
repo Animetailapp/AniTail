@@ -93,6 +93,7 @@ import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.constants.DarkModeKey
 import com.anitail.music.constants.LyricsClickKey
+import com.anitail.music.constants.LyricsRomanizeJapaneseKey
 import com.anitail.music.constants.LyricsScrollKey
 import com.anitail.music.constants.LyricsTextPositionKey
 import com.anitail.music.constants.PlayerBackgroundStyle
@@ -140,6 +141,7 @@ fun Lyrics(
     val lyricsTextPosition by rememberEnumPreference(LyricsTextPositionKey, LyricsPosition.CENTER)
     val changeLyrics by rememberPreference(LyricsClickKey, true)
     val scrollLyrics by rememberPreference(LyricsScrollKey, true)
+    val romanizeJapaneseLyrics by rememberPreference(LyricsRomanizeJapaneseKey, true)
     val scope = rememberCoroutineScope()
 
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
@@ -164,9 +166,11 @@ fun Lyrics(
             val parsedLines = parseLyrics(lyrics)
             parsedLines.map { entry ->
                 val newEntry = LyricsEntry(entry.time, entry.text)
-                if (isJapanese(entry.text)) {
-                    scope.launch {
-                        newEntry.romanizedTextFlow.value = romanizeJapanese(entry.text)
+                if (romanizeJapaneseLyrics) {
+                    if (isJapanese(entry.text)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeJapanese(entry.text)
+                        }
                     }
                 }
                 newEntry
@@ -176,9 +180,11 @@ fun Lyrics(
         } else {
             lyrics.lines().mapIndexed { index, line ->
                 val newEntry = LyricsEntry(index * 100L, line)
-                if (isJapanese(line)) {
-                    scope.launch {
-                        newEntry.romanizedTextFlow.value = romanizeJapanese(line)
+                if (romanizeJapaneseLyrics) {
+                    if (isJapanese(line)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeJapanese(line)
+                        }
                     }
                 }
                 newEntry
@@ -449,7 +455,8 @@ fun Lyrics(
                                     if (isSelected) {
                                         selectedIndices.remove(index)
                                         if (selectedIndices.isEmpty()) {
-                                            isSelectionModeActive = false // Exit mode if last item deselected
+                                            isSelectionModeActive =
+                                                false // Exit mode if last item deselected
                                         }
                                     } else {
                                         if (selectedIndices.size < maxSelectionLimit) {
@@ -488,7 +495,9 @@ fun Lyrics(
                             }
                         )
                         .background(
-                            if (isSelected && isSelectionModeActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                            if (isSelected && isSelectionModeActive) MaterialTheme.colorScheme.primary.copy(
+                                alpha = 0.3f
+                            )
                             else Color.Transparent
                         )
                         .padding(horizontal = 24.dp, vertical = 8.dp)
@@ -516,21 +525,23 @@ fun Lyrics(
                             },
                             fontWeight = FontWeight.Bold
                         )
-                        // Show japanese romanized text if available
-                        val romanizedText by item.romanizedTextFlow.collectAsState()
-                        romanizedText?.let { romanized ->
-                            Text(
-                                text = romanized,
-                                fontSize = 16.sp,
-                                color = textColor.copy(alpha = 0.8f),
-                                textAlign = when (lyricsTextPosition) {
-                                    LyricsPosition.LEFT -> TextAlign.Left
-                                    LyricsPosition.CENTER -> TextAlign.Center
-                                    LyricsPosition.RIGHT -> TextAlign.Right
-                                },
-                                fontWeight = FontWeight.Normal,
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
+                        if (romanizeJapaneseLyrics) {
+                            // Show japanese romanized text if available
+                            val romanizedText by item.romanizedTextFlow.collectAsState()
+                            romanizedText?.let { romanized ->
+                                Text(
+                                    text = romanized,
+                                    fontSize = 16.sp,
+                                    color = textColor.copy(alpha = 0.8f),
+                                    textAlign = when (lyricsTextPosition) {
+                                        LyricsPosition.LEFT -> TextAlign.Left
+                                        LyricsPosition.CENTER -> TextAlign.Center
+                                        LyricsPosition.RIGHT -> TextAlign.Right
+                                    },
+                                    fontWeight = FontWeight.Normal,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -677,11 +688,20 @@ fun Lyrics(
                                 val shareIntent = Intent().apply {
                                     action = Intent.ACTION_SEND
                                     type = "text/plain"
-                                    val songLink = "https://music.youtube.com/watch?v=${mediaMetadata?.id}"
+                                    val songLink =
+                                        "https://music.youtube.com/watch?v=${mediaMetadata?.id}"
                                     // Use the potentially multi-line lyricsText here
-                                    putExtra(Intent.EXTRA_TEXT, "\"$lyricsText\"\n\n$songTitle - $artists\n$songLink")
+                                    putExtra(
+                                        Intent.EXTRA_TEXT,
+                                        "\"$lyricsText\"\n\n$songTitle - $artists\n$songLink"
+                                    )
                                 }
-                                context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.share_lyrics)))
+                                context.startActivity(
+                                    Intent.createChooser(
+                                        shareIntent,
+                                        context.getString(R.string.share_lyrics)
+                                    )
+                                )
                                 showShareDialog = false
                             }
                             .padding(vertical = 12.dp),
@@ -862,7 +882,11 @@ fun Lyrics(
                                     .size(32.dp)
                                     .background(color, shape = RoundedCornerShape(8.dp))
                                     .clickable { previewBackgroundColor = color }
-                                    .border(2.dp, if (previewBackgroundColor == color) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(8.dp))
+                                    .border(
+                                        2.dp,
+                                        if (previewBackgroundColor == color) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        RoundedCornerShape(8.dp)
+                                    )
                             )
                         }
                     }
@@ -875,7 +899,11 @@ fun Lyrics(
                                     .size(32.dp)
                                     .background(color, shape = RoundedCornerShape(8.dp))
                                     .clickable { previewTextColor = color }
-                                    .border(2.dp, if (previewTextColor == color) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(8.dp))
+                                    .border(
+                                        2.dp,
+                                        if (previewTextColor == color) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        RoundedCornerShape(8.dp)
+                                    )
                             )
                         }
                     }
@@ -888,7 +916,11 @@ fun Lyrics(
                                     .size(32.dp)
                                     .background(color, shape = RoundedCornerShape(8.dp))
                                     .clickable { previewSecondaryTextColor = color }
-                                    .border(2.dp, if (previewSecondaryTextColor == color) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(8.dp))
+                                    .border(
+                                        2.dp,
+                                        if (previewSecondaryTextColor == color) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                        RoundedCornerShape(8.dp)
+                                    )
                             )
                         }
                     }

@@ -51,6 +51,7 @@ import com.anitail.music.constants.GridItemSize
 import com.anitail.music.constants.GridItemsSizeKey
 import com.anitail.music.constants.LibraryFilter
 import com.anitail.music.constants.LyricsClickKey
+import com.anitail.music.constants.LyricsRomanizeJapaneseKey
 import com.anitail.music.constants.LyricsScrollKey
 import com.anitail.music.constants.LyricsTextPositionKey
 import com.anitail.music.constants.PlayerBackgroundStyle
@@ -114,6 +115,10 @@ fun AppearanceSettings(
     )
     val (lyricsClick, onLyricsClickChange) = rememberPreference(LyricsClickKey, defaultValue = true)
     val (lyricsScroll, onLyricsScrollChange) = rememberPreference(LyricsScrollKey, defaultValue = true)
+    val (lyricsRomanizeJapanese, onLyricsRomanizeJapaneseChange) = rememberPreference(
+        LyricsRomanizeJapaneseKey,
+        defaultValue = true
+    )
     val (sliderStyle, onSliderStyleChange) = rememberEnumPreference(
         SliderStyleKey,
         defaultValue = SliderStyle.DEFAULT
@@ -154,7 +159,7 @@ fun AppearanceSettings(
         defaultValue = true
     )
 
-    val availableBackgroundStyles = PlayerBackgroundStyle.entries.filter {
+    PlayerBackgroundStyle.entries.filter {
         it != PlayerBackgroundStyle.BLUR || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     }
 
@@ -427,6 +432,13 @@ fun AppearanceSettings(
             icon = { Icon(painterResource(R.drawable.lyrics), null) },
             checked = lyricsScroll,
             onCheckedChange = onLyricsScrollChange,
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.lyrics_romanize_japanese)) },
+            icon = { Icon(painterResource(R.drawable.lyrics), null) },
+            checked = lyricsRomanizeJapanese,
+            onCheckedChange = onLyricsRomanizeJapaneseChange,
         )
 
         PreferenceGroupTitle(

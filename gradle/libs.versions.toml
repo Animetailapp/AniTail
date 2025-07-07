@@ -17,6 +17,7 @@ hilt = "2.56.2"
 ktor = "3.2.1"
 ksp = "2.2.0-2.0.2"
 okhttp = "5.0.0-alpha.14"
+newpipe = "dev-SNAPSHOT"
 workRuntimeKtx = "2.10.2"
 kuromojiIpadic = "0.9.0"
 
@@ -92,7 +93,9 @@ junit = { group = "junit", name = "junit", version = "4.13.2" }
 
 timber = { group = "com.jakewharton.timber", name = "timber", version = "5.0.1" }
 
-newpipe-extractor = { group = "com.github.libre-tube", name = "NewPipeExtractor", version = "bcb7705" }
+newpipe-extractor = { group = "com.github.libre-tube", name = "NewPipeExtractor", version.ref = "newpipe" }
+#newpipe-extractor = { group = "com.github.TeamNewPipe", name = "NewPipeExtractor", version = "v0.24.6" }
+
 kuromoji-ipadic = { group = "com.atilika.kuromoji", name = "kuromoji-ipadic", version.ref = "kuromojiIpadic" }
 work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
 
