@@ -1,6 +1,7 @@
 package com.anitail.music.ui.player
 
 import android.annotation.SuppressLint
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
@@ -11,6 +12,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -75,8 +77,10 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
@@ -243,12 +247,31 @@ fun Queue(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.bedtime),
-                        contentDescription = null,
-                        modifier = Modifier.size(iconSize),
-                        tint = TextBackgroundColor
-                    )
+                    AnimatedContent(
+                        label = "sleepTimer",
+                        targetState = sleepTimerEnabled,
+                    ) { enabled ->
+                        if (enabled) {
+                            Text(
+                                text = makeTimeString(sleepTimerTimeLeft),
+                                color = TextBackgroundColor,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .basicMarquee()
+                            )
+                        } else {
+                            Icon(
+                                painter = painterResource(id = R.drawable.bedtime),
+                                contentDescription = null,
+                                modifier = Modifier.size(iconSize),
+                                tint = TextBackgroundColor
+                            )
+                        }
+                    }
                 }
 
                 Box(
@@ -264,7 +287,9 @@ fun Queue(
                     Icon(
                         painter = painterResource(id = R.drawable.lyrics),
                         contentDescription = null,
-                        modifier = Modifier.size(iconSize),
+                        modifier = Modifier
+                            .size(iconSize)
+                            .alpha(if (showLyrics) 1f else 0.5f),
                         tint = TextBackgroundColor
                     )
                 }
