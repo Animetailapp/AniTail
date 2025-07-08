@@ -598,19 +598,25 @@ fun BottomSheetPlayer(
                                 .clip(shareShape)
                                 .background(textButtonColor)
                                 .clickable {
-                                    val intent = Intent().apply {
-                                        action = Intent.ACTION_SEND
-                                        type = "text/plain"
-                                        putExtra(
-                                            Intent.EXTRA_TEXT,
-                                            "https://music.youtube.com/watch?v=${mediaMetadata.id}"
+                                    menuState.show {
+                                        PlayerMenu(
+                                            mediaMetadata = mediaMetadata,
+                                            navController = navController,
+                                            playerBottomSheetState = state,
+                                            onShowDetailsDialog = {
+                                                mediaMetadata.id.let {
+                                                    bottomSheetPageState.show {
+                                                        ShowMediaInfo(it)
+                                                    }
+                                                }
+                                            },
+                                            onDismiss = menuState::dismiss,
                                         )
                                     }
-                                    context.startActivity(Intent.createChooser(intent, null))
                                 }
                         ) {
                             Image(
-                                painter = painterResource(R.drawable.share),
+                                painter = painterResource(R.drawable.more_vert),
                                 contentDescription = null,
                                 colorFilter = ColorFilter.tint(iconButtonColor),
                                 modifier = Modifier
@@ -1101,16 +1107,97 @@ fun BottomSheetPlayer(
                             .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal))
                             .padding(bottom = queueSheetState.collapsedBound + 48.dp),
                 ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
+                    Column(
                         modifier = Modifier.weight(1f),
                     ) {
-                        val screenWidth = LocalConfiguration.current.screenWidthDp
-                        val thumbnailSize = (screenWidth * 0.4).dp
-                        Thumbnail(
-                            sliderPositionProvider = { sliderPosition },
-                            modifier = Modifier.size(thumbnailSize)
-                        )
+                        // Now Playing Header for Landscape
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = PlayerHorizontalPadding)
+                                .padding(top = 36.dp, bottom = 12.dp)
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.now_playing),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = TextBackgroundColor.copy(alpha = 0.8f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+
+                                Spacer(Modifier.height(3.dp))
+
+                                // Show queue name dynamically based on current playing context
+                                val queueTitle = when {
+                                    mediaMetadata?.album != null -> mediaMetadata!!.album!!.title
+                                    automix.isNotEmpty() -> "Automix"
+                                    currentSong?.song?.title != null -> stringResource(R.string.queue_all_songs)
+                                    else -> "Unknown"
+                                }
+                                Text(
+                                    text = queueTitle,
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextBackgroundColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.basicMarquee()
+                                )
+                            }
+
+                            if (useNewPlayerDesign) {
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(RoundedCornerShape(19.dp))
+                                        .background(textButtonColor.copy(alpha = 0.8f))
+                                        .clickable {
+                                            val intent = Intent().apply {
+                                                action = Intent.ACTION_SEND
+                                                type = "text/plain"
+                                                putExtra(
+                                                    Intent.EXTRA_TEXT,
+                                                    "https://music.youtube.com/watch?v=${mediaMetadata?.id}"
+                                                )
+                                            }
+                                            context.startActivity(
+                                                Intent.createChooser(
+                                                    intent,
+                                                    null
+                                                )
+                                            )
+                                        }
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.share),
+                                        contentDescription = "Share",
+                                        tint = iconButtonColor,
+                                        modifier = Modifier
+                                            .align(Alignment.Center)
+                                            .size(21.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            val screenWidth = LocalConfiguration.current.screenWidthDp
+                            val thumbnailSize = (screenWidth * 0.4).dp
+                            Thumbnail(
+                                sliderPositionProvider = { sliderPosition },
+                                modifier = Modifier.size(thumbnailSize)
+                            )
+                        }
                     }
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1138,6 +1225,77 @@ fun BottomSheetPlayer(
                             .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal))
                             .padding(bottom = queueSheetState.collapsedBound),
                 ) {
+                    // Now Playing Header
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = PlayerHorizontalPadding)
+                            .padding(top = 40.dp, bottom = 16.dp)
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.now_playing),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = TextBackgroundColor.copy(alpha = 0.8f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+
+                            Spacer(Modifier.height(4.dp))
+
+                            // Show queue name dynamically based on current playing context
+                            val queueTitle = when {
+                                mediaMetadata?.album != null -> mediaMetadata!!.album!!.title
+                                automix.isNotEmpty() -> "Automix"
+                                currentSong?.song?.title != null -> stringResource(R.string.queue_all_songs)
+                                else -> "Unknown"
+                            }
+                            Text(
+                                text = queueTitle,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = TextBackgroundColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.basicMarquee()
+                            )
+                        }
+                        if (useNewPlayerDesign) {
+                            // Share button on the right
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(textButtonColor.copy(alpha = 0.8f))
+                                    .clickable {
+                                        val intent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                            type = "text/plain"
+                                            putExtra(
+                                                Intent.EXTRA_TEXT,
+                                                "https://music.youtube.com/watch?v=${mediaMetadata?.id}"
+                                            )
+                                        }
+                                        context.startActivity(Intent.createChooser(intent, null))
+                                    }
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.share),
+                                    contentDescription = "Share",
+                                    tint = iconButtonColor,
+                                    modifier = Modifier
+                                        .align(Alignment.Center)
+                                        .size(22.dp)
+                                )
+                            }
+                        }
+                    }
+                    
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier.weight(1f),
