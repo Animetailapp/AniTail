@@ -67,6 +67,7 @@ import com.anitail.music.constants.SliderStyleKey
 import com.anitail.music.constants.SlimNavBarKey
 import com.anitail.music.constants.SwipeThumbnailKey
 import com.anitail.music.constants.SwipeToSongKey
+import com.anitail.music.constants.UseNewPlayerDesignKey
 import com.anitail.music.ui.component.DefaultDialog
 import com.anitail.music.ui.component.EnumListPreference
 import com.anitail.music.ui.component.IconButton
@@ -93,6 +94,10 @@ fun AppearanceSettings(
     val (darkMode, onDarkModeChange) = rememberEnumPreference(
         DarkModeKey,
         defaultValue = DarkMode.AUTO
+    )
+    val (useNewPlayerDesign, onUseNewPlayerDesignChange) = rememberPreference(
+        UseNewPlayerDesignKey,
+        defaultValue = true
     )
     val (playerBackground, onPlayerBackgroundChange) =
         rememberEnumPreference(
@@ -154,7 +159,7 @@ fun AppearanceSettings(
         defaultValue = true
     )
 
-    val availableBackgroundStyles = PlayerBackgroundStyle.entries.filter {
+    PlayerBackgroundStyle.entries.filter {
         it != PlayerBackgroundStyle.BLUR || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     }
 
@@ -353,6 +358,13 @@ fun AppearanceSettings(
             title = stringResource(R.string.player),
         )
 
+        SwitchPreference(
+            title = { Text(stringResource(R.string.new_player_design)) },
+            icon = { Icon(painterResource(R.drawable.palette), null) },
+            checked = useNewPlayerDesign,
+            onCheckedChange = onUseNewPlayerDesignChange,
+        )
+
         EnumListPreference(
             title = { Text(stringResource(R.string.player_background_style)) },
             icon = { Icon(painterResource(R.drawable.gradient), null) },
@@ -383,11 +395,11 @@ fun AppearanceSettings(
         PreferenceEntry(
             title = { Text(stringResource(R.string.player_slider_style)) },
             description =
-            when (sliderStyle) {
-                SliderStyle.DEFAULT -> stringResource(R.string.default_)
-                SliderStyle.SQUIGGLY -> stringResource(R.string.squiggly)
-                SliderStyle.SLIM -> stringResource(R.string.slim)
-            },
+                when (sliderStyle) {
+                    SliderStyle.DEFAULT -> stringResource(R.string.default_)
+                    SliderStyle.SQUIGGLY -> stringResource(R.string.squiggly)
+                    SliderStyle.SLIM -> stringResource(R.string.slim)
+                },
             icon = { Icon(painterResource(R.drawable.sliders), null) },
             onClick = {
                 showSliderOptionDialog = true
@@ -468,11 +480,11 @@ fun AppearanceSettings(
         )
 
         SwitchPreference(
-             title = { Text(stringResource(R.string.swipe_song_to_add)) },
-             icon = { Icon(painterResource(R.drawable.swipe), null) },
-             checked = swipeToSong,
-             onCheckedChange = onSwipeToSongChange
-         )
+            title = { Text(stringResource(R.string.swipe_song_to_add)) },
+            icon = { Icon(painterResource(R.drawable.swipe), null) },
+            checked = swipeToSong,
+            onCheckedChange = onSwipeToSongChange
+        )
 
         SwitchPreference(
             title = { Text(stringResource(R.string.slim_navbar)) },

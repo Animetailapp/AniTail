@@ -662,7 +662,6 @@
     <string name="image_url_hint">Enter the URL of an image (JPG, PNG, etc.). Make sure the URL starts with http:// or https://</string>
     <string name="set_background_image">Set background image</string>
     <string name="remove_background_image">Remove background image</string>
-
     <!-- Last.fm -->
     <string name="lastfm_settings">Last.fm</string>
     <string name="login_to_lastfm">Login to Last.fm</string>
@@ -705,4 +704,8 @@
     <string name="retry_pending_scrobbles">Retry pending scrobbles</string>
     <string name="clear_pending_scrobbles">Clear pending scrobbles</string>
     <string name="scrobble_queue_management">Scrobble Queue</string>
+   <string name="lyrics_romanize_japanese">Romanize Japanese Lyrics</string>
+    <string name="lyrics_romanize_korean">Romanize Korean Lyrics</string>
+    <string name="lyrics_romanize_chinese">Romanize Chinese Lyrics</string>
+    <string name="new_player_design">New player design</string>
 </resources>
