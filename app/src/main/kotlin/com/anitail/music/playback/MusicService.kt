@@ -116,6 +116,7 @@ import com.anitail.music.utils.LanJamCommands
 import com.anitail.music.utils.LanJamQueueSync
 import com.anitail.music.utils.LanJamServer
 import com.anitail.music.utils.LastFmService
+import com.anitail.music.utils.NetworkConnectivity
 import com.anitail.music.utils.SyncUtils
 import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.utils.dataStore
@@ -180,6 +181,9 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   private val binder = MusicBinder()
 
   private lateinit var connectivityManager: ConnectivityManager
+    lateinit var connectivityObserver: NetworkConnectivity
+    val waitingForNetworkConnection = MutableStateFlow(false)
+    private val isNetworkConnected = MutableStateFlow(false)
   private val songUrlCache = HashMap<String, Pair<String, Long>>()
 
   private val audioQuality by
@@ -224,8 +228,9 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   private var discordRpc: DiscordRPC? = null
 
   val automixItems = MutableStateFlow<List<MediaItem>>(emptyList())
+    private var consecutivePlaybackErr = 0
 
-  override fun onCreate() {
+    override fun onCreate() {
     super.onCreate()
     instance = this
     setMediaNotificationProvider(
@@ -280,6 +285,19 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     val sessionToken = SessionToken(this, ComponentName(this, MusicService::class.java))
     val controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
     controllerFuture.addListener({ controllerFuture.get() }, MoreExecutors.directExecutor())
+
+        connectivityObserver = NetworkConnectivity(this)
+
+        scope.launch {
+            connectivityObserver.networkStatus.collect { isConnected ->
+                isNetworkConnected.value = isConnected
+                if (isConnected && waitingForNetworkConnection.value) {
+                    waitingForNetworkConnection.value = false
+                    player.prepare()
+                    player.play()
+                }
+            }
+        }
 
     combine(playerVolume, normalizeFactor) { playerVolume, normalizeFactor ->
           playerVolume * normalizeFactor
@@ -451,7 +469,37 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     startPeriodicScrobbleCheck()
   }
 
-  /**
+    private fun waitOnNetworkError() {
+        waitingForNetworkConnection.value = true
+    }
+
+    private fun skipOnError() {
+        /**
+         * Auto skip to the next media item on error.
+         *
+         * To prevent a "runaway diesel engine" scenario, force the user to take action after
+         * too many errors come up too quickly. Pause to show player "stopped" state
+         */
+        consecutivePlaybackErr += 2
+        val nextWindowIndex = player.nextMediaItemIndex
+
+        if (consecutivePlaybackErr <= MAX_CONSECUTIVE_ERR && nextWindowIndex != C.INDEX_UNSET) {
+            player.seekTo(nextWindowIndex, C.TIME_UNSET)
+            player.prepare()
+            player.play()
+            return
+        }
+
+        player.pause()
+        consecutivePlaybackErr = 0
+    }
+
+    private fun stopOnError() {
+        player.pause()
+    }
+
+
+    /**
    * Actualiza la configuración de LAN JAM y gestiona los ciclos de vida de servidor/cliente Llamar
    * desde MainActivity o donde se observe el JamViewModel
    *
@@ -1412,13 +1460,18 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   }
 
   override fun onPlayerError(error: PlaybackException) {
-    if (dataStore.get(AutoSkipNextOnErrorKey, false) &&
-        isInternetAvailable(this) &&
-        player.hasNextMediaItem()) {
-      player.seekToNext()
-      player.prepare()
-      player.playWhenReady = true
+      val isConnectionError = (error.cause?.cause is PlaybackException) &&
+              (error.cause?.cause as PlaybackException).errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
+
+      if (!isNetworkConnected.value || isConnectionError) {
+          waitOnNetworkError()
+          return
     }
+      if (dataStore.get(AutoSkipNextOnErrorKey, false)) {
+          skipOnError()
+      } else {
+          stopOnError()
+      }
   }
 
   private fun createCacheDataSource(): CacheDataSource.Factory =
@@ -1681,8 +1734,10 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     const val CHUNK_LENGTH = 512 * 1024L
     const val PERSISTENT_QUEUE_FILE = "persistent_queue.data"
     const val PERSISTENT_AUTOMIX_FILE = "persistent_automix.data"
+      const val MAX_CONSECUTIVE_ERR = 5
 
-    // Constants for lyrics download action
+
+      // Constants for lyrics download action
     const val ACTION_DOWNLOAD_LYRICS = "com.anitail.music.action.DOWNLOAD_LYRICS"
     const val EXTRA_SONG_ID = "com.anitail.music.extra.SONG_ID"
     // Static instance to access the service from callbacks
