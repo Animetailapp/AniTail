@@ -239,6 +239,7 @@
     <string name="undo">Deshacer</string>
 
     <!-- Reproductor -->
+    <string name="now_playing">Reproduciendo ahora</string>
     <string name="lyrics_not_found">Letra no encontrada</string>
     <string name="sleep_timer">Temporizador</string>
     <string name="end_of_song">Fin de la canción</string>
