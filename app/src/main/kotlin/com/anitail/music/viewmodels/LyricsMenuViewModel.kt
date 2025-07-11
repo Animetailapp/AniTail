@@ -7,10 +7,13 @@ import com.anitail.music.db.entities.LyricsEntity
 import com.anitail.music.lyrics.LyricsHelper
 import com.anitail.music.lyrics.LyricsResult
 import com.anitail.music.models.MediaMetadata
+import com.anitail.music.utils.NetworkConnectivity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -22,10 +25,22 @@ class LyricsMenuViewModel
 constructor(
     private val lyricsHelper: LyricsHelper,
     val database: MusicDatabase,
+    private val networkConnectivity: NetworkConnectivity,
 ) : ViewModel() {
     private var job: Job? = null
     val results = MutableStateFlow(emptyList<LyricsResult>())
     val isLoading = MutableStateFlow(false)
+
+    private val _isNetworkAvailable = MutableStateFlow(false)
+    val isNetworkAvailable: StateFlow<Boolean> = _isNetworkAvailable.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            networkConnectivity.networkStatus.collect { isConnected ->
+                _isNetworkAvailable.value = isConnected
+            }
+        }
+    }
 
     fun search(
         mediaId: String,

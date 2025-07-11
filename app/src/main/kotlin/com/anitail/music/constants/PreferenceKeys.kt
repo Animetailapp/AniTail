@@ -333,6 +333,7 @@ val RepeatModeKey = intPreferencesKey("repeatMode")
 
 val SearchSourceKey = stringPreferencesKey("searchSource")
 val SwipeThumbnailKey = booleanPreferencesKey("swipeThumbnail")
+val SwipeSensitivityKey = floatPreferencesKey("swipeSensitivity")
 
 enum class SearchSource {
     LOCAL,

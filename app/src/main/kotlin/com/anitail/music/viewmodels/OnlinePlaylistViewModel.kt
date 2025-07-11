@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.PlaylistItem
 import com.anitail.innertube.models.SongItem
-import com.anitail.innertube.utils.completed
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.utils.reportException
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,15 +28,35 @@ class OnlinePlaylistViewModel @Inject constructor(
     val dbPlaylist = database.playlistByBrowseId(playlistId)
         .stateIn(viewModelScope, SharingStarted.Lazily, null)
 
+    var continuation: String? = null
+        private set
+
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            YouTube.playlist(playlistId).completed()
+            YouTube.playlist(playlistId)
                 .onSuccess { playlistPage ->
                     playlist.value = playlistPage.playlist
-                    playlistSongs.value = playlistPage.songs
+                    playlistSongs.value = playlistPage.songs.distinctBy { it.id }
+                    continuation = playlistPage.songsContinuation
                 }.onFailure {
                     reportException(it)
                 }
+        }
+    }
+
+    fun loadMoreSongs() {
+        continuation?.let {
+            viewModelScope.launch(Dispatchers.IO) {
+                YouTube.playlistContinuation(it)
+                    .onSuccess { playlistContinuationPage ->
+                        val currentSongs = playlistSongs.value.toMutableList()
+                        currentSongs.addAll(playlistContinuationPage.songs)
+                        playlistSongs.value = currentSongs.distinctBy { it.id }
+                        continuation = playlistContinuationPage.continuation
+                    }.onFailure {
+                        reportException(it)
+                    }
+            }
         }
     }
 }
