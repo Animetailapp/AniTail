@@ -712,4 +712,5 @@
     <string name="swipe_sensitivity">Swipe sensitivity</string>
     <string name="swipe_sensitivity_desc">Adjust how sensitive swipe gestures are for changing songs</string>
     <string name="subscribed">Subscribed</string>
+    <string name="subscribe">Subscribe</string>
 </resources>

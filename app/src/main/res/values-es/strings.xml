@@ -690,4 +690,5 @@
     <string name="swipe_sensitivity">Sensibilidad de deslizamiento</string>
     <string name="swipe_sensitivity_desc">Ajusta la sensibilidad de los gestos de deslizamiento para cambiar de canción</string>
     <string name="subscribed">Suscrito</string>
+    <string name="subscribe">Suscribirse</string>
 </resources>
