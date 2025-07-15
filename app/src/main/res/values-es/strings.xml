@@ -687,6 +687,8 @@
     <string name="lyrics_romanize_japanese">Romanizar letras japonesas</string>
     <string name="lyrics_romanize_korean">Romanizar letras coreanas</string>
     <string name="new_player_design">Nuevo diseño del reproductor</string>
-
-
+    <string name="swipe_sensitivity">Sensibilidad de deslizamiento</string>
+    <string name="swipe_sensitivity_desc">Ajusta la sensibilidad de los gestos de deslizamiento para cambiar de canción</string>
+    <string name="subscribed">Suscrito</string>
+    <string name="subscribe">Suscribirse</string>
 </resources>
