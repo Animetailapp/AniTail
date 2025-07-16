@@ -1,5 +1,6 @@
 package com.anitail.music.ui.screens.playlist
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,10 +34,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,7 +66,6 @@ import com.anitail.music.constants.SongSortDescendingKey
 import com.anitail.music.constants.SongSortType
 import com.anitail.music.constants.SongSortTypeKey
 import com.anitail.music.constants.ThumbnailCornerRadius
-import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.extensions.togglePlayPause
 import com.anitail.music.playback.queues.ListQueue
@@ -90,7 +90,7 @@ fun CachePlaylistScreen(
     scrollBehavior: TopAppBarScrollBehavior,
     viewModel: CachePlaylistViewModel = hiltViewModel(),
 ) {
-    val context = LocalContext.current
+    LocalContext.current
     val menuState = LocalMenuState.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val haptic = LocalHapticFeedback.current
@@ -107,19 +107,21 @@ fun CachePlaylistScreen(
     val (sortDescending, onSortDescendingChange) = rememberPreference(SongSortDescendingKey, true)
 
     val wrappedSongs = remember(cachedSongs, sortType, sortDescending) {
-        mutableStateListOf<ItemWrapper<Song>>().apply {
-            val sortedSongs = when (sortType) {
-                SongSortType.CREATE_DATE -> cachedSongs.sortedBy { it.song.dateDownload ?: LocalDateTime.MIN }
-                SongSortType.NAME -> cachedSongs.sortedBy { it.song.title }
-                SongSortType.ARTIST -> cachedSongs.sortedBy { song ->
-                    song.song.artistName ?: song.artists.joinToString(separator = "") { it.name }
-                }
-                SongSortType.PLAY_TIME -> cachedSongs.sortedBy { it.song.totalPlayTime }
-            }.let { if (sortDescending) it.reversed() else it }
+        val sortedSongs = when (sortType) {
+            SongSortType.CREATE_DATE -> cachedSongs.sortedBy {
+                it.song.dateDownload ?: LocalDateTime.MIN
+            }
 
-            addAll(sortedSongs.map { song -> ItemWrapper(song) })
-        }
-    }
+            SongSortType.NAME -> cachedSongs.sortedBy { it.song.title }
+            SongSortType.ARTIST -> cachedSongs.sortedBy { song ->
+                song.song.artistName ?: song.artists.joinToString(separator = "") { it.name }
+            }
+
+            SongSortType.PLAY_TIME -> cachedSongs.sortedBy { it.song.totalPlayTime }
+        }.let { if (sortDescending) it.reversed() else it }
+
+        sortedSongs.map { song -> ItemWrapper(song) }
+    }.toMutableStateList()
 
     var selection by remember { mutableStateOf(false) }
     var isSearching by remember { mutableStateOf(false) }
@@ -130,6 +132,17 @@ fun CachePlaylistScreen(
     LaunchedEffect(isSearching) {
         if (isSearching) {
             focusRequester.requestFocus()
+        }
+    }
+
+    if (isSearching) {
+        BackHandler {
+            isSearching = false
+            query = TextFieldValue()
+        }
+    } else if (selection) {
+        BackHandler {
+            selection = false
         }
     }
 
@@ -149,15 +162,24 @@ fun CachePlaylistScreen(
             state = lazyListState,
             contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
         ) {
-            if (filteredSongs.isEmpty()) {
+            if (filteredSongs.isEmpty() && !isSearching) {
                 item {
                     EmptyPlaceholder(
                         icon = R.drawable.music_note,
                         text = stringResource(R.string.playlist_is_empty)
                     )
                 }
+            }
+
+            if (filteredSongs.isEmpty() && isSearching) {
+                item {
+                    EmptyPlaceholder(
+                        icon = R.drawable.search,
+                        text = stringResource(R.string.no_results_found)
+                    )
+                }
             } else {
-                if (!isSearching) {
+                if (filteredSongs.isNotEmpty() && !isSearching) {
                     item {
                         Column(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -247,7 +269,9 @@ fun CachePlaylistScreen(
                             }
                         }
                     }
+                }
 
+                if (filteredSongs.isNotEmpty()) {
                     item {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -307,8 +331,8 @@ fun CachePlaylistScreen(
                                             playerConnection.playQueue(
                                                 ListQueue(
                                                     title = "Cache Songs",
-                                                    items = filteredSongs.map { it.item.toMediaItem() },
-                                                    startIndex = index
+                                                    items = cachedSongs.map { it.toMediaItem() },
+                                                    startIndex = cachedSongs.indexOfFirst { it.id == songWrapper.item.id }
                                                 )
                                             )
                                         }
