@@ -168,6 +168,15 @@
     <string name="search_lyrics">Buscar letra</string>
     <string name="lyrics">Letra</string>
     <string name="lyrics_auto_scroll">Desplazamiento automático de la letra</string>
+    <string name="lyrics_font_size">Tamaño de la fuente de la letra</string>
+    <string name="lyrics_custom_font">Estilo de la fuente de la letra</string>
+    <string name="use_system_font">Usar fuente del sistema</string>
+    <string name="load_custom_font">Cargar fuente personalizada</string>
+    <string name="smooth_lyrics_animation">Animación suave de la letra</string>
+    <string name="font_size_preview">Texto de la letra de muestra para vista previa</string>
+    <string name="select_font_file">Seleccionar archivo de fuente (.ttf/.otf)</string>
+    <string name="font_loading_error">Error al cargar el archivo de fuente</string>
+    <string name="font_loaded_successfully">Fuente cargada correctamente</string>
 
     <string name="edit_song">Editar canción</string>
     <string name="song_title">Título de la canción</string>

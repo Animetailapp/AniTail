@@ -6,6 +6,12 @@ import android.content.res.Configuration
 import android.os.Build
 import android.widget.Toast
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.core.EaseInOutCubic
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -66,6 +72,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -76,6 +83,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -93,9 +101,12 @@ import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.constants.DarkModeKey
 import com.anitail.music.constants.LyricsClickKey
+import com.anitail.music.constants.LyricsCustomFontPathKey
+import com.anitail.music.constants.LyricsFontSizeKey
 import com.anitail.music.constants.LyricsRomanizeJapaneseKey
 import com.anitail.music.constants.LyricsRomanizeKoreanKey
 import com.anitail.music.constants.LyricsScrollKey
+import com.anitail.music.constants.LyricsSmoothScrollKey
 import com.anitail.music.constants.LyricsTextPositionKey
 import com.anitail.music.constants.PlayerBackgroundStyle
 import com.anitail.music.constants.PlayerBackgroundStyleKey
@@ -115,6 +126,7 @@ import com.anitail.music.ui.screens.settings.DarkMode
 import com.anitail.music.ui.screens.settings.LyricsPosition
 import com.anitail.music.ui.utils.fadingEdge
 import com.anitail.music.utils.ComposeToImage
+import com.anitail.music.utils.FontUtils
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
@@ -147,11 +159,22 @@ fun Lyrics(
     val scrollLyrics by rememberPreference(LyricsScrollKey, true)
     val romanizeJapaneseLyrics by rememberPreference(LyricsRomanizeJapaneseKey, true)
     val romanizeKoreanLyrics by rememberPreference(LyricsRomanizeKoreanKey, true)
+    val lyricsFontSize by rememberPreference(LyricsFontSizeKey, 20f)
+    val lyricsCustomFontPath by rememberPreference(LyricsCustomFontPathKey, "")
+    val smoothScroll by rememberPreference(LyricsSmoothScrollKey, true)
     val scope = rememberCoroutineScope()
-
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
     val lyricsEntity by playerConnection.currentLyrics.collectAsState(initial = null)
     val lyrics = remember(lyricsEntity) { lyricsEntity?.lyrics?.trim() }
+
+    // Custom font handling
+    val customFont = remember(lyricsCustomFontPath) {
+        if (lyricsCustomFontPath.isNotEmpty()) {
+            FontUtils.loadCustomFont(lyricsCustomFontPath)
+        } else {
+            null
+        }
+    }
 
     val playerBackground by rememberEnumPreference(
         key = PlayerBackgroundStyleKey,
@@ -383,9 +406,34 @@ fun Lyrics(
 
                     if (currentLineOffset in centerRangeStart..centerRangeEnd ||
                         previousLineOffset in centerRangeStart..centerRangeEnd) {
-                        lazyListState.animateScrollToItem(
-                            currentLineIndex,
-                            with(density) { 36.dp.toPx().toInt() } + calculateOffset())
+
+                        val scrollOffset =
+                            with(density) { 36.dp.toPx().toInt() } + calculateOffset()
+
+                        if (smoothScroll) {
+                            // Apple Music style smooth animation - refined and fluid
+                            scope.launch {
+                                // Pre-animación: preparar el highlight de la línea siguiente
+                                delay(100)
+
+                                // Animación principal más fluida con easing personalizado
+                                lazyListState.animateScrollToItem(
+                                    index = currentLineIndex,
+                                    scrollOffset = scrollOffset
+                                )
+
+                                // Post-animación: estabilizar el highlight
+                                delay(150)
+                            }
+                        } else {
+                            // Animación rápida pero aún suave
+                            scope.launch {
+                                lazyListState.animateScrollToItem(
+                                    index = currentLineIndex,
+                                    scrollOffset = scrollOffset
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -520,44 +568,126 @@ fun Lyrics(
                             else Color.Transparent
                         )
                         .padding(horizontal = 24.dp, vertical = 8.dp)
-                        .alpha(
-                            if (!isSynced || index == displayedCurrentLineIndex || (isSelectionModeActive && isSelected)) 1f
-                            else 0.5f
-                        )
+
+                    // Animaciones fluidas para la línea actual
+                    val isCurrentLine = index == displayedCurrentLineIndex
+                    val isNearCurrentLine = kotlin.math.abs(index - displayedCurrentLineIndex) <= 1
+
+                    // Efecto de pulse cuando se activa una nueva línea (solo en modo smooth)
+                    var showPulse by remember(index) { mutableStateOf(false) }
+
+                    LaunchedEffect(isCurrentLine) {
+                        if (isCurrentLine && smoothScroll && isSynced) {
+                            showPulse = true
+                            delay(300) // Duración del pulso
+                            showPulse = false
+                        }
+                    }
+
+                    val pulseScale by animateFloatAsState(
+                        targetValue = if (showPulse) 1.08f else 1f,
+                        animationSpec = tween(durationMillis = 300, easing = EaseInOutCubic),
+                        label = "pulse_animation_$index"
+                    )
+
+                    // Animación de opacidad más suave
+                    val targetAlpha = when {
+                        !isSynced || isCurrentLine || (isSelectionModeActive && isSelected) -> 1f
+                        isNearCurrentLine -> 0.7f
+                        else -> 0.4f
+                    }
+                    val animatedAlpha by animateFloatAsState(
+                        targetValue = targetAlpha,
+                        animationSpec = if (smoothScroll) {
+                            tween(durationMillis = 800, easing = EaseInOutCubic)
+                        } else {
+                            tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                        },
+                        label = "alpha_animation_$index"
+                    )
+
+                    // Animación de escala para destacar la línea actual
+                    val targetScale = if (isCurrentLine && isSynced) 1.05f else 1f
+                    val animatedScale by animateFloatAsState(
+                        targetValue = targetScale,
+                        animationSpec = if (smoothScroll) {
+                            spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessLow
+                            )
+                        } else {
+                            tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                        },
+                        label = "scale_animation_$index"
+                    )
 
                     Column(
-                        modifier = itemModifier,
+                        modifier = itemModifier
+                            .graphicsLayer {
+                                alpha = animatedAlpha
+                                // Combinar escala normal con efecto de pulse
+                                val finalScale = animatedScale * pulseScale
+                                scaleX = finalScale
+                                scaleY = finalScale
+
+                                // Efecto de profundidad sutil para la línea actual
+                                if (isCurrentLine && smoothScroll) {
+                                    shadowElevation = 4f
+                                    // Ligero brillo adicional durante el pulse
+                                    if (showPulse) {
+                                        shadowElevation = 8f
+                                    }
+                                }
+                            },
                         horizontalAlignment = when (lyricsTextPosition) {
                             LyricsPosition.LEFT -> Alignment.Start
                             LyricsPosition.CENTER -> Alignment.CenterHorizontally
                             LyricsPosition.RIGHT -> Alignment.End
                         }
                     ) {
+                        // Color dinámico para la línea actual
+                        val textColorAnimated = if (isCurrentLine && isSynced) {
+                            if (smoothScroll) {
+                                // Color más vibrante para la línea actual en modo smooth
+                                textColor.copy(alpha = 1f)
+                            } else {
+                                textColor
+                            }
+                        } else {
+                            textColor
+                        }
+                        
                         Text(
                             text = item.text,
-                            fontSize = 20.sp,
-                            color = textColor,
+                            fontSize = lyricsFontSize.sp,
+                            color = textColorAnimated,
                             textAlign = when (lyricsTextPosition) {
                                 LyricsPosition.LEFT -> TextAlign.Left
                                 LyricsPosition.CENTER -> TextAlign.Center
                                 LyricsPosition.RIGHT -> TextAlign.Right
                             },
-                            fontWeight = FontWeight.Bold
+                            fontWeight = if (isCurrentLine && isSynced) FontWeight.ExtraBold else FontWeight.Bold,
+                            fontFamily = customFont ?: FontFamily.Default
                         )
                         if (romanizeJapaneseLyrics || romanizeKoreanLyrics) {
-                            // Show romanized text if available
+                            // Show romanized text if available with matching animations
                             val romanizedText by item.romanizedTextFlow.collectAsState()
                             romanizedText?.let { romanized ->
                                 Text(
                                     text = romanized,
-                                    fontSize = 16.sp,
-                                    color = textColor.copy(alpha = 0.8f),
+                                    fontSize = (lyricsFontSize * 0.8f).sp,
+                                    color = if (isCurrentLine && isSynced) {
+                                        textColor.copy(alpha = if (smoothScroll) 0.9f else 0.8f)
+                                    } else {
+                                        textColor.copy(alpha = 0.6f)
+                                    },
                                     textAlign = when (lyricsTextPosition) {
                                         LyricsPosition.LEFT -> TextAlign.Left
                                         LyricsPosition.CENTER -> TextAlign.Center
                                         LyricsPosition.RIGHT -> TextAlign.Right
                                     },
-                                    fontWeight = FontWeight.Normal,
+                                    fontWeight = if (isCurrentLine && isSynced) FontWeight.Medium else FontWeight.Normal,
+                                    fontFamily = customFont ?: FontFamily.Default,
                                     modifier = Modifier.padding(top = 2.dp)
                                 )
                             }
@@ -570,7 +700,7 @@ fun Lyrics(
         if (lyrics == LYRICS_NOT_FOUND) {
             Text(
                 text = stringResource(R.string.lyrics_not_found),
-                fontSize = 20.sp,
+                fontSize = lyricsFontSize.sp,
                 color = MaterialTheme.colorScheme.secondary,
                 textAlign = when (lyricsTextPosition) {
                     LyricsPosition.LEFT -> TextAlign.Left
@@ -578,6 +708,7 @@ fun Lyrics(
                     LyricsPosition.RIGHT -> TextAlign.Right
                 },
                 fontWeight = FontWeight.Bold,
+                fontFamily = customFont ?: FontFamily.Default,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp, vertical = 8.dp)
