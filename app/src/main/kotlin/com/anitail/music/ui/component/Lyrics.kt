@@ -630,14 +630,7 @@ fun Lyrics(
                                 scaleX = finalScale
                                 scaleY = finalScale
 
-                                // Efecto de profundidad sutil para la línea actual
-                                if (isCurrentLine && smoothScroll) {
-                                    shadowElevation = 4f
-                                    // Ligero brillo adicional durante el pulse
-                                    if (showPulse) {
-                                        shadowElevation = 8f
-                                    }
-                                }
+
                             },
                         horizontalAlignment = when (lyricsTextPosition) {
                             LyricsPosition.LEFT -> Alignment.Start
