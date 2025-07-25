@@ -65,12 +65,39 @@ data class HomePage(
                         SongItem(
                             id = renderer.navigationEndpoint.watchEndpoint?.videoId ?: return null,
                             title = renderer.title.runs?.firstOrNull()?.text ?: return null,
-                            artists = listOfNotNull(renderer.subtitle?.runs?.firstOrNull()?.let {
-                                Artist(
-                                    name = it.text,
-                                    id = it.navigationEndpoint?.browseEndpoint?.browseId
-                                )
-                            }),
+                            artists = renderer.subtitle?.runs?.let { runs ->
+                                // First approach: look for elements with navigationEndpoint
+                                val artistsWithEndpoint = runs.mapNotNull { run ->
+                                    run.navigationEndpoint?.browseEndpoint?.browseId?.let { browseId ->
+                                        if (browseId.startsWith("UC") || browseId.startsWith("MPLA")) {
+                                            Artist(name = run.text, id = browseId)
+                                        } else null
+                                    }
+                                }
+
+                                artistsWithEndpoint.ifEmpty {
+                                    // Fallback: use oddElements approach
+                                    runs.oddElements().mapNotNull { run ->
+                                        when {
+                                            run.text.matches(Regex("^\\d+.*")) -> null
+                                            run.text.lowercase() in listOf(
+                                                "song",
+                                                "songs",
+                                                "•",
+                                                "views",
+                                                "view"
+                                            ) -> null
+
+                                            run.text.contains("views", ignoreCase = true) -> null
+                                            run.text.isBlank() || run.text.length <= 1 -> null
+                                            else -> Artist(
+                                                name = run.text,
+                                                id = run.navigationEndpoint?.browseEndpoint?.browseId
+                                            )
+                                        }
+                                    }.take(3)
+                                }
+                            } ?: emptyList(),
                             album = null,
                             duration = null,
                             thumbnail = renderer.thumbnailRenderer.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
@@ -87,12 +114,42 @@ data class HomePage(
                                 ?.musicPlayButtonRenderer?.playNavigationEndpoint
                                 ?.watchPlaylistEndpoint?.playlistId ?: return null,
                             title = renderer.title.runs?.firstOrNull()?.text ?: return null,
-                            artists = renderer.subtitle?.runs?.oddElements()?.drop(1)?.map {
-                                Artist(
-                                    name = it.text,
-                                    id = it.navigationEndpoint?.browseEndpoint?.browseId
-                                )
-                            },
+                            artists = renderer.subtitle?.runs?.let { runs ->
+                                // First approach: look for elements with navigationEndpoint
+                                val artistsWithEndpoint = runs.mapNotNull { run ->
+                                    run.navigationEndpoint?.browseEndpoint?.browseId?.let { browseId ->
+                                        if (browseId.startsWith("UC") || browseId.startsWith("MPLA")) {
+                                            Artist(name = run.text, id = browseId)
+                                        } else null
+                                    }
+                                }
+
+                                artistsWithEndpoint.ifEmpty {
+                                    // Fallback: use oddElements approach
+                                    runs.oddElements().mapNotNull { run ->
+                                        when {
+                                            run.text.matches(Regex("^\\d+.*")) -> null
+                                            run.text.matches(Regex("^\\d{4}$")) -> null // years
+                                            run.text.lowercase() in listOf(
+                                                "song",
+                                                "songs",
+                                                "•",
+                                                "views",
+                                                "view",
+                                                "album",
+                                                "albums"
+                                            ) -> null
+
+                                            run.text.contains("views", ignoreCase = true) -> null
+                                            run.text.isBlank() || run.text.length <= 1 -> null
+                                            else -> Artist(
+                                                name = run.text,
+                                                id = run.navigationEndpoint?.browseEndpoint?.browseId
+                                            )
+                                        }
+                                    }.take(3)
+                                }
+                            } ?: emptyList(),
                             year = renderer.subtitle?.runs?.lastOrNull()?.text?.toIntOrNull(),
                             thumbnail = renderer.thumbnailRenderer.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
                             explicit = renderer.subtitleBadges?.find {

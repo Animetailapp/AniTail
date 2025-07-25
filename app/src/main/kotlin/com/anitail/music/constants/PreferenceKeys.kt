@@ -26,6 +26,7 @@ val AutoBackupKeepCountKey = intPreferencesKey("autoBackupKeepCount")
 val AutoBackupCustomLocationKey = stringPreferencesKey("autoBackupCustomLocation")
 val AutoBackupUseCustomLocationKey = booleanPreferencesKey("autoBackupUseCustomLocation")
 val UseNewPlayerDesignKey = booleanPreferencesKey("useNewPlayerDesign")
+val UseNewMiniPlayerDesignKey = booleanPreferencesKey("useNewMiniPlayerDesign")
 
 
 enum class SliderStyle {
@@ -327,6 +328,9 @@ val LyricsScrollKey = booleanPreferencesKey("lyricsScrollKey")
 val LyricsRomanizeJapaneseKey = booleanPreferencesKey("lyricsRomanizeJapanese")
 val LyricsRomanizeKoreanKey = booleanPreferencesKey("lyricsRomanizeKorean")
 val TranslateLyricsKey = booleanPreferencesKey("translateLyrics")
+val LyricsFontSizeKey = floatPreferencesKey("lyricsFontSize")
+val LyricsCustomFontPathKey = stringPreferencesKey("lyricsCustomFontPath")
+val LyricsSmoothScrollKey = booleanPreferencesKey("lyricsSmoothScroll")
 
 val PlayerVolumeKey = floatPreferencesKey("playerVolume")
 val RepeatModeKey = intPreferencesKey("repeatMode")

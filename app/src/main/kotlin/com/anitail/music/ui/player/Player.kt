@@ -105,6 +105,7 @@ import com.anitail.music.constants.QueuePeekHeight
 import com.anitail.music.constants.ShowLyricsKey
 import com.anitail.music.constants.SliderStyle
 import com.anitail.music.constants.SliderStyleKey
+import com.anitail.music.constants.UseNewMiniPlayerDesignKey
 import com.anitail.music.constants.UseNewPlayerDesignKey
 import com.anitail.music.extensions.togglePlayPause
 import com.anitail.music.extensions.toggleRepeatMode
@@ -150,6 +151,11 @@ fun BottomSheetPlayer(
         defaultValue = true
     )
 
+    val (useNewMiniPlayerDesign) = rememberPreference(
+        UseNewMiniPlayerDesignKey,
+        defaultValue = true
+    )
+
 
     val playerBackground by rememberEnumPreference(
         key = PlayerBackgroundStyleKey,
@@ -180,10 +186,26 @@ fun BottomSheetPlayer(
                 if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON
             useDarkTheme && pureBlack
         }
-    val backgroundColor = if (useBlackBackground && state.value > state.collapsedBound) {
-        lerp(MaterialTheme.colorScheme.surfaceContainer, Color.Black, state.progress)
+    val backgroundColor = if (useNewMiniPlayerDesign) {
+        if (useBlackBackground && state.value > state.collapsedBound) {
+            // Make background transparent when collapsed, gradually show when pulled up (same as normal mode)
+            val progress =
+                ((state.value - state.collapsedBound) / (state.expandedBound - state.collapsedBound))
+                    .coerceIn(0f, 1f)
+            Color.Black.copy(alpha = progress)
+        } else {
+            // Make background transparent when collapsed, gradually show when pulled up
+            val progress =
+                ((state.value - state.collapsedBound) / (state.expandedBound - state.collapsedBound))
+                    .coerceIn(0f, 1f)
+            MaterialTheme.colorScheme.surfaceContainer.copy(alpha = progress)
+        }
     } else {
-        MaterialTheme.colorScheme.surfaceContainer
+        if (useBlackBackground) {
+            lerp(MaterialTheme.colorScheme.surfaceContainer, Color.Black, state.progress)
+        } else {
+            MaterialTheme.colorScheme.surfaceContainer
+        }
     }
 
     val playbackState by playerConnection.playbackState.collectAsState()
@@ -440,44 +462,87 @@ fun BottomSheetPlayer(
             }
         }
     }
+    // Use fixed dismissedBound to prevent background showing when nav bar disappears (only for new design)
+    val dismissedBound = if (useNewMiniPlayerDesign) {
+        QueuePeekHeight
+    } else {
+        // Original behavior (exactly as main branch)
+        QueuePeekHeight + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
+    }
 
     val queueSheetState =
         rememberBottomSheetState(
-            dismissedBound = QueuePeekHeight + WindowInsets.systemBars.asPaddingValues()
-                .calculateBottomPadding(),
+            dismissedBound = dismissedBound,
             expandedBound = state.expandedBound,
         )
 
     BottomSheet(
         state = state,
         modifier = modifier,
-        brushBackgroundColor = if (useBlackBackground) {
-            Brush.verticalGradient(
-                colors = listOf(
-                    backgroundColor,
-                    backgroundColor,
-                )
-            )
-        } else {
-            if (state.value > changeBound) {
+        brushBackgroundColor = if (useNewMiniPlayerDesign) {
+            // New design with transparency effects
+            if (useBlackBackground) {
                 Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.surfaceContainer,
-                        backgroundColor
+                    colors = listOf(
+                        backgroundColor,
+                        backgroundColor,
                     )
                 )
-            } else if (gradientColors.size >=
-                2 &&
-                state.value > changeBound
-            ) {
-                Brush.verticalGradient(gradientColors)
             } else {
+                // Calculate transparency progress (new design)
+                val progress =
+                    ((state.value - state.collapsedBound) / (state.expandedBound - state.collapsedBound))
+                        .coerceIn(0f, 1f)
+
+                if (state.value > changeBound) {
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surfaceContainer.copy(alpha = progress),
+                            backgroundColor
+                        )
+                    )
+                } else if (gradientColors.size >= 2 && state.value > changeBound) {
+                    // Apply transparency to gradient colors
+                    val transparentGradientColors = gradientColors.map { color ->
+                        color.copy(alpha = color.alpha * progress)
+                    }
+                    Brush.verticalGradient(transparentGradientColors)
+                } else {
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surfaceContainer.copy(alpha = progress),
+                            MaterialTheme.colorScheme.surfaceContainer.copy(alpha = progress),
+                        )
+                    )
+                }
+            }
+        } else {
+            // Original gradient behavior (exactly as main branch)
+            if (useBlackBackground) {
                 Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.surfaceContainer,
-                        MaterialTheme.colorScheme.surfaceContainer,
+                    colors = listOf(
+                        backgroundColor,
+                        backgroundColor,
                     )
                 )
+            } else {
+                if (state.value > changeBound) {
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surfaceContainer,
+                            backgroundColor
+                        )
+                    )
+                } else if (gradientColors.size >= 2 && state.value > changeBound) {
+                    Brush.verticalGradient(gradientColors)
+                } else {
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.surfaceContainer,
+                            MaterialTheme.colorScheme.surfaceContainer,
+                        )
+                    )
+                }
             }
         },
         onDismiss = {
@@ -490,7 +555,6 @@ fun BottomSheetPlayer(
                 position = position,
                 duration = duration,
                 pureBlack = pureBlack,
-                playerBottomSheetState = state
             )
         },
     ) {

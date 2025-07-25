@@ -1,6 +1,7 @@
 package com.anitail.music.ui.player
 
 import android.annotation.SuppressLint
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -143,10 +144,14 @@ fun Queue(
 
     val currentWindowIndex by playerConnection.currentWindowIndex.collectAsState()
 
-    val selectedSongs: MutableList<MediaMetadata> = mutableStateListOf()
-    val selectedItems: MutableList<Timeline.Window> = mutableStateListOf()
-    var selection by remember {
-        mutableStateOf(false)
+    val selectedSongs = remember { mutableStateListOf<MediaMetadata>() }
+    val selectedItems = remember { mutableStateListOf<Timeline.Window>() }
+    var selection by remember { mutableStateOf(false) }
+
+    if (selection) {
+        BackHandler {
+            selection = false
+        }
     }
 
     var locked by rememberPreference(QueueEditLockKey, defaultValue = true)

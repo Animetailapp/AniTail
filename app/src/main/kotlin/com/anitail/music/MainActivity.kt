@@ -130,6 +130,7 @@ import com.anitail.music.constants.DarkModeKey
 import com.anitail.music.constants.DefaultOpenTabKey
 import com.anitail.music.constants.DisableScreenshotKey
 import com.anitail.music.constants.DynamicThemeKey
+import com.anitail.music.constants.MiniPlayerBottomSpacing
 import com.anitail.music.constants.MiniPlayerHeight
 import com.anitail.music.constants.NavigationBarAnimationSpec
 import com.anitail.music.constants.NavigationBarHeight
@@ -139,6 +140,7 @@ import com.anitail.music.constants.SearchSource
 import com.anitail.music.constants.SearchSourceKey
 import com.anitail.music.constants.SlimNavBarKey
 import com.anitail.music.constants.StopMusicOnTaskClearKey
+import com.anitail.music.constants.UseNewMiniPlayerDesignKey
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.SearchHistory
 import com.anitail.music.extensions.toEnum
@@ -407,6 +409,10 @@ class MainActivity : ComponentActivity() {
 
                     val navigationItems = remember { Screens.MainScreens }
                     val (slimNav) = rememberPreference(SlimNavBarKey, defaultValue = false)
+                    val (useNewMiniPlayerDesign) = rememberPreference(
+                        UseNewMiniPlayerDesignKey,
+                        defaultValue = true
+                    )
                     val defaultOpenTab =
                         remember {
                             dataStore[DefaultOpenTabKey].toEnum(defaultValue = NavigationTab.HOME)
@@ -490,7 +496,7 @@ class MainActivity : ComponentActivity() {
                     val playerBottomSheetState =
                         rememberBottomSheetState(
                             dismissedBound = 0.dp,
-                            collapsedBound = bottomInset + (if (shouldShowNavigationBar) NavigationBarHeight else 0.dp) + MiniPlayerHeight,
+                            collapsedBound = bottomInset + (if (shouldShowNavigationBar) NavigationBarHeight else 0.dp) + (if (useNewMiniPlayerDesign) MiniPlayerBottomSpacing else 0.dp) + MiniPlayerHeight,
                             expandedBound = maxHeight,
                         )
 
@@ -498,11 +504,12 @@ class MainActivity : ComponentActivity() {
                         remember(
                             bottomInset,
                             shouldShowNavigationBar,
-                            playerBottomSheetState.isDismissed
+                            playerBottomSheetState.isDismissed,
+                            useNewMiniPlayerDesign
                         ) {
                             var bottom = bottomInset
                             if (shouldShowNavigationBar) bottom += NavigationBarHeight
-                            if (!playerBottomSheetState.isDismissed) bottom += MiniPlayerHeight
+                            if (!playerBottomSheetState.isDismissed) bottom += MiniPlayerHeight + (if (useNewMiniPlayerDesign) MiniPlayerBottomSpacing else 0.dp)
                             windowsInsets
                                 .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)
                                 .add(WindowInsets(top = AppBarHeight, bottom = bottom))
@@ -884,7 +891,7 @@ class MainActivity : ComponentActivity() {
                                             modifier =
                                             Modifier
                                                 .fillMaxSize()
-                                                .padding(bottom = if (!playerBottomSheetState.isDismissed) MiniPlayerHeight else 0.dp)
+                                                .padding(bottom = if (!playerBottomSheetState.isDismissed) MiniPlayerHeight + (if (useNewMiniPlayerDesign) MiniPlayerBottomSpacing else 0.dp) else 0.dp)
                                                 .navigationBarsPadding(),
                                         ) { searchSource ->
                                             when (searchSource) {

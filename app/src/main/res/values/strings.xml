@@ -324,6 +324,15 @@
     <string name="center">Center</string>
     <string name="right">Right</string>
     <string name="lyrics_click_change">Change lyrics on click</string>
+    <string name="lyrics_font_size">Lyrics font size</string>
+    <string name="lyrics_custom_font">Lyrics font style</string>
+    <string name="use_system_font">Use system font</string>
+    <string name="load_custom_font">Load custom font</string>
+    <string name="smooth_lyrics_animation">Smooth lyrics animation</string>
+    <string name="font_size_preview">Sample lyrics text for preview</string>
+    <string name="select_font_file">Select font file (.ttf/.otf)</string>
+    <string name="font_loading_error">Error loading font file</string>
+    <string name="font_loaded_successfully">Font loaded successfully</string>
     <string name="grid_cell_size">Grid cell size</string>
     <string name="small">Small</string>
     <string name="big">Big</string>
@@ -713,4 +722,5 @@
     <string name="swipe_sensitivity_desc">Adjust how sensitive swipe gestures are for changing songs</string>
     <string name="subscribed">Subscribed</string>
     <string name="subscribe">Subscribe</string>
+    <string name="new_mini_player_design">New mini player design</string>
 </resources>

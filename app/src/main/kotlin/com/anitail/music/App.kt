@@ -41,9 +41,11 @@ import com.anitail.music.utils.reportException
 import com.onesignal.OneSignal
 import com.onesignal.debug.LogLevel
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -55,6 +57,7 @@ import java.util.Locale
 
 @HiltAndroidApp
 class App : Application(), ImageLoaderFactory, Configuration.Provider {
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     @javax.inject.Inject
     lateinit var workerFactory: androidx.hilt.work.HiltWorkerFactory
@@ -65,6 +68,7 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
             .build()
 
     @RequiresApi(Build.VERSION_CODES.M)
+
     @OptIn(DelicateCoroutinesApi::class)
     override fun onCreate() {
         super.onCreate()
@@ -84,7 +88,7 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
             Timber.e(e, "OneSignal initialization failed")
         }        // Initialize automatic update checks
         UpdateCheckWorker.schedule(this)
-        
+
         // Initialize automatic backup (only schedule, don't run immediately)
         try {
             AutoBackupWorker.schedulePeriodicOnly(this)
@@ -123,7 +127,7 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
             YouTube.useLoginForBrowse = true
         }
 
-        GlobalScope.launch {
+        applicationScope.launch {
             dataStore.data
                 .map { it[VisitorDataKey] }
                 .distinctUntilChanged()
@@ -142,7 +146,7 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
                         }
                 }
         }
-        GlobalScope.launch {
+        applicationScope.launch {
             dataStore.data
                 .map { it[DataSyncIdKey] }
                 .distinctUntilChanged()
@@ -163,7 +167,7 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
                     }
                 }
         }
-        GlobalScope.launch {
+        applicationScope.launch {
             dataStore.data
                 .map { it[InnerTubeCookieKey] }
                 .distinctUntilChanged()
