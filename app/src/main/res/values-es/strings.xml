@@ -700,4 +700,5 @@
     <string name="swipe_sensitivity_desc">Ajusta la sensibilidad de los gestos de deslizamiento para cambiar de canción</string>
     <string name="subscribed">Suscrito</string>
     <string name="subscribe">Suscribirse</string>
+    <string name="new_mini_player_design">Nuevo diseño del mini reproductor</string>
 </resources>

@@ -46,6 +46,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.anitail.music.constants.NavigationBarAnimationSpec
+import com.anitail.music.constants.UseNewMiniPlayerDesignKey
+import com.anitail.music.utils.rememberPreference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -62,6 +64,10 @@ fun BottomSheet(
     collapsedContent: @Composable BoxScope.() -> Unit,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val (useNewMiniPlayerDesign) = rememberPreference(
+        UseNewMiniPlayerDesignKey,
+        defaultValue = true
+    )
     Box(
         modifier =
         modifier
@@ -72,7 +78,8 @@ fun BottomSheet(
                         .roundToPx()
                         .coerceAtLeast(0)
                 IntOffset(x = 0, y = y)
-            }.pointerInput(state) {
+            }
+            .pointerInput(state) {
                 val velocityTracker = VelocityTracker()
 
                 detectVerticalDragGestures(
@@ -90,12 +97,14 @@ fun BottomSheet(
                         state.performFling(velocity, onDismiss)
                     },
                 )
-            }.clip(
+            }
+            .clip(
                 RoundedCornerShape(
-                    topStart = if (!state.isExpanded) 16.dp else 0.dp,
-                    topEnd = if (!state.isExpanded) 16.dp else 0.dp,
+                    topStart = if (useNewMiniPlayerDesign) 0.dp else (if (!state.isExpanded) 16.dp else 0.dp),
+                    topEnd = if (useNewMiniPlayerDesign) 0.dp else (if (!state.isExpanded) 16.dp else 0.dp),
                 ),
-            ).background(brushBackgroundColor),
+            )
+            .background(brushBackgroundColor),
     ) {
         if (!state.isCollapsed && !state.isDismissed) {
             BackHandler(onBack = state::collapseSoft)
@@ -119,11 +128,13 @@ fun BottomSheet(
                 Modifier
                     .graphicsLayer {
                         alpha = 1f - (state.progress * 4).coerceAtMost(1f)
-                    }.clickable(
+                    }
+                    .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         onClick = state::expandSoft,
-                    ).fillMaxWidth()
+                    )
+                    .fillMaxWidth()
                     .height(state.collapsedBound),
                 content = collapsedContent,
             )

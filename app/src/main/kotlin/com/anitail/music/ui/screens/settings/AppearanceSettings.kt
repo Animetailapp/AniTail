@@ -77,6 +77,7 @@ import com.anitail.music.constants.SlimNavBarKey
 import com.anitail.music.constants.SwipeSensitivityKey
 import com.anitail.music.constants.SwipeThumbnailKey
 import com.anitail.music.constants.SwipeToSongKey
+import com.anitail.music.constants.UseNewMiniPlayerDesignKey
 import com.anitail.music.constants.UseNewPlayerDesignKey
 import com.anitail.music.ui.component.DefaultDialog
 import com.anitail.music.ui.component.EnumListPreference
@@ -110,6 +111,10 @@ fun AppearanceSettings(
     )
     val (useNewPlayerDesign, onUseNewPlayerDesignChange) = rememberPreference(
         UseNewPlayerDesignKey,
+        defaultValue = true
+    )
+    val (useNewMiniPlayerDesign, onUseNewMiniPlayerDesignChange) = rememberPreference(
+        UseNewMiniPlayerDesignKey,
         defaultValue = true
     )
     val (playerBackground, onPlayerBackgroundChange) =
@@ -439,6 +444,13 @@ fun AppearanceSettings(
             icon = { Icon(painterResource(R.drawable.palette), null) },
             checked = useNewPlayerDesign,
             onCheckedChange = onUseNewPlayerDesignChange,
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.new_mini_player_design)) },
+            icon = { Icon(painterResource(R.drawable.nav_bar), null) },
+            checked = useNewMiniPlayerDesign,
+            onCheckedChange = onUseNewMiniPlayerDesignChange,
         )
 
         EnumListPreference(

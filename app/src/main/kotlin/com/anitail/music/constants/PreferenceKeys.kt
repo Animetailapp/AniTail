@@ -26,6 +26,7 @@ val AutoBackupKeepCountKey = intPreferencesKey("autoBackupKeepCount")
 val AutoBackupCustomLocationKey = stringPreferencesKey("autoBackupCustomLocation")
 val AutoBackupUseCustomLocationKey = booleanPreferencesKey("autoBackupUseCustomLocation")
 val UseNewPlayerDesignKey = booleanPreferencesKey("useNewPlayerDesign")
+val UseNewMiniPlayerDesignKey = booleanPreferencesKey("useNewMiniPlayerDesign")
 
 
 enum class SliderStyle {
