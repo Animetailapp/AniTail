@@ -95,6 +95,7 @@ import com.anitail.music.extensions.togglePlayPause
 import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.AutoResizeText
+import com.anitail.music.ui.component.DraggableScrollbar
 import com.anitail.music.ui.component.FontSizeRange
 import com.anitail.music.ui.component.IconButton
 import com.anitail.music.ui.component.LocalMenuState
@@ -521,6 +522,17 @@ fun OnlinePlaylistScreen(
                 }
             }
         }
+
+        DraggableScrollbar(
+            modifier = Modifier
+                .padding(
+                    LocalPlayerAwareWindowInsets.current.union(WindowInsets.ime)
+                        .asPaddingValues()
+                )
+                .align(Alignment.CenterEnd),
+            scrollState = lazyListState,
+            headerItems = 1
+        )
 
         TopAppBar(
             title = {

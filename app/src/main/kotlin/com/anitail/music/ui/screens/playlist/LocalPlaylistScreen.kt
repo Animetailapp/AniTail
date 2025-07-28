@@ -130,6 +130,7 @@ import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.AutoResizeText
 import com.anitail.music.ui.component.DefaultDialog
+import com.anitail.music.ui.component.DraggableScrollbar
 import com.anitail.music.ui.component.EmptyPlaceholder
 import com.anitail.music.ui.component.FontSizeRange
 import com.anitail.music.ui.component.IconButton
@@ -841,6 +842,17 @@ fun LocalPlaylistScreen(
             }
         }
         }
+
+        DraggableScrollbar(
+            modifier = Modifier
+                .padding(
+                    LocalPlayerAwareWindowInsets.current.union(WindowInsets.ime)
+                        .asPaddingValues()
+                )
+                .align(Alignment.CenterEnd),
+            scrollState = lazyListState,
+            headerItems = 2
+        )
 
         TopAppBar(
             colors = TopAppBarDefaults.topAppBarColors(
