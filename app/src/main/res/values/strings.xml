@@ -723,4 +723,9 @@
     <string name="subscribed">Subscribed</string>
     <string name="subscribe">Subscribe</string>
     <string name="new_mini_player_design">New mini player design</string>
+    <string name="storage_overview">Storage overview</string>
+    <string name="clear_downloads_confirmation">Are you sure you want to remove all downloaded songs? This action cannot be undone.</string>
+    <string name="clear_song_cache_confirmation">Are you sure you want to clear the song cache? This will free up space but might affect playback performance temporarily.</string>
+    <string name="clear_image_cache_confirmation">Are you sure you want to clear the image cache? Album art and artist images will need to be re-downloaded.</string>
+    <string name="confirm">Confirm</string>
 </resources>
