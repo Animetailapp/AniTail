@@ -212,7 +212,18 @@ object YouTube {
             .toMutableList()
         var continuation = response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer
             ?.contents?.firstOrNull()?.musicPlaylistShelfRenderer?.contents?.getContinuation()
-        while (continuation != null) {
+        val seenContinuations = mutableSetOf<String>()
+        var requestCount = 0
+        val maxRequests = 50 // Prevent excessive API calls
+
+        while (continuation != null && requestCount < maxRequests) {
+            // Prevent infinite loops by tracking seen continuations
+            if (continuation in seenContinuations) {
+                break
+            }
+            seenContinuations.add(continuation)
+            requestCount++
+            
             response = innerTube.browse(
                 client = WEB_REMIX,
                 continuation = continuation,
@@ -757,11 +768,42 @@ object YouTube {
                             ?.musicPlayButtonRenderer?.playNavigationEndpoint
                             ?.watchPlaylistEndpoint?.playlistId ?: return null,
                         title = renderer.title.runs?.firstOrNull()?.text ?: return null,
-                        artists = renderer.subtitle?.runs?.oddElements()?.drop(1)?.mapNotNull {
-                            it.navigationEndpoint?.browseEndpoint?.browseId?.let { id ->
-                                Artist(name = it.text, id = id)
+                        artists = renderer.subtitle?.runs?.let { runs ->
+                            // First approach: look for elements with navigationEndpoint
+                            val artistsWithEndpoint = runs.mapNotNull { run ->
+                                run.navigationEndpoint?.browseEndpoint?.browseId?.let { browseId ->
+                                    if (browseId.startsWith("UC") || browseId.startsWith("MPLA")) {
+                                        Artist(name = run.text, id = browseId)
+                                    } else null
+                                }
                             }
-                        },
+
+                            artistsWithEndpoint.ifEmpty {
+                                // Fallback: use oddElements approach
+                                runs.oddElements().mapNotNull { run ->
+                                    when {
+                                        run.text.matches(Regex("^\\d+.*")) -> null
+                                        run.text.matches(Regex("^\\d{4}$")) -> null
+                                        run.text.lowercase() in listOf(
+                                            "song",
+                                            "songs",
+                                            "•",
+                                            "views",
+                                            "view",
+                                            "album",
+                                            "albums"
+                                        ) -> null
+
+                                        run.text.contains("views", ignoreCase = true) -> null
+                                        run.text.isBlank() || run.text.length <= 1 -> null
+                                        else -> Artist(
+                                            name = run.text,
+                                            id = run.navigationEndpoint?.browseEndpoint?.browseId
+                                        )
+                                    }
+                                }.take(3)
+                            }
+                        } ?: emptyList(),
                         year = renderer.subtitle?.runs?.lastOrNull()?.text?.toIntOrNull(),
                         thumbnail = renderer.thumbnailRenderer.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
                         explicit = renderer.subtitleBadges?.any {

@@ -51,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -94,6 +95,7 @@ import com.anitail.music.extensions.togglePlayPause
 import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.AutoResizeText
+import com.anitail.music.ui.component.DraggableScrollbar
 import com.anitail.music.ui.component.FontSizeRange
 import com.anitail.music.ui.component.IconButton
 import com.anitail.music.ui.component.LocalMenuState
@@ -138,9 +140,11 @@ fun OnlinePlaylistScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     var isSearching by rememberSaveable { mutableStateOf(false) }
+
     var query by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue())
     }
+
     val filteredSongs =
         remember(songs, query) {
             if (query.text.isEmpty()) {
@@ -159,20 +163,28 @@ fun OnlinePlaylistScreen(
                     }
             }
         }
+
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(isSearching) {
         if (isSearching) {
             focusRequester.requestFocus()
         }
     }
+
     if (isSearching) {
         BackHandler {
             isSearching = false
             query = TextFieldValue()
         }
+    } else if (selection) {
+        BackHandler {
+            selection = false
+        }
     }
 
-    val wrappedSongs = filteredSongs.map { item -> ItemWrapper(item) }.toMutableList()
+    val wrappedSongs = remember(filteredSongs) {
+        filteredSongs.map { item -> ItemWrapper(item) }
+    }.toMutableStateList()
 
     val showTopBarTitle by remember {
         derivedStateOf {
@@ -510,6 +522,17 @@ fun OnlinePlaylistScreen(
                 }
             }
         }
+
+        DraggableScrollbar(
+            modifier = Modifier
+                .padding(
+                    LocalPlayerAwareWindowInsets.current.union(WindowInsets.ime)
+                        .asPaddingValues()
+                )
+                .align(Alignment.CenterEnd),
+            scrollState = lazyListState,
+            headerItems = 1
+        )
 
         TopAppBar(
             title = {

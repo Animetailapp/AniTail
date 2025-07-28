@@ -1,6 +1,10 @@
 package com.anitail.music.ui.screens.settings
 
+import android.net.Uri
 import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -41,6 +45,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.R
@@ -52,7 +57,10 @@ import com.anitail.music.constants.GridItemSize
 import com.anitail.music.constants.GridItemsSizeKey
 import com.anitail.music.constants.LibraryFilter
 import com.anitail.music.constants.LyricsClickKey
+import com.anitail.music.constants.LyricsCustomFontPathKey
+import com.anitail.music.constants.LyricsFontSizeKey
 import com.anitail.music.constants.LyricsScrollKey
+import com.anitail.music.constants.LyricsSmoothScrollKey
 import com.anitail.music.constants.LyricsTextPositionKey
 import com.anitail.music.constants.PlayerBackgroundStyle
 import com.anitail.music.constants.PlayerBackgroundStyleKey
@@ -69,6 +77,7 @@ import com.anitail.music.constants.SlimNavBarKey
 import com.anitail.music.constants.SwipeSensitivityKey
 import com.anitail.music.constants.SwipeThumbnailKey
 import com.anitail.music.constants.SwipeToSongKey
+import com.anitail.music.constants.UseNewMiniPlayerDesignKey
 import com.anitail.music.constants.UseNewPlayerDesignKey
 import com.anitail.music.ui.component.DefaultDialog
 import com.anitail.music.ui.component.EnumListPreference
@@ -79,9 +88,11 @@ import com.anitail.music.ui.component.PreferenceEntry
 import com.anitail.music.ui.component.PreferenceGroupTitle
 import com.anitail.music.ui.component.SwitchPreference
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.utils.FontUtils
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.utils.rememberPreference
 import me.saket.squiggles.SquigglySlider
+import java.io.File
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -100,6 +111,10 @@ fun AppearanceSettings(
     )
     val (useNewPlayerDesign, onUseNewPlayerDesignChange) = rememberPreference(
         UseNewPlayerDesignKey,
+        defaultValue = true
+    )
+    val (useNewMiniPlayerDesign, onUseNewMiniPlayerDesignChange) = rememberPreference(
+        UseNewMiniPlayerDesignKey,
         defaultValue = true
     )
     val (playerBackground, onPlayerBackgroundChange) =
@@ -122,10 +137,69 @@ fun AppearanceSettings(
     )
     val (lyricsClick, onLyricsClickChange) = rememberPreference(LyricsClickKey, defaultValue = true)
     val (lyricsScroll, onLyricsScrollChange) = rememberPreference(LyricsScrollKey, defaultValue = true)
+    val (lyricsFontSize, onLyricsFontSizeChange) = rememberPreference(
+        LyricsFontSizeKey,
+        defaultValue = 20f
+    )
+    val (lyricsCustomFontPath, onLyricsCustomFontPathChange) = rememberPreference(
+        LyricsCustomFontPathKey,
+        defaultValue = ""
+    )
+    val (lyricsSmoothScroll, onLyricsSmoothScrollChange) = rememberPreference(
+        LyricsSmoothScrollKey,
+        defaultValue = true
+    )
     val (sliderStyle, onSliderStyleChange) = rememberEnumPreference(
         SliderStyleKey,
         defaultValue = SliderStyle.DEFAULT
     )
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Font picker launcher
+    val fontPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { fileUri ->
+            try {
+                context.contentResolver.openInputStream(fileUri)?.use { inputStream ->
+                    val cacheDir = File(context.cacheDir, "fonts")
+                    if (!cacheDir.exists()) cacheDir.mkdirs()
+
+                    val fileName =
+                        "custom_lyrics_font.${fileUri.toString().substringAfterLast(".")}"
+                    val destFile = File(cacheDir, fileName)
+
+                    destFile.outputStream().use { outputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+
+                    if (FontUtils.isValidFontFile(destFile.absolutePath)) {
+                        onLyricsCustomFontPathChange(destFile.absolutePath)
+                        FontUtils.clearCache() // Clear cache to reload new font
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.font_loaded_successfully),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        destFile.delete()
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.font_loading_error),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.font_loading_error),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
     val (swipeThumbnail, onSwipeThumbnailChange) = rememberPreference(
         SwipeThumbnailKey,
         defaultValue = true
@@ -372,6 +446,13 @@ fun AppearanceSettings(
             onCheckedChange = onUseNewPlayerDesignChange,
         )
 
+        SwitchPreference(
+            title = { Text(stringResource(R.string.new_mini_player_design)) },
+            icon = { Icon(painterResource(R.drawable.nav_bar), null) },
+            checked = useNewMiniPlayerDesign,
+            onCheckedChange = onUseNewMiniPlayerDesignChange,
+        )
+
         EnumListPreference(
             title = { Text(stringResource(R.string.player_background_style)) },
             icon = { Icon(painterResource(R.drawable.gradient), null) },
@@ -520,6 +601,113 @@ fun AppearanceSettings(
             icon = { Icon(painterResource(R.drawable.lyrics), null) },
             checked = lyricsScroll,
             onCheckedChange = onLyricsScrollChange,
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.smooth_lyrics_animation)) },
+            icon = { Icon(painterResource(R.drawable.lyrics), null) },
+            checked = lyricsSmoothScroll,
+            onCheckedChange = onLyricsSmoothScrollChange,
+        )
+
+        // Lyrics font size preference with dialog
+        var showFontSizeDialog by rememberSaveable { mutableStateOf(false) }
+
+        if (showFontSizeDialog) {
+            var tempFontSize by remember { mutableFloatStateOf(lyricsFontSize) }
+
+            DefaultDialog(
+                onDismiss = {
+                    tempFontSize = lyricsFontSize
+                    showFontSizeDialog = false
+                },
+                buttons = {
+                    TextButton(
+                        onClick = {
+                            tempFontSize = 20f // Reset to default
+                        }
+                    ) {
+                        Text(stringResource(R.string.reset))
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    TextButton(
+                        onClick = {
+                            tempFontSize = lyricsFontSize
+                            showFontSizeDialog = false
+                        }
+                    ) {
+                        Text(stringResource(android.R.string.cancel))
+                    }
+                    TextButton(
+                        onClick = {
+                            onLyricsFontSizeChange(tempFontSize)
+                            showFontSizeDialog = false
+                        }
+                    ) {
+                        Text(stringResource(android.R.string.ok))
+                    }
+                }
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.lyrics_font_size),
+                        style = MaterialTheme.typography.headlineSmall,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    Text(
+                        text = stringResource(R.string.font_size_preview),
+                        fontSize = tempFontSize.sp,
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    Text(
+                        text = "${tempFontSize.toInt()}sp",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+
+                    Slider(
+                        value = tempFontSize,
+                        onValueChange = { tempFontSize = it },
+                        valueRange = 12f..36f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+
+        PreferenceEntry(
+            title = { Text(stringResource(R.string.lyrics_font_size)) },
+            description = "${lyricsFontSize.toInt()}sp",
+            icon = { Icon(painterResource(R.drawable.tune), null) },
+            onClick = { showFontSizeDialog = true }
+        )
+
+        PreferenceEntry(
+            title = { Text(stringResource(R.string.lyrics_custom_font)) },
+            description = if (lyricsCustomFontPath.isEmpty())
+                stringResource(R.string.use_system_font)
+            else
+                File(lyricsCustomFontPath).name,
+            icon = { Icon(painterResource(R.drawable.format_align_left), null) },
+            onClick = {
+                if (lyricsCustomFontPath.isEmpty()) {
+                    // Load custom font
+                    fontPickerLauncher.launch("*/*")
+                } else {
+                    // Show options to change or reset
+                    // For now, just reset to system font
+                    onLyricsCustomFontPathChange("")
+                    FontUtils.clearCache()
+                }
+            }
         )
 
         PreferenceGroupTitle(

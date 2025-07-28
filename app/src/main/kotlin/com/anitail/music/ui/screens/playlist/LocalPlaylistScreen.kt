@@ -67,6 +67,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -129,6 +130,7 @@ import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.AutoResizeText
 import com.anitail.music.ui.component.DefaultDialog
+import com.anitail.music.ui.component.DraggableScrollbar
 import com.anitail.music.ui.component.EmptyPlaceholder
 import com.anitail.music.ui.component.FontSizeRange
 import com.anitail.music.ui.component.IconButton
@@ -189,9 +191,11 @@ fun LocalPlaylistScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     var isSearching by rememberSaveable { mutableStateOf(false) }
+
     var query by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue())
     }
+
     val filteredSongs =
         remember(songs, query) {
             if (query.text.isEmpty()) {
@@ -205,22 +209,31 @@ fun LocalPlaylistScreen(
                 }
             }
         }
+
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(isSearching) {
         if (isSearching) {
             focusRequester.requestFocus()
         }
     }
+
+    var selection by remember {
+        mutableStateOf(false)
+    }
+
+    val wrappedSongs = remember(filteredSongs) {
+        filteredSongs.map { item -> ItemWrapper(item) }
+    }.toMutableStateList()
+
     if (isSearching) {
         BackHandler {
             isSearching = false
             query = TextFieldValue()
         }
-    }
-
-    val wrappedSongs = filteredSongs.map { item -> ItemWrapper(item) }.toMutableList()
-    var selection by remember {
-        mutableStateOf(false)
+    } else if (selection) {
+        BackHandler {
+            selection = false
+        }
     }
 
     val downloadUtil = LocalDownloadUtil.current
@@ -830,6 +843,17 @@ fun LocalPlaylistScreen(
         }
         }
 
+        DraggableScrollbar(
+            modifier = Modifier
+                .padding(
+                    LocalPlayerAwareWindowInsets.current.union(WindowInsets.ime)
+                        .asPaddingValues()
+                )
+                .align(Alignment.CenterEnd),
+            scrollState = lazyListState,
+            headerItems = 2
+        )
+
         TopAppBar(
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = Color.Transparent, // Make the TopAppBar transparent
@@ -974,7 +998,7 @@ fun LocalPlaylistHeader(
     val playerConnection = LocalPlayerConnection.current ?: return
     val context = LocalContext.current
     val database = LocalDatabase.current
-    val syncUtils = LocalSyncUtils.current
+    LocalSyncUtils.current
     val scope = rememberCoroutineScope()
 
     val playlistLength =
