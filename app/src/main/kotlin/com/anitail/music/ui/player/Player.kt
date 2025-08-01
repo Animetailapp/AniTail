@@ -282,7 +282,6 @@ fun BottomSheetPlayer(
                             palette.mutedSwatch?.rgb?.let { Color(it) }
                             palette.lightMutedSwatch?.rgb?.let { Color(it) }
 
-                            // دالة لتحديد إذا كان اللون غامق أو فاتح
                             fun isColorDark(color: Color): Boolean {
                                 // YIQ formula to determine brightness
                                 val yiq =
@@ -292,7 +291,6 @@ fun BottomSheetPlayer(
 
                             val extractedColors = if (dominantColor != null) {
                                 if (isColorDark(dominantColor)) {
-                                    // إذا كان اللون غامق، التدرج من الغامق إلى الأفتح
                                     listOf(
                                         dominantColor,
                                         Color(
@@ -868,18 +866,10 @@ fun BottomSheetPlayer(
                         track = { sliderState ->
                             PlayerSliderTrack(
                                 sliderState = sliderState,
-                                colors = SliderDefaults.colors(
-                                    activeTrackColor = textButtonColor,
-                                    activeTickColor = textButtonColor,
-                                )
+                                colors = PlayerSliderColors.slimSliderColors(textButtonColor)
                             )
                         },
                         modifier = Modifier.padding(horizontal = PlayerHorizontalPadding)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.2f))
                     )
                 }
             }
