@@ -1233,14 +1233,19 @@ class MainActivity : ComponentActivity() {
                     else -> null
                 }
 
+                val playlistId = uri.getQueryParameter("list")
+
                 videoId?.let {
                     coroutineScope.launch {
                         withContext(Dispatchers.IO) {
-                            YouTube.queue(listOf(it))
+                            YouTube.queue(listOf(it), playlistId)
                         }.onSuccess {
                             playerConnection?.playQueue(
                                 YouTubeQueue(
-                                    WatchEndpoint(videoId = it.firstOrNull()?.id),
+                                    WatchEndpoint(
+                                        videoId = it.firstOrNull()?.id,
+                                        playlistId = playlistId
+                                    ),
                                     it.firstOrNull()?.toMediaMetadata()
                                 )
                             )
