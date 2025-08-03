@@ -171,21 +171,33 @@ fun OnlineSearchScreen(
                                     is SongItem -> YouTubeSongMenu(
                                         song = item,
                                         navController = navController,
-                                        onDismiss = menuState::dismiss
+                                        onDismiss = {
+                                            menuState.dismiss()
+                                            onDismiss()
+                                        }
                                     )
                                     is AlbumItem -> YouTubeAlbumMenu(
                                         albumItem = item,
                                         navController = navController,
-                                        onDismiss = menuState::dismiss
+                                        onDismiss = {
+                                            menuState.dismiss()
+                                            onDismiss()
+                                        }
                                     )
                                     is ArtistItem -> YouTubeArtistMenu(
                                         artist = item,
-                                        onDismiss = menuState::dismiss
+                                        onDismiss = {
+                                            menuState.dismiss()
+                                            onDismiss()
+                                        }
                                     )
                                     is PlaylistItem -> YouTubePlaylistMenu(
                                         playlist = item,
                                         coroutineScope = scope,
-                                        onDismiss = menuState::dismiss
+                                        onDismiss = {
+                                            menuState.dismiss()
+                                            onDismiss()
+                                        }
                                     )
                                 }
                             }
@@ -232,21 +244,33 @@ fun OnlineSearchScreen(
                                     is SongItem -> YouTubeSongMenu(
                                         song = item,
                                         navController = navController,
-                                        onDismiss = menuState::dismiss
+                                        onDismiss = {
+                                            menuState.dismiss()
+                                            onDismiss()
+                                        }
                                     )
                                     is AlbumItem -> YouTubeAlbumMenu(
                                         albumItem = item,
                                         navController = navController,
-                                        onDismiss = menuState::dismiss
+                                        onDismiss = {
+                                            menuState.dismiss()
+                                            onDismiss()
+                                        }
                                     )
                                     is ArtistItem -> YouTubeArtistMenu(
                                         artist = item,
-                                        onDismiss = menuState::dismiss
+                                        onDismiss = {
+                                            menuState.dismiss()
+                                            onDismiss()
+                                        }
                                     )
                                     is PlaylistItem -> YouTubePlaylistMenu(
                                         playlist = item,
                                         coroutineScope = coroutineScope,
-                                        onDismiss = menuState::dismiss
+                                        onDismiss = {
+                                            menuState.dismiss()
+                                            onDismiss()
+                                        }
                                     )
                                 }
                             }
