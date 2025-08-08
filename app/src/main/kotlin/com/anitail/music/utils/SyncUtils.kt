@@ -64,7 +64,7 @@ constructor(
           .filterNot { it.id in remoteIds }
           .forEach { database.update(it.song.localToggleLike()) }
 
-      val now = LocalDateTime.now()
+        LocalDateTime.now()
       remoteSongs.forEachIndexed { index, song ->
         launch {
           val dbSong = database.song(song.id).firstOrNull()
@@ -183,6 +183,7 @@ constructor(
                 PlaylistEntity(
                     name = playlist.title,
                     browseId = playlist.id,
+                    thumbnailUrl = playlist.thumbnail,
                     isEditable = playlist.isEditable,
                     bookmarkedAt = LocalDateTime.now(),
                     remoteSongCount =
