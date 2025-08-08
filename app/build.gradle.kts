@@ -233,4 +233,7 @@ dependencies {
     // Last.fm integration
     implementation(libs.lastfm.java)
     implementation(libs.commons.codec)
+
+    // On-device translation for lyrics (ML Kit)
+    implementation("com.google.mlkit:translate:17.0.2")
 }

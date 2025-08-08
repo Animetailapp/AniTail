@@ -110,6 +110,7 @@ import com.anitail.music.constants.LyricsSmoothScrollKey
 import com.anitail.music.constants.LyricsTextPositionKey
 import com.anitail.music.constants.PlayerBackgroundStyle
 import com.anitail.music.constants.PlayerBackgroundStyleKey
+import com.anitail.music.constants.TranslateLyricsKey
 import com.anitail.music.db.entities.LyricsEntity.Companion.LYRICS_NOT_FOUND
 import com.anitail.music.lyrics.LyricsEntry
 import com.anitail.music.lyrics.LyricsUtils.findCurrentLineIndex
@@ -119,6 +120,7 @@ import com.anitail.music.lyrics.LyricsUtils.isKorean
 import com.anitail.music.lyrics.LyricsUtils.parseLyrics
 import com.anitail.music.lyrics.LyricsUtils.romanizeJapanese
 import com.anitail.music.lyrics.LyricsUtils.romanizeKorean
+import com.anitail.music.lyrics.TranslationUtils
 import com.anitail.music.ui.component.shimmer.ShimmerHost
 import com.anitail.music.ui.component.shimmer.TextPlaceholder
 import com.anitail.music.ui.menu.LyricsMenu
@@ -162,6 +164,7 @@ fun Lyrics(
     val lyricsFontSize by rememberPreference(LyricsFontSizeKey, 20f)
     val lyricsCustomFontPath by rememberPreference(LyricsCustomFontPathKey, "")
     val smoothScroll by rememberPreference(LyricsSmoothScrollKey, true)
+    val translateLyrics by rememberPreference(TranslateLyricsKey, false)
     val scope = rememberCoroutineScope()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
     val lyricsEntity by playerConnection.currentLyrics.collectAsState(initial = null)
@@ -444,6 +447,41 @@ fun Lyrics(
         previousLineIndex = currentLineIndex
     }
 
+    // Inline translation: translate lines when enabled. We use app locale as target.
+    val appLocale = remember(context) {
+        context.resources.configuration.locales.get(0)?.toLanguageTag() ?: "en"
+    }
+    LaunchedEffect(translateLyrics, lines, appLocale) {
+        if (!translateLyrics) {
+            // Clear previous translations
+            lines.forEach { it.translatedTextFlow.value = null }
+            return@LaunchedEffect
+        }
+        val target = TranslationUtils.languageTagToMlKit(appLocale) ?: return@LaunchedEffect
+        // Try to infer probable source (best-effort). If text contains Japanese/Korean/Chinese, set accordingly; else let ML Kit detect? (not available directly), we fallback to English->target for Latin scripts.
+        lines.forEach { entry ->
+            if (entry.text.isBlank()) return@forEach
+            // Skip if already translated
+            if (entry.translatedTextFlow.value != null) return@forEach
+            val source = when {
+                isJapanese(entry.text) -> com.google.mlkit.nl.translate.TranslateLanguage.JAPANESE
+                isKorean(entry.text) -> com.google.mlkit.nl.translate.TranslateLanguage.KOREAN
+                isChinese(entry.text) -> com.google.mlkit.nl.translate.TranslateLanguage.CHINESE
+                else -> com.google.mlkit.nl.translate.TranslateLanguage.ENGLISH
+            }
+            scope.launch(Dispatchers.IO) {
+                runCatching {
+                    // Download model lazily if needed
+                    TranslationUtils.ensureModelDownloaded(source, target)
+                    val translated = TranslationUtils.translateOrNull(entry.text, source, target)
+                    if (!translated.isNullOrBlank()) {
+                        entry.translatedTextFlow.value = translated
+                    }
+                }
+            }
+        }
+    }
+
     BoxWithConstraints(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -662,6 +700,28 @@ fun Lyrics(
                             fontWeight = if (isCurrentLine && isSynced) FontWeight.ExtraBold else FontWeight.Bold,
                             fontFamily = customFont ?: FontFamily.Default
                         )
+                        if (translateLyrics) {
+                            val translated by item.translatedTextFlow.collectAsState()
+                            translated?.let { t ->
+                                // Use a distinct theme color for translated text to clearly differentiate it
+                                val translatedColor = MaterialTheme.colorScheme.primary
+                                    .copy(alpha = if (isCurrentLine && isSynced) 0.95f else 0.8f)
+
+                                Text(
+                                    text = t,
+                                    fontSize = (lyricsFontSize * 0.85f).sp,
+                                    color = translatedColor,
+                                    textAlign = when (lyricsTextPosition) {
+                                        LyricsPosition.LEFT -> TextAlign.Left
+                                        LyricsPosition.CENTER -> TextAlign.Center
+                                        LyricsPosition.RIGHT -> TextAlign.Right
+                                    },
+                                    fontWeight = if (isCurrentLine && isSynced) FontWeight.SemiBold else FontWeight.Normal,
+                                    fontFamily = customFont ?: FontFamily.Default,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                )
+                            }
+                        }
                         if (romanizeJapaneseLyrics || romanizeKoreanLyrics) {
                             // Show romanized text if available with matching animations
                             val romanizedText by item.romanizedTextFlow.collectAsState()
