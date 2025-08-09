@@ -160,7 +160,18 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
-        <provider
+    <!--  Cast -->
+    <activity
+        android:name=".cast.CastExpandedActivity"
+        android:exported="false"
+        android:theme="@style/Theme.Anitail"
+        android:parentActivityName=".MainActivity">
+        <meta-data
+            android:name="android.support.PARENT_ACTIVITY"
+            android:value=".MainActivity" />
+    </activity>
+
+    <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.FileProvider"
             android:exported="false"
@@ -211,6 +222,13 @@
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
+
+    <!-- Google Cast framework initialization -->
+    <meta-data
+        android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+        android:value="com.anitail.music.cast.CastOptionsProvider" />
+
+    <!-- Optional: Default media receiver ID is provided via CastOptionsProvider -->
     </application>
 
 </manifest>

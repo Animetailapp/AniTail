@@ -357,6 +357,14 @@ private fun NewMiniPlayer(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
+                // Botón Cast
+                com.anitail.music.ui.component.CastMiniPlayerButton(
+                    pureBlack = pureBlack,
+                    modifier = Modifier
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
                 // Subscribe/Subscribed button
                 mediaMetadata?.let { metadata ->
                     metadata.artists.firstOrNull()?.id?.let { artistId ->

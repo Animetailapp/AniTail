@@ -173,6 +173,7 @@ dependencies {
     implementation(libs.concurrent.futures)
 
     implementation(libs.activity)
+    implementation(libs.appcompat)
     implementation(libs.navigation)
     implementation(libs.hilt.navigation)
     implementation(libs.datastore)
@@ -199,6 +200,8 @@ dependencies {
     implementation(libs.media3)
     implementation(libs.media3.session)
     implementation(libs.media3.okhttp)
+    implementation(libs.media3.cast)
+    implementation(libs.play.services.cast)
     implementation(libs.squigglyslider)
 
     implementation(libs.room.runtime)

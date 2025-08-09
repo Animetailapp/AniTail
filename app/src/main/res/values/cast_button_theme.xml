@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="AniTailCastButtonTheme" parent="Theme.Anitail">
+        <item name="android:windowBackground">?android:colorBackground</item>
+        <item name="android:colorBackground">?android:colorBackground</item>
+        <item name="android:textColorPrimary">?android:textColorPrimary</item>
+        <item name="colorControlNormal">?android:textColorPrimary</item>
+        <item name="colorControlActivated">?android:textColorPrimary</item>
+    </style>
+</resources>

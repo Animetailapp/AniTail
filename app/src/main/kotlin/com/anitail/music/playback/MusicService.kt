@@ -16,6 +16,7 @@ import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
+import androidx.media3.cast.CastPlayer
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -184,7 +185,11 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     lateinit var connectivityObserver: NetworkConnectivity
     val waitingForNetworkConnection = MutableStateFlow(false)
     private val isNetworkConnected = MutableStateFlow(false)
-  private val songUrlCache = HashMap<String, Pair<String, Long>>()
+
+    // Cache simple: mediaId -> StreamInfo(url, mimeType, expiryMillis)
+    private data class StreamInfo(val url: String, val mimeType: String, val expiry: Long)
+
+    private val streamUrlCache = HashMap<String, StreamInfo>()
 
   private val audioQuality by
       enumPreference(this, AudioQualityKey, com.anitail.music.constants.AudioQuality.AUTO)
@@ -221,6 +226,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   @Inject @DownloadCache lateinit var downloadCache: SimpleCache
 
   lateinit var player: ExoPlayer
+    private var castPlayer: CastPlayer? = null
   private lateinit var mediaSession: MediaLibrarySession
 
   private var isAudioEffectSessionOpened = false
@@ -1441,7 +1447,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       shuffledIndices.shuffle()
       shuffledIndices[shuffledIndices.indexOf(player.currentMediaItemIndex)] = shuffledIndices[0]
       shuffledIndices[0] = player.currentMediaItemIndex
-      player.setShuffleOrder(DefaultShuffleOrder(shuffledIndices, System.currentTimeMillis()))
+        player.shuffleOrder = DefaultShuffleOrder(shuffledIndices, System.currentTimeMillis())
     }
 
     if (isJamEnabled && isJamHost) {
@@ -1652,6 +1658,10 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   }
 
   override fun onDestroy() {
+      try {
+          castPlayer?.release()
+      } catch (_: Exception) {
+      }
     stopPeriodicWidgetUpdates()
     widgetUpdateJob?.cancel()
     stopPeriodicScrobbleCheck()
@@ -1772,6 +1782,142 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     stopSelf()
   }
 
+    /**
+     * Attempt to cast the current queue to an available Cast session. This uses Media3 CastPlayer.
+     * If no session is active, this is a no-op.
+     */
+    private var originalItemsBeforeCast: List<MediaItem>? = null
+    val isCastPreparing = MutableStateFlow(false)
+
+    /**
+     * Obtiene (y cachea) la URL de stream directa para un mediaId. Devuelve null si falla.
+     */
+    private suspend fun getStreamInfo(mediaId: String): StreamInfo? = withContext(Dispatchers.IO) {
+        streamUrlCache[mediaId]?.takeIf { it.expiry > System.currentTimeMillis() }
+            ?.let { return@withContext it }
+        val playbackData = YTPlayerUtils.playerResponseForPlayback(
+            mediaId,
+            audioQuality = audioQuality,
+            connectivityManager = connectivityManager,
+        ).getOrNull() ?: return@withContext null
+        val info = StreamInfo(
+            url = playbackData.streamUrl,
+            mimeType = playbackData.format.mimeType.split(";").firstOrNull()
+                ?: playbackData.format.mimeType,
+            expiry = System.currentTimeMillis() + (playbackData.streamExpiresInSeconds * 1000L)
+        )
+        streamUrlCache[mediaId] = info
+        info
+    }
+
+    /** Convierte MediaItem local (con uri = id) en uno con uri remota reproducible por Chromecast */
+    private suspend fun MediaItem.toCastMediaItem(): MediaItem? {
+        val md = metadata ?: return null
+        val info = getStreamInfo(md.id) ?: return null
+        return MediaItem.Builder()
+            .setMediaId(md.id)
+            .setUri(info.url)
+            .setCustomCacheKey(md.id)
+            .setMimeType(info.mimeType)
+            .setTag(md)
+            .setMediaMetadata(
+                androidx.media3.common.MediaMetadata.Builder()
+                    .setTitle(md.title)
+                    .setSubtitle(md.artistName ?: md.artists.joinToString { it.name })
+                    .setArtist(md.artistName ?: md.artists.joinToString { it.name })
+                    .setArtworkUri(md.thumbnailUrl?.toUri())
+                    .setAlbumTitle(md.album?.title)
+                    .setMediaType(androidx.media3.common.MediaMetadata.MEDIA_TYPE_MUSIC)
+                    .build()
+            )
+            .build()
+    }
+
+    fun castCurrentToDevice() {
+        try {
+            val castContext =
+                com.google.android.gms.cast.framework.CastContext.getSharedInstance(this)
+            castContext.sessionManager.currentCastSession ?: return
+            if (castPlayer == null) {
+                castPlayer = CastPlayer(castContext)
+            }
+            if (mediaSession.player === castPlayer) return
+
+            if (isCastPreparing.value) {
+                Timber.d("Cast ⏳ Preparación ya en curso, ignorando nuevo intento")
+                return
+            }
+            isCastPreparing.value = true
+            val itemsSnapshot: List<MediaItem> =
+                (0 until player.mediaItemCount).map { player.getMediaItemAt(it) }
+            if (itemsSnapshot.isEmpty()) return
+            val originalIndex = player.currentMediaItemIndex.coerceAtLeast(0)
+            val currentPos = player.currentPosition
+
+            scope.launch(Dispatchers.IO) {
+                try {
+                    Timber.d("Cast ▶️ Generando mediaItems para Cast: total=${itemsSnapshot.size}")
+                    val indexAndItems = itemsSnapshot.mapIndexed { idx, mi -> idx to mi }
+                    val castPairs = indexAndItems.mapNotNull { (idx, mi) ->
+                        val casted = mi.toCastMediaItem()
+                        casted?.let { idx to it }
+                    }
+                    if (castPairs.isEmpty()) {
+                        Timber.w("Cast ⚠️ No se pudo obtener ninguna URL de stream para enviar al dispositivo")
+                        return@launch
+                    }
+
+                    val newIndex =
+                        castPairs.indexOfFirst { it.first == originalIndex }.takeIf { it >= 0 } ?: 0
+                    val castItems = castPairs.map { it.second }
+                    Timber.d("Cast ✅ MediaItems listos (${castItems.size}) newIndex=$newIndex pos=$currentPos - realizando switch")
+                    withContext(Dispatchers.Main) {
+                        try {
+                            originalItemsBeforeCast = itemsSnapshot
+                            castPlayer?.setMediaItems(castItems, newIndex, currentPos)
+                            castPlayer?.prepare()
+                            castPlayer?.play()
+                            player.pause()
+                            castPlayer?.let { mediaSession.setPlayer(it) }
+                            updateNotification()
+                            Timber.d("Cast ▶️ Transferencia completada")
+                        } catch (e: Exception) {
+                            Timber.e(e, "Cast ❌ Falló el switch, revirtiendo")
+                            mediaSession.setPlayer(player)
+                        } finally {
+                            isCastPreparing.value = false
+                        }
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "Cast ❌ Error preparando CastPlayer")
+                    withContext(Dispatchers.Main) { isCastPreparing.value = false }
+                }
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Optional helper to return playback to local device after cast session ends */
+    fun returnToLocalPlayback() {
+        try {
+            if (castPlayer == null) return
+            val usingCast = mediaSession.player === castPlayer
+            if (!usingCast) return
+            val index = castPlayer?.currentMediaItemIndex?.takeIf { it >= 0 } ?: 0
+            val pos = castPlayer?.currentPosition ?: 0L
+            castPlayer?.pause()
+            val restoreItems = originalItemsBeforeCast ?: player.mediaItems
+            player.setMediaItems(restoreItems, index, pos)
+            mediaSession.setPlayer(player)
+            player.prepare()
+            player.play()
+            updateNotification()
+            Timber.d("Cast 🔄 Retornado a reproducción local")
+        } catch (e: Exception) {
+            Timber.e(e, "Cast ❌ Error al volver a local")
+        }
+    }
+
   /** Starts periodic widget updates to show song progress */
   private fun startPeriodicWidgetUpdates() {
     if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -1800,19 +1946,15 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     widgetUpdateJob = null
   }
 
-  // Nueva función para guardar conexiones
   private suspend fun saveJamConnection(clientIp: String, timestamp: String) {
     dataStore.edit { preferences ->
       val existingHistory = preferences[JamConnectionHistoryKey] ?: ""
       val newEntry = "$clientIp|$timestamp"
 
-      // Limitar a las últimas 30 conexiones
       val historyEntries = existingHistory.split(";").filter { it.isNotEmpty() }.toMutableList()
 
-      // Añadir la nueva conexión al principio
       historyEntries.add(0, newEntry)
 
-      // Mantener solo las últimas 30 entradas
       val trimmedHistory = historyEntries.take(30).joinToString(";")
       preferences[JamConnectionHistoryKey] = trimmedHistory
     }
@@ -1849,6 +1991,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
    * Función utilitaria para sincronizar la cola actual con los clientes JAM Se debe llamar después
    * de cualquier modificación a la cola (eliminar, reorganizar, etc.)
    */
+
   fun syncQueueWithClients() {
     if (!isJamEnabled || !isJamHost || player.mediaItemCount == 0) {
       return
@@ -1958,7 +2101,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   /** Checks if current song should be scrobbled and scrobbles if needed */
 
   private fun checkAndScrobbleIfNeeded() {
-      // Asegurar que estamos en el hilo principal para acceder al player
       if (Looper.myLooper() != Looper.getMainLooper()) {
           scope.launch(Dispatchers.Main) { checkAndScrobbleIfNeeded() }
           return
@@ -1969,7 +2111,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       val songId = song.song.id
         val currentMetadata = player.currentMetadata
 
-        // Verificar que realmente tengamos metadata válida antes de proceder
         if (currentMetadata?.id != songId) {
             Timber.d(
                 "🔄 Metadata mismatch, skipping scrobble check: metadata=${currentMetadata?.id}, song=$songId"
@@ -1993,7 +2134,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
       val realPlayedTime = System.currentTimeMillis() - currentSongStartTime
 
-        // Verificar que las condiciones sean correctas antes de scrobble
         if (realPlayedTime >= 30000L && currentPosition >= 30000L) {
             // Double-check que no hemos scrobbled ya (protección adicional)
             if (!hasScrobbled) {
