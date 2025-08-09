@@ -53,6 +53,7 @@ import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaController
 import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
 import androidx.media3.session.SessionToken
 import com.anitail.innertube.YouTube
@@ -239,11 +240,38 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     override fun onCreate() {
     super.onCreate()
     instance = this
-    setMediaNotificationProvider(
-        DefaultMediaNotificationProvider(
-                this, { NOTIFICATION_ID }, CHANNEL_ID, R.string.music_player)
-            .apply { setSmallIcon(R.drawable.ic_ani) },
-    )
+        // Proveedor base
+        val baseNotificationProvider =
+            DefaultMediaNotificationProvider(
+                this, { NOTIFICATION_ID }, CHANNEL_ID, R.string.music_player
+            )
+                .apply { setSmallIcon(R.drawable.ic_ani) }
+
+        val suppressingProvider = object : MediaNotification.Provider {
+            override fun createNotification(
+                mediaSession: MediaSession,
+                mediaButtonPreferences: com.google.common.collect.ImmutableList<CommandButton>,
+                actionFactory: MediaNotification.ActionFactory,
+                onNotificationChangedCallback: MediaNotification.Provider.Callback
+            ): MediaNotification {
+                return (baseNotificationProvider as MediaNotification.Provider)
+                    .createNotification(
+                        mediaSession,
+                        mediaButtonPreferences,
+                        actionFactory,
+                        onNotificationChangedCallback
+                    )
+            }
+
+            override fun handleCustomCommand(
+                session: MediaSession,
+                action: String,
+                extras: android.os.Bundle
+            ): Boolean =
+                (baseNotificationProvider as MediaNotification.Provider)
+                    .handleCustomCommand(session, action, extras)
+        }
+        setMediaNotificationProvider(suppressingProvider)
 
     connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
 
