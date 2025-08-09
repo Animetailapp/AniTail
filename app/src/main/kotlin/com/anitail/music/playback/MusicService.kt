@@ -1856,41 +1856,67 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
             scope.launch(Dispatchers.IO) {
                 try {
-                    Timber.d("Cast ▶️ Generando mediaItems para Cast: total=${itemsSnapshot.size}")
-                    val indexAndItems = itemsSnapshot.mapIndexed { idx, mi -> idx to mi }
-                    val castPairs = indexAndItems.mapNotNull { (idx, mi) ->
-                        val casted = mi.toCastMediaItem()
-                        casted?.let { idx to it }
-                    }
-                    if (castPairs.isEmpty()) {
-                        Timber.w("Cast ⚠️ No se pudo obtener ninguna URL de stream para enviar al dispositivo")
+                    // 1. Preparar SOLO la canción actual
+                    val currentLocal = itemsSnapshot.getOrNull(originalIndex)
+                    val currentCast = currentLocal?.toCastMediaItem()
+                    if (currentCast == null) {
+                        Timber.w("Cast ⚠️ No se pudo convertir la canción actual, abortando")
+                        withContext(Dispatchers.Main) { isCastPreparing.value = false }
                         return@launch
                     }
-
-                    val newIndex =
-                        castPairs.indexOfFirst { it.first == originalIndex }.takeIf { it >= 0 } ?: 0
-                    val castItems = castPairs.map { it.second }
-                    Timber.d("Cast ✅ MediaItems listos (${castItems.size}) newIndex=$newIndex pos=$currentPos - realizando switch")
+                    Timber.d("Cast ▶️ Preparando sólo la pista actual primero (${originalIndex})")
                     withContext(Dispatchers.Main) {
                         try {
                             originalItemsBeforeCast = itemsSnapshot
-                            castPlayer?.setMediaItems(castItems, newIndex, currentPos)
+                            castPlayer?.setMediaItems(
+                                listOf(currentCast), /* startIndex */
+                                0,
+                                currentPos
+                            )
                             castPlayer?.prepare()
                             castPlayer?.play()
+                            // Cambiar a cast y pausar local
                             player.pause()
                             castPlayer?.let { mediaSession.setPlayer(it) }
                             updateNotification()
-                            Timber.d("Cast ▶️ Transferencia completada")
+                            Timber.d("Cast ✅ Pista actual reproduciéndose en remoto; rellenando cola...")
                         } catch (e: Exception) {
-                            Timber.e(e, "Cast ❌ Falló el switch, revirtiendo")
+                            Timber.e(e, "Cast ❌ Falló al iniciar pista actual")
                             mediaSession.setPlayer(player)
+                            isCastPreparing.value = false
+                            return@withContext
                         } finally {
+                            // Liberar el estado de preparación sólo respecto a la pista inicial
                             isCastPreparing.value = false
                         }
                     }
+
+                    // 2. Rellenar resto de la cola en background manteniendo orden original
+                    val after = (originalIndex + 1 until itemsSnapshot.size).toList()
+                    val before =
+                        (0 until originalIndex).toList() // se añadirán al principio en orden inverso
+
+                    // Añadir siguientes primero (se reproducirán después del actual)
+                    for (idx in after) {
+                        if (!isActive) break
+                        val mi = itemsSnapshot[idx]
+                        val casted = mi.toCastMediaItem() ?: continue
+                        withContext(Dispatchers.Main) {
+                            castPlayer?.addMediaItem(casted)
+                        }
+                    }
+                    // Añadir los anteriores al inicio en orden inverso para preservar orden final
+                    for (idx in before.asReversed()) {
+                        if (!isActive) break
+                        val mi = itemsSnapshot[idx]
+                        val casted = mi.toCastMediaItem() ?: continue
+                        withContext(Dispatchers.Main) {
+                            castPlayer?.addMediaItem(0, casted)
+                        }
+                    }
+                    Timber.d("Cast ✅ Cola remota rellenada. Total=${castPlayer?.mediaItemCount}")
                 } catch (e: Exception) {
-                    Timber.e(e, "Cast ❌ Error preparando CastPlayer")
-                    withContext(Dispatchers.Main) { isCastPreparing.value = false }
+                    Timber.e(e, "Cast ❌ Error durante carga progresiva")
                 }
             }
         } catch (_: Exception) {

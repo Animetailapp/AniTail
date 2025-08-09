@@ -43,11 +43,12 @@ fun CastMiniPlayerButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
     val routeButtonRef: MutableState<MediaRouteButton?> = remember { mutableStateOf(null) }
     val outline = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
     val primary = MaterialTheme.colorScheme.primary
-    val tintColor =
-        if (isCasting) primary else if (pureBlack) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurface.copy(
-            alpha = 0.7f
-        )
-    val bgColor = if (isCasting) primary.copy(alpha = 0.12f) else Color.Transparent
+    val tintColor = when {
+        isCasting -> Color.White // icono blanco cuando está casteando
+        pureBlack -> Color.White.copy(alpha = 0.7f)
+        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+    }
+    val bgColor = Color.Transparent
 
     // Transferir playback cuando cambia el estado de casting
     LaunchedEffect(isCasting) {
@@ -64,7 +65,7 @@ fun CastMiniPlayerButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
         modifier = modifier
             .size(40.dp)
             .clip(CircleShape)
-            .border(1.dp, if (isCasting) primary.copy(alpha = 0.5f) else outline, CircleShape)
+            .border(1.dp, if (isCasting) primary.copy(alpha = 0.6f) else outline, CircleShape)
             .background(bgColor, CircleShape)
             .clickable(enabled = !isPreparing) { routeButtonRef.value?.performClick() }
     ) {
