@@ -1974,7 +1974,11 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
   /** Starts periodic widget updates to show song progress */
   private fun startPeriodicWidgetUpdates() {
-    if (Looper.myLooper() != Looper.getMainLooper()) {
+      // Widget deshabilitado: no iniciar job periódico
+      widgetUpdateJob?.cancel()
+      widgetUpdateJob = null
+      return
+      if (Looper.myLooper() != Looper.getMainLooper()) {
       scope.launch(Dispatchers.Main) { startPeriodicWidgetUpdates() }
       return
     }
@@ -1988,7 +1992,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
               if (player.isPlaying && player.playbackState == STATE_READY) {
                 sendWidgetUpdateBroadcast()
               }
-              delay(2000)
+                delay(5000) // Menor frecuencia incluso si se reactivara el widget
             }
           } catch (_: Exception) {}
         }
