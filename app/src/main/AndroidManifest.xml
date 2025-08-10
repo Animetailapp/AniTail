@@ -162,7 +162,7 @@
 
     <!--  Cast -->
     <activity
-        android:name=".cast.CastExpandedActivity"
+        android:name=".cast.CastComposeActivity"
         android:exported="false"
         android:theme="@style/Theme.Anitail"
         android:parentActivityName=".MainActivity">

@@ -701,4 +701,13 @@
     <string name="subscribed">Suscrito</string>
     <string name="subscribe">Suscribirse</string>
     <string name="new_mini_player_design">Nuevo diseño del mini reproductor</string>
+    <!-- Selector de dispositivos Cast -->
+    <string name="cast_devices">Dispositivos Cast</string>
+    <string name="cast_no_devices">No hay dispositivos disponibles</string>
+    <string name="cast_connected">Conectado</string>
+    <string name="cast_connecting">Conectando…</string>
+    <string name="casting_to">Transmitiendo a %1$s</string>
+    <string name="disconnect">Desconectar</string>
+    <string name="disconnect_cast_title">Desconectar</string>
+    <string name="disconnect_cast_message">¿Detener transmisión y desconectar de %1$s?</string>
 </resources>

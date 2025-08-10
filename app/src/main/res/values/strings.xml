@@ -728,4 +728,13 @@
     <string name="clear_song_cache_confirmation">Are you sure you want to clear the song cache? This will free up space but might affect playback performance temporarily.</string>
     <string name="clear_image_cache_confirmation">Are you sure you want to clear the image cache? Album art and artist images will need to be re-downloaded.</string>
     <string name="confirm">Confirm</string>
+    <!-- Cast Device Picker -->
+    <string name="cast_devices">Cast devices</string>
+    <string name="cast_no_devices">No devices available</string>
+    <string name="cast_connected">Connected</string>
+    <string name="cast_connecting">Connecting…</string>
+    <string name="casting_to">Casting to %1$s</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="disconnect_cast_title">Disconnect</string>
+    <string name="disconnect_cast_message">Stop casting and disconnect from %1$s?</string>
 </resources>

@@ -11,4 +11,40 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+
+    <!-- Tema oscuro base (no pure black) -->
+    <style name="Theme.Anitail.Dark" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">#121212</item>
+        <item name="colorPrimary">@android:color/white</item>
+        <item name="colorPrimaryDark">#121212</item>
+        <item name="colorAccent">@android:color/white</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <!-- Tema pure black para pantallas AMOLED -->
+    <style name="Theme.Anitail.PureBlack" parent="Theme.Anitail.Dark">
+        <item name="android:windowBackground">#000000</item>
+        <item name="colorPrimaryDark">#000000</item>
+    </style>
+
+    <!-- Estilos para diálogos Cast -->
+    <style name="Theme.Anitail.Cast.Light" parent="Theme.Anitail">
+        <item name="colorPrimary">@android:color/black</item>
+        <item name="colorAccent">@android:color/black</item>
+    </style>
+
+    <style name="Theme.Anitail.Cast.Dark" parent="Theme.Anitail.Dark">
+        <item name="colorPrimary">@android:color/white</item>
+        <item name="colorAccent">@android:color/white</item>
+    </style>
+
+    <style name="Theme.Anitail.Cast.PureBlack" parent="Theme.Anitail.PureBlack">
+        <item name="colorPrimary">@android:color/white</item>
+        <item name="colorAccent">@android:color/white</item>
+    </style>
 </resources>
+

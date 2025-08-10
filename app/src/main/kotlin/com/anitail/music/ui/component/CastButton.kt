@@ -1,5 +1,6 @@
 package com.anitail.music.ui.component
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +17,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,6 +29,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.mediarouter.app.MediaRouteButton
 import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
+import com.anitail.music.cast.CastDevicePickerDialog
 import com.anitail.music.cast.CastManager
 import com.google.android.gms.cast.framework.CastButtonFactory
 import com.google.android.gms.cast.framework.CastContext
@@ -41,6 +44,7 @@ fun CastMiniPlayerButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
     val isPreparingState = playerConnection?.service?.isCastPreparing?.collectAsState()
     val isPreparing = isPreparingState?.value ?: false
     val routeButtonRef: MutableState<MediaRouteButton?> = remember { mutableStateOf(null) }
+    var showPicker by remember { mutableStateOf(false) }
     val outline = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
     val primary = MaterialTheme.colorScheme.primary
     val tintColor = when {
@@ -67,7 +71,21 @@ fun CastMiniPlayerButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
             .clip(CircleShape)
             .border(1.dp, if (isCasting) primary.copy(alpha = 0.6f) else outline, CircleShape)
             .background(bgColor, CircleShape)
-            .clickable(enabled = !isPreparing) { routeButtonRef.value?.performClick() }
+            .clickable(enabled = !isPreparing) {
+                if (isCasting) {
+                    // Nueva actividad Compose personalizada
+                    runCatching {
+                        context.startActivity(
+                            Intent(
+                                context,
+                                com.anitail.music.cast.CastComposeActivity::class.java
+                            )
+                        )
+                    }
+                } else {
+                    showPicker = true
+                }
+            }
     ) {
         Icon(
             painter = painterResource(if (isCasting) R.drawable.ic_cast_filled else R.drawable.ic_cast),
@@ -91,5 +109,8 @@ fun CastMiniPlayerButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
                 }
             }
         )
+        if (showPicker) {
+            CastDevicePickerDialog(onDismiss = { showPicker = false })
+        }
     }
 }
