@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -261,9 +262,9 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
     Surface(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
-				.fillMaxSize()
-				.background(MaterialTheme.colorScheme.surface)
-				.padding(16.dp)
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(16.dp)
         ) {
             var showDisconnectDialog by remember { mutableStateOf(false) }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -345,10 +346,10 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
             Spacer(Modifier.height(12.dp))
             // Control de volumen del dispositivo
             if (deviceVolumeMax > 1f) {
-                var localVolume by remember(deviceVolume) { mutableStateOf(deviceVolume) }
+                var localVolume by remember(deviceVolume) { mutableFloatStateOf(deviceVolume) }
                 Column(Modifier
-					.fillMaxWidth()
-					.padding(bottom = 8.dp)) {
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(
                             stringResource(R.string.volume),
@@ -371,28 +372,28 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
             }
             Box(
                 modifier = Modifier
-					.fillMaxWidth()
-					.weight(1f), contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .weight(1f), contentAlignment = Alignment.Center
             ) {
                 if (artwork != null) {
                     AsyncImage(
                         model = artwork,
                         contentDescription = null,
                         modifier = Modifier
-							.fillMaxWidth()
-							.aspectRatio(1f)
-							.clip(MaterialTheme.shapes.medium),
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .clip(MaterialTheme.shapes.medium),
                         contentScale = ContentScale.Crop
                     )
                 } else {
                     Box(
                         modifier = Modifier
-							.fillMaxWidth()
-							.aspectRatio(1f)
-							.background(
-								MaterialTheme.colorScheme.surfaceVariant,
-								MaterialTheme.shapes.medium
-							),
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant,
+                                MaterialTheme.shapes.medium
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
