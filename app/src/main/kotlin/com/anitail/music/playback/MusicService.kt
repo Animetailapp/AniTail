@@ -1876,11 +1876,27 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                 return
             }
             isCastPreparing.value = true
-            val itemsSnapshot: List<MediaItem> =
-                (0 until player.mediaItemCount).map { player.getMediaItemAt(it) }
+            // Capturar estado del player en el hilo principal
+            val (itemsSnapshot, originalIndex, currentPos) =
+                if (Looper.myLooper() == Looper.getMainLooper()) {
+                    val items = (0 until player.mediaItemCount).map { player.getMediaItemAt(it) }
+                    Triple(
+                        items,
+                        player.currentMediaItemIndex.coerceAtLeast(0),
+                        player.currentPosition
+                    )
+                } else {
+                    runBlocking(Dispatchers.Main) {
+                        val items =
+                            (0 until player.mediaItemCount).map { player.getMediaItemAt(it) }
+                        Triple(
+                            items,
+                            player.currentMediaItemIndex.coerceAtLeast(0),
+                            player.currentPosition
+                        )
+                    }
+                }
             if (itemsSnapshot.isEmpty()) return
-            val originalIndex = player.currentMediaItemIndex.coerceAtLeast(0)
-            val currentPos = player.currentPosition
 
             scope.launch(Dispatchers.IO) {
                 try {
@@ -1954,6 +1970,10 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     /** Optional helper to return playback to local device after cast session ends */
     fun returnToLocalPlayback() {
         try {
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                scope.launch(Dispatchers.Main) { returnToLocalPlayback() }
+                return
+            }
             if (castPlayer == null) return
             val usingCast = mediaSession.player === castPlayer
             if (!usingCast) return
@@ -2055,7 +2075,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       return
     }
 
-    scope.launch(Dispatchers.IO) {
+      scope.launch(Dispatchers.Main) {
       try {
         val title = queueTitle
         val items = player.mediaItems.mapNotNull { it.metadata }
@@ -2069,7 +2089,9 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                 position = position,
             )
         val queueMessage = LanJamQueueSync.serializeQueue(persistQueue)
-        lanJamServer?.sendWithRetry(queueMessage, 2) ?: 0
+          withContext(Dispatchers.IO) {
+              lanJamServer?.sendWithRetry(queueMessage, 2) ?: 0
+          }
       } catch (_: Exception) {}
     }
   }
@@ -2104,20 +2126,21 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     }
   }
 
-  private fun getNextQueueItems(count: Int): List<MediaItem> {
-    val result = mutableListOf<MediaItem>()
-    val currentIndex = player.currentMediaItemIndex
-    val totalItems = player.mediaItemCount
+    private suspend fun getNextQueueItems(count: Int): List<MediaItem> =
+        withContext(Dispatchers.Main) {
+            val result = mutableListOf<MediaItem>()
+            val currentIndex = player.currentMediaItemIndex
+            val totalItems = player.mediaItemCount
 
-    for (i in 1..count) {
-      val nextIndex = currentIndex + i
-      if (nextIndex < totalItems) {
-        player.getMediaItemAt(nextIndex).let { result.add(it) }
-      }
-    }
+            for (i in 1..count) {
+                val nextIndex = currentIndex + i
+                if (nextIndex < totalItems) {
+                    player.getMediaItemAt(nextIndex).let { result.add(it) }
+                }
+            }
 
-    return result
-  }
+            result
+        }
 
     /** Starts periodic scrobble checking during playbook */
   private fun startPeriodicScrobbleCheck() {
