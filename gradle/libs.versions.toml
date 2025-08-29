@@ -1,5 +1,5 @@
 [versions]
-androidGradlePlugin = "8.13.0-alpha03"
+androidGradlePlugin = "8.13.0-rc02"
 hiltWork = "1.3.0-alpha02"
 commonsCodec = "1.19.0"
 json = "20250517"
