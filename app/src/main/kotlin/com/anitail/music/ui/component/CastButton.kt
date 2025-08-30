@@ -32,6 +32,7 @@ import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.cast.CastDevicePickerDialog
 import com.anitail.music.cast.CastManager
+import com.anitail.music.utils.GooglePlayServicesUtils
 import com.google.android.gms.cast.framework.CastButtonFactory
 import com.google.android.gms.cast.framework.CastContext
 
@@ -39,6 +40,12 @@ import com.google.android.gms.cast.framework.CastContext
 fun CastMiniPlayerButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current
+
+    // Verificar si Cast está disponible antes de renderizar
+    if (!GooglePlayServicesUtils.isCastAvailable(context)) {
+        return
+    }
+    
     // Usar singleton para evitar crear múltiples instancias
     val castManager =
         remember(context.applicationContext) { CastManager(context.applicationContext) }

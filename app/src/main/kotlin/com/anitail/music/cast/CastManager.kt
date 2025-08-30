@@ -1,6 +1,7 @@
 package com.anitail.music.cast
 
 import android.content.Context
+import com.anitail.music.utils.GooglePlayServicesUtils
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.Session
 import com.google.android.gms.cast.framework.SessionManagerListener
@@ -10,7 +11,13 @@ class CastManager(private val context: Context) {
     val isCasting = MutableStateFlow(false)
 
     // Memoizar CastContext para evitar múltiples llamadas
-    private val castContext by lazy { CastContext.getSharedInstance(context) }
+    private val castContext by lazy {
+        if (GooglePlayServicesUtils.isCastAvailable(context)) {
+            CastContext.getSharedInstance(context)
+        } else {
+            null
+        }
+    }
 
     private val sessionListener = object : SessionManagerListener<Session> {
         override fun onSessionStarted(session: Session, sessionId: String) {
@@ -34,11 +41,13 @@ class CastManager(private val context: Context) {
     }
 
     fun start() {
-        castContext.sessionManager.addSessionManagerListener(sessionListener)
-        isCasting.value = castContext.sessionManager.currentCastSession != null
+        val context = castContext ?: return
+        context.sessionManager.addSessionManagerListener(sessionListener)
+        isCasting.value = context.sessionManager.currentCastSession != null
     }
 
     fun stop() {
-        castContext.sessionManager.removeSessionManagerListener(sessionListener)
+        val context = castContext ?: return
+        context.sessionManager.removeSessionManagerListener(sessionListener)
     }
 }

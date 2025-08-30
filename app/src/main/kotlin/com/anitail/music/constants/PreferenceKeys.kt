@@ -80,6 +80,7 @@ val AutoDownloadOnLikeKey = booleanPreferencesKey("autoDownloadOnLike")
 val AutoDownloadLyricsKey = booleanPreferencesKey("autoDownloadLyrics")
 val NotificationButtonTypeKey = stringPreferencesKey("notificationButtonType")
 val EnableBackupUploadKey = booleanPreferencesKey("enableBackupUpload")
+val EnableCastKey = booleanPreferencesKey("enableCast")
 
 enum class NotificationButtonType {
     CLOSE,

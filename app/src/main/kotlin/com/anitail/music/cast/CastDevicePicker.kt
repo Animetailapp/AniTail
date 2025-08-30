@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.mediarouter.media.MediaRouteSelector
 import androidx.mediarouter.media.MediaRouter
 import com.anitail.music.R
+import com.anitail.music.utils.GooglePlayServicesUtils
 import com.google.android.gms.cast.CastMediaControlIntent
 import com.google.android.gms.cast.framework.CastContext
 import kotlinx.coroutines.delay
@@ -44,6 +45,13 @@ private data class CastRouteUi(
 @Composable
 fun CastDevicePickerDialog(onDismiss: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
+
+    // Verificar si Cast está disponible antes de mostrar el diálogo
+    if (!GooglePlayServicesUtils.isCastAvailable(context)) {
+        onDismiss()
+        return
+    }
+    
     val castContext =
         remember { runCatching { CastContext.getSharedInstance(context) }.getOrNull() }
     val mediaRouter = remember { MediaRouter.getInstance(context) }

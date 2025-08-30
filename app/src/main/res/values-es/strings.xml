@@ -714,4 +714,10 @@
     <string name="disconnect">Desconectar</string>
     <string name="disconnect_cast_title">Desconectar</string>
     <string name="disconnect_cast_message">¿Detener transmisión y desconectar de %1$s?</string>
+
+    <!-- Cast Settings -->
+    <string name="enable_cast">Habilitar Cast</string>
+    <string name="enable_cast_desc">Permitir transmitir contenido a dispositivos compatibles. Requiere Google Play Services.</string>
+    <string name="cast_unavailable">Cast no disponible</string>
+    <string name="cast_requires_google_play_services">La funcionalidad de Cast requiere que Google Play Services esté disponible en tu dispositivo.</string>
 </resources>

@@ -202,6 +202,7 @@ dependencies {
     implementation(libs.media3.okhttp)
     implementation(libs.media3.cast)
     implementation(libs.play.services.cast)
+    implementation(libs.play.services.base)
     implementation(libs.squigglyslider)
 
     implementation(libs.room.runtime)

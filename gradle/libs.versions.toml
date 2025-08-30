@@ -12,6 +12,7 @@ material3 = "1.5.0-alpha03"
 materialKolor = "3.0.1"
 media3 = "1.8.0"
 playServicesCast = "22.1.0"
+playServicesBase = "18.7.2"
 onesignal = "5.2.0-beta-06"
 room = "2.8.0-rc02"
 hilt = "2.57.1"
@@ -70,6 +71,7 @@ media3-okhttp = { group = "androidx.media3", name = "media3-datasource-okhttp", 
 media3-session = { group = "androidx.media3", name = "media3-session", version.ref = "media3" }
 media3-cast = { group = "androidx.media3", name = "media3-cast", version.ref = "media3" }
 play-services-cast = { group = "com.google.android.gms", name = "play-services-cast-framework", version.ref = "playServicesCast" }
+play-services-base = { group = "com.google.android.gms", name = "play-services-base", version.ref = "playServicesBase" }
 
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }

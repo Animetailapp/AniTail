@@ -146,6 +146,13 @@ class CastComposeActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Verificar si Cast está disponible antes de continuar
+        if (!com.anitail.music.utils.GooglePlayServicesUtils.isCastAvailable(this)) {
+            finish()
+            return
+        }
+        
         startService(
             android.content.Intent(
                 this,
