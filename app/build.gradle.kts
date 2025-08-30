@@ -19,7 +19,7 @@ android {
     ndkVersion = "25.1.8937393"
     defaultConfig {
         applicationId = "com.anitail.music"
-        minSdk = 21
+        minSdk = 23
         targetSdk = 36
         versionCode = 12
         versionName = "1.10.1"

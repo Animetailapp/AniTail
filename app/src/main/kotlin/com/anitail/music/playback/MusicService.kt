@@ -236,6 +236,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
   val automixItems = MutableStateFlow<List<MediaItem>>(emptyList())
     private var consecutivePlaybackErr = 0
+    private var lastWidgetUpdateAt: Long = 0L
 
     override fun onCreate() {
     super.onCreate()
@@ -617,20 +618,23 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                     scope.launch {
                       val isEmpty = player.mediaItems.isEmpty()
                       if (!isEmpty) {
-
-                        val title = queueTitle
-                        val items = player.mediaItems.mapNotNull { it.metadata }
-                        val currentIndex = player.currentMediaItemIndex
-                        val position = player.currentPosition
+                          // Snapshot en main para evitar accesos en hilos equivocados
+                          val titleSnap = queueTitle
+                          val itemsSnap = player.mediaItems
+                          val currentIndexSnap = player.currentMediaItemIndex
+                          val positionSnap = player.currentPosition
+                          val isPlayingSnap = player.isPlaying
+                          val repeatModeSnap = player.repeatMode
+                          val shuffleSnap = player.shuffleModeEnabled
 
                         withContext(Dispatchers.IO) {
                           try {
                             val persistQueue =
                                 PersistQueue(
-                                    title = title,
-                                    items = items,
-                                    mediaItemIndex = currentIndex,
-                                    position = position,
+                                    title = titleSnap,
+                                    items = itemsSnap.mapNotNull { it.metadata },
+                                    mediaItemIndex = currentIndexSnap,
+                                    position = positionSnap,
                                 )
                             val queueMessage = LanJamQueueSync.serializeQueue(persistQueue)
                             val success = lanJamServer?.sendWithRetry(queueMessage, 3) ?: 0
@@ -643,7 +647,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                                   LanJamCommands.serialize(
                                       LanJamCommands.Command(
                                           type =
-                                              if (player.isPlaying) LanJamCommands.CommandType.PLAY
+                                              if (isPlayingSnap) LanJamCommands.CommandType.PLAY
                                               else LanJamCommands.CommandType.PAUSE))
                               lanJamServer?.sendWithRetry(playStateCommand, 2)
 
@@ -652,10 +656,12 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                                   LanJamCommands.serialize(
                                       LanJamCommands.Command(
                                           type = LanJamCommands.CommandType.TOGGLE_REPEAT,
-                                          repeatMode = player.repeatMode)),
+                                          repeatMode = repeatModeSnap
+                                      )
+                                  ),
                                   2)
 
-                              if (player.shuffleModeEnabled) {
+                                if (shuffleSnap) {
                                 delay(100)
                                 lanJamServer?.sendWithRetry(
                                     LanJamCommands.serialize(
@@ -1227,6 +1233,13 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       return
     }
 
+      // Throttle: evita emitir demasiadas actualizaciones seguidas
+      val now = android.os.SystemClock.uptimeMillis()
+      if (now - lastWidgetUpdateAt < WIDGET_UPDATE_THROTTLE_MS) {
+          return
+      }
+      lastWidgetUpdateAt = now
+
     val meta = currentMediaMetadata.value
 
     if (meta?.id != null) {
@@ -1659,30 +1672,37 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       filesDir.resolve(PERSISTENT_QUEUE_FILE).delete()
       return
     }
-    val persistQueue =
-        PersistQueue(
-            title = queueTitle,
-            items = player.mediaItems.mapNotNull { it.metadata },
-            mediaItemIndex = player.currentMediaItemIndex,
-            position = player.currentPosition,
+      // Capturar snapshot rápido en main y escribir en IO
+      scope.launch(Dispatchers.Default) {
+          val snapshot = withContext(Dispatchers.Main.immediate) {
+              Pair(
+                  PersistQueue(
+                      title = queueTitle,
+                      items = player.mediaItems.mapNotNull { it.metadata },
+                      mediaItemIndex = player.currentMediaItemIndex,
+                      position = player.currentPosition,
+                  ),
+                  PersistQueue(
+                      title = "automix",
+                      items = automixItems.value.mapNotNull { it.metadata },
+                      mediaItemIndex = 0,
+                      position = 0,
+                  ),
         )
-    val persistAutomix =
-        PersistQueue(
-            title = "automix",
-            items = automixItems.value.mapNotNull { it.metadata },
-            mediaItemIndex = 0,
-            position = 0,
-        )
-    runCatching {
-          val json = Json.encodeToString(persistQueue)
-          filesDir.resolve(PERSISTENT_QUEUE_FILE).writeText(json, Charsets.UTF_8)
-        }
-        .onFailure { reportException(it) }
-    runCatching {
-          val json = Json.encodeToString(persistAutomix)
-          filesDir.resolve(PERSISTENT_AUTOMIX_FILE).writeText(json, Charsets.UTF_8)
-        }
-        .onFailure { reportException(it) }
+          }
+          withContext(Dispatchers.IO) {
+              runCatching {
+                  val json = Json.encodeToString(snapshot.first)
+                  filesDir.resolve(PERSISTENT_QUEUE_FILE).writeText(json, Charsets.UTF_8)
+              }
+                  .onFailure { reportException(it) }
+              runCatching {
+                  val json = Json.encodeToString(snapshot.second)
+                  filesDir.resolve(PERSISTENT_AUTOMIX_FILE).writeText(json, Charsets.UTF_8)
+              }
+                  .onFailure { reportException(it) }
+          }
+      }
   }
 
   override fun onDestroy() {
@@ -1773,6 +1793,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     const val PERSISTENT_QUEUE_FILE = "persistent_queue.data"
     const val PERSISTENT_AUTOMIX_FILE = "persistent_automix.data"
       const val MAX_CONSECUTIVE_ERR = 5
+      const val WIDGET_UPDATE_THROTTLE_MS = 300L
 
 
       // Constants for lyrics download action
@@ -1940,23 +1961,20 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                     val before =
                         (0 until originalIndex).toList() // se añadirán al principio en orden inverso
 
-                    // Añadir siguientes primero (se reproducirán después del actual)
+                    // Preparar listas en background y añadir en lotes en Main
+                    val castAfter = mutableListOf<MediaItem>()
                     for (idx in after) {
                         if (!isActive) break
-                        val mi = itemsSnapshot[idx]
-                        val casted = mi.toCastMediaItem() ?: continue
-                        withContext(Dispatchers.Main) {
-                            castPlayer?.addMediaItem(casted)
-                        }
+                        itemsSnapshot[idx].toCastMediaItem()?.let { castAfter.add(it) }
                     }
-                    // Añadir los anteriores al inicio en orden inverso para preservar orden final
-                    for (idx in before.asReversed()) {
+                    val castBefore = mutableListOf<MediaItem>()
+                    for (idx in before) { // en orden natural 0..originalIndex-1
                         if (!isActive) break
-                        val mi = itemsSnapshot[idx]
-                        val casted = mi.toCastMediaItem() ?: continue
-                        withContext(Dispatchers.Main) {
-                            castPlayer?.addMediaItem(0, casted)
-                        }
+                        itemsSnapshot[idx].toCastMediaItem()?.let { castBefore.add(it) }
+                    }
+                    withContext(Dispatchers.Main) {
+                        if (castAfter.isNotEmpty()) castPlayer?.addMediaItems(castAfter)
+                        if (castBefore.isNotEmpty()) castPlayer?.addMediaItems(0, castBefore)
                     }
                     Timber.d("Cast ✅ Cola remota rellenada. Total=${castPlayer?.mediaItemCount}")
                 } catch (e: Exception) {
@@ -2075,23 +2093,34 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       return
     }
 
-      scope.launch(Dispatchers.Main) {
+      scope.launch(Dispatchers.Default) {
       try {
-        val title = queueTitle
-        val items = player.mediaItems.mapNotNull { it.metadata }
-        val currentIndex = player.currentMediaItemIndex
-        val position = player.currentPosition
+          data class QueueSnapshot(
+              val title: String?,
+              val items: List<MediaItem>,
+              val index: Int,
+              val position: Long,
+          )
+          // Captura mínima en el hilo principal
+          val snap = withContext(Dispatchers.Main.immediate) {
+              QueueSnapshot(
+                  title = queueTitle,
+                  items = player.mediaItems,
+                  index = player.currentMediaItemIndex,
+                  position = player.currentPosition,
+              )
+          }
+          // Trabajo pesado fuera de main
+          val mapped = snap.items.mapNotNull { it.metadata }
         val persistQueue =
             PersistQueue(
-                title = title,
-                items = items,
-                mediaItemIndex = currentIndex,
-                position = position,
+                title = snap.title,
+                items = mapped,
+                mediaItemIndex = snap.index,
+                position = snap.position,
             )
         val queueMessage = LanJamQueueSync.serializeQueue(persistQueue)
-          withContext(Dispatchers.IO) {
-              lanJamServer?.sendWithRetry(queueMessage, 2) ?: 0
-          }
+          withContext(Dispatchers.IO) { lanJamServer?.sendWithRetry(queueMessage, 2) ?: 0 }
       } catch (_: Exception) {}
     }
   }
