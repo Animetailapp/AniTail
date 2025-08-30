@@ -97,7 +97,7 @@ fun CastDevicePickerDialog(onDismiss: () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
-        delay(250)
+        delay(500) // Incrementar delay para reducir carga inicial
         discovering = false
     }
 

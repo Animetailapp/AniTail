@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 class CastManager(private val context: Context) {
     val isCasting = MutableStateFlow(false)
 
+    // Memoizar CastContext para evitar múltiples llamadas
+    private val castContext by lazy { CastContext.getSharedInstance(context) }
+
     private val sessionListener = object : SessionManagerListener<Session> {
         override fun onSessionStarted(session: Session, sessionId: String) {
             isCasting.value = true
@@ -31,16 +34,11 @@ class CastManager(private val context: Context) {
     }
 
     fun start() {
-        CastContext.getSharedInstance(context).sessionManager.addSessionManagerListener(
-            sessionListener
-        )
-        isCasting.value =
-            CastContext.getSharedInstance(context).sessionManager.currentCastSession != null
+        castContext.sessionManager.addSessionManagerListener(sessionListener)
+        isCasting.value = castContext.sessionManager.currentCastSession != null
     }
 
     fun stop() {
-        CastContext.getSharedInstance(context).sessionManager.removeSessionManagerListener(
-            sessionListener
-        )
+        castContext.sessionManager.removeSessionManagerListener(sessionListener)
     }
 }

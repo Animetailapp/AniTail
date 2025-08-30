@@ -73,8 +73,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -191,45 +191,46 @@ class CastComposeActivity : ComponentActivity() {
             var lastArtworkProcessed by remember { mutableStateOf<String?>(null) }
             var lastPrefetchedNext by remember { mutableStateOf<String?>(null) }
             val imageLoader = remember { ImageLoader(ctx) }
-            LaunchedEffect(controller) {
-                while (isActive) {
-                    val art = controller?.currentMediaItem?.mediaMetadata?.artworkUri?.toString()
-                    if (art != null && art != lastArtworkProcessed) {
-                        runCatching {
-                            val drawable = withContext(Dispatchers.IO) {
-                                imageLoader.execute(
-                                    ImageRequest.Builder(ctx)
-                                        .data(art)
-                                        .allowHardware(false)
-                                        .build()
-                                ).drawable
-                            }
-                            val bmp = (drawable as? BitmapDrawable)?.bitmap
-                            if (bmp != null) {
-                                themeColor = bmp.extractThemeColor()
-                                lastArtworkProcessed = art
-                            }
-                            // Prefetch del siguiente artwork si existe
-                            val nextIndex = controller?.currentMediaItemIndex?.plus(1) ?: -1
-                            val items = runCatching { controller?.mediaItems }.getOrNull()
-                            val nextArt =
-                                items?.getOrNull(nextIndex)?.mediaMetadata?.artworkUri?.toString()
-                            if (!nextArt.isNullOrBlank() && nextArt != lastPrefetchedNext) {
-                                runCatching {
-                                    withContext(Dispatchers.IO) {
-                                        imageLoader.execute(
-                                            ImageRequest.Builder(ctx)
-                                                .data(nextArt)
-                                                .allowHardware(false)
-                                                .build()
-                                        )
-                                    }
-                                }
-                                lastPrefetchedNext = nextArt
-                            }
+
+            // Optimizado: Solo procesar artwork cuando cambie el media item
+            LaunchedEffect(controller?.currentMediaItem?.mediaMetadata?.artworkUri) {
+                val art = controller?.currentMediaItem?.mediaMetadata?.artworkUri?.toString()
+                if (art != null && art != lastArtworkProcessed) {
+                    runCatching {
+                        val drawable = withContext(Dispatchers.IO) {
+                            imageLoader.execute(
+                                ImageRequest.Builder(ctx)
+                                    .data(art)
+                                    .allowHardware(false)
+                                    .build()
+                            ).drawable
+                        }
+                        val bmp = (drawable as? BitmapDrawable)?.bitmap
+                        if (bmp != null) {
+                            themeColor = bmp.extractThemeColor()
+                            lastArtworkProcessed = art
                         }
                     }
-                    delay(5000)
+                }
+            }
+
+            // Prefetch separado para evitar retraso en UI
+            LaunchedEffect(controller?.currentMediaItemIndex) {
+                val nextIndex = controller?.currentMediaItemIndex?.plus(1) ?: -1
+                val items = runCatching { controller?.mediaItems }.getOrNull()
+                val nextArt = items?.getOrNull(nextIndex)?.mediaMetadata?.artworkUri?.toString()
+                if (!nextArt.isNullOrBlank() && nextArt != lastPrefetchedNext) {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            imageLoader.execute(
+                                ImageRequest.Builder(ctx)
+                                    .data(nextArt)
+                                    .allowHardware(false)
+                                    .build()
+                            )
+                        }
+                    }
+                    lastPrefetchedNext = nextArt
                 }
             }
 
@@ -344,7 +345,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
         var nameLast = deviceName
         var lastMediaId: String? = null
         var consecutiveErrors = 0
-        val startTime = System.currentTimeMillis()
+        System.currentTimeMillis()
 
         fun refreshMetadata(): Boolean = runCatching {
             controller.isPlaying.let { p -> if (p != isPlaying) isPlaying = p }
@@ -377,32 +378,26 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
             }
         }.isSuccess
 
-        // Refresco inmediato antes del primer delay
+        // Refresco inmediato
         refreshMetadata()
 
         while (isActive) {
-            val success = refreshMetadata()
-            if (!success) {
-                consecutiveErrors++
-                if (consecutiveErrors > 5) break
-            } else if (consecutiveErrors > 0) consecutiveErrors = 0
+            // Usar intervalos más largos para reducir sobrecarga
+            val baseInterval = if (isPlaying) 1000L else 2000L
+            val interval = if (consecutiveErrors > 0) {
+                (baseInterval * (1 + consecutiveErrors)).coerceAtMost(10000L)
+            } else baseInterval
 
-            val elapsed = System.currentTimeMillis() - startTime
-            val needFast = (title.isBlank() || duration == 0L || artwork == null)
-            val ultraFast = elapsed < 1600 && needFast
-            val fast = !ultraFast && elapsed < 3500 && needFast
-            val medium = !ultraFast && !fast && elapsed < 7000 && needFast
-            val interval = when {
-                ultraFast -> 120L
-                fast -> 240L
-                medium -> 500L
-                else -> 1000L
+            if (refreshMetadata()) {
+                consecutiveErrors = 0
+            } else {
+                consecutiveErrors = (consecutiveErrors + 1).coerceAtMost(5)
             }
             delay(interval)
         }
     }
 
-    // Telemetría y actualización de progreso usando snapshotFlow para suspender cuando no está reproduciendo
+    // Telemetría y actualización de progreso optimizada
     var avgProgressInterval by remember { mutableLongStateOf(0L) }
     var lastProgressTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(controller) {
@@ -419,12 +414,14 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                         lastProgressTick = now
                     }
                     val nearEnd = duration > 0 && (duration - position) < 1500
-                    val interval = if (nearEnd) 150L else 250L
-                    // Actualizamos posición y refrescamos isPlaying rápido (optimista)
+                    // Intervalos más largos para reducir carga del CPU
+                    val interval = if (nearEnd) 300L else 500L
+                    // Actualizamos posición con menos frecuencia
                     runCatching { controller.currentPosition.let { position = it } }
                     runCatching { controller.isPlaying }.getOrNull()
                         ?.let { p -> if (p != isPlaying) isPlaying = p }
-                    if (BuildConfig.DEBUG && now / 5000 != (now - diff) / 5000) {
+                    if (BuildConfig.DEBUG && now / 15000 != (now - diff) / 15000) {
+                        // Reducir frecuencia de logs para mejor rendimiento
                         try {
                             Timber.d("CastProgress avgInterval=${avgProgressInterval}ms")
                         } catch (_: Exception) {
@@ -437,25 +434,26 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {
-        // Fondo con blur usando el artwork (imitando nuevo player)
+        // Fondo simplificado sin blur costoso
         Box(modifier = Modifier.fillMaxSize()) {
             if (artwork != null) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(artwork)
-                        .crossfade(true)
+                        .crossfade(false) // Remover crossfade para mejor rendimiento
                         .build(),
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
-                        .blur(60.dp),
-                    contentScale = ContentScale.Crop
+                        .scale(1.2f), // Escala ligera en lugar de blur costoso
+                    contentScale = ContentScale.Crop,
+                    alpha = 0.3f // Transparencia en lugar de blur
                 )
-                // Overlay oscura para contraste
+                // Overlay más fuerte para compensar la falta de blur
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.65f))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
                 )
             } else {
                 Box(
@@ -473,7 +471,6 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
             var showDisconnectDialog by remember { mutableStateOf(false) }
             // Estado para mostrar la hoja de la cola (movido al fondo)
             var showQueueSheet by remember { mutableStateOf(false) }
-            var queueRevision by remember { mutableIntStateOf(0) }
             // Cabecera centrada similar al nuevo player
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 val headerBtnSize = 42.dp
@@ -608,7 +605,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                             localVolume = v
                             volumeJob?.cancel()
                             volumeJob = activity?.lifecycleScope?.launch {
-                                delay(160) // debounce
+                                delay(300) // Incrementar debounce para reducir frecuencia
                                 controller?.setDeviceVolume(v.toInt())
                             }
                         },
@@ -632,7 +629,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(artwork)
-                            .crossfade(true)
+                            .crossfade(false) // Remover crossfade para mejor rendimiento
                             .build(),
                         contentDescription = null,
                         modifier = artModifier,
@@ -830,9 +827,10 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                 if (showQueueSheet) {
                     val c = controller
                     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-                    // Snapshot estable de la cola: iteramos usando mediaItemCount para evitar inconsistencias durante scroll
-                    val items: List<MediaItem> =
-                        remember(queueRevision, c?.mediaItemCount, c?.currentMediaItemIndex) {
+                    // Snapshot estable de la cola: solo rebuild cuando cambie realmente el contenido
+                    val items: List<MediaItem> = remember(showQueueSheet) {
+                        if (!showQueueSheet) emptyList()
+                        else {
                             val count = c?.mediaItemCount ?: 0
                             buildList(count) {
                                 for (i in 0 until count) {
@@ -841,6 +839,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                 }
                             }
                         }
+                    }
                     ModalBottomSheet(
                         onDismissRequest = { showQueueSheet = false },
                         sheetState = sheetState,
@@ -930,7 +929,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                                         }
                                                     }.isSuccess
                                                     if (removed) {
-                                                        queueRevision++
+                                                        // queueRevision eliminado para optimizar rendimiento
                                                         if ((controller?.mediaItemCount
                                                                 ?: 0) == 0
                                                         ) showQueueSheet = false
@@ -991,7 +990,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                                 AsyncImage(
                                                     model = ImageRequest.Builder(LocalContext.current)
                                                         .data(thumb)
-                                                        .crossfade(true)
+                                                        .crossfade(false) // Remover crossfade para mejor rendimiento
                                                         .build(),
                                                     contentDescription = null,
                                                     modifier = Modifier

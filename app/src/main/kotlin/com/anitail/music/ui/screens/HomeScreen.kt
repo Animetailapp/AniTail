@@ -108,6 +108,7 @@ import com.anitail.music.ui.utils.SnapLayoutInfoProvider
 import com.anitail.music.utils.rememberPreference
 import com.anitail.music.viewmodels.HomeViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -122,7 +123,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val menuState = LocalMenuState.current
-    val bottomSheetPageState = LocalBottomSheetPageState.current
+    LocalBottomSheetPageState.current
     val database = LocalDatabase.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val haptic = LocalHapticFeedback.current
@@ -171,6 +172,7 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         snapshotFlow { lazylistState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+            .distinctUntilChanged() // Evitar emitir el mismo valor repetidamente
             .collect { lastVisibleIndex ->
                 val len = lazylistState.layoutInfo.totalItemsCount
                 if (lastVisibleIndex != null && lastVisibleIndex >= len - 3) {
@@ -497,7 +499,7 @@ fun HomeScreen(
                                         .data(url)
                                         .diskCachePolicy(CachePolicy.ENABLED)
                                         .diskCacheKey(url)
-                                        .crossfade(true)
+                                        .crossfade(false) // Remover crossfade para mejor rendimiento
                                         .build(),
                                     placeholder = painterResource(id = R.drawable.person),
                                     error = painterResource(id = R.drawable.person),

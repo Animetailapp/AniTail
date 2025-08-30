@@ -11,6 +11,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
@@ -38,8 +39,24 @@ import com.google.android.gms.cast.framework.CastContext
 fun CastMiniPlayerButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current
-    val castManager = remember { CastManager(context.applicationContext) }
-    LaunchedEffect(Unit) { runCatching { CastContext.getSharedInstance(context); castManager.start() } }
+    // Usar singleton para evitar crear múltiples instancias
+    val castManager =
+        remember(context.applicationContext) { CastManager(context.applicationContext) }
+
+    // Inicializar solo una vez y manegar ciclo de vida
+    LaunchedEffect(castManager) {
+        runCatching {
+            CastContext.getSharedInstance(context)
+            castManager.start()
+        }
+    }
+
+    DisposableEffect(castManager) {
+        onDispose {
+            castManager.stop()
+        }
+    }
+    
     val isCasting by castManager.isCasting.collectAsState()
     val isPreparingState = playerConnection?.service?.isCastPreparing?.collectAsState()
     val isPreparing = isPreparingState?.value ?: false

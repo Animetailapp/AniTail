@@ -1897,7 +1897,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                 return
             }
             isCastPreparing.value = true
-            // Capturar estado del player en el hilo principal
+            // Capturar estado del player en el hilo principal sin bloqueo
             val (itemsSnapshot, originalIndex, currentPos) =
                 if (Looper.myLooper() == Looper.getMainLooper()) {
                     val items = (0 until player.mediaItemCount).map { player.getMediaItemAt(it) }
@@ -1907,17 +1907,28 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                         player.currentPosition
                     )
                 } else {
-                    runBlocking(Dispatchers.Main) {
+                    // Evitar runBlocking en el hilo principal - usar withContext en su lugar
+                    scope.launch(Dispatchers.Main) {
                         val items =
                             (0 until player.mediaItemCount).map { player.getMediaItemAt(it) }
-                        Triple(
+                        val snapshot = Triple(
                             items,
                             player.currentMediaItemIndex.coerceAtLeast(0),
                             player.currentPosition
                         )
+                        // Continuar procesamiento en background
+                        startCastWithSnapshot(snapshot)
                     }
+                    return
                 }
             if (itemsSnapshot.isEmpty()) return
+            startCastWithSnapshot(Triple(itemsSnapshot, originalIndex, currentPos))
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun startCastWithSnapshot(snapshot: Triple<List<MediaItem>, Int, Long>) {
+        val (itemsSnapshot, originalIndex, currentPos) = snapshot
 
             scope.launch(Dispatchers.IO) {
                 try {
@@ -1981,8 +1992,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                     Timber.e(e, "Cast ❌ Error durante carga progresiva")
                 }
             }
-        } catch (_: Exception) {
-        }
     }
 
     /** Optional helper to return playback to local device after cast session ends */
