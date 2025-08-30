@@ -239,5 +239,5 @@ dependencies {
     implementation(libs.commons.codec)
 
     // On-device translation for lyrics (ML Kit)
-    implementation("com.google.mlkit:translate:17.0.2")
+    implementation(libs.translate)
 }

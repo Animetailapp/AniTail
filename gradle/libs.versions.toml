@@ -20,6 +20,7 @@ ktor = "3.2.3"
 ksp = "2.2.20-Beta2-2.0.2"
 okhttp = "5.0.0-alpha.14"
 newpipe = "dev-SNAPSHOT"
+translate = "17.0.3"
 workRuntimeKtx = "2.10.3"
 kuromojiIpadic = "0.9.0"
 
@@ -52,6 +53,7 @@ compose-icons-extended = { group = "androidx.compose.material", name = "material
 onesignal = { module = "com.onesignal:OneSignal", version.ref = "onesignal" }
 squigglyslider = { group = "me.saket.squigglyslider", name = "squigglyslider", version = "1.0.0" }
 
+translate = { module = "com.google.mlkit:translate", version.ref = "translate" }
 viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
 viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 
