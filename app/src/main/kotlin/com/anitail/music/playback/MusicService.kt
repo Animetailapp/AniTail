@@ -59,6 +59,7 @@ import androidx.media3.session.SessionToken
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint
+import com.anitail.music.BuildConfig
 import com.anitail.music.MainActivity
 import com.anitail.music.R
 import com.anitail.music.constants.AudioNormalizationKey
@@ -1018,9 +1019,31 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   }
 
   fun playNext(items: List<MediaItem>) {
-    player.addMediaItems(
-        if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1, items)
+      val insertIndex = if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1
+      player.addMediaItems(insertIndex, items)
     player.prepare()
+
+      // Si hay una sesión de Cast activa, agregar también al Cast
+      if (castPlayer != null && mediaSession.player === castPlayer) {
+          scope.launch(Dispatchers.IO) {
+              try {
+                  val castItems = items.mapNotNull { it.toCastMediaItem() }
+                  if (castItems.isNotEmpty()) {
+                      withContext(Dispatchers.Main) {
+                          val castInsertIndex =
+                              if (castPlayer?.mediaItemCount == 0) 0 else castPlayer?.currentMediaItemIndex?.plus(
+                                  1
+                              ) ?: 0
+                          castPlayer?.addMediaItems(castInsertIndex, castItems)
+                      }
+                      Timber.d("Cast ✅ Agregadas ${castItems.size} canciones como siguiente en Cast")
+                  }
+              } catch (e: Exception) {
+                  Timber.e(e, "Cast ❌ Error agregando canciones como siguiente en Cast")
+              }
+          }
+      }
+    
     if (isJamEnabled && isJamHost) {
       val title = queueTitle
       scope.launch {
@@ -1047,6 +1070,24 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   fun addToQueue(items: List<MediaItem>) {
     player.addMediaItems(items)
     player.prepare()
+
+      // Si hay una sesión de Cast activa, agregar también al Cast
+      if (castPlayer != null && mediaSession.player === castPlayer) {
+          scope.launch(Dispatchers.IO) {
+              try {
+                  val castItems = items.mapNotNull { it.toCastMediaItem() }
+                  if (castItems.isNotEmpty()) {
+                      withContext(Dispatchers.Main) {
+                          castPlayer?.addMediaItems(castItems)
+                      }
+                      Timber.d("Cast ✅ Agregadas ${castItems.size} canciones a la cola del Cast")
+                  }
+              } catch (e: Exception) {
+                  Timber.e(e, "Cast ❌ Error agregando canciones a la cola del Cast")
+              }
+          }
+      }
+    
     if (isJamEnabled && isJamHost) {
       val title = queueTitle
       val allItems = player.mediaItems.mapNotNull { it.metadata }
@@ -1861,25 +1902,39 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
     /** Convierte MediaItem local (con uri = id) en uno con uri remota reproducible por Chromecast */
     private suspend fun MediaItem.toCastMediaItem(): MediaItem? {
-        val md = metadata ?: return null
-        val info = getStreamInfo(md.id) ?: return null
-        return MediaItem.Builder()
-            .setMediaId(md.id)
-            .setUri(info.url)
-            .setCustomCacheKey(md.id)
-            .setMimeType(info.mimeType)
-            .setTag(md)
-            .setMediaMetadata(
-                androidx.media3.common.MediaMetadata.Builder()
-                    .setTitle(md.title)
-                    .setSubtitle(md.artistName ?: md.artists.joinToString { it.name })
-                    .setArtist(md.artistName ?: md.artists.joinToString { it.name })
-                    .setArtworkUri(md.thumbnailUrl?.toUri())
-                    .setAlbumTitle(md.album?.title)
-                    .setMediaType(androidx.media3.common.MediaMetadata.MEDIA_TYPE_MUSIC)
-                    .build()
-            )
-            .build()
+        val md = metadata ?: run {
+            Timber.w("Cast ⚠️ toCastMediaItem: MediaItem sin metadata - ${this.mediaId}")
+            return null
+        }
+
+        try {
+            val info = getStreamInfo(md.id) ?: run {
+                Timber.w("Cast ⚠️ toCastMediaItem: No se pudo obtener stream info para ${md.title} (${md.id})")
+                return null
+            }
+
+            Timber.d("Cast ✅ toCastMediaItem: Convertida exitosamente ${md.title}")
+            return MediaItem.Builder()
+                .setMediaId(md.id)
+                .setUri(info.url)
+                .setCustomCacheKey(md.id)
+                .setMimeType(info.mimeType)
+                .setTag(md)
+                .setMediaMetadata(
+                    androidx.media3.common.MediaMetadata.Builder()
+                        .setTitle(md.title)
+                        .setSubtitle(md.artistName ?: md.artists.joinToString { it.name })
+                        .setArtist(md.artistName ?: md.artists.joinToString { it.name })
+                        .setArtworkUri(md.thumbnailUrl?.toUri())
+                        .setAlbumTitle(md.album?.title)
+                        .setMediaType(androidx.media3.common.MediaMetadata.MEDIA_TYPE_MUSIC)
+                        .build()
+                )
+                .build()
+        } catch (e: Exception) {
+            Timber.e(e, "Cast ❌ toCastMediaItem: Error convirtiendo ${md.title} (${md.id})")
+            return null
+        }
     }
 
     fun castCurrentToDevice() {
@@ -1907,9 +1962,11 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             val (itemsSnapshot, originalIndex, currentPos) =
                 if (Looper.myLooper() == Looper.getMainLooper()) {
                     val items = (0 until player.mediaItemCount).map { player.getMediaItemAt(it) }
+                    val currentIndex = player.currentMediaItemIndex.coerceAtLeast(0)
+                    Timber.d("Cast 📊 Capturando snapshot: ${items.size} canciones, índice actual: $currentIndex")
                     Triple(
                         items,
-                        player.currentMediaItemIndex.coerceAtLeast(0),
+                        currentIndex,
                         player.currentPosition
                     )
                 } else {
@@ -1978,22 +2035,97 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                     val before =
                         (0 until originalIndex).toList() // se añadirán al principio en orden inverso
 
+                    Timber.d("Cast 📊 Preparando resto de cola: ${after.size} canciones después, ${before.size} canciones antes")
+
                     // Preparar listas en background y añadir en lotes en Main
                     val castAfter = mutableListOf<MediaItem>()
                     for (idx in after) {
                         if (!isActive) break
-                        itemsSnapshot[idx].toCastMediaItem()?.let { castAfter.add(it) }
+                        val castItem = itemsSnapshot[idx].toCastMediaItem()
+                        if (castItem != null) {
+                            castAfter.add(castItem)
+                        } else {
+                            Timber.w("Cast ⚠️ No se pudo convertir canción en índice $idx: ${itemsSnapshot[idx].mediaId}")
+                        }
                     }
                     val castBefore = mutableListOf<MediaItem>()
                     for (idx in before) { // en orden natural 0..originalIndex-1
                         if (!isActive) break
-                        itemsSnapshot[idx].toCastMediaItem()?.let { castBefore.add(it) }
+                        val castItem = itemsSnapshot[idx].toCastMediaItem()
+                        if (castItem != null) {
+                            castBefore.add(castItem)
+                        } else {
+                            Timber.w("Cast ⚠️ No se pudo convertir canción en índice $idx: ${itemsSnapshot[idx].mediaId}")
+                        }
                     }
+
+                    Timber.d("Cast 📊 Conversiones exitosas: ${castAfter.size} después, ${castBefore.size} antes")
+
+                    // Diagnosticar metadatos antes de agregar al Cast Player
+                    if (BuildConfig.DEBUG) {
+                        castAfter.take(3).forEachIndexed { index, item ->
+                            Timber.d("Cast 🔍 Pre-agregar [después $index]: título='${item.mediaMetadata?.title}', id='${item.mediaId}', uri='${item.localConfiguration?.uri}'")
+                        }
+                        castBefore.take(3).forEachIndexed { index, item ->
+                            Timber.d("Cast 🔍 Pre-agregar [antes $index]: título='${item.mediaMetadata?.title}', id='${item.mediaId}', uri='${item.localConfiguration?.uri}'")
+                        }
+                    }
+                    
                     withContext(Dispatchers.Main) {
-                        if (castAfter.isNotEmpty()) castPlayer?.addMediaItems(castAfter)
-                        if (castBefore.isNotEmpty()) castPlayer?.addMediaItems(0, castBefore)
+                        if (castAfter.isNotEmpty()) {
+                            castPlayer?.addMediaItems(castAfter)
+                            Timber.d("Cast ✅ Agregadas ${castAfter.size} canciones después de la actual")
+
+                            // Verificar metadatos después de agregar
+                            if (BuildConfig.DEBUG) {
+                                castPlayer?.let { player ->
+                                    val totalItems = player.mediaItemCount
+                                    val lastIndex = totalItems - 1
+                                    if (lastIndex >= 0) {
+                                        try {
+                                            val lastItem = player.getMediaItemAt(lastIndex)
+                                            Timber.d("Cast 🔍 Post-agregar último item: título='${lastItem.mediaMetadata?.title}', id='${lastItem.mediaId}'")
+                                        } catch (e: Exception) {
+                                            Timber.w(
+                                                e,
+                                                "Cast ⚠️ Error verificando último item agregado"
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (castBefore.isNotEmpty()) {
+                            castPlayer?.addMediaItems(0, castBefore)
+                            Timber.d("Cast ✅ Agregadas ${castBefore.size} canciones antes de la actual")
+
+                            // Verificar metadatos después de agregar al inicio
+                            if (BuildConfig.DEBUG) {
+                                castPlayer?.let { player ->
+                                    if (player.mediaItemCount > 0) {
+                                        try {
+                                            val firstItem = player.getMediaItemAt(0)
+                                            Timber.d("Cast 🔍 Post-agregar primer item: título='${firstItem.mediaMetadata?.title}', id='${firstItem.mediaId}'")
+                                        } catch (e: Exception) {
+                                            Timber.w(
+                                                e,
+                                                "Cast ⚠️ Error verificando primer item agregado"
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Verificar el total final después de todas las operaciones
+                        val totalCount = castPlayer?.mediaItemCount ?: 0
+                        val expectedTotal = 1 + castAfter.size + castBefore.size
+                        Timber.d("Cast ✅ Cola remota rellenada. Total=$totalCount, Esperado=$expectedTotal")
+
+                        if (totalCount != expectedTotal) {
+                            Timber.w("Cast ⚠️ Discrepancia en el conteo: actual=$totalCount, esperado=$expectedTotal")
+                        }
                     }
-                    Timber.d("Cast ✅ Cola remota rellenada. Total=${castPlayer?.mediaItemCount}")
                 } catch (e: Exception) {
                     Timber.e(e, "Cast ❌ Error durante carga progresiva")
                 }

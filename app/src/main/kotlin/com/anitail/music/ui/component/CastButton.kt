@@ -47,8 +47,15 @@ fun CastMiniPlayerButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
     }
     
     // Usar singleton para evitar crear múltiples instancias
-    val castManager =
-        remember(context.applicationContext) { CastManager(context.applicationContext) }
+    val castManager = remember(context.applicationContext, playerConnection) {
+        CastManager(
+            context.applicationContext,
+            onCastSessionStarted = {
+                // Sincronizar automáticamente cuando se detecta una nueva sesión de Cast
+                playerConnection?.service?.castCurrentToDevice()
+            }
+        )
+    }
 
     // Inicializar solo una vez y manegar ciclo de vida
     LaunchedEffect(castManager) {

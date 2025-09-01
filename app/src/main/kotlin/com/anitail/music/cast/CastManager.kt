@@ -7,7 +7,10 @@ import com.google.android.gms.cast.framework.Session
 import com.google.android.gms.cast.framework.SessionManagerListener
 import kotlinx.coroutines.flow.MutableStateFlow
 
-class CastManager(private val context: Context) {
+class CastManager(
+    private val context: Context,
+    private val onCastSessionStarted: (() -> Unit)? = null
+) {
     val isCasting = MutableStateFlow(false)
 
     // Memoizar CastContext para evitar múltiples llamadas
@@ -22,6 +25,8 @@ class CastManager(private val context: Context) {
     private val sessionListener = object : SessionManagerListener<Session> {
         override fun onSessionStarted(session: Session, sessionId: String) {
             isCasting.value = true
+            // Sincronizar automáticamente la cola cuando se inicia una sesión de Cast
+            onCastSessionStarted?.invoke()
         }
 
         override fun onSessionEnded(session: Session, error: Int) {
@@ -30,6 +35,8 @@ class CastManager(private val context: Context) {
 
         override fun onSessionResumed(session: Session, wasSuspended: Boolean) {
             isCasting.value = true
+            // También sincronizar cuando se reanuda una sesión
+            onCastSessionStarted?.invoke()
         }
 
         override fun onSessionSuspended(session: Session, reason: Int) {}
