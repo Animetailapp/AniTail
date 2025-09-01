@@ -720,4 +720,15 @@
     <string name="enable_cast_desc">Permitir transmitir contenido a dispositivos compatibles. Requiere Google Play Services.</string>
     <string name="cast_unavailable">Cast no disponible</string>
     <string name="cast_requires_google_play_services">La funcionalidad de Cast requiere que Google Play Services esté disponible en tu dispositivo.</string>
+
+    <!-- Progreso de carga de cola Cast -->
+    <string name="cast_queue_starting">Iniciando…</string>
+    <string name="cast_queue_loading_step">Cargando %1$d de %2$d…</string>
+    <string name="cast_queue_completed_count">Completado: %1$d canciones (cola Cast)</string>
+    <string name="cast_queue_completed_alt_count">Completado: %1$d canciones (método alternativo)</string>
+    <string name="cast_queue_only_current">Solo el elemento actual disponible…</string>
+    <string name="cast_queue_completed_single">Completado: 1 canción (solo actual Cast)</string>
+    <string name="cast_queue_none_available">No hay elementos disponibles en Cast</string>
+    <string name="cast_queue_error">Error cargando cola</string>
+    <string name="cast_queue_loading">Cargando cola…</string>
 </resources>

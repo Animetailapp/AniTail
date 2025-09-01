@@ -92,7 +92,6 @@ import androidx.media3.session.SessionToken
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.anitail.music.BuildConfig
 import com.anitail.music.R
 import com.anitail.music.constants.DarkModeKey
 import com.anitail.music.constants.MediaSessionConstants
@@ -113,7 +112,6 @@ import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import timber.log.Timber
 
 /**
  * Pantalla expandida personalizada para sesiones Cast usando Compose.
@@ -148,12 +146,11 @@ class CastComposeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Verificar si Cast está disponible antes de continuar
         if (!com.anitail.music.utils.GooglePlayServicesUtils.isCastAvailable(this)) {
             finish()
             return
         }
-        
+
         startService(
             android.content.Intent(
                 this,
@@ -195,12 +192,10 @@ class CastComposeActivity : ComponentActivity() {
 
             var themeColor by remember { mutableStateOf(DefaultThemeColor) }
             val ctx = LocalContext.current
-            // Cache de último artwork procesado para evitar reprocesar la misma imagen
             var lastArtworkProcessed by remember { mutableStateOf<String?>(null) }
             var lastPrefetchedNext by remember { mutableStateOf<String?>(null) }
             val imageLoader = remember { ImageLoader(ctx) }
 
-            // Optimizado: Solo procesar artwork cuando cambie el media item
             LaunchedEffect(controller?.currentMediaItem?.mediaMetadata?.artworkUri) {
                 val art = controller?.currentMediaItem?.mediaMetadata?.artworkUri?.toString()
                 if (art != null && art != lastArtworkProcessed) {
@@ -222,7 +217,6 @@ class CastComposeActivity : ComponentActivity() {
                 }
             }
 
-            // Prefetch separado para evitar retraso en UI
             LaunchedEffect(controller?.currentMediaItemIndex) {
                 val nextIndex = controller?.currentMediaItemIndex?.plus(1) ?: -1
                 val items = runCatching { controller?.mediaItems }.getOrNull()
@@ -263,7 +257,7 @@ class CastComposeActivity : ComponentActivity() {
     }
 }
 
-@SuppressLint("ContextCastToActivity")
+@SuppressLint("ContextCastToActivity", "AutoboxingStateCreation")
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 private fun CastExpandedContent(controllerProvider: () -> MediaController?, onClose: () -> Unit) {
@@ -279,12 +273,10 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
     var deviceName by remember { mutableStateOf("") }
     var deviceVolume by remember { mutableFloatStateOf(0f) }
     var deviceVolumeMax by remember { mutableFloatStateOf(1f) }
-    // liked derivado de DB vía PlayerConnection si disponible
     val activity = LocalContext.current as? CastComposeActivity
     val currentSong = activity?.playerConnection?.currentSong?.collectAsState(initial = null)?.value
     val liked = currentSong?.song?.liked == true
 
-    // Listener en vivo para reflejar cambios sin interacción manual (evita depender solo de polling)
     DisposableEffect(controller) {
         if (controller == null) return@DisposableEffect onDispose { }
         val listener = object : Player.Listener {
@@ -293,18 +285,12 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
-                // Duración puede cambiar cuando se prepara
                 runCatching { controller.duration.coerceAtLeast(0L) }.getOrNull()
                     ?.let { d -> if (d != duration) duration = d }
-                // Posición puntual (si estaba parada y arranca)
                 runCatching { controller.currentPosition }.getOrNull()?.let { p -> position = p }
-                if (BuildConfig.DEBUG) {
-                    Timber.d("CastQueue: PlaybackState changed to $playbackState")
-                }
             }
 
             override fun onTimelineChanged(timeline: Timeline, reason: Int) {
-                // Actualiza duración y metadata tan pronto la timeline esté disponible
                 runCatching { controller.duration.coerceAtLeast(0L) }.getOrNull()
                     ?.let { d -> if (d != duration) duration = d }
                 controller.currentMediaItem?.mediaMetadata?.let { md ->
@@ -342,7 +328,6 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
     }
 
     val context = LocalContext.current
-    // Obtener CastContext una sola vez (evita llamada repetitiva costosa)
     val rememberedCastContext = remember {
         try {
             CastContext.getSharedInstance(context)
@@ -350,7 +335,6 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
             null
         }
     }
-    // Loop de metadatos adaptativo con fast-start agresivo para reducir latencia inicial
     LaunchedEffect(controller, rememberedCastContext) {
         if (controller == null) return@LaunchedEffect
         var nameLast = deviceName
@@ -359,32 +343,30 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
         System.currentTimeMillis()
 
         fun refreshMetadata(): Boolean = runCatching {
-            // Verificar estado del controller antes de cualquier acceso
             if (controller.playbackState == Player.STATE_IDLE) {
                 return@runCatching false
             }
 
             try {
                 controller.isPlaying.let { p -> if (p != isPlaying) isPlaying = p }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 return@runCatching false
             }
 
             try {
                 controller.duration.coerceAtLeast(0L).let { d -> if (d != duration) duration = d }
-            } catch (e: Exception) {
-                // Duración puede no estar disponible, no es crítico
+            } catch (_: Exception) {
             }
 
             val currentItem = try {
                 controller.currentMediaItem
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
-            
+
             if (currentItem?.mediaId != null && currentItem.mediaId != lastMediaId) {
                 lastMediaId = currentItem.mediaId
-                currentItem.mediaMetadata?.let { md ->
+                currentItem.mediaMetadata.let { md ->
                     val newTitle = (md.title ?: "").toString()
                     val newArtist = (md.artist ?: md.subtitle ?: "").toString()
                     val newArtwork = md.artworkUri?.toString()
@@ -396,16 +378,14 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
 
             try {
                 controller.repeatMode.let { if (it != repeatMode) repeatMode = it }
-            } catch (e: Exception) {
-                // No crítico
+            } catch (_: Exception) {
             }
 
             try {
                 controller.shuffleModeEnabled.let { if (it != shuffleOn) shuffleOn = it }
-            } catch (e: Exception) {
-                // No crítico
+            } catch (_: Exception) {
             }
-            
+
             rememberedCastContext?.sessionManager?.currentCastSession?.castDevice?.friendlyName?.let { fn ->
                 if (fn != nameLast && fn != deviceName) {
                     deviceName = fn; nameLast = fn
@@ -421,31 +401,27 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                     val maxV = info.maxVolume.toFloat().coerceAtLeast(1f)
                     if (maxV != deviceVolumeMax) deviceVolumeMax = maxV
                 }
-            } catch (e: Exception) {
-                // No crítico
+            } catch (_: Exception) {
             }
         }.isSuccess
 
-        // Refresco inmediato
         refreshMetadata()
 
         while (isActive) {
-            // Usar intervalos más largos para reducir sobrecarga y evitar frame drops
-            val baseInterval = if (isPlaying) 2000L else 5000L // Intervalos más largos
+            val baseInterval = if (isPlaying) 2000L else 5000L
             val interval = if (consecutiveErrors > 0) {
                 (baseInterval * (1 + consecutiveErrors)).coerceAtMost(15000L)
             } else baseInterval
 
-            if (refreshMetadata()) {
-                consecutiveErrors = 0
+            consecutiveErrors = if (refreshMetadata()) {
+                0
             } else {
-                consecutiveErrors = (consecutiveErrors + 1).coerceAtMost(3) // Limitar errores
+                (consecutiveErrors + 1).coerceAtMost(3)
             }
             delay(interval)
         }
     }
 
-    // Telemetría y actualización de progreso optimizada
     var avgProgressInterval by remember { mutableLongStateOf(0L) }
     var lastProgressTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(controller) {
@@ -462,9 +438,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                         lastProgressTick = now
                     }
                     val nearEnd = duration > 0 && (duration - position) < 1500
-                    // Intervalos aún más largos para reducir frame drops
-                    val interval = if (nearEnd) 500L else 1000L // Intervalos más largos
-                    // Actualizamos posición con menos frecuencia y protegido
+                    val interval = if (nearEnd) 500L else 1000L
                     runCatching {
                         if (controller.playbackState != Player.STATE_IDLE) {
                             controller.currentPosition.let { position = it }
@@ -475,36 +449,26 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                             controller.isPlaying
                         } else null
                     }.getOrNull()?.let { p -> if (p != isPlaying) isPlaying = p }
-                    if (BuildConfig.DEBUG && now / 30000 != (now - diff) / 30000) {
-                        // Reducir frecuencia de logs significativamente para evitar overhead
-                        try {
-                            Timber.d("CastProgress avgInterval=${avgProgressInterval}ms")
-                        } catch (_: Exception) {
-                            Timber.tag("CastProgress").d("avgInterval=${avgProgressInterval}ms")
-                        }
-                    }
                     delay(interval)
                 }
             }
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {
-        // Fondo simplificado sin blur costoso
         Box(modifier = Modifier.fillMaxSize()) {
             if (artwork != null) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(artwork)
-                        .crossfade(false) // Remover crossfade para mejor rendimiento
+                        .crossfade(false)
                         .build(),
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
-                        .scale(1.2f), // Escala ligera en lugar de blur costoso
+                        .scale(1.2f),
                     contentScale = ContentScale.Crop,
-                    alpha = 0.3f // Transparencia en lugar de blur
+                    alpha = 0.3f
                 )
-                // Overlay más fuerte para compensar la falta de blur
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -524,9 +488,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                 .padding(20.dp)
         ) {
             var showDisconnectDialog by remember { mutableStateOf(false) }
-            // Estado para mostrar la hoja de la cola (movido al fondo)
             var showQueueSheet by remember { mutableStateOf(false) }
-            // Cabecera centrada similar al nuevo player
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 val headerBtnSize = 42.dp
                 val headerShape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)
@@ -596,12 +558,10 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                     )
                                 }
                             }
-                            // Forzar liberar la ruta seleccionada para reactivar discovery visible
                             runCatching {
                                 act?.let { ctx ->
                                     val mr = androidx.mediarouter.media.MediaRouter.getInstance(ctx)
                                     if (mr.selectedRoute != mr.defaultRoute) {
-                                        // UNSELECT_REASON_STOPPED = 1 (mantener si la constante cambia)
                                         runCatching { mr.unselect(androidx.mediarouter.media.MediaRouter.UNSELECT_REASON_STOPPED) }
                                     }
                                 }
@@ -634,7 +594,6 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                 )
             }
             Spacer(Modifier.height(8.dp))
-            // Control de volumen del dispositivo
             if (deviceVolumeMax > 1f) {
                 var localVolume by remember(deviceVolume) { mutableFloatStateOf(deviceVolume) }
                 var volumeJob by remember { mutableStateOf<Job?>(null) }
@@ -660,7 +619,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                             localVolume = v
                             volumeJob?.cancel()
                             volumeJob = activity?.lifecycleScope?.launch {
-                                delay(300) // Incrementar debounce para reducir frecuencia
+                                delay(300)
                                 controller?.setDeviceVolume(v.toInt())
                             }
                         },
@@ -669,7 +628,6 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                     )
                 }
             }
-            // Arte principal (centrado, tamaño controlado) sobre el fondo difuminado
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -684,7 +642,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(artwork)
-                            .crossfade(false) // Remover crossfade para mejor rendimiento
+                            .crossfade(false)
                             .build(),
                         contentDescription = null,
                         modifier = artModifier,
@@ -706,7 +664,6 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                 }
             }
             Spacer(Modifier.height(20.dp))
-            // Info de título / artista bajo el artwork (similar al nuevo player)
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
@@ -734,15 +691,12 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                     onSeek = { seekTo -> controller?.seekTo(seekTo) }
                 )
                 Spacer(Modifier.height(16.dp))
-                // Fila de controles principal (repeat, previous, play, next, like)
-                // Controles estilo "nuevo player": botón central grande y botones laterales + cluster secundario
                 Column(Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Botón de Queue (cluster izquierda)
                         val queueShape = remember {
                             androidx.compose.foundation.shape.RoundedCornerShape(
                                 topStart = 50.dp,
@@ -753,17 +707,9 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                         }
                         val clusterBorder = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                         val queueItemCount = remember(controller) {
-                            if (controller == null) {
-                                0
-                            } else {
-                                runCatching {
-                                    controller.mediaItemCount
-                                }.getOrElse { 0 }.also { count ->
-                                    if (BuildConfig.DEBUG) {
-                                        Timber.d("CastQueue: Botón queue - count=$count")
-                                    }
-                                }
-                            }
+                            if (controller == null) 0 else runCatching {
+                                controller.mediaItemCount
+                            }.getOrElse { 0 }
                         }
                         Box(
                             modifier = Modifier
@@ -785,7 +731,6 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                             )
                         }
                         Spacer(Modifier.width(18.dp))
-                        // Previous
                         FilledTonalIconButton(
                             enabled = controller?.hasPreviousMediaItem() == true,
                             onClick = { controller?.seekToPrevious() },
@@ -802,11 +747,9 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                             )
                         }
                         Spacer(Modifier.width(8.dp))
-                        // Play grande central
                         FilledIconButton(
                             onClick = {
                                 if (isPlaying) controller?.pause() else controller?.play()
-                                // Toggle optimista inmediato
                                 isPlaying = !isPlaying
                             },
                             modifier = Modifier.size(96.dp)
@@ -818,7 +761,6 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                             )
                         }
                         Spacer(Modifier.width(8.dp))
-                        // Next
                         FilledTonalIconButton(
                             enabled = controller?.hasNextMediaItem() == true,
                             onClick = { controller?.seekToNext() },
@@ -835,12 +777,10 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                             )
                         }
                         Spacer(Modifier.width(18.dp))
-                        // Repeat / Like cluster derecha apilado
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             val sideShape =
                                 remember { androidx.compose.foundation.shape.RoundedCornerShape(14.dp) }
                             val borderCol = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
-                            // Repeat
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
@@ -869,7 +809,6 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                 )
                             }
                             Spacer(Modifier.height(10.dp))
-                            // Like
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
@@ -895,27 +834,20 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                         }
                     }
                 }
-                // Hoja modal de la cola (se muestra cuando se pulsa el nuevo botón inferior)
                 if (showQueueSheet) {
                     val c = controller
                     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-                    // Estado reactivo para items de la cola que se actualiza progresivamente
                     var items by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
                     var isLoadingQueue by remember { mutableStateOf(false) }
-                    var queueVersion by remember { mutableStateOf(0) }
+                    var queueVersion by remember { mutableIntStateOf(0) }
                     var loadingProgress by remember { mutableStateOf("") }
 
-                    // Listener para observar cambios en tiempo real en la cola
                     DisposableEffect(c) {
                         val listener = if (c != null) {
                             object : Player.Listener {
                                 override fun onTimelineChanged(timeline: Timeline, reason: Int) {
                                     if (showQueueSheet) {
-                                        // Incrementar versión para forzar recarga
                                         queueVersion += 1
-                                        if (BuildConfig.DEBUG) {
-                                            Timber.d("CastQueue: Timeline cambió, nueva versión: $queueVersion, razón: $reason")
-                                        }
                                     }
                                 }
 
@@ -925,9 +857,6 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                 ) {
                                     if (showQueueSheet && reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) {
                                         queueVersion += 1
-                                        if (BuildConfig.DEBUG) {
-                                            Timber.d("CastQueue: Transición de item por cambio de playlist, nueva versión: $queueVersion")
-                                        }
                                     }
                                 }
                             }.also { c.addListener(it) }
@@ -940,123 +869,77 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                         }
                     }
 
-                    // Observar cambios en la cola y cargar items progresivamente
                     LaunchedEffect(showQueueSheet, c, queueVersion) {
-                        if (BuildConfig.DEBUG) {
-                            Timber.d("CastQueue: LaunchedEffect iniciado - showQueueSheet: $showQueueSheet, controller: ${c != null}, queueVersion: $queueVersion")
-                        }
 
                         if (!showQueueSheet || c == null) {
-                            if (BuildConfig.DEBUG) {
-                                Timber.d("CastQueue: Saliendo - showQueueSheet: $showQueueSheet, controller: ${c != null}")
-                            }
                             items = emptyList()
                             loadingProgress = ""
                             return@LaunchedEffect
                         }
 
-                        if (BuildConfig.DEBUG) {
-                            Timber.d("CastQueue: Iniciando carga de cola...")
-                        }
-
                         isLoadingQueue = true
-                        items = emptyList() // Limpiar lista actual
-                        loadingProgress = "Iniciando..."
+                        items = emptyList()
+                        loadingProgress = context.getString(R.string.cast_queue_starting)
 
                         try {
-                            if (BuildConfig.DEBUG) {
-                                Timber.d("CastQueue: Intentando obtener cola desde Cast MediaController...")
-                                // Diagnosticar el estado del MediaController
-                                Timber.d("CastQueue: MediaController estado - mediaItemCount: ${c.mediaItemCount}, currentIndex: ${c.currentMediaItemIndex}")
-                            }
-
-                            // Primero intentar obtener la cola directamente del Cast MediaController
                             val allMediaItems = runCatching { c.mediaItems }.getOrNull()
-                            if (BuildConfig.DEBUG) {
-                                Timber.d("CastQueue: mediaItems obtenidos - count: ${allMediaItems?.size ?: 0}")
-                                allMediaItems?.forEachIndexed { index, item ->
-                                    Timber.d("CastQueue: Item [$index]: ${item?.mediaMetadata?.title} (id: ${item?.mediaId})")
-                                }
-                            }
 
                             if (allMediaItems != null && allMediaItems.isNotEmpty()) {
                                 val filteredItems = allMediaItems.filter { item ->
-                                    item != null &&
-                                            !item.mediaId.isNullOrBlank() &&
-                                            item.mediaMetadata != null
+                                    item.mediaId.isNotBlank()
                                 }
 
-                                if (BuildConfig.DEBUG) {
-                                    Timber.d("CastQueue: Obtenidos ${filteredItems.size} items válidos desde Cast MediaController (total: ${allMediaItems.size})")
-                                }
-
-                                // Mostrar items progresivamente para mejor UX
                                 val loadedItems = mutableListOf<MediaItem>()
                                 filteredItems.forEachIndexed { index, mediaItem ->
                                     if (!isActive) return@forEachIndexed
 
                                     loadingProgress =
-                                        "Cargando ${index + 1} de ${filteredItems.size}..."
+                                        context.getString(
+                                            R.string.cast_queue_loading_step,
+                                            index + 1,
+                                            filteredItems.size
+                                        )
                                     loadedItems.add(mediaItem)
                                     items = loadedItems.toList()
 
-                                    if (BuildConfig.DEBUG) {
-                                        Timber.d("CastQueue: Agregado item ${index + 1}/${filteredItems.size}: ${mediaItem.mediaMetadata?.title}")
-                                    }
-
-                                    // Pausa más corta ya que no hay acceso a red
                                     if (index < filteredItems.size - 1) {
                                         delay(30)
                                     }
                                 }
 
                                 loadingProgress =
-                                    "Completado: ${filteredItems.size} canciones (cola Cast)"
+                                    context.getString(
+                                        R.string.cast_queue_completed_count,
+                                        filteredItems.size
+                                    )
 
                             } else {
-                                if (BuildConfig.DEBUG) {
-                                    Timber.d("CastQueue: Cast MediaController.mediaItems está vacío, intentando método alternativo...")
-                                }
 
 
                                 val mediaItemCount = c.mediaItemCount
-                                if (BuildConfig.DEBUG) {
-                                    Timber.d("CastQueue: MediaItemCount alternativo: $mediaItemCount")
-                                }
 
                                 if (mediaItemCount > 0) {
                                     val alternativeItems = mutableListOf<MediaItem>()
                                     for (i in 0 until mediaItemCount) {
                                         try {
                                             val item = c.getMediaItemAt(i)
-                                            if (item != null && !item.mediaId.isNullOrBlank() && item.mediaMetadata != null) {
+                                            if (item.mediaId.isNotBlank()) {
                                                 alternativeItems.add(item)
-                                                if (BuildConfig.DEBUG) {
-                                                    Timber.d("CastQueue: Item alternativo [$i]: ${item.mediaMetadata?.title}")
-                                                }
                                             }
-                                        } catch (e: Exception) {
-                                            if (BuildConfig.DEBUG) {
-                                                Timber.w(
-                                                    e,
-                                                    "CastQueue: Error obteniendo item en posición $i"
-                                                )
-                                            }
+                                        } catch (_: Exception) {
                                         }
                                     }
 
                                     if (alternativeItems.isNotEmpty()) {
-                                        if (BuildConfig.DEBUG) {
-                                            Timber.d("CastQueue: Obtenidos ${alternativeItems.size} items con método alternativo")
-                                        }
-
-                                        // Mostrar items progresivamente
                                         val loadedItems = mutableListOf<MediaItem>()
                                         alternativeItems.forEachIndexed { index, mediaItem ->
                                             if (!isActive) return@forEachIndexed
 
-                                            loadingProgress =
-                                                "Cargando ${index + 1} de ${alternativeItems.size}..."
+                                            loadingProgress = context.getString(
+                                                R.string.cast_queue_loading_step,
+                                                index + 1,
+                                                alternativeItems.size
+                                            )
                                             loadedItems.add(mediaItem)
                                             items = loadedItems.toList()
 
@@ -1065,53 +948,52 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                             }
                                         }
 
-                                        loadingProgress =
-                                            "Completado: ${alternativeItems.size} canciones (método alternativo)"
+                                        loadingProgress = context.getString(
+                                            R.string.cast_queue_completed_alt_count,
+                                            alternativeItems.size
+                                        )
                                     } else {
-                                        // Último recurso: mostrar solo el item actual
                                         val currentMediaItem =
                                             runCatching { c.currentMediaItem }.getOrNull()
                                         if (currentMediaItem != null &&
-                                            !currentMediaItem.mediaId.isNullOrBlank() &&
-                                            currentMediaItem.mediaMetadata != null
+                                            currentMediaItem.mediaId.isNotBlank()
                                         ) {
 
-                                            loadingProgress = "Solo item actual disponible..."
+                                            loadingProgress =
+                                                context.getString(R.string.cast_queue_only_current)
                                             items = listOf(currentMediaItem)
                                             delay(500)
                                             loadingProgress =
-                                                "Completado: 1 canción (solo actual Cast)"
+                                                context.getString(R.string.cast_queue_completed_single)
                                         } else {
-                                            loadingProgress = "No hay items disponibles en Cast"
+                                            loadingProgress =
+                                                context.getString(R.string.cast_queue_none_available)
                                         }
                                     }
                                 } else {
-                                    // Fallback final: mostrar solo el item actual del Cast
                                     val currentMediaItem =
                                         runCatching { c.currentMediaItem }.getOrNull()
                                     if (currentMediaItem != null &&
-                                        !currentMediaItem.mediaId.isNullOrBlank() &&
-                                        currentMediaItem.mediaMetadata != null
+                                        currentMediaItem.mediaId.isNotBlank()
                                     ) {
 
-                                        loadingProgress = "Solo item actual disponible..."
+                                        loadingProgress =
+                                            context.getString(R.string.cast_queue_only_current)
                                         items = listOf(currentMediaItem)
                                         delay(500)
-                                        loadingProgress = "Completado: 1 canción (solo actual Cast)"
+                                        loadingProgress =
+                                            context.getString(R.string.cast_queue_completed_single)
                                     } else {
-                                        loadingProgress = "No hay items disponibles en Cast"
+                                        loadingProgress =
+                                            context.getString(R.string.cast_queue_none_available)
                                     }
                                 }
                             }
-                        } catch (exception: Exception) {
-                            if (BuildConfig.DEBUG) {
-                                Timber.e(exception, "CastQueue: Error en carga progresiva")
-                            }
+                        } catch (_: Exception) {
                             items = emptyList()
-                            loadingProgress = "Error cargando cola"
+                            loadingProgress = context.getString(R.string.cast_queue_error)
                         } finally {
                             isLoadingQueue = false
-                            // Limpiar mensaje de progreso después de un delay
                             delay(1000)
                             loadingProgress = ""
                         }
@@ -1162,7 +1044,6 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                         }
                         HorizontalDivider()
 
-                        // Mostrar indicador de carga si está cargando o hay mensaje de progreso
                         if (isLoadingQueue || loadingProgress.isNotEmpty()) {
                             Row(
                                 modifier = Modifier
@@ -1180,7 +1061,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                     Spacer(modifier = Modifier.width(8.dp))
                                 }
                                 Text(
-                                    text = if (loadingProgress.isNotEmpty()) loadingProgress else "Cargando cola...",
+                                    text = loadingProgress.ifEmpty { stringResource(R.string.cast_queue_loading) },
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1203,20 +1084,17 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                 itemsIndexed(
                                     items,
                                     key = { index, item ->
-                                        // Asegurar que la key sea única incluso si mediaId es nulo o vacío
                                         val mediaId = item.mediaId
-                                        if (mediaId.isNullOrBlank()) {
+                                        if (mediaId.isBlank()) {
                                             "idx_$index"
                                         } else {
-                                            // Combinar con el índice para garantizar unicidad total
                                             "${mediaId}_$index"
                                         }
                                     }) { idx, it ->
-                                    // En este punto, todos los items ya están validados
                                     val mediaId =
-                                        it.mediaId!! // Seguro que no es null por el filtro anterior
-                                    val metadata = it.mediaMetadata!!
-                                    
+                                        it.mediaId
+                                    val metadata = it.mediaMetadata
+
                                     val currentMediaId = c?.currentMediaItem?.mediaId
                                     val isCurrent =
                                         currentMediaId != null && mediaId == currentMediaId
@@ -1227,10 +1105,10 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                                 if (targetId != currentMediaId && controller != null) {
                                                     val removed = runCatching {
                                                         val ctrl = controller
-                                                        if (ctrl != null && ctrl.playbackState != Player.STATE_IDLE) {
+                                                        if (ctrl.playbackState != Player.STATE_IDLE) {
                                                             val count = try {
                                                                 ctrl.mediaItemCount
-                                                            } catch (e: Exception) {
+                                                            } catch (_: Exception) {
                                                                 return@runCatching false
                                                             }
                                                             if (count <= 0) return@runCatching false
@@ -1238,7 +1116,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                                             for (i in 0 until count) {
                                                                 val mid = try {
                                                                     ctrl.getMediaItemAt(i).mediaId
-                                                                } catch (e: Exception) {
+                                                                } catch (_: Exception) {
                                                                     null
                                                                 }
                                                                 if (mid == targetId) {
@@ -1249,7 +1127,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                                                 try {
                                                                     ctrl.removeMediaItem(found)
                                                                     return@runCatching true
-                                                                } catch (e: Exception) {
+                                                                } catch (_: Exception) {
                                                                     return@runCatching false
                                                                 }
                                                             }
@@ -1257,10 +1135,9 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                                         return@runCatching false
                                                     }.getOrElse { false }
                                                     if (removed) {
-                                                        // queueRevision eliminado para optimizar rendimiento
                                                         val remainingCount = try {
-                                                            controller?.mediaItemCount ?: 0
-                                                        } catch (e: Exception) {
+                                                            controller.mediaItemCount
+                                                        } catch (_: Exception) {
                                                             0
                                                         }
                                                         if (remainingCount == 0) {
@@ -1283,21 +1160,11 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                             Modifier
                                                 .fillMaxWidth()
                                                 .clickable {
-                                                    val targetId = mediaId
-                                                    if (BuildConfig.DEBUG) {
-                                                        Timber.d("CastQueue: Click en item $idx, mediaId: $targetId")
-                                                    }
-
+                                                    mediaId
                                                     if (controller != null) {
                                                         runCatching {
-                                                            // Reproducir directamente en el Cast usando el MediaController
                                                             val targetId = mediaId
 
-                                                            if (BuildConfig.DEBUG) {
-                                                                Timber.d("CastQueue: Cambiando a canción en Cast - índice $idx: ${metadata.title}")
-                                                            }
-
-                                                            // Buscar el índice de la canción en la cola actual del Cast
                                                             var foundIndex = -1
                                                             val currentCount =
                                                                 controller.mediaItemCount
@@ -1310,43 +1177,17 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                                                         foundIndex = i
                                                                         break
                                                                     }
-                                                                } catch (e: Exception) {
-                                                                    if (BuildConfig.DEBUG) {
-                                                                        Timber.w(
-                                                                            e,
-                                                                            "CastQueue: Error accediendo Cast mediaItem $i"
-                                                                        )
-                                                                    }
+                                                                } catch (_: Exception) {
                                                                 }
                                                             }
 
                                                             if (foundIndex >= 0) {
-                                                                // La canción está en la cola del Cast, saltar a ella
-                                                                if (BuildConfig.DEBUG) {
-                                                                    Timber.d("CastQueue: Saltando a posición $foundIndex en Cast")
-                                                                }
                                                                 controller.seekToDefaultPosition(
                                                                     foundIndex
                                                                 )
                                                                 controller.play()
-                                                            } else {
-                                                                if (BuildConfig.DEBUG) {
-                                                                    Timber.w("CastQueue: Canción no encontrada en cola del Cast")
-                                                                }
                                                             }
-
-                                                        }.onFailure { exception ->
-                                                            if (BuildConfig.DEBUG) {
-                                                                Timber.e(
-                                                                    exception,
-                                                                    "CastQueue: Error cambiando canción en Cast"
-                                                                )
-                                                            }
-                                                        }
-                                                    } else {
-                                                        if (BuildConfig.DEBUG) {
-                                                            Timber.w("CastQueue: Controller no disponible")
-                                                        }
+                                                        }.onFailure { _ -> }
                                                     }
                                                     showQueueSheet = false
                                                 }
@@ -1364,7 +1205,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                                 AsyncImage(
                                                     model = ImageRequest.Builder(LocalContext.current)
                                                         .data(thumb)
-                                                        .crossfade(false) // Remover crossfade para mejor rendimiento
+                                                        .crossfade(false)
                                                         .build(),
                                                     contentDescription = null,
                                                     modifier = Modifier

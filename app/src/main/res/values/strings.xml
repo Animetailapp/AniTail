@@ -747,4 +747,15 @@
     <string name="enable_cast_desc">Allow casting media to compatible devices. Requires Google Play Services.</string>
     <string name="cast_unavailable">Cast unavailable</string>
     <string name="cast_requires_google_play_services">Cast functionality requires Google Play Services to be available on your device.</string>
+
+    <!-- Cast queue loading progress -->
+    <string name="cast_queue_starting">Starting…</string>
+    <string name="cast_queue_loading_step">Loading %1$d of %2$d…</string>
+    <string name="cast_queue_completed_count">Completed: %1$d songs (Cast queue)</string>
+    <string name="cast_queue_completed_alt_count">Completed: %1$d songs (alternative)</string>
+    <string name="cast_queue_only_current">Only current item available…</string>
+    <string name="cast_queue_completed_single">Completed: 1 song (only current Cast)</string>
+    <string name="cast_queue_none_available">No items available in Cast</string>
+    <string name="cast_queue_error">Error loading queue</string>
+    <string name="cast_queue_loading">Loading queue…</string>
 </resources>
