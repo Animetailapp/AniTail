@@ -19,7 +19,7 @@ android {
     ndkVersion = "25.1.8937393"
     defaultConfig {
         applicationId = "com.anitail.music"
-        minSdk = 21
+        minSdk = 23
         targetSdk = 36
         versionCode = 12
         versionName = "1.10.1"
@@ -173,6 +173,7 @@ dependencies {
     implementation(libs.concurrent.futures)
 
     implementation(libs.activity)
+    implementation(libs.appcompat)
     implementation(libs.navigation)
     implementation(libs.hilt.navigation)
     implementation(libs.datastore)
@@ -199,6 +200,9 @@ dependencies {
     implementation(libs.media3)
     implementation(libs.media3.session)
     implementation(libs.media3.okhttp)
+    implementation(libs.media3.cast)
+    implementation(libs.play.services.cast)
+    implementation(libs.play.services.base)
     implementation(libs.squigglyslider)
 
     implementation(libs.room.runtime)
@@ -233,4 +237,7 @@ dependencies {
     // Last.fm integration
     implementation(libs.lastfm.java)
     implementation(libs.commons.codec)
+
+    // On-device translation for lyrics (ML Kit)
+    implementation(libs.translate)
 }

@@ -25,6 +25,7 @@ data class PlaylistEntity(
     val bookmarkedAt: LocalDateTime? = null,
     val remoteSongCount: Int? = null,
     val playEndpointParams: String? = null,
+    val thumbnailUrl: String? = null,
     val shuffleEndpointParams: String? = null,
     val radioEndpointParams: String? = null,
     val backgroundImageUrl: String? = null

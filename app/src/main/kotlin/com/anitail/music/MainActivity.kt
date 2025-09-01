@@ -16,10 +16,10 @@ import android.provider.Settings
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
@@ -189,6 +189,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -199,7 +200,7 @@ import kotlin.time.Duration.Companion.days
 
 @Suppress("DEPRECATION", "ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     @Inject
     lateinit var database: MusicDatabase
 
@@ -320,14 +321,16 @@ class MainActivity : ComponentActivity() {
                     hostIp = hostIp
                 )
 
+                // Optimizado: Solo actualizar cuando JAM esté habilitado y sea host
                 if (isJamEnabled && isJamHost) {
-                    while (true) {
+                    while (isActive) {
                         playerConnection?.service?.lanJamServer?.clientList?.let { clients ->
                             jamViewModel.updateActiveConnections(
                                 clients.map { client -> client.ip to client.connectedAt.toLong() }
                             )
                         }
-                        delay(5000)
+                        // Incrementar delay para reducir carga del CPU
+                        delay(10000) // 10 segundos en lugar de 5
                     }
                 }
             }
@@ -363,23 +366,33 @@ class MainActivity : ComponentActivity() {
                     themeColor = DefaultThemeColor
                     return@LaunchedEffect
                 }
+                // Cache para evitar reprocesar la misma imagen
+                var lastThumbnailUrl: String? = null
+                
                 playerConnection.service.currentMediaMetadata.collectLatest { song ->
                     themeColor =
-                        if (song != null) {
+                        if (song != null && song.thumbnailUrl != lastThumbnailUrl) {
+                            lastThumbnailUrl = song.thumbnailUrl
                             withContext(Dispatchers.IO) {
-                                val result =
-                                    imageLoader.execute(
-                                        ImageRequest
-                                            .Builder(this@MainActivity)
-                                            .data(song.thumbnailUrl)
-                                            .allowHardware(false) // pixel access is not supported on Config#HARDWARE bitmaps
-                                            .build(),
-                                    )
-                                (result.drawable as? BitmapDrawable)?.bitmap?.extractThemeColor()
-                                    ?: DefaultThemeColor
+                                runCatching {
+                                    val result =
+                                        imageLoader.execute(
+                                            ImageRequest
+                                                .Builder(this@MainActivity)
+                                                .data(song.thumbnailUrl)
+                                                .allowHardware(false) // pixel access is not supported on Config#HARDWARE bitmaps
+                                                .diskCachePolicy(coil.request.CachePolicy.ENABLED) // Cache para mejor rendimiento
+                                                .build(),
+                                        )
+                                    (result.drawable as? BitmapDrawable)?.bitmap?.extractThemeColor()
+                                        ?: DefaultThemeColor
+                                }.getOrElse { DefaultThemeColor }
                             }
-                        } else {
+                        } else if (song == null) {
+                            lastThumbnailUrl = null
                             DefaultThemeColor
+                        } else {
+                            themeColor // Mantener color actual si es la misma imagen
                         }
                 }
             }

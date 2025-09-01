@@ -16,6 +16,7 @@ import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
+import androidx.media3.cast.CastPlayer
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -52,6 +53,7 @@ import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaController
 import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
 import androidx.media3.session.SessionToken
 import com.anitail.innertube.YouTube
@@ -184,7 +186,11 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     lateinit var connectivityObserver: NetworkConnectivity
     val waitingForNetworkConnection = MutableStateFlow(false)
     private val isNetworkConnected = MutableStateFlow(false)
-  private val songUrlCache = HashMap<String, Pair<String, Long>>()
+
+    // Cache simple: mediaId -> StreamInfo(url, mimeType, expiryMillis)
+    private data class StreamInfo(val url: String, val mimeType: String, val expiry: Long)
+
+    private val streamUrlCache = HashMap<String, StreamInfo>()
 
   private val audioQuality by
       enumPreference(this, AudioQualityKey, com.anitail.music.constants.AudioQuality.AUTO)
@@ -221,6 +227,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   @Inject @DownloadCache lateinit var downloadCache: SimpleCache
 
   lateinit var player: ExoPlayer
+    private var castPlayer: CastPlayer? = null
   private lateinit var mediaSession: MediaLibrarySession
 
   private var isAudioEffectSessionOpened = false
@@ -229,15 +236,43 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
   val automixItems = MutableStateFlow<List<MediaItem>>(emptyList())
     private var consecutivePlaybackErr = 0
+    private var lastWidgetUpdateAt: Long = 0L
 
     override fun onCreate() {
     super.onCreate()
     instance = this
-    setMediaNotificationProvider(
-        DefaultMediaNotificationProvider(
-                this, { NOTIFICATION_ID }, CHANNEL_ID, R.string.music_player)
-            .apply { setSmallIcon(R.drawable.ic_ani) },
-    )
+        // Proveedor base
+        val baseNotificationProvider =
+            DefaultMediaNotificationProvider(
+                this, { NOTIFICATION_ID }, CHANNEL_ID, R.string.music_player
+            )
+                .apply { setSmallIcon(R.drawable.ic_ani) }
+
+        val suppressingProvider = object : MediaNotification.Provider {
+            override fun createNotification(
+                mediaSession: MediaSession,
+                mediaButtonPreferences: com.google.common.collect.ImmutableList<CommandButton>,
+                actionFactory: MediaNotification.ActionFactory,
+                onNotificationChangedCallback: MediaNotification.Provider.Callback
+            ): MediaNotification {
+                return (baseNotificationProvider as MediaNotification.Provider)
+                    .createNotification(
+                        mediaSession,
+                        mediaButtonPreferences,
+                        actionFactory,
+                        onNotificationChangedCallback
+                    )
+            }
+
+            override fun handleCustomCommand(
+                session: MediaSession,
+                action: String,
+                extras: android.os.Bundle
+            ): Boolean =
+                (baseNotificationProvider as MediaNotification.Provider)
+                    .handleCustomCommand(session, action, extras)
+        }
+        setMediaNotificationProvider(suppressingProvider)
 
     connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
 
@@ -583,20 +618,23 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                     scope.launch {
                       val isEmpty = player.mediaItems.isEmpty()
                       if (!isEmpty) {
-
-                        val title = queueTitle
-                        val items = player.mediaItems.mapNotNull { it.metadata }
-                        val currentIndex = player.currentMediaItemIndex
-                        val position = player.currentPosition
+                          // Snapshot en main para evitar accesos en hilos equivocados
+                          val titleSnap = queueTitle
+                          val itemsSnap = player.mediaItems
+                          val currentIndexSnap = player.currentMediaItemIndex
+                          val positionSnap = player.currentPosition
+                          val isPlayingSnap = player.isPlaying
+                          val repeatModeSnap = player.repeatMode
+                          val shuffleSnap = player.shuffleModeEnabled
 
                         withContext(Dispatchers.IO) {
                           try {
                             val persistQueue =
                                 PersistQueue(
-                                    title = title,
-                                    items = items,
-                                    mediaItemIndex = currentIndex,
-                                    position = position,
+                                    title = titleSnap,
+                                    items = itemsSnap.mapNotNull { it.metadata },
+                                    mediaItemIndex = currentIndexSnap,
+                                    position = positionSnap,
                                 )
                             val queueMessage = LanJamQueueSync.serializeQueue(persistQueue)
                             val success = lanJamServer?.sendWithRetry(queueMessage, 3) ?: 0
@@ -609,7 +647,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                                   LanJamCommands.serialize(
                                       LanJamCommands.Command(
                                           type =
-                                              if (player.isPlaying) LanJamCommands.CommandType.PLAY
+                                              if (isPlayingSnap) LanJamCommands.CommandType.PLAY
                                               else LanJamCommands.CommandType.PAUSE))
                               lanJamServer?.sendWithRetry(playStateCommand, 2)
 
@@ -618,10 +656,12 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                                   LanJamCommands.serialize(
                                       LanJamCommands.Command(
                                           type = LanJamCommands.CommandType.TOGGLE_REPEAT,
-                                          repeatMode = player.repeatMode)),
+                                          repeatMode = repeatModeSnap
+                                      )
+                                  ),
                                   2)
 
-                              if (player.shuffleModeEnabled) {
+                                if (shuffleSnap) {
                                 delay(100)
                                 lanJamServer?.sendWithRetry(
                                     LanJamCommands.serialize(
@@ -978,9 +1018,31 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   }
 
   fun playNext(items: List<MediaItem>) {
-    player.addMediaItems(
-        if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1, items)
+      val insertIndex = if (player.mediaItemCount == 0) 0 else player.currentMediaItemIndex + 1
+      player.addMediaItems(insertIndex, items)
     player.prepare()
+
+      // Si hay una sesión de Cast activa, agregar también al Cast
+      if (castPlayer != null && mediaSession.player === castPlayer) {
+          scope.launch(Dispatchers.IO) {
+              try {
+                  val castItems = items.mapNotNull { it.toCastMediaItem() }
+                  if (castItems.isNotEmpty()) {
+                      withContext(Dispatchers.Main) {
+                          val castInsertIndex =
+                              if (castPlayer?.mediaItemCount == 0) 0 else castPlayer?.currentMediaItemIndex?.plus(
+                                  1
+                              ) ?: 0
+                          castPlayer?.addMediaItems(castInsertIndex, castItems)
+                      }
+                      // Cast log eliminado
+                  }
+              } catch (e: Exception) {
+                  // Cast log eliminado
+              }
+          }
+      }
+    
     if (isJamEnabled && isJamHost) {
       val title = queueTitle
       scope.launch {
@@ -1007,6 +1069,22 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   fun addToQueue(items: List<MediaItem>) {
     player.addMediaItems(items)
     player.prepare()
+
+      // Si hay una sesión de Cast activa, agregar también al Cast
+      if (castPlayer != null && mediaSession.player === castPlayer) {
+          scope.launch(Dispatchers.IO) {
+              try {
+                  val castItems = items.mapNotNull { it.toCastMediaItem() }
+                  if (castItems.isNotEmpty()) {
+                      withContext(Dispatchers.Main) {
+                          castPlayer?.addMediaItems(castItems)
+                      }
+                  }
+              } catch (e: Exception) {
+              }
+          }
+      }
+    
     if (isJamEnabled && isJamHost) {
       val title = queueTitle
       val allItems = player.mediaItems.mapNotNull { it.metadata }
@@ -1192,6 +1270,13 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       scope.launch(Dispatchers.Main) { sendWidgetUpdateBroadcast() }
       return
     }
+
+      // Throttle: evita emitir demasiadas actualizaciones seguidas
+      val now = android.os.SystemClock.uptimeMillis()
+      if (now - lastWidgetUpdateAt < WIDGET_UPDATE_THROTTLE_MS) {
+          return
+      }
+      lastWidgetUpdateAt = now
 
     val meta = currentMediaMetadata.value
 
@@ -1441,7 +1526,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       shuffledIndices.shuffle()
       shuffledIndices[shuffledIndices.indexOf(player.currentMediaItemIndex)] = shuffledIndices[0]
       shuffledIndices[0] = player.currentMediaItemIndex
-      player.setShuffleOrder(DefaultShuffleOrder(shuffledIndices, System.currentTimeMillis()))
+        player.shuffleOrder = DefaultShuffleOrder(shuffledIndices, System.currentTimeMillis())
     }
 
     if (isJamEnabled && isJamHost) {
@@ -1625,33 +1710,44 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       filesDir.resolve(PERSISTENT_QUEUE_FILE).delete()
       return
     }
-    val persistQueue =
-        PersistQueue(
-            title = queueTitle,
-            items = player.mediaItems.mapNotNull { it.metadata },
-            mediaItemIndex = player.currentMediaItemIndex,
-            position = player.currentPosition,
+      // Capturar snapshot rápido en main y escribir en IO
+      scope.launch(Dispatchers.Default) {
+          val snapshot = withContext(Dispatchers.Main.immediate) {
+              Pair(
+                  PersistQueue(
+                      title = queueTitle,
+                      items = player.mediaItems.mapNotNull { it.metadata },
+                      mediaItemIndex = player.currentMediaItemIndex,
+                      position = player.currentPosition,
+                  ),
+                  PersistQueue(
+                      title = "automix",
+                      items = automixItems.value.mapNotNull { it.metadata },
+                      mediaItemIndex = 0,
+                      position = 0,
+                  ),
         )
-    val persistAutomix =
-        PersistQueue(
-            title = "automix",
-            items = automixItems.value.mapNotNull { it.metadata },
-            mediaItemIndex = 0,
-            position = 0,
-        )
-    runCatching {
-          val json = Json.encodeToString(persistQueue)
-          filesDir.resolve(PERSISTENT_QUEUE_FILE).writeText(json, Charsets.UTF_8)
-        }
-        .onFailure { reportException(it) }
-    runCatching {
-          val json = Json.encodeToString(persistAutomix)
-          filesDir.resolve(PERSISTENT_AUTOMIX_FILE).writeText(json, Charsets.UTF_8)
-        }
-        .onFailure { reportException(it) }
+          }
+          withContext(Dispatchers.IO) {
+              runCatching {
+                  val json = Json.encodeToString(snapshot.first)
+                  filesDir.resolve(PERSISTENT_QUEUE_FILE).writeText(json, Charsets.UTF_8)
+              }
+                  .onFailure { reportException(it) }
+              runCatching {
+                  val json = Json.encodeToString(snapshot.second)
+                  filesDir.resolve(PERSISTENT_AUTOMIX_FILE).writeText(json, Charsets.UTF_8)
+              }
+                  .onFailure { reportException(it) }
+          }
+      }
   }
 
   override fun onDestroy() {
+      try {
+          castPlayer?.release()
+      } catch (_: Exception) {
+      }
     stopPeriodicWidgetUpdates()
     widgetUpdateJob?.cancel()
     stopPeriodicScrobbleCheck()
@@ -1735,6 +1831,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     const val PERSISTENT_QUEUE_FILE = "persistent_queue.data"
     const val PERSISTENT_AUTOMIX_FILE = "persistent_automix.data"
       const val MAX_CONSECUTIVE_ERR = 5
+      const val WIDGET_UPDATE_THROTTLE_MS = 300L
 
 
       // Constants for lyrics download action
@@ -1772,9 +1869,236 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     stopSelf()
   }
 
+    /**
+     * Attempt to cast the current queue to an available Cast session. This uses Media3 CastPlayer.
+     * If no session is active, this is a no-op.
+     */
+    private var originalItemsBeforeCast: List<MediaItem>? = null
+    val isCastPreparing = MutableStateFlow(false)
+
+    /**
+     * Obtiene (y cachea) la URL de stream directa para un mediaId. Devuelve null si falla.
+     */
+    private suspend fun getStreamInfo(mediaId: String): StreamInfo? = withContext(Dispatchers.IO) {
+        streamUrlCache[mediaId]?.takeIf { it.expiry > System.currentTimeMillis() }
+            ?.let { return@withContext it }
+        val playbackData = YTPlayerUtils.playerResponseForPlayback(
+            mediaId,
+            audioQuality = audioQuality,
+            connectivityManager = connectivityManager,
+        ).getOrNull() ?: return@withContext null
+        val info = StreamInfo(
+            url = playbackData.streamUrl,
+            mimeType = playbackData.format.mimeType.split(";").firstOrNull()
+                ?: playbackData.format.mimeType,
+            expiry = System.currentTimeMillis() + (playbackData.streamExpiresInSeconds * 1000L)
+        )
+        streamUrlCache[mediaId] = info
+        info
+    }
+
+    /** Convierte MediaItem local (con uri = id) en uno con uri remota reproducible por Chromecast */
+    private suspend fun MediaItem.toCastMediaItem(): MediaItem? {
+        val md = metadata ?: run {
+            // Cast log eliminado
+            return null
+        }
+
+        try {
+            val info = getStreamInfo(md.id) ?: return null
+            return MediaItem.Builder()
+                .setMediaId(md.id)
+                .setUri(info.url)
+                .setCustomCacheKey(md.id)
+                .setMimeType(info.mimeType)
+                .setTag(md)
+                .setMediaMetadata(
+                    androidx.media3.common.MediaMetadata.Builder()
+                        .setTitle(md.title)
+                        .setSubtitle(md.artistName ?: md.artists.joinToString { it.name })
+                        .setArtist(md.artistName ?: md.artists.joinToString { it.name })
+                        .setArtworkUri(md.thumbnailUrl?.toUri())
+                        .setAlbumTitle(md.album?.title)
+                        .setMediaType(androidx.media3.common.MediaMetadata.MEDIA_TYPE_MUSIC)
+                        .build()
+                )
+                .build()
+        } catch (e: Exception) {
+            // Cast log eliminado
+            return null
+        }
+    }
+
+    fun castCurrentToDevice() {
+        try {
+            // Verificar si Cast está disponible antes de proceder
+            if (!com.anitail.music.utils.GooglePlayServicesUtils.isCastAvailable(this)) {
+                return
+            }
+            
+            val castContext =
+                com.google.android.gms.cast.framework.CastContext.getSharedInstance(this)
+            castContext.sessionManager.currentCastSession ?: return
+            if (castPlayer == null) {
+                castPlayer = CastPlayer(castContext)
+            }
+            if (mediaSession.player === castPlayer) return
+
+            if (isCastPreparing.value) {
+                return
+            }
+            isCastPreparing.value = true
+            // Capturar estado del player en el hilo principal sin bloqueo
+            val (itemsSnapshot, originalIndex, currentPos) =
+                if (Looper.myLooper() == Looper.getMainLooper()) {
+                    val items = (0 until player.mediaItemCount).map { player.getMediaItemAt(it) }
+                    val currentIndex = player.currentMediaItemIndex.coerceAtLeast(0)
+                    Triple(
+                        items,
+                        currentIndex,
+                        player.currentPosition
+                    )
+                } else {
+                    // Evitar runBlocking en el hilo principal - usar withContext en su lugar
+                    scope.launch(Dispatchers.Main) {
+                        val items =
+                            (0 until player.mediaItemCount).map { player.getMediaItemAt(it) }
+                        val snapshot = Triple(
+                            items,
+                            player.currentMediaItemIndex.coerceAtLeast(0),
+                            player.currentPosition
+                        )
+                        // Continuar procesamiento en background
+                        startCastWithSnapshot(snapshot)
+                    }
+                    return
+                }
+            if (itemsSnapshot.isEmpty()) return
+            startCastWithSnapshot(Triple(itemsSnapshot, originalIndex, currentPos))
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun startCastWithSnapshot(snapshot: Triple<List<MediaItem>, Int, Long>) {
+        val (itemsSnapshot, originalIndex, currentPos) = snapshot
+
+            scope.launch(Dispatchers.IO) {
+                try {
+                    // 1. Preparar SOLO la canción actual
+                    val currentLocal = itemsSnapshot.getOrNull(originalIndex)
+                    val currentCast = currentLocal?.toCastMediaItem()
+                    if (currentCast == null) {
+                        withContext(Dispatchers.Main) { isCastPreparing.value = false }
+                        return@launch
+                    }
+                    withContext(Dispatchers.Main) {
+                        try {
+                            originalItemsBeforeCast = itemsSnapshot
+                            castPlayer?.setMediaItems(
+                                listOf(currentCast), /* startIndex */
+                                0,
+                                currentPos
+                            )
+                            castPlayer?.prepare()
+                            castPlayer?.play()
+                            // Cambiar a cast y pausar local
+                            player.pause()
+                            castPlayer?.let { mediaSession.setPlayer(it) }
+                            updateNotification()
+                        } catch (e: Exception) {
+                            // Cast log eliminado
+                            mediaSession.setPlayer(player)
+                            isCastPreparing.value = false
+                            return@withContext
+                        } finally {
+                            // Liberar el estado de preparación sólo respecto a la pista inicial
+                            isCastPreparing.value = false
+                        }
+                    }
+
+                    // 2. Rellenar resto de la cola en background manteniendo orden original
+                    val after = (originalIndex + 1 until itemsSnapshot.size).toList()
+                    val before =
+                        (0 until originalIndex).toList() // se añadirán al principio en orden inverso
+
+                    // Información de preparación de cola de Cast omitida
+
+                    // Preparar listas en background y añadir en lotes en Main
+                    val castAfter = mutableListOf<MediaItem>()
+                    for (idx in after) {
+                        if (!isActive) break
+                        val castItem = itemsSnapshot[idx].toCastMediaItem()
+                        if (castItem != null) {
+                            castAfter.add(castItem)
+                        }
+                    }
+                    val castBefore = mutableListOf<MediaItem>()
+                    for (idx in before) { // en orden natural 0..originalIndex-1
+                        if (!isActive) break
+                        val castItem = itemsSnapshot[idx].toCastMediaItem()
+                        if (castItem != null) {
+                            castBefore.add(castItem)
+                        }
+                    }
+
+
+                    // Diagnosticar metadatos antes de agregar al Cast Player
+                    // Diagnóstico de preagregado eliminado
+                    
+                    withContext(Dispatchers.Main) {
+                        if (castAfter.isNotEmpty()) {
+                            castPlayer?.addMediaItems(castAfter)
+
+                            // Verificar metadatos después de agregar
+                            // Verificación de post-agregado eliminada
+                        }
+                        if (castBefore.isNotEmpty()) {
+                            castPlayer?.addMediaItems(0, castBefore)
+
+                            // Verificar metadatos después de agregar al inicio
+                            // Verificación de post-agregado eliminada
+                        }
+
+                        // Verificar el total final después de todas las operaciones
+                        // Resumen de cola remoto eliminado
+                    }
+                } catch (e: Exception) {
+                    // Cast log eliminado
+                }
+            }
+    }
+
+    /** Optional helper to return playback to local device after cast session ends */
+    fun returnToLocalPlayback() {
+        try {
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                scope.launch(Dispatchers.Main) { returnToLocalPlayback() }
+                return
+            }
+            if (castPlayer == null) return
+            val usingCast = mediaSession.player === castPlayer
+            if (!usingCast) return
+            val index = castPlayer?.currentMediaItemIndex?.takeIf { it >= 0 } ?: 0
+            val pos = castPlayer?.currentPosition ?: 0L
+            castPlayer?.pause()
+            val restoreItems = originalItemsBeforeCast ?: player.mediaItems
+            player.setMediaItems(restoreItems, index, pos)
+            mediaSession.setPlayer(player)
+            player.prepare()
+            player.play()
+            updateNotification()
+        } catch (e: Exception) {
+            // Cast log eliminado
+        }
+    }
+
   /** Starts periodic widget updates to show song progress */
   private fun startPeriodicWidgetUpdates() {
-    if (Looper.myLooper() != Looper.getMainLooper()) {
+      // Widget deshabilitado: no iniciar job periódico
+      widgetUpdateJob?.cancel()
+      widgetUpdateJob = null
+      return
+      if (Looper.myLooper() != Looper.getMainLooper()) {
       scope.launch(Dispatchers.Main) { startPeriodicWidgetUpdates() }
       return
     }
@@ -1788,7 +2112,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
               if (player.isPlaying && player.playbackState == STATE_READY) {
                 sendWidgetUpdateBroadcast()
               }
-              delay(2000)
+                delay(5000) // Menor frecuencia incluso si se reactivara el widget
             }
           } catch (_: Exception) {}
         }
@@ -1800,19 +2124,15 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     widgetUpdateJob = null
   }
 
-  // Nueva función para guardar conexiones
   private suspend fun saveJamConnection(clientIp: String, timestamp: String) {
     dataStore.edit { preferences ->
       val existingHistory = preferences[JamConnectionHistoryKey] ?: ""
       val newEntry = "$clientIp|$timestamp"
 
-      // Limitar a las últimas 30 conexiones
       val historyEntries = existingHistory.split(";").filter { it.isNotEmpty() }.toMutableList()
 
-      // Añadir la nueva conexión al principio
       historyEntries.add(0, newEntry)
 
-      // Mantener solo las últimas 30 entradas
       val trimmedHistory = historyEntries.take(30).joinToString(";")
       preferences[JamConnectionHistoryKey] = trimmedHistory
     }
@@ -1849,26 +2169,40 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
    * Función utilitaria para sincronizar la cola actual con los clientes JAM Se debe llamar después
    * de cualquier modificación a la cola (eliminar, reorganizar, etc.)
    */
+
   fun syncQueueWithClients() {
     if (!isJamEnabled || !isJamHost || player.mediaItemCount == 0) {
       return
     }
 
-    scope.launch(Dispatchers.IO) {
+      scope.launch(Dispatchers.Default) {
       try {
-        val title = queueTitle
-        val items = player.mediaItems.mapNotNull { it.metadata }
-        val currentIndex = player.currentMediaItemIndex
-        val position = player.currentPosition
+          data class QueueSnapshot(
+              val title: String?,
+              val items: List<MediaItem>,
+              val index: Int,
+              val position: Long,
+          )
+          // Captura mínima en el hilo principal
+          val snap = withContext(Dispatchers.Main.immediate) {
+              QueueSnapshot(
+                  title = queueTitle,
+                  items = player.mediaItems,
+                  index = player.currentMediaItemIndex,
+                  position = player.currentPosition,
+              )
+          }
+          // Trabajo pesado fuera de main
+          val mapped = snap.items.mapNotNull { it.metadata }
         val persistQueue =
             PersistQueue(
-                title = title,
-                items = items,
-                mediaItemIndex = currentIndex,
-                position = position,
+                title = snap.title,
+                items = mapped,
+                mediaItemIndex = snap.index,
+                position = snap.position,
             )
         val queueMessage = LanJamQueueSync.serializeQueue(persistQueue)
-        lanJamServer?.sendWithRetry(queueMessage, 2) ?: 0
+          withContext(Dispatchers.IO) { lanJamServer?.sendWithRetry(queueMessage, 2) ?: 0 }
       } catch (_: Exception) {}
     }
   }
@@ -1903,20 +2237,21 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     }
   }
 
-  private fun getNextQueueItems(count: Int): List<MediaItem> {
-    val result = mutableListOf<MediaItem>()
-    val currentIndex = player.currentMediaItemIndex
-    val totalItems = player.mediaItemCount
+    private suspend fun getNextQueueItems(count: Int): List<MediaItem> =
+        withContext(Dispatchers.Main) {
+            val result = mutableListOf<MediaItem>()
+            val currentIndex = player.currentMediaItemIndex
+            val totalItems = player.mediaItemCount
 
-    for (i in 1..count) {
-      val nextIndex = currentIndex + i
-      if (nextIndex < totalItems) {
-        player.getMediaItemAt(nextIndex).let { result.add(it) }
-      }
-    }
+            for (i in 1..count) {
+                val nextIndex = currentIndex + i
+                if (nextIndex < totalItems) {
+                    player.getMediaItemAt(nextIndex).let { result.add(it) }
+                }
+            }
 
-    return result
-  }
+            result
+        }
 
     /** Starts periodic scrobble checking during playbook */
   private fun startPeriodicScrobbleCheck() {
@@ -1958,7 +2293,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   /** Checks if current song should be scrobbled and scrobbles if needed */
 
   private fun checkAndScrobbleIfNeeded() {
-      // Asegurar que estamos en el hilo principal para acceder al player
       if (Looper.myLooper() != Looper.getMainLooper()) {
           scope.launch(Dispatchers.Main) { checkAndScrobbleIfNeeded() }
           return
@@ -1969,7 +2303,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       val songId = song.song.id
         val currentMetadata = player.currentMetadata
 
-        // Verificar que realmente tengamos metadata válida antes de proceder
         if (currentMetadata?.id != songId) {
             Timber.d(
                 "🔄 Metadata mismatch, skipping scrobble check: metadata=${currentMetadata?.id}, song=$songId"
@@ -1993,7 +2326,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
       val realPlayedTime = System.currentTimeMillis() - currentSongStartTime
 
-        // Verificar que las condiciones sean correctas antes de scrobble
         if (realPlayedTime >= 30000L && currentPosition >= 30000L) {
             // Double-check que no hemos scrobbled ya (protección adicional)
             if (!hasScrobbled) {

@@ -24,11 +24,19 @@ import timber.log.Timber
 class MusicWidgetProvider : AppWidgetProvider() {
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        if (WIDGET_DISABLED) {
+            Timber.tag(TAG).d("Widget deshabilitado: onUpdate ignorado")
+            return
+        }
         updateWidgets(context, appWidgetManager, appWidgetIds)
         requestMusicServiceUpdate(context)
     }    @RequiresApi(Build.VERSION_CODES.O)
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
+        if (WIDGET_DISABLED) {
+            Timber.tag(TAG).d("Widget deshabilitado: onReceive(${intent.action}) ignorado")
+            return
+        }
         val appWidgetManager = AppWidgetManager.getInstance(context)
         val thisWidget = ComponentName(context, MusicWidgetProvider::class.java)
         val appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
@@ -115,8 +123,8 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 Timber.tag(TAG).e(e, "Error obtaining artist name")
                 ""
             }
-            
-            val recommendation = try {
+
+            try {
                 updateIntent.getStringExtra(MusicService.EXTRA_WIDGET_RECOMMENDATION) ?: ""
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e, "Error obtaining recommendation")
@@ -426,5 +434,8 @@ class MusicWidgetProvider : AppWidgetProvider() {
         const val ACTION_PLAY_PAUSE = "com.anitail.music.widget.PLAY_PAUSE"
         const val ACTION_NEXT = "com.anitail.music.widget.NEXT"
         const val ACTION_PREV = "com.anitail.music.widget.PREV"
+
+        // Flag global para desactivar completamente el widget (evita consumo de batería y CPU)
+        const val WIDGET_DISABLED = true
     }
 }

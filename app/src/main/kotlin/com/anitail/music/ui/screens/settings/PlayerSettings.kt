@@ -13,7 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavController
@@ -26,6 +28,7 @@ import com.anitail.music.constants.AutoDownloadLyricsKey
 import com.anitail.music.constants.AutoDownloadOnLikeKey
 import com.anitail.music.constants.AutoLoadMoreKey
 import com.anitail.music.constants.AutoSkipNextOnErrorKey
+import com.anitail.music.constants.EnableCastKey
 import com.anitail.music.constants.HistoryDuration
 import com.anitail.music.constants.NotificationButtonType
 import com.anitail.music.constants.NotificationButtonTypeKey
@@ -39,6 +42,7 @@ import com.anitail.music.ui.component.PreferenceGroupTitle
 import com.anitail.music.ui.component.SliderPreference
 import com.anitail.music.ui.component.SwitchPreference
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.utils.GooglePlayServicesUtils
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.utils.rememberPreference
 
@@ -97,6 +101,15 @@ fun PlayerSettings(
         HistoryDuration,
         defaultValue = 30f
     )
+    val (enableCast, onEnableCastChange) = rememberPreference(
+        EnableCastKey,
+        defaultValue = true
+    )
+
+    val context = LocalContext.current
+    val googlePlayServicesAvailable = remember {
+        GooglePlayServicesUtils.isGooglePlayServicesAvailable(context)
+    }
 
     Column(
         Modifier
@@ -212,7 +225,25 @@ fun PlayerSettings(
             checked = autoDownloadLyrics,
             onCheckedChange = onAutoDownloadLyricsChange
         )
-          PreferenceGroupTitle(
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.enable_cast)) },
+            description = if (googlePlayServicesAvailable) {
+                stringResource(R.string.enable_cast_desc)
+            } else {
+                stringResource(R.string.cast_requires_google_play_services)
+            },
+            icon = { Icon(painterResource(R.drawable.ic_cast), null) },
+            checked = enableCast && googlePlayServicesAvailable,
+            onCheckedChange = { enabled ->
+                if (googlePlayServicesAvailable) {
+                    onEnableCastChange(enabled)
+                }
+            },
+            isEnabled = googlePlayServicesAvailable
+        )
+
+        PreferenceGroupTitle(
             title = stringResource(R.string.notification)
         )
         

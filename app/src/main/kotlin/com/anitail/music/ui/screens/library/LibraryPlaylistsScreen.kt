@@ -87,7 +87,7 @@ fun LibraryPlaylistsScreen(
     allowSyncing: Boolean = true,
 ) {
     val menuState = LocalMenuState.current
-    val haptic = LocalHapticFeedback.current
+    LocalHapticFeedback.current
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -113,7 +113,7 @@ fun LibraryPlaylistsScreen(
                 name = stringResource(R.string.liked)
             ),
             songCount = 0,
-            thumbnails = emptyList(),
+            songThumbnails = emptyList(),
         )
 
     val downloadPlaylist =
@@ -123,7 +123,7 @@ fun LibraryPlaylistsScreen(
                 name = stringResource(R.string.offline)
             ),
             songCount = 0,
-            thumbnails = emptyList(),
+            songThumbnails = emptyList(),
         )
 
     val topPlaylist =
@@ -133,7 +133,7 @@ fun LibraryPlaylistsScreen(
                 name = stringResource(R.string.my_top) + " $topSize"
             ),
             songCount = 0,
-            thumbnails = emptyList(),
+            songThumbnails = emptyList(),
         )
 
     val cachePlaylist =
@@ -143,7 +143,7 @@ fun LibraryPlaylistsScreen(
                 name = stringResource(R.string.cached_playlist)
             ),
             songCount = 0,
-            thumbnails = emptyList(),
+            songThumbnails = emptyList(),
         )
 
     val (showLiked) = rememberPreference(ShowLikedPlaylistKey, true)
@@ -159,7 +159,7 @@ fun LibraryPlaylistsScreen(
         backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsState()
 
     val (innerTubeCookie) = rememberPreference(InnerTubeCookieKey, "")
-    val isLoggedIn = remember(innerTubeCookie) {
+    remember(innerTubeCookie) {
         "SAPISID" in parseCookieString(innerTubeCookie)
     }
 

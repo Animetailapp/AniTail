@@ -92,3 +92,8 @@
 
 # Keep all classes within the kuromoji package
 -keep class com.atilika.kuromoji.** { *; }
+
+# --- Google Cast / MediaRouter (release) ---
+-keep class com.google.android.gms.cast.** { *; }
+-keep class com.google.android.gms.cast.framework.** { *; }
+-keep class androidx.mediarouter.** { *; }

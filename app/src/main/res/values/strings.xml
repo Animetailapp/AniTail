@@ -275,6 +275,10 @@
     <string name="repeat_mode_off">Repeat mode off</string>
     <string name="repeat_mode_one">Repeat current song</string>
     <string name="repeat_mode_all">Repeat queue</string>
+    <!-- Cast / Queue management -->
+    <string name="manage_queue">Manage queue</string>
+    <string name="queue_empty">Queue is empty</string>
+    <string name="remove_from_queue">Remove from queue</string>
 
     <!-- Queue Title -->
     <string name="queue_all_songs">All songs</string>
@@ -728,4 +732,30 @@
     <string name="clear_song_cache_confirmation">Are you sure you want to clear the song cache? This will free up space but might affect playback performance temporarily.</string>
     <string name="clear_image_cache_confirmation">Are you sure you want to clear the image cache? Album art and artist images will need to be re-downloaded.</string>
     <string name="confirm">Confirm</string>
+    <!-- Cast Device Picker -->
+    <string name="cast_devices">Cast devices</string>
+    <string name="cast_no_devices">No devices available</string>
+    <string name="cast_connected">Connected</string>
+    <string name="cast_connecting">Connecting…</string>
+    <string name="casting_to">Casting to %1$s</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="disconnect_cast_title">Disconnect</string>
+    <string name="disconnect_cast_message">Stop casting and disconnect from %1$s?</string>
+
+    <!-- Cast Settings -->
+    <string name="enable_cast">Enable Cast</string>
+    <string name="enable_cast_desc">Allow casting media to compatible devices. Requires Google Play Services.</string>
+    <string name="cast_unavailable">Cast unavailable</string>
+    <string name="cast_requires_google_play_services">Cast functionality requires Google Play Services to be available on your device.</string>
+
+    <!-- Cast queue loading progress -->
+    <string name="cast_queue_starting">Starting…</string>
+    <string name="cast_queue_loading_step">Loading %1$d of %2$d…</string>
+    <string name="cast_queue_completed_count">Completed: %1$d songs (Cast queue)</string>
+    <string name="cast_queue_completed_alt_count">Completed: %1$d songs (alternative)</string>
+    <string name="cast_queue_only_current">Only current item available…</string>
+    <string name="cast_queue_completed_single">Completed: 1 song (only current Cast)</string>
+    <string name="cast_queue_none_available">No items available in Cast</string>
+    <string name="cast_queue_error">Error loading queue</string>
+    <string name="cast_queue_loading">Loading queue…</string>
 </resources>

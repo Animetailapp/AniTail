@@ -271,6 +271,10 @@
     <string name="repeat_mode_off">Repetición desactivada</string>
     <string name="repeat_mode_one">Repetir canción actual</string>
     <string name="repeat_mode_all">Repetir cola</string>
+    <!-- Cast / Queue management -->
+    <string name="manage_queue">Gestionar cola</string>
+    <string name="queue_empty">La cola está vacía</string>
+    <string name="remove_from_queue">Eliminar de la cola</string>
 
     <!-- Título de cola -->
     <string name="queue_all_songs">Todas las canciones</string>
@@ -701,4 +705,30 @@
     <string name="subscribed">Suscrito</string>
     <string name="subscribe">Suscribirse</string>
     <string name="new_mini_player_design">Nuevo diseño del mini reproductor</string>
+    <!-- Selector de dispositivos Cast -->
+    <string name="cast_devices">Dispositivos Cast</string>
+    <string name="cast_no_devices">No hay dispositivos disponibles</string>
+    <string name="cast_connected">Conectado</string>
+    <string name="cast_connecting">Conectando…</string>
+    <string name="casting_to">Transmitiendo a %1$s</string>
+    <string name="disconnect">Desconectar</string>
+    <string name="disconnect_cast_title">Desconectar</string>
+    <string name="disconnect_cast_message">¿Detener transmisión y desconectar de %1$s?</string>
+
+    <!-- Cast Settings -->
+    <string name="enable_cast">Habilitar Cast</string>
+    <string name="enable_cast_desc">Permitir transmitir contenido a dispositivos compatibles. Requiere Google Play Services.</string>
+    <string name="cast_unavailable">Cast no disponible</string>
+    <string name="cast_requires_google_play_services">La funcionalidad de Cast requiere que Google Play Services esté disponible en tu dispositivo.</string>
+
+    <!-- Progreso de carga de cola Cast -->
+    <string name="cast_queue_starting">Iniciando…</string>
+    <string name="cast_queue_loading_step">Cargando %1$d de %2$d…</string>
+    <string name="cast_queue_completed_count">Completado: %1$d canciones (cola Cast)</string>
+    <string name="cast_queue_completed_alt_count">Completado: %1$d canciones (método alternativo)</string>
+    <string name="cast_queue_only_current">Solo el elemento actual disponible…</string>
+    <string name="cast_queue_completed_single">Completado: 1 canción (solo actual Cast)</string>
+    <string name="cast_queue_none_available">No hay elementos disponibles en Cast</string>
+    <string name="cast_queue_error">Error cargando cola</string>
+    <string name="cast_queue_loading">Cargando cola…</string>
 </resources>

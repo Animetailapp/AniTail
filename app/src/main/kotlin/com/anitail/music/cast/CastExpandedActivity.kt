@@ -1,0 +1,2 @@
+// Archivo eliminado: CastExpandedActivity obsoleto
+
