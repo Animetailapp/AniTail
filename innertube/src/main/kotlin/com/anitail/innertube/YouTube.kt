@@ -877,7 +877,11 @@ object YouTube {
         innerTube.removeFromPlaylist(WEB_REMIX, playlistId, videoId, setVideoId)
     }
 
-    suspend fun moveSongPlaylist(playlistId: String, setVideoId: String, successorSetVideoId: String) = runCatching {
+    suspend fun moveSongPlaylist(
+        playlistId: String,
+        setVideoId: String,
+        successorSetVideoId: String?
+    ) = runCatching {
         innerTube.moveSongPlaylist(WEB_REMIX, playlistId, setVideoId, successorSetVideoId)
     }
 
