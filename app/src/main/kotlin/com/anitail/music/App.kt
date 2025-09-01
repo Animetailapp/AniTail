@@ -51,7 +51,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import okhttp3.Credentials
 import timber.log.Timber
+import java.net.Authenticator
+import java.net.PasswordAuthentication
 import java.net.Proxy
 import java.util.Locale
 
@@ -112,6 +115,23 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
         }
 
         if (dataStore[ProxyEnabledKey] == true) {
+            if (dataStore[ProxyUsernameKey] != "" || dataStore[ProxyPasswordKey] != "") {
+                if (dataStore[ProxyTypeKey].toEnum(defaultValue = Proxy.Type.HTTP) == Proxy.Type.HTTP) {
+                    YouTube.proxyAuth = Credentials.basic(
+                        dataStore[ProxyUsernameKey] ?: "",
+                        dataStore[ProxyPasswordKey] ?: ""
+                    )
+                } else {
+                    val authenticator = object : Authenticator() {
+                        override fun getPasswordAuthentication() =
+                            PasswordAuthentication(
+                                dataStore[ProxyUsernameKey] ?: "",
+                                (dataStore[ProxyPasswordKey] ?: "").toCharArray()
+                            )
+                    }
+                    Authenticator.setDefault(authenticator)
+                }
+            }
             try {
                 YouTube.proxy = Proxy(
                     dataStore[ProxyTypeKey].toEnum(defaultValue = Proxy.Type.HTTP),

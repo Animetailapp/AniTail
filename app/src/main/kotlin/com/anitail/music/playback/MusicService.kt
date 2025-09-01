@@ -1569,7 +1569,13 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                       DefaultDataSource.Factory(
                           this,
                           OkHttpDataSource.Factory(
-                              OkHttpClient.Builder().proxy(YouTube.proxy).build(),
+                              OkHttpClient.Builder().proxy(YouTube.proxy)
+                                  .proxyAuthenticator { _, response ->
+                                      response.request.newBuilder()
+                                          .header("Proxy-Authorization", YouTube.proxyAuth!!)
+                                          .build()
+                                  }
+                                  .build(),
                           ),
                       ),
                   ),
