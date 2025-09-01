@@ -26,8 +26,10 @@ import com.anitail.music.constants.InnerTubeCookieKey
 import com.anitail.music.constants.LanguageCodeToName
 import com.anitail.music.constants.MaxImageCacheSizeKey
 import com.anitail.music.constants.ProxyEnabledKey
+import com.anitail.music.constants.ProxyPasswordKey
 import com.anitail.music.constants.ProxyTypeKey
 import com.anitail.music.constants.ProxyUrlKey
+import com.anitail.music.constants.ProxyUsernameKey
 import com.anitail.music.constants.SYSTEM_DEFAULT
 import com.anitail.music.constants.UseLoginForBrowse
 import com.anitail.music.constants.VisitorDataKey

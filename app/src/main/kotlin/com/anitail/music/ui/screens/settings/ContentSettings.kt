@@ -52,8 +52,10 @@ import com.anitail.music.constants.LyricsRomanizeKoreanKey
 import com.anitail.music.constants.PreferredLyricsProvider
 import com.anitail.music.constants.PreferredLyricsProviderKey
 import com.anitail.music.constants.ProxyEnabledKey
+import com.anitail.music.constants.ProxyPasswordKey
 import com.anitail.music.constants.ProxyTypeKey
 import com.anitail.music.constants.ProxyUrlKey
+import com.anitail.music.constants.ProxyUsernameKey
 import com.anitail.music.constants.QuickPicks
 import com.anitail.music.constants.QuickPicksKey
 import com.anitail.music.constants.SYSTEM_DEFAULT
@@ -61,6 +63,7 @@ import com.anitail.music.constants.TopSize
 import com.anitail.music.ui.component.EditTextPreference
 import com.anitail.music.ui.component.IconButton
 import com.anitail.music.ui.component.ListPreference
+import com.anitail.music.ui.component.PreferenceEntry
 import com.anitail.music.ui.component.PreferenceGroupTitle
 import com.anitail.music.ui.component.SwitchPreference
 import com.anitail.music.ui.utils.backToMain
