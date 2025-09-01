@@ -346,7 +346,7 @@
     <string name="slim">Slim</string>
     <string name="misc">Misc</string>
     <string name="default_open_tab">Default open tab</string>
-    <string name="slim_navbar">Hide bottom navigation bar labels</string>
+    <string name="slim_navbar">Slim bottom navigation bar</string>
     <string name="auto_playlists">Auto Playlists</string>
     <string name="show_liked_playlist">Show Liked Playlist</string>
     <string name="show_downloaded_playlist">Show Downloaded Playlist</string>
