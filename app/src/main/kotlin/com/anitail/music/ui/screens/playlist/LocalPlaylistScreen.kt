@@ -411,6 +411,25 @@ fun LocalPlaylistScreen(
                 database.transaction {
                     move(viewModel.playlistId, from, to)
                 }
+
+                // Sync order with YT Music
+                if (viewModel.playlist.value?.playlist?.browseId != null) {
+                    viewModel.viewModelScope.launch(Dispatchers.IO) {
+                        val playlistSongMap = database.playlistSongMaps(viewModel.playlistId, 0)
+                        val successorIndex = if (from > to) to else to + 1
+                        val successorSetVideoId =
+                            playlistSongMap.getOrNull(successorIndex)?.setVideoId
+
+                        playlistSongMap.getOrNull(from)?.setVideoId?.let { setVideoId ->
+                            YouTube.moveSongPlaylist(
+                                viewModel.playlist.value?.playlist?.browseId!!,
+                                setVideoId,
+                                successorSetVideoId
+                            )
+                        }
+                    }
+                }
+
                 dragInfo = null
             }
         }
@@ -534,7 +553,7 @@ fun LocalPlaylistScreen(
                                 },
                                 modifier = Modifier.weight(1f),
                             )
-                            if (editable) {
+                            if (editable && sortType == PlaylistSongSortType.CUSTOM) {
                                 IconButton(
                                     onClick = { locked = !locked },
                                     modifier = Modifier.padding(horizontal = 6.dp),
@@ -644,7 +663,7 @@ fun LocalPlaylistScreen(
                                         )
                                     }
 
-                                    if (sortType == PlaylistSongSortType.CUSTOM && !locked && !selection && !isSearching) {
+                                    if (sortType == PlaylistSongSortType.CUSTOM && !locked && !selection && !isSearching && editable) {
                                         IconButton(
                                             onClick = { },
                                             modifier = Modifier.draggableHandle(),
@@ -781,7 +800,7 @@ fun LocalPlaylistScreen(
                                             contentDescription = null,
                                         )
                                     }
-                                    if (sortType == PlaylistSongSortType.CUSTOM && !locked && !selection && !isSearching) {
+                                    if (sortType == PlaylistSongSortType.CUSTOM && !locked && !selection && !isSearching && editable) {
                                         IconButton(
                                             onClick = { },
                                             modifier = Modifier.draggableHandle(),
@@ -1182,7 +1201,8 @@ fun LocalPlaylistHeader(
                                                 PlaylistSongMap(
                                                     songId = song.id,
                                                     playlistId = playlist.id,
-                                                    position = position
+                                                    position = position,
+                                                    setVideoId = song.setVideoId
                                                 )
                                             }
                                             .forEach(::insert)

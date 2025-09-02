@@ -290,6 +290,11 @@
 
     <!-- Configuración -->
     <string name="settings">Configuración</string>
+    <!-- Categorías de ajustes -->
+    <string name="category_interface">Interfaz</string>
+    <string name="category_content">Contenido</string>
+    <string name="category_player">Reproductor</string>
+    <string name="category_system">Sistema</string>
     <string name="login_settings">Configuración de inicio de sesión</string>
     <string name="use_login_for_browse">Usar inicio de sesión para explorar más contenido</string>
     <string name="use_login_for_browse_desc">Esto puede mostrar más contenido si has iniciado sesión con una cuenta de YTMusic</string>

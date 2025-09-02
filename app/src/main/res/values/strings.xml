@@ -294,6 +294,11 @@
 
     <!-- Settings -->
     <string name="settings">Settings</string>
+    <!-- Settings categories -->
+    <string name="category_interface">Interface</string>
+    <string name="category_content">Content</string>
+    <string name="category_player">Player</string>
+    <string name="category_system">System</string>
     <string name="login_settings">Login settings</string>
     <string name="use_login_for_browse">Use login for browsing more content</string>
     <string name="use_login_for_browse_desc">This can shows more content if you are logged in with YTMusic account</string>
@@ -346,7 +351,7 @@
     <string name="slim">Slim</string>
     <string name="misc">Misc</string>
     <string name="default_open_tab">Default open tab</string>
-    <string name="slim_navbar">Hide bottom navigation bar labels</string>
+    <string name="slim_navbar">Slim bottom navigation bar</string>
     <string name="auto_playlists">Auto Playlists</string>
     <string name="show_liked_playlist">Show Liked Playlist</string>
     <string name="show_downloaded_playlist">Show Downloaded Playlist</string>

@@ -93,7 +93,31 @@
 # Keep all classes within the kuromoji package
 -keep class com.atilika.kuromoji.** { *; }
 
+## Queue Persistence Rules
+# Keep queue-related classes to prevent serialization issues in release builds
+-keep class com.anitail.music.models.PersistQueue { *; }
+-keep class com.metrolist.music.playback.queues.** { *; }
+
+# Keep serialization methods for queue persistence
+-keepclassmembers class * implements java.io.Serializable {
+    private void writeObject(java.io.ObjectOutputStream);
+    private void readObject(java.io.ObjectInputStream);
+}
+
 # --- Google Cast / MediaRouter (release) ---
 -keep class com.google.android.gms.cast.** { *; }
 -keep class com.google.android.gms.cast.framework.** { *; }
 -keep class androidx.mediarouter.** { *; }
+
+
+## Media3 Protection Rules
+# Protect Guava from conflicts with system versions
+-keep class com.google.common.** { *; }
+-keep class com.google.common.util.concurrent.** { *; }
+-keep class com.google.common.collect.** { *; }
+-dontwarn com.google.common.**
+
+# Protect Media3 from obfuscation
+-keep class androidx.media3.** { *; }
+-keep interface androidx.media3.** { *; }
+-dontwarn androidx.media3.**
