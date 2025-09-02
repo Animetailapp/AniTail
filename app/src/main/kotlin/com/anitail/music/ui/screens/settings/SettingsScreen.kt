@@ -12,7 +12,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -85,9 +86,10 @@ fun SettingsScreen(
 
 
     Column(
-        Modifier
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+        modifier = Modifier
+            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal))
             .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp)
     ) {
         Spacer(
             Modifier.windowInsetsPadding(
@@ -99,15 +101,13 @@ fun SettingsScreen(
 
         Card(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .fillMaxSize(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Row(
                 modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth(),
+                    .fillMaxSize(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Image(
@@ -161,7 +161,7 @@ fun SettingsScreen(
         SettingsBox(
             title = stringResource(R.string.content),
             icon = IconResource.Drawable(painterResource(R.drawable.language)),
-            shape = shapeManager(isBoth = true),
+            shape = shapeManager(isFirst = true),
             onClick = { navController.navigate("settings/content") }
         )
         SettingsBox(
@@ -293,6 +293,14 @@ fun SettingsScreen(
             shape = shapeManager(isLast = true),
             onClick = { navController.navigate("settings/about") }
         )
+        Spacer(
+            Modifier.windowInsetsPadding(
+                LocalPlayerAwareWindowInsets.current.only(
+                    WindowInsetsSides.Bottom
+                )
+            )
+        )
+        Spacer(modifier = Modifier.height(16.dp))
 
     }
 
