@@ -48,10 +48,10 @@ import com.anitail.music.BuildConfig
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.R
 import com.anitail.music.ui.component.IconButton
-import com.anitail.music.ui.screens.settings.desings.IconResource
-import com.anitail.music.ui.screens.settings.desings.SettingCategory
-import com.anitail.music.ui.screens.settings.desings.SettingsBox
-import com.anitail.music.ui.screens.settings.desings.shapeManager
+import com.anitail.music.ui.screens.settings.designs.IconResource
+import com.anitail.music.ui.screens.settings.designs.SettingCategory
+import com.anitail.music.ui.screens.settings.designs.SettingsBox
+import com.anitail.music.ui.screens.settings.designs.shapeManager
 import com.anitail.music.ui.utils.backToMain
 import java.util.Calendar
 
