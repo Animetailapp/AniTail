@@ -1,4 +1,4 @@
-package com.anitail.music.ui.screens.settings.desings
+package com.anitail.music.ui.screens.settings.designs
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
