@@ -164,6 +164,12 @@ fun SettingsScreen(
             shape = shapeManager(isBoth = true),
             onClick = { navController.navigate("settings/content") }
         )
+        SettingsBox(
+            title = stringResource(R.string.privacy),
+            icon = IconResource.Drawable(painterResource(R.drawable.security)),
+            shape = shapeManager(isLast = true),
+            onClick = { navController.navigate("settings/privacy") }
+        )
 
         // Player category
         SettingCategory(title = stringResource(id = R.string.category_player))
