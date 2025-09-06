@@ -26,8 +26,10 @@ import com.anitail.music.constants.InnerTubeCookieKey
 import com.anitail.music.constants.LanguageCodeToName
 import com.anitail.music.constants.MaxImageCacheSizeKey
 import com.anitail.music.constants.ProxyEnabledKey
+import com.anitail.music.constants.ProxyPasswordKey
 import com.anitail.music.constants.ProxyTypeKey
 import com.anitail.music.constants.ProxyUrlKey
+import com.anitail.music.constants.ProxyUsernameKey
 import com.anitail.music.constants.SYSTEM_DEFAULT
 import com.anitail.music.constants.UseLoginForBrowse
 import com.anitail.music.constants.VisitorDataKey
@@ -51,7 +53,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import okhttp3.Credentials
 import timber.log.Timber
+import java.net.Authenticator
+import java.net.PasswordAuthentication
 import java.net.Proxy
 import java.util.Locale
 
@@ -112,11 +117,22 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
         }
 
         if (dataStore[ProxyEnabledKey] == true) {
+            val username = dataStore[ProxyUsernameKey].orEmpty()
+            val password = dataStore[ProxyPasswordKey].orEmpty()
+            val type = dataStore[ProxyTypeKey].toEnum(defaultValue = Proxy.Type.HTTP)
+
+            if (username.isNotEmpty() || password.isNotEmpty()) {
+                if (type == Proxy.Type.HTTP) {
+                    YouTube.proxyAuth = Credentials.basic(username, password)
+                } else {
+                    Authenticator.setDefault(object : Authenticator() {
+                        override fun getPasswordAuthentication() =
+                            PasswordAuthentication(username, password.toCharArray())
+                    })
+                }
+            }
             try {
-                YouTube.proxy = Proxy(
-                    dataStore[ProxyTypeKey].toEnum(defaultValue = Proxy.Type.HTTP),
-                    dataStore[ProxyUrlKey]!!.toInetSocketAddress()
-                )
+                YouTube.proxy = Proxy(type, dataStore[ProxyUrlKey]!!.toInetSocketAddress())
             } catch (e: Exception) {
                 Toast.makeText(this, "Failed to parse proxy url.", LENGTH_SHORT).show()
                 reportException(e)

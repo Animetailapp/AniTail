@@ -1,5 +1,6 @@
-package com.anitail.innertube
+package com.anitail.innertube.pages
 
+import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.YouTubeClient
 import com.anitail.innertube.models.response.PlayerResponse
 import io.ktor.http.URLBuilder
@@ -16,10 +17,17 @@ import org.schabi.newpipe.extractor.services.youtube.YoutubeJavaScriptPlayerMana
 import java.io.IOException
 import java.net.Proxy
 
-private class NewPipeDownloaderImpl(proxy: Proxy?) : Downloader() {
+private class NewPipeDownloaderImpl(proxy: Proxy?, proxyAuth: String?) : Downloader() {
 
     private val client = OkHttpClient.Builder()
         .proxy(proxy)
+        .proxyAuthenticator { _, response ->
+            proxyAuth?.let { auth ->
+                response.request.newBuilder()
+                    .header("Proxy-Authorization", auth)
+                    .build()
+            } ?: response.request
+        }
         .build()
 
     @Throws(IOException::class, ReCaptchaException::class)
@@ -64,7 +72,7 @@ private class NewPipeDownloaderImpl(proxy: Proxy?) : Downloader() {
 object NewPipeUtils {
 
     init {
-        NewPipe.init(NewPipeDownloaderImpl(YouTube.proxy))
+        NewPipe.init(NewPipeDownloaderImpl(YouTube.proxy, YouTube.proxyAuth))
     }
 
     fun getSignatureTimestamp(videoId: String): Result<Int> = runCatching {

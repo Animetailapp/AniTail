@@ -71,6 +71,8 @@ class InnerTube {
             httpClient = createClient()
         }
 
+    var proxyAuth: String? = null
+
     var useLoginForBrowse: Boolean = false
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -90,9 +92,18 @@ class InnerTube {
             deflate(0.8F)
         }
 
-        if (proxy != null) {
+        proxy?.let {
             engine {
                 proxy = this@InnerTube.proxy
+                proxyAuth?.let {
+                    config {
+                        proxyAuthenticator { _, response ->
+                            response.request.newBuilder()
+                                .header("Proxy-Authorization", proxyAuth!!)
+                                .build()
+                        }
+                    }
+                }
             }
         }
 

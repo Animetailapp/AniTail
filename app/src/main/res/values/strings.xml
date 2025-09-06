@@ -377,8 +377,12 @@
     <string name="system_default">System default</string>
     <string name="proxy">Proxy</string>
     <string name="enable_proxy">Enable proxy</string>
+    <string name="config_proxy">Configure proxy</string>
     <string name="proxy_type">Proxy type</string>
     <string name="proxy_url">Proxy URL</string>
+    <string name="proxy_username">Proxy Username</string>
+    <string name="proxy_password">Proxy Password</string>
+    <string name="enable_authentication">Enable Authentication</string>
     <string name="default_lib_chips">Change default library chip</string>
     <string name="set_quick_picks">Set quick picks</string>
     <string name="last_song_listened">Based on last song listened</string>
