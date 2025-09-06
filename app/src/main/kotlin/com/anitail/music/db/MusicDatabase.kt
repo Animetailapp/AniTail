@@ -88,7 +88,7 @@ class MusicDatabase(
         SortedSongAlbumMap::class,
         PlaylistSongMapPreview::class,
     ],
-    version = 21,
+    version = 23,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 2, to = 3),
@@ -109,8 +109,9 @@ class MusicDatabase(
         AutoMigration(from = 17, to = 18),
         AutoMigration(from = 18, to = 19, spec = Migration18To19::class),
         AutoMigration(from = 19, to = 20, spec = Migration19To20::class),
-        AutoMigration(from = 20, to = 21),
-
+        AutoMigration(from = 20, to = 21, spec = Migration20To21::class),
+        AutoMigration(from = 21, to = 22, spec = Migration21To22::class),
+        AutoMigration(from = 22, to = 23)
     ],
 )
 @TypeConverters(Converters::class)
@@ -125,7 +126,9 @@ abstract class InternalDatabase : RoomDatabase() {
                 delegate =
                 Room
                     .databaseBuilder(context, InternalDatabase::class.java, DB_NAME)
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(
+                        MIGRATION_1_2,
+                    )
                     .build(),
             )
     }
@@ -431,7 +434,7 @@ class Migration11To12 : AutoMigrationSpec {
                 )
             }
         }
-        db.query("CREATE INDEX IF NOT EXISTS `index_song_albumId` ON `song` (`albumId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_song_albumId` ON `song` (`albumId`)")
     }
 }
 
@@ -494,3 +497,33 @@ class Migration19To20 : AutoMigrationSpec {
         }
     }
 }
+
+@DeleteColumn.Entries(
+    DeleteColumn(
+        tableName = "song",
+        columnName = "artistName"
+    )
+)
+
+class Migration20To21 : AutoMigrationSpec
+
+class Migration21To22 : AutoMigrationSpec {
+    override fun onPostMigrate(db: SupportSQLiteDatabase) {
+        // Add romanizeLyrics column only if it doesn't already exist (idempotent)
+        var columnExists = false
+        db.query("PRAGMA table_info(song)").use { cursor ->
+            val nameColumnIndex = cursor.getColumnIndex("name")
+            while (cursor.moveToNext()) {
+                if (nameColumnIndex >= 0 && cursor.getString(nameColumnIndex) == "romanizeLyrics") {
+                    columnExists = true
+                    break
+                }
+            }
+        }
+
+        if (!columnExists) {
+            db.execSQL("ALTER TABLE song ADD COLUMN romanizeLyrics INTEGER NOT NULL DEFAULT 1")
+        }
+    }
+}
+

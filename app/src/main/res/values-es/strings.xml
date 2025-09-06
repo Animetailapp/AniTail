@@ -736,4 +736,22 @@
     <string name="cast_queue_none_available">No hay elementos disponibles en Cast</string>
     <string name="cast_queue_error">Error cargando cola</string>
     <string name="cast_queue_loading">Cargando cola…</string>
+
+    <!-- Ajustes de romanización -->
+    <string name="lyrics_romanization_cyrillic">Cirílico</string>
+    <string name="lyrics_romanize_title">Romanización</string>
+    <string name="lyrics_romanization">Romanización de la letra</string>
+    <string name="romanization">Romanización</string>
+    <string name="lyrics_romanize_russian">Romanizar la letra en ruso</string>
+    <string name="lyrics_romanize_ukrainian">Romanizar la letra en ucraniano</string>
+    <string name="lyrics_romanize_belarusian">Romanizar la letra en bielorruso</string>
+    <string name="lyrics_romanize_kyrgyz">Romanizar la letra en kirguís</string>
+    <string name="lyrics_romanize_serbian">Romanizar la letra en serbio</string>
+    <string name="lyrics_romanize_bulgarian">Romanizar Letras en búlgaro</string>
+    <string name="line_by_line_option_title">EXPERIMENTAL: Detectar idioma línea por línea</string>
+    <string name="line_by_line_option_desc">Se detectará el cirílico línea por línea en lugar de la canción completa.</string>
+    <string name="line_by_line_dialog_title">¿Estás seguro?</string>
+    <string name="line_by_line_dialog_desc">Esta función es experimental y puede tener sus fallos. \n\nPor defecto, el idioma se determina a partir de la canción completa, pero con esta opción activada, se determinará línea por línea. Esto permitirá que las canciones multilingües funcionen, PERO el idioma podría no ser siempre correcto (por ejemplo, si hay una letra en ucraniano que no contiene letras específicas del idioma ucraniano, podría romanizarse como ruso). Si no tiene problemas, se recomienda mantener esta opción desactivada.</string>
+    <string name="line_by_line_dialog_enable">Habilitar</string>
+    <string name="romanize_current_track">Romanizar la pista actual</string>
 </resources>

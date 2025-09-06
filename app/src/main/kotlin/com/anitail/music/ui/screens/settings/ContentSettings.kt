@@ -47,8 +47,6 @@ import com.anitail.music.constants.EnableKugouKey
 import com.anitail.music.constants.EnableLrcLibKey
 import com.anitail.music.constants.HideExplicitKey
 import com.anitail.music.constants.LanguageCodeToName
-import com.anitail.music.constants.LyricsRomanizeJapaneseKey
-import com.anitail.music.constants.LyricsRomanizeKoreanKey
 import com.anitail.music.constants.PreferredLyricsProvider
 import com.anitail.music.constants.PreferredLyricsProviderKey
 import com.anitail.music.constants.ProxyEnabledKey
@@ -106,14 +104,6 @@ fun ContentSettings(
             key = PreferredLyricsProviderKey,
             defaultValue = PreferredLyricsProvider.LRCLIB,
         )
-    val (lyricsRomanizeJapanese, onLyricsRomanizeJapaneseChange) = rememberPreference(
-        LyricsRomanizeJapaneseKey,
-        defaultValue = true
-    )
-    val (lyricsRomanizeKorean, onLyricsRomanizeKoreanChange) = rememberPreference(
-        LyricsRomanizeKoreanKey,
-        defaultValue = true
-    )
     val (lengthTop, onLengthTopChange) = rememberPreference(key = TopSize, defaultValue = "50")
     val (quickPicks, onQuickPicksChange) = rememberEnumPreference(key = QuickPicksKey, defaultValue = QuickPicks.QUICK_PICKS)
 
@@ -365,18 +355,11 @@ fun ContentSettings(
             },
             onValueSelected = onPreferredProviderChange,
         )
-        SwitchPreference(
-            title = { Text(stringResource(R.string.lyrics_romanize_japanese)) },
-            icon = { Icon(painterResource(R.drawable.lyrics), null) },
-            checked = lyricsRomanizeJapanese,
-            onCheckedChange = onLyricsRomanizeJapaneseChange,
-        )
 
-        SwitchPreference(
-            title = { Text(stringResource(R.string.lyrics_romanize_korean)) },
-            icon = { Icon(painterResource(R.drawable.lyrics), null) },
-            checked = lyricsRomanizeKorean,
-            onCheckedChange = onLyricsRomanizeKoreanChange,
+        PreferenceEntry(
+            title = { Text(stringResource(R.string.lyrics_romanization)) },
+            icon = { Icon(painterResource(R.drawable.language_korean_latin), null) },
+            onClick = { navController.navigate("settings/content/romanization") }
         )
 
         PreferenceGroupTitle(title = stringResource(R.string.misc))

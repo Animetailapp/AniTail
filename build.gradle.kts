@@ -11,7 +11,7 @@ buildscript {
     }
     dependencies {
         classpath(libs.gradle)
-        classpath(kotlin("gradle-plugin", libs.versions.kotlin.get()))
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:${libs.versions.kotlin.get()}")
     }
 }
 
