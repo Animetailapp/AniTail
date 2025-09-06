@@ -39,6 +39,10 @@ data class SongEntity(
     val totalPlayTime: Long = 0, // in milliseconds
     val inLibrary: LocalDateTime? = null,
     val dateDownload: LocalDateTime? = LocalDateTime.now(),
+    @ColumnInfo(defaultValue = "0")
+    val isLocal: Boolean = false,
+    @ColumnInfo(defaultValue = true.toString())
+    val romanizeLyrics: Boolean = true
 ) {
     fun localToggleLike() = copy(
         liked = !liked,

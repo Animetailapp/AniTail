@@ -1,7 +1,5 @@
 package com.anitail.music.ui.screens
 
-import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -37,6 +35,7 @@ import com.anitail.music.ui.screens.settings.JamSettingsScreen
 import com.anitail.music.ui.screens.settings.LastFmSettingsScreen
 import com.anitail.music.ui.screens.settings.PlayerSettings
 import com.anitail.music.ui.screens.settings.PrivacySettings
+import com.anitail.music.ui.screens.settings.RomanizationSettings
 import com.anitail.music.ui.screens.settings.SettingsScreen
 import com.anitail.music.ui.screens.settings.StorageSettings
 import com.anitail.music.ui.screens.settings.UpdateSettings
@@ -272,6 +271,9 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable("settings/import_from_spotify/ImportFromSpotify") {
         ImportFromSpotifyScreen(navController, scrollBehavior)
+    }
+    composable("settings/content/romanization") {
+        RomanizationSettings(navController, scrollBehavior)
     }
     composable("settings/player") {
         PlayerSettings(navController, scrollBehavior)

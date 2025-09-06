@@ -420,15 +420,19 @@ interface DatabaseDao {
         toTimeStamp: Long? = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli(),
     ): Flow<List<Album>>
 
-    @Query("""
-        SELECT album.*, count(song.dateDownload) downloadCount
-        FROM album_artist_map 
-            JOIN album ON album_artist_map.albumId = album.id
-            JOIN song ON album_artist_map.albumId = song.albumId
+    @Transaction
+    @Query(
+        """
+        SELECT album.*,
+               NULL AS songCountListened,
+               NULL AS timeListened
+        FROM album_artist_map
+                 JOIN album ON album_artist_map.albumId = album.id
         WHERE artistId = :artistId
         GROUP BY album.id
         LIMIT :previewSize
-    """)
+        """
+    )
     fun artistAlbumsPreview(artistId: String, previewSize: Int = 6): Flow<List<Album>>
 
     @Query("SELECT sum(count) from playCount WHERE song = :songId")

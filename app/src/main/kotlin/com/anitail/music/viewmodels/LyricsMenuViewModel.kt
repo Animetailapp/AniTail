@@ -1,9 +1,12 @@
 package com.anitail.music.viewmodels
 
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.LyricsEntity
+import com.anitail.music.db.entities.Song
 import com.anitail.music.lyrics.LyricsHelper
 import com.anitail.music.lyrics.LyricsResult
 import com.anitail.music.models.MediaMetadata
@@ -34,12 +37,19 @@ constructor(
     private val _isNetworkAvailable = MutableStateFlow(false)
     val isNetworkAvailable: StateFlow<Boolean> = _isNetworkAvailable.asStateFlow()
 
+    private val _currentSong = mutableStateOf<Song?>(null)
+    val currentSong: State<Song?> = _currentSong
+
     init {
         viewModelScope.launch {
             networkConnectivity.networkStatus.collect { isConnected ->
                 _isNetworkAvailable.value = isConnected
             }
         }
+    }
+
+    fun setCurrentSong(song: Song) {
+        _currentSong.value = song
     }
 
     fun search(

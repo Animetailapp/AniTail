@@ -88,7 +88,7 @@ class MusicDatabase(
         SortedSongAlbumMap::class,
         PlaylistSongMapPreview::class,
     ],
-    version = 21,
+    version = 22,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 2, to = 3),
@@ -109,7 +109,8 @@ class MusicDatabase(
         AutoMigration(from = 17, to = 18),
         AutoMigration(from = 18, to = 19, spec = Migration18To19::class),
         AutoMigration(from = 19, to = 20, spec = Migration19To20::class),
-        AutoMigration(from = 20, to = 21),
+        // 20 -> 21 se migra manualmente por nueva columna NOT NULL (isLocal)
+        AutoMigration(from = 21, to = 22)
 
     ],
 )
@@ -125,7 +126,7 @@ abstract class InternalDatabase : RoomDatabase() {
                 delegate =
                 Room
                     .databaseBuilder(context, InternalDatabase::class.java, DB_NAME)
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_20_21)
                     .build(),
             )
     }
@@ -491,6 +492,33 @@ class Migration19To20 : AutoMigrationSpec {
         // Only add the column if it doesn't already exist
         if (!columnExists) {
             db.execSQL("ALTER TABLE playlist ADD COLUMN backgroundImageUrl TEXT")
+        }
+    }
+}
+
+// Migración manual 20 -> 21 para manejar columnas nuevas NOT NULL
+val MIGRATION_20_21 = object : Migration(20, 21) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Añadir columnas solo si no existen para evitar fallos en re-ejecuciones
+        fun columnExists(table: String, column: String): Boolean {
+            var exists = false
+            db.query("PRAGMA table_info($table)").use { cursor ->
+                val nameIndex = cursor.getColumnIndex("name")
+                while (cursor.moveToNext()) {
+                    if (nameIndex >= 0 && cursor.getString(nameIndex) == column) {
+                        exists = true
+                        break
+                    }
+                }
+            }
+            return exists
+        }
+
+        if (!columnExists("song", "isLocal")) {
+            db.execSQL("ALTER TABLE song ADD COLUMN isLocal INTEGER NOT NULL DEFAULT 0")
+        }
+        if (!columnExists("song", "romanizeLyrics")) {
+            db.execSQL("ALTER TABLE song ADD COLUMN romanizeLyrics INTEGER NOT NULL DEFAULT 1")
         }
     }
 }

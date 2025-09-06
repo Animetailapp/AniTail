@@ -103,8 +103,15 @@ import com.anitail.music.constants.DarkModeKey
 import com.anitail.music.constants.LyricsClickKey
 import com.anitail.music.constants.LyricsCustomFontPathKey
 import com.anitail.music.constants.LyricsFontSizeKey
+import com.anitail.music.constants.LyricsRomanizeBelarusianKey
+import com.anitail.music.constants.LyricsRomanizeBulgarianKey
+import com.anitail.music.constants.LyricsRomanizeCyrillicByLineKey
 import com.anitail.music.constants.LyricsRomanizeJapaneseKey
 import com.anitail.music.constants.LyricsRomanizeKoreanKey
+import com.anitail.music.constants.LyricsRomanizeKyrgyzKey
+import com.anitail.music.constants.LyricsRomanizeRussianKey
+import com.anitail.music.constants.LyricsRomanizeSerbianKey
+import com.anitail.music.constants.LyricsRomanizeUkrainianKey
 import com.anitail.music.constants.LyricsScrollKey
 import com.anitail.music.constants.LyricsSmoothScrollKey
 import com.anitail.music.constants.LyricsTextPositionKey
@@ -114,10 +121,17 @@ import com.anitail.music.constants.TranslateLyricsKey
 import com.anitail.music.db.entities.LyricsEntity.Companion.LYRICS_NOT_FOUND
 import com.anitail.music.lyrics.LyricsEntry
 import com.anitail.music.lyrics.LyricsUtils.findCurrentLineIndex
+import com.anitail.music.lyrics.LyricsUtils.isBelarusian
+import com.anitail.music.lyrics.LyricsUtils.isBulgarian
 import com.anitail.music.lyrics.LyricsUtils.isChinese
 import com.anitail.music.lyrics.LyricsUtils.isJapanese
 import com.anitail.music.lyrics.LyricsUtils.isKorean
+import com.anitail.music.lyrics.LyricsUtils.isKyrgyz
+import com.anitail.music.lyrics.LyricsUtils.isRussian
+import com.anitail.music.lyrics.LyricsUtils.isSerbian
+import com.anitail.music.lyrics.LyricsUtils.isUkrainian
 import com.anitail.music.lyrics.LyricsUtils.parseLyrics
+import com.anitail.music.lyrics.LyricsUtils.romanizeCyrillic
 import com.anitail.music.lyrics.LyricsUtils.romanizeJapanese
 import com.anitail.music.lyrics.LyricsUtils.romanizeKorean
 import com.anitail.music.lyrics.TranslationUtils
@@ -137,7 +151,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.seconds
-
 
 @RequiresApi(Build.VERSION_CODES.M)
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -160,6 +173,13 @@ fun Lyrics(
     val changeLyrics by rememberPreference(LyricsClickKey, true)
     val scrollLyrics by rememberPreference(LyricsScrollKey, true)
     val romanizeJapaneseLyrics by rememberPreference(LyricsRomanizeJapaneseKey, true)
+    val romanizeRussianLyrics by rememberPreference(LyricsRomanizeRussianKey, true)
+    val romanizeUkrainianLyrics by rememberPreference(LyricsRomanizeUkrainianKey, true)
+    val romanizeSerbianLyrics by rememberPreference(LyricsRomanizeSerbianKey, true)
+    val romanizeBulgarianLyrics by rememberPreference(LyricsRomanizeBulgarianKey, true)
+    val romanizeBelarusianLyrics by rememberPreference(LyricsRomanizeBelarusianKey, true)
+    val romanizeKyrgyzLyrics by rememberPreference(LyricsRomanizeKyrgyzKey, true)
+    val romanizeCyrillicByLine by rememberPreference(LyricsRomanizeCyrillicByLineKey, false)
     val romanizeKoreanLyrics by rememberPreference(LyricsRomanizeKoreanKey, true)
     val lyricsFontSize by rememberPreference(LyricsFontSizeKey, 20f)
     val lyricsCustomFontPath by rememberPreference(LyricsCustomFontPathKey, "")
@@ -168,6 +188,7 @@ fun Lyrics(
     val scope = rememberCoroutineScope()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
     val lyricsEntity by playerConnection.currentLyrics.collectAsState(initial = null)
+    val currentSong by playerConnection.currentSong.collectAsState(initial = null)
     val lyrics = remember(lyricsEntity) { lyricsEntity?.lyrics?.trim() }
 
     // Custom font handling
@@ -211,6 +232,48 @@ fun Lyrics(
                         }
                     }
                 }
+                if (romanizeRussianLyrics) {
+                    if (isRussian(if (romanizeCyrillicByLine) entry.text else lyrics)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeCyrillic(entry.text)
+                        }
+                    }
+                }
+                if (romanizeUkrainianLyrics) {
+                    if (isUkrainian(if (romanizeCyrillicByLine) entry.text else lyrics)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeCyrillic(entry.text)
+                        }
+                    }
+                }
+                if (romanizeSerbianLyrics) {
+                    if (isSerbian(if (romanizeCyrillicByLine) entry.text else lyrics)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeCyrillic(entry.text)
+                        }
+                    }
+                }
+                if (romanizeBulgarianLyrics) {
+                    if (isBulgarian(if (romanizeCyrillicByLine) entry.text else lyrics)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeCyrillic(entry.text)
+                        }
+                    }
+                }
+                if (romanizeBelarusianLyrics) {
+                    if (isBelarusian(if (romanizeCyrillicByLine) entry.text else lyrics)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeCyrillic(entry.text)
+                        }
+                    }
+                }
+                if (romanizeKyrgyzLyrics) {
+                    if (isKyrgyz(if (romanizeCyrillicByLine) entry.text else lyrics)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeCyrillic(entry.text)
+                        }
+                    }
+                }
                 newEntry
             }.let {
                 listOf(LyricsEntry.HEAD_LYRICS_ENTRY) + it
@@ -229,6 +292,48 @@ fun Lyrics(
                     if (isKorean(line)) {
                         scope.launch {
                             newEntry.romanizedTextFlow.value = romanizeKorean(line)
+                        }
+                    }
+                }
+                if (romanizeRussianLyrics) {
+                    if (isRussian(if (romanizeCyrillicByLine) line else lyrics)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeCyrillic(line)
+                        }
+                    }
+                }
+                if (romanizeUkrainianLyrics) {
+                    if (isUkrainian(if (romanizeCyrillicByLine) line else lyrics)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeCyrillic(line)
+                        }
+                    }
+                }
+                if (romanizeSerbianLyrics) {
+                    if (isSerbian(if (romanizeCyrillicByLine) line else lyrics)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeCyrillic(line)
+                        }
+                    }
+                }
+                if (romanizeBulgarianLyrics) {
+                    if (isBulgarian(if (romanizeCyrillicByLine) line else lyrics)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeCyrillic(line)
+                        }
+                    }
+                }
+                if (romanizeBelarusianLyrics) {
+                    if (isBelarusian(if (romanizeCyrillicByLine) line else lyrics)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeCyrillic(line)
+                        }
+                    }
+                }
+                if (romanizeKyrgyzLyrics) {
+                    if (isKyrgyz(if (romanizeCyrillicByLine) line else lyrics)) {
+                        scope.launch {
+                            newEntry.romanizedTextFlow.value = romanizeCyrillic(line)
                         }
                     }
                 }
@@ -722,27 +827,32 @@ fun Lyrics(
                                 )
                             }
                         }
-                        if (romanizeJapaneseLyrics || romanizeKoreanLyrics) {
-                            // Show romanized text if available with matching animations
-                            val romanizedText by item.romanizedTextFlow.collectAsState()
-                            romanizedText?.let { romanized ->
-                                Text(
-                                    text = romanized,
-                                    fontSize = (lyricsFontSize * 0.8f).sp,
-                                    color = if (isCurrentLine && isSynced) {
-                                        textColor.copy(alpha = if (smoothScroll) 0.9f else 0.8f)
-                                    } else {
-                                        textColor.copy(alpha = 0.6f)
-                                    },
-                                    textAlign = when (lyricsTextPosition) {
-                                        LyricsPosition.LEFT -> TextAlign.Left
-                                        LyricsPosition.CENTER -> TextAlign.Center
-                                        LyricsPosition.RIGHT -> TextAlign.Right
-                                    },
-                                    fontWeight = if (isCurrentLine && isSynced) FontWeight.Medium else FontWeight.Normal,
-                                    fontFamily = customFont ?: FontFamily.Default,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
+                        if (currentSong?.romanizeLyrics == true && (romanizeJapaneseLyrics || romanizeKoreanLyrics || romanizeRussianLyrics || romanizeUkrainianLyrics || romanizeSerbianLyrics || romanizeBulgarianLyrics || romanizeBelarusianLyrics || romanizeKyrgyzLyrics)) {
+                            if (romanizeJapaneseLyrics ||
+                                romanizeKoreanLyrics ||
+                                romanizeRussianLyrics ||
+                                romanizeUkrainianLyrics ||
+                                romanizeSerbianLyrics ||
+                                romanizeBulgarianLyrics ||
+                                romanizeBelarusianLyrics ||
+                                romanizeKyrgyzLyrics
+                            ) {
+                                // Show romanized text if available
+                                val romanizedText by item.romanizedTextFlow.collectAsState()
+                                romanizedText?.let { romanized ->
+                                    Text(
+                                        text = romanized,
+                                        fontSize = 18.sp,
+                                        color = textColor.copy(alpha = 0.8f),
+                                        textAlign = when (lyricsTextPosition) {
+                                            LyricsPosition.LEFT -> TextAlign.Left
+                                            LyricsPosition.CENTER -> TextAlign.Center
+                                            LyricsPosition.RIGHT -> TextAlign.Right
+                                        },
+                                        fontWeight = FontWeight.Normal,
+                                        modifier = Modifier.padding(top = 2.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -827,8 +937,9 @@ fun Lyrics(
                             menuState.show {
                                 LyricsMenu(
                                     lyricsProvider = { lyricsEntity },
+                                    songProvider = { currentSong?.song },
                                     mediaMetadataProvider = { metadata },
-                                    onDismiss = menuState::dismiss
+                                    onDismiss = menuState::dismiss,
                                 )
                             }
                         }

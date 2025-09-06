@@ -29,9 +29,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +53,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.anitail.music.LocalDatabase
 import com.anitail.music.R
 import com.anitail.music.db.entities.LyricsEntity
+import com.anitail.music.db.entities.SongEntity
 import com.anitail.music.models.MediaMetadata
 import com.anitail.music.ui.component.DefaultDialog
 import com.anitail.music.ui.component.ListDialog
@@ -61,6 +64,7 @@ import com.anitail.music.viewmodels.LyricsMenuViewModel
 @Composable
 fun LyricsMenu(
     lyricsProvider: () -> LyricsEntity?,
+    songProvider: () -> SongEntity?,
     mediaMetadataProvider: () -> MediaMetadata,
     onDismiss: () -> Unit,
     viewModel: LyricsMenuViewModel = hiltViewModel(),
@@ -308,6 +312,13 @@ fun LyricsMenu(
         }
     }
 
+    var isChecked by remember { mutableStateOf(songProvider()?.romanizeLyrics ?: true) }
+
+    // Sync isChecked with song changes
+    LaunchedEffect(songProvider()) {
+        isChecked = songProvider()?.romanizeLyrics ?: true
+    }
+
     LazyColumn(
         contentPadding = PaddingValues(
             start = 8.dp,
@@ -316,6 +327,84 @@ fun LyricsMenu(
             bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding(),
         ),
     ) {
+
+        item {
+            ListItem(
+                headlineContent = { Text(text = stringResource(R.string.romanize_current_track)) },
+                leadingContent = {
+                    Icon(
+                        painter = painterResource(R.drawable.language_korean_latin),
+                        contentDescription = null,
+                    )
+                },
+                trailingContent = {
+                    Switch(
+                        checked = isChecked,
+                        onCheckedChange = { newCheckedState ->
+                            isChecked = newCheckedState
+                            songProvider()?.let { song ->
+                                database.query {
+                                    upsert(song.copy(romanizeLyrics = newCheckedState))
+                                }
+                            }
+                        }
+                    )
+                },
+                modifier = Modifier.clickable {
+                    isChecked = !isChecked
+                    songProvider()?.let { song ->
+                        database.query {
+                            upsert(song.copy(romanizeLyrics = isChecked))
+                        }
+                    }
+                }
+            )
+        }
+        /* if (showRomanizationDialog) {
+    var isChecked by remember { mutableStateOf(songProvider()?.romanizeLyrics ?: true) }
+
+    // Sync with song changes
+    LaunchedEffect(songProvider()) {
+        isChecked = songProvider()?.romanizeLyrics ?: true
+    }
+
+    DefaultDialog(
+        onDismiss = { showRomanizationDialog = false },
+        title = { Text(stringResource(R.string.romanization)) }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    // Toggle isChecked when the row is clicked
+                    isChecked = !isChecked
+                    songProvider()?.let { song ->
+                        database.query {
+                            upsert(song.copy(romanizeLyrics = isChecked))
+                        }
+                    }
+                }
+                .padding(vertical = 8.dp, horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.romanize_current_track),
+                modifier = Modifier.weight(1f)
+            )
+            Switch(
+                checked = isChecked,
+                onCheckedChange = { newCheckedState ->
+                    isChecked = newCheckedState
+                    songProvider()?.let { song ->
+                        database.query {
+                            upsert(song.copy(romanizeLyrics = newCheckedState))
+                        }
+                    }
+                }
+            )
+        }
+    }
+} */
         item {
             ListItem(
                 headlineContent = { Text(text = stringResource(R.string.edit)) },
