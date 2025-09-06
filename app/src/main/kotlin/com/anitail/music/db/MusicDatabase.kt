@@ -109,8 +109,8 @@ class MusicDatabase(
         AutoMigration(from = 17, to = 18),
         AutoMigration(from = 18, to = 19, spec = Migration18To19::class),
         AutoMigration(from = 19, to = 20, spec = Migration19To20::class),
-        // 20 -> 21 se migra manualmente por nueva columna NOT NULL (isLocal)
-        AutoMigration(from = 21, to = 22)
+        AutoMigration(from = 20, to = 21, spec = Migration20To21::class),
+        AutoMigration(from = 21, to = 22),
 
     ],
 )
@@ -126,7 +126,9 @@ abstract class InternalDatabase : RoomDatabase() {
                 delegate =
                 Room
                     .databaseBuilder(context, InternalDatabase::class.java, DB_NAME)
-                    .addMigrations(MIGRATION_1_2, MIGRATION_20_21)
+                    .addMigrations(
+                        MIGRATION_1_2,
+                    )
                     .build(),
             )
     }
@@ -432,7 +434,7 @@ class Migration11To12 : AutoMigrationSpec {
                 )
             }
         }
-        db.query("CREATE INDEX IF NOT EXISTS `index_song_albumId` ON `song` (`albumId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_song_albumId` ON `song` (`albumId`)")
     }
 }
 
@@ -496,10 +498,9 @@ class Migration19To20 : AutoMigrationSpec {
     }
 }
 
-// Migración manual 20 -> 21 para manejar columnas nuevas NOT NULL
-val MIGRATION_20_21 = object : Migration(20, 21) {
-    override fun migrate(db: SupportSQLiteDatabase) {
-        // Añadir columnas solo si no existen para evitar fallos en re-ejecuciones
+class Migration20To21 : AutoMigrationSpec {
+    override fun onPostMigrate(db: SupportSQLiteDatabase) {
+        // Repetimos la verificación por si alguna BD ya estaba en 21 sin las columnas
         fun columnExists(table: String, column: String): Boolean {
             var exists = false
             db.query("PRAGMA table_info($table)").use { cursor ->
@@ -522,3 +523,4 @@ val MIGRATION_20_21 = object : Migration(20, 21) {
         }
     }
 }
+
