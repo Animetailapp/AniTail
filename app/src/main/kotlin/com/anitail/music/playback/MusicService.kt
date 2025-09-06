@@ -1559,29 +1559,34 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       }
   }
 
-  private fun createCacheDataSource(): CacheDataSource.Factory =
-      CacheDataSource.Factory()
-          .setCache(downloadCache)
-          .setUpstreamDataSourceFactory(
-              CacheDataSource.Factory()
-                  .setCache(playerCache)
-                  .setUpstreamDataSourceFactory(
-                      DefaultDataSource.Factory(
-                          this,
-                          OkHttpDataSource.Factory(
-                              OkHttpClient.Builder().proxy(YouTube.proxy)
-                                  .proxyAuthenticator { _, response ->
-                                      response.request.newBuilder()
-                                          .header("Proxy-Authorization", YouTube.proxyAuth!!)
-                                          .build()
-                                  }
-                                  .build(),
-                          ),
-                      ),
-                  ),
-          )
-          .setCacheWriteDataSinkFactory(null)
-          .setFlags(FLAG_IGNORE_CACHE_ON_ERROR)
+    private fun createCacheDataSource(): CacheDataSource.Factory =
+        CacheDataSource
+            .Factory()
+            .setCache(downloadCache)
+            .setUpstreamDataSourceFactory(
+                CacheDataSource
+                    .Factory()
+                    .setCache(playerCache)
+                    .setUpstreamDataSourceFactory(
+                        DefaultDataSource.Factory(
+                            this,
+                            OkHttpDataSource.Factory(
+                                OkHttpClient
+                                    .Builder()
+                                    .proxy(YouTube.proxy)
+                                    .proxyAuthenticator { _, response ->
+                                        YouTube.proxyAuth?.let { auth ->
+                                            response.request.newBuilder()
+                                                .header("Proxy-Authorization", auth)
+                                                .build()
+                                        } ?: response.request
+                                    }
+                                    .build(),
+                            ),
+                        ),
+                    ),
+            ).setCacheWriteDataSinkFactory(null)
+            .setFlags(FLAG_IGNORE_CACHE_ON_ERROR)
 
   private fun createDataSourceFactory(): DataSource.Factory {
     val songUrlCache = HashMap<String, Pair<String, Long>>()

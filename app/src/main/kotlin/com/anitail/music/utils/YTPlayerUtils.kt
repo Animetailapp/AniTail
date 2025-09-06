@@ -2,7 +2,6 @@ package com.anitail.music.utils
 
 import android.net.ConnectivityManager
 import androidx.media3.common.PlaybackException
-import com.anitail.innertube.NewPipeUtils
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.YouTubeClient
 import com.anitail.innertube.models.YouTubeClient.Companion.ANDROID_VR_NO_AUTH
@@ -13,6 +12,7 @@ import com.anitail.innertube.models.YouTubeClient.Companion.WEB
 import com.anitail.innertube.models.YouTubeClient.Companion.WEB_CREATOR
 import com.anitail.innertube.models.YouTubeClient.Companion.WEB_REMIX
 import com.anitail.innertube.models.response.PlayerResponse
+import com.anitail.innertube.pages.NewPipeUtils
 import com.anitail.music.constants.AudioQuality
 import com.anitail.music.utils.YTPlayerUtils.MAIN_CLIENT
 import com.anitail.music.utils.YTPlayerUtils.STREAM_FALLBACK_CLIENTS
@@ -79,14 +79,13 @@ object YTPlayerUtils {
         Timber.tag(logTag).d("Signature timestamp: $signatureTimestamp")
 
         val isLoggedIn = YouTube.cookie != null
-        val sessionId =
-            if (isLoggedIn) {
-                // signed in sessions use dataSyncId as identifier
-                YouTube.dataSyncId
-            } else {
-                // signed out sessions use visitorData as identifier
-                YouTube.visitorData
-            }
+        if (isLoggedIn) {
+            // signed in sessions use dataSyncId as identifier
+            YouTube.dataSyncId
+        } else {
+            // signed out sessions use visitorData as identifier
+            YouTube.visitorData
+        }
         Timber.tag(logTag).d("Session authentication status: ${if (isLoggedIn) "Logged in" else "Not logged in"}")
 
         Timber.tag(logTag).d("Attempting to get player response using MAIN_CLIENT: ${MAIN_CLIENT.clientName}")

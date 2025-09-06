@@ -1,5 +1,6 @@
-package com.anitail.innertube
+package com.anitail.innertube.pages
 
+import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.YouTubeClient
 import com.anitail.innertube.models.response.PlayerResponse
 import io.ktor.http.URLBuilder
@@ -21,9 +22,11 @@ private class NewPipeDownloaderImpl(proxy: Proxy?, proxyAuth: String?) : Downloa
     private val client = OkHttpClient.Builder()
         .proxy(proxy)
         .proxyAuthenticator { _, response ->
-            response.request.newBuilder()
-                .header("Proxy-Authorization", proxyAuth!!)
-                .build()
+            proxyAuth?.let { auth ->
+                response.request.newBuilder()
+                    .header("Proxy-Authorization", auth)
+                    .build()
+            } ?: response.request
         }
         .build()
 
