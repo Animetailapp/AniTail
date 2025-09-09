@@ -22,6 +22,7 @@ import androidx.navigation.NavController
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.R
 import com.anitail.music.constants.AudioNormalizationKey
+import com.anitail.music.constants.AudioOffload
 import com.anitail.music.constants.AudioQuality
 import com.anitail.music.constants.AudioQualityKey
 import com.anitail.music.constants.AutoDownloadLyricsKey
@@ -105,6 +106,11 @@ fun PlayerSettings(
         EnableCastKey,
         defaultValue = true
     )
+    val (audioOffload, onAudioOffloadChange) = rememberPreference(
+        key = AudioOffload,
+        defaultValue = false
+    )
+
 
     val context = LocalContext.current
     val googlePlayServicesAvailable = remember {
@@ -165,6 +171,14 @@ fun PlayerSettings(
 
         PreferenceGroupTitle(
             title = stringResource(R.string.queue)
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.audio_offload)) },
+            description = stringResource(R.string.audio_offload_description),
+            icon = { Icon(painterResource(R.drawable.graphic_eq), null) },
+            checked = audioOffload,
+            onCheckedChange = onAudioOffloadChange
         )
 
         SwitchPreference(

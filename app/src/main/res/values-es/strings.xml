@@ -754,4 +754,6 @@
     <string name="line_by_line_dialog_desc">Esta función es experimental y puede tener sus fallos. \n\nPor defecto, el idioma se determina a partir de la canción completa, pero con esta opción activada, se determinará línea por línea. Esto permitirá que las canciones multilingües funcionen, PERO el idioma podría no ser siempre correcto (por ejemplo, si hay una letra en ucraniano que no contiene letras específicas del idioma ucraniano, podría romanizarse como ruso). Si no tiene problemas, se recomienda mantener esta opción desactivada.</string>
     <string name="line_by_line_dialog_enable">Habilitar</string>
     <string name="romanize_current_track">Romanizar la pista actual</string>
+    <string name="audio_offload">Activar descarga</string>
+    <string name="audio_offload_description">Usar la ruta de audio de descarga para la reproducción. Desactivar esto puede aumentar el consumo de energía, pero puede ser útil si experimentas problemas con la reproducción o el procesamiento posterior de audio</string>
 </resources>

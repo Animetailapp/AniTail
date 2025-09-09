@@ -62,6 +62,7 @@ import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.music.MainActivity
 import com.anitail.music.R
 import com.anitail.music.constants.AudioNormalizationKey
+import com.anitail.music.constants.AudioOffload
 import com.anitail.music.constants.AudioQualityKey
 import com.anitail.music.constants.AutoDownloadLyricsKey
 import com.anitail.music.constants.AutoDownloadOnLikeKey
@@ -100,6 +101,7 @@ import com.anitail.music.extensions.currentMetadata
 import com.anitail.music.extensions.findNextMediaItemById
 import com.anitail.music.extensions.mediaItems
 import com.anitail.music.extensions.metadata
+import com.anitail.music.extensions.setOffloadEnabled
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.lyrics.LyricsHelper
 import com.anitail.music.models.PersistQueue
@@ -297,6 +299,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
               sleepTimer = SleepTimer(scope, this)
               addListener(sleepTimer)
               addAnalyticsListener(PlaybackStatsListener(false, this@MusicService))
+                setOffloadEnabled(dataStore.get(AudioOffload, false))
+
             }
     mediaLibrarySessionCallback.apply {
       toggleLike = ::toggleLike
