@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
 import androidx.media3.cast.CastPlayer
+import com.anitail.music.cast.UniversalCastManager
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -229,7 +230,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   @Inject @DownloadCache lateinit var downloadCache: SimpleCache
 
   lateinit var player: ExoPlayer
-    private var castPlayer: CastPlayer? = null
+  private var castPlayer: CastPlayer? = null
+  private var universalCastManager: UniversalCastManager? = null
   private lateinit var mediaSession: MediaLibrarySession
 
   private var isAudioEffectSessionOpened = false
@@ -324,6 +326,14 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     val sessionToken = SessionToken(this, ComponentName(this, MusicService::class.java))
     val controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
     controllerFuture.addListener({ controllerFuture.get() }, MoreExecutors.directExecutor())
+
+    // Initialize Universal Cast Manager for both Cast and DLNA support
+    universalCastManager = UniversalCastManager(
+        context = this,
+        onCastSessionStarted = { castCurrentToDevice() },
+        onDlnaSessionStarted = { handleDlnaSessionStart() }
+    )
+    universalCastManager?.start()
 
         connectivityObserver = NetworkConnectivity(this)
 
@@ -1761,6 +1771,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   override fun onDestroy() {
       try {
           castPlayer?.release()
+          universalCastManager?.stop()
       } catch (_: Exception) {
       }
     stopPeriodicWidgetUpdates()
@@ -2106,6 +2117,47 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             // Cast log eliminado
         }
     }
+
+    /** Handle DLNA session start */
+    private fun handleDlnaSessionStart() {
+        try {
+            scope.launch(Dispatchers.IO) {
+                val currentSong = currentSong.value
+                if (currentSong != null && universalCastManager != null) {
+                    val streamInfo = getStreamInfo(currentSong.id)
+                    if (streamInfo != null) {
+                        universalCastManager?.playMedia(
+                            mediaUrl = streamInfo.url,
+                            title = currentSong.song.title,
+                            artist = currentSong.song.artists.joinToString(", ") { it.name },
+                            albumArt = currentSong.song.thumbnailUrl,
+                            mimeType = streamInfo.mimeType
+                        )
+                        Timber.d("Started DLNA playback for: ${currentSong.song.title}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error starting DLNA playback")
+        }
+    }
+
+    /** Cast current media to DLNA device */
+    fun castCurrentToDlnaDevice() {
+        try {
+            val dlnaManager = universalCastManager?.getDlnaManager()
+            if (dlnaManager?.isConnected?.value == true) {
+                handleDlnaSessionStart()
+            } else {
+                Timber.w("No DLNA device connected")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error casting to DLNA device")
+        }
+    }
+
+    /** Get universal cast manager for UI components */
+    fun getUniversalCastManager(): UniversalCastManager? = universalCastManager
 
   /** Starts periodic widget updates to show song progress */
   private fun startPeriodicWidgetUpdates() {
