@@ -1,8 +1,6 @@
 package com.anitail.music.cast
 
 import android.content.Context
-import android.net.nsd.NsdManager
-import android.net.nsd.NsdServiceInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,7 +13,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import timber.log.Timber
-import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 
 data class DlnaDevice(
@@ -39,19 +36,16 @@ class DlnaManager(
     private val _isConnected = MutableStateFlow(false)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
     
-    private val _discoveredDevices = MutableStateFlow<List<DlnaDevice>>(emptyList())
-    val discoveredDevices: StateFlow<List<DlnaDevice>> = _discoveredDevices.asStateFlow()
-    
     private val _selectedDevice = MutableStateFlow<DlnaDevice?>(null)
     val selectedDevice: StateFlow<DlnaDevice?> = _selectedDevice.asStateFlow()
     
-    private var nsdManager: NsdManager? = null
-    private var discoveryListener: NsdManager.DiscoveryListener? = null
+    // Use enhanced device discovery
+    private val deviceDiscovery = DlnaDeviceDiscovery(context, scope)
+    val discoveredDevices: StateFlow<Set<DlnaDevice>> = deviceDiscovery.discoveredDevices
     
     fun start() {
         try {
-            nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
-            startDiscovery()
+            deviceDiscovery.startDiscovery()
             Timber.d("DLNA service started and searching for devices")
         } catch (e: Exception) {
             Timber.e(e, "Failed to start DLNA service")
@@ -60,110 +54,12 @@ class DlnaManager(
     
     fun stop() {
         try {
-            stopDiscovery()
-            _discoveredDevices.value = emptyList()
+            deviceDiscovery.stopDiscovery()
             disconnect()
             Timber.d("DLNA service stopped")
         } catch (e: Exception) {
             Timber.e(e, "Error stopping DLNA service")
         }
-    }
-    
-    private fun startDiscovery() {
-        discoveryListener = object : NsdManager.DiscoveryListener {
-            override fun onStartDiscoveryFailed(serviceType: String?, errorCode: Int) {
-                Timber.e("DLNA discovery start failed: $errorCode")
-            }
-            
-            override fun onStopDiscoveryFailed(serviceType: String?, errorCode: Int) {
-                Timber.e("DLNA discovery stop failed: $errorCode")
-            }
-            
-            override fun onDiscoveryStarted(serviceType: String?) {
-                Timber.d("DLNA discovery started for: $serviceType")
-            }
-            
-            override fun onDiscoveryStopped(serviceType: String?) {
-                Timber.d("DLNA discovery stopped for: $serviceType")
-            }
-            
-            override fun onServiceFound(serviceInfo: NsdServiceInfo?) {
-                serviceInfo?.let { info ->
-                    Timber.d("DLNA service found: ${info.serviceName}")
-                    resolveService(info)
-                }
-            }
-            
-            override fun onServiceLost(serviceInfo: NsdServiceInfo?) {
-                serviceInfo?.let { info ->
-                    val currentDevices = _discoveredDevices.value.toMutableList()
-                    val removed = currentDevices.removeAll { it.name == info.serviceName }
-                    if (removed) {
-                        _discoveredDevices.value = currentDevices
-                        Timber.d("DLNA device lost: ${info.serviceName}")
-                        
-                        // If the currently selected device was lost, disconnect
-                        if (_selectedDevice.value?.name == info.serviceName) {
-                            disconnect()
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Discover DLNA/UPnP media renderers
-        nsdManager?.discoverServices("_http._tcp", NsdManager.PROTOCOL_DNS_SD, discoveryListener)
-    }
-    
-    private fun stopDiscovery() {
-        discoveryListener?.let { listener ->
-            nsdManager?.stopServiceDiscovery(listener)
-        }
-        discoveryListener = null
-    }
-    
-    private fun resolveService(serviceInfo: NsdServiceInfo) {
-        val resolveListener = object : NsdManager.ResolveListener {
-            override fun onResolveFailed(serviceInfo: NsdServiceInfo?, errorCode: Int) {
-                Timber.w("Failed to resolve service: ${serviceInfo?.serviceName}, error: $errorCode")
-            }
-            
-            override fun onServiceResolved(serviceInfo: NsdServiceInfo?) {
-                serviceInfo?.let { info ->
-                    val host = info.host?.hostAddress ?: return
-                    val port = info.port
-                    
-                    // Check if this looks like a DLNA device (basic heuristic)
-                    if (isDlnaDevice(info)) {
-                        val dlnaDevice = DlnaDevice(
-                            id = "${host}:${port}",
-                            name = info.serviceName,
-                            host = host,
-                            port = port
-                        )
-                        
-                        val currentDevices = _discoveredDevices.value.toMutableList()
-                        if (currentDevices.none { it.id == dlnaDevice.id }) {
-                            currentDevices.add(dlnaDevice)
-                            _discoveredDevices.value = currentDevices
-                            Timber.d("DLNA device resolved: ${dlnaDevice.name} at ${dlnaDevice.host}:${dlnaDevice.port}")
-                        }
-                    }
-                }
-            }
-        }
-        
-        nsdManager?.resolveService(serviceInfo, resolveListener)
-    }
-    
-    private fun isDlnaDevice(serviceInfo: NsdServiceInfo): Boolean {
-        // Basic heuristics to identify DLNA devices
-        val name = serviceInfo.serviceName.lowercase()
-        return name.contains("dlna") || 
-               name.contains("media") || 
-               name.contains("renderer") ||
-               name.contains("tv") ||
-               serviceInfo.serviceType.contains("_http._tcp")
     }
     
     fun connectToDevice(device: DlnaDevice) {
