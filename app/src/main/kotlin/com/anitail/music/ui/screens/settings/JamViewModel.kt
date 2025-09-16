@@ -71,6 +71,15 @@ class JamViewModel(application: Application) : AndroidViewModel(application) {
             loadConnectionHistory()
         }
         
+        // Detectar la IP local real al inicializar
+        viewModelScope.launch(Dispatchers.IO) {
+            val realLocalIp = detectLocalIpAddress()
+            withContext(Dispatchers.Main) {
+                _localIpAddress.value = realLocalIp
+            }
+            Timber.d("IP local detectada en inicialización: $realLocalIp")
+        }
+        
         // Observar cambios en el historial de conexiones
         viewModelScope.launch {
             context.dataStore.data
@@ -215,6 +224,15 @@ class JamViewModel(application: Application) : AndroidViewModel(application) {
         
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                // Asegurar que tenemos la IP local correcta
+                if (_localIpAddress.value == "127.0.0.1" || _localIpAddress.value.startsWith("192.168.1.100")) {
+                    val realLocalIp = detectLocalIpAddress()
+                    withContext(Dispatchers.Main) {
+                        _localIpAddress.value = realLocalIp
+                    }
+                    Timber.d("IP local actualizada para escaneo: $realLocalIp")
+                }
+                
                 val discoveredHosts = mutableListOf<HostInfo>()
                 val baseIp = _localIpAddress.value.substringBeforeLast('.') + "."
                 
@@ -362,5 +380,72 @@ class JamViewModel(application: Application) : AndroidViewModel(application) {
             }
             context.dataStore.edit { it[JamConnectionHistoryKey] = historyStr }
         }
+    }
+    
+    /**
+     * Detecta la dirección IP local real del dispositivo
+     * Reutiliza la lógica del LanJamServer para consistencia
+     */
+    private suspend fun detectLocalIpAddress(): String = withContext(Dispatchers.IO) {
+        try {
+            val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val networkInterface = interfaces.nextElement()
+                
+                // Ignorar interfaces virtuales y desactivadas
+                if (networkInterface.isLoopback || !networkInterface.isUp) {
+                    continue
+                }
+                
+                // Priorizar interfaces WiFi y ethernet
+                val isWifiOrEthernet = networkInterface.displayName?.let { name ->
+                    name.contains("wlan", ignoreCase = true) || 
+                    name.contains("eth", ignoreCase = true) ||
+                    name.contains("en", ignoreCase = true) // Común en algunos dispositivos
+                } ?: false
+                
+                if (isWifiOrEthernet) {
+                    val addresses = networkInterface.inetAddresses
+                    while (addresses.hasMoreElements()) {
+                        val address = addresses.nextElement()
+                        if (!address.isLoopbackAddress && address is java.net.InetAddress) {
+                            val hostAddress = address.hostAddress ?: continue
+                            
+                            // Preferir IPv4 cuando esté disponible
+                            if (!hostAddress.contains(":")) {
+                                Timber.d("IP local detectada: $hostAddress de interfaz ${networkInterface.displayName}")
+                                return@withContext hostAddress
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Si no encontramos una interfaz WiFi/ethernet, probar cualquier interfaz con IPv4
+            val interfaces2 = java.net.NetworkInterface.getNetworkInterfaces()
+            while (interfaces2.hasMoreElements()) {
+                val networkInterface = interfaces2.nextElement()
+                if (networkInterface.isLoopback || !networkInterface.isUp) continue
+                
+                val addresses = networkInterface.inetAddresses
+                while (addresses.hasMoreElements()) {
+                    val address = addresses.nextElement()
+                    if (!address.isLoopbackAddress && address is java.net.InetAddress) {
+                        val hostAddress = address.hostAddress ?: continue
+                        
+                        // Preferir IPv4
+                        if (!hostAddress.contains(":")) {
+                            Timber.d("IP local detectada (fallback): $hostAddress de interfaz ${networkInterface.displayName}")
+                            return@withContext hostAddress
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error detectando IP local")
+        }
+        
+        Timber.w("No se pudo detectar IP local, usando 192.168.1.100 como fallback")
+        return@withContext "192.168.1.100" // Fallback más realista que 127.0.0.1
     }
 }
