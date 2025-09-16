@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 23,
-    "identityHash": "a07c3368e939399c79aa7863a04e2072",
+    "identityHash": "7e078b606b92209511ec2da2bfe2f954",
     "entities": [
       {
         "tableName": "song",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `duration` INTEGER NOT NULL, `thumbnailUrl` TEXT, `albumId` TEXT, `albumName` TEXT, `artistName` TEXT, `explicit` INTEGER NOT NULL DEFAULT 0, `year` INTEGER, `date` INTEGER, `dateModified` INTEGER, `liked` INTEGER NOT NULL, `likedDate` INTEGER, `totalPlayTime` INTEGER NOT NULL, `inLibrary` INTEGER, `dateDownload` INTEGER, `isLocal` INTEGER NOT NULL DEFAULT 0, `romanizeLyrics` INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `duration` INTEGER NOT NULL, `thumbnailUrl` TEXT, `albumId` TEXT, `albumName` TEXT, `artistName` TEXT, `explicit` INTEGER NOT NULL DEFAULT 0, `year` INTEGER, `date` INTEGER, `dateModified` INTEGER, `liked` INTEGER NOT NULL, `likedDate` INTEGER, `totalPlayTime` INTEGER NOT NULL, `inLibrary` INTEGER, `dateDownload` INTEGER, `isLocal` INTEGER NOT NULL DEFAULT 0, `libraryAddToken` TEXT, `libraryRemoveToken` TEXT, `romanizeLyrics` INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -101,6 +101,16 @@
             "affinity": "INTEGER",
             "notNull": true,
             "defaultValue": "0"
+          },
+          {
+            "fieldPath": "libraryAddToken",
+            "columnName": "libraryAddToken",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "libraryRemoveToken",
+            "columnName": "libraryRemoveToken",
+            "affinity": "TEXT"
           },
           {
             "fieldPath": "romanizeLyrics",
@@ -975,7 +985,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a07c3368e939399c79aa7863a04e2072')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7e078b606b92209511ec2da2bfe2f954')"
     ]
   }
 }

@@ -387,7 +387,18 @@ fun YouTubeSongMenu(
                     )
                 },
                 modifier = Modifier.clickable {
-                    if (librarySong?.song?.inLibrary != null) {
+                    val currentSong = librarySong?.song ?: return@clickable
+                    val isInLibrary = currentSong.inLibrary != null
+                    val token =
+                        if (isInLibrary) currentSong.libraryRemoveToken else currentSong.libraryAddToken
+
+                    token?.let {
+                        coroutineScope.launch {
+                            YouTube.feedback(listOf(it))
+                        }
+                    }
+
+                    if (isInLibrary) {
                         database.query {
                             inLibrary(song.id, null)
                         }

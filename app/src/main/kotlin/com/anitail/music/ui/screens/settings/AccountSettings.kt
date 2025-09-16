@@ -35,7 +35,6 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.utils.parseCookieString
-import com.anitail.music.App.Companion.forgetAccount
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.R
 import com.anitail.music.constants.AccountChannelHandleKey
@@ -59,6 +58,7 @@ import com.anitail.music.ui.component.TextFieldDialog
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.utils.rememberPreference
+import com.anitail.music.viewmodels.AccountSettingsViewModel
 import com.anitail.music.viewmodels.HomeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,9 +83,10 @@ fun AccountSettings(
     val (ytmSync, onYtmSyncChange) = rememberPreference(YtmSyncKey, true)
     val (discordToken, _) = rememberPreference(DiscordTokenKey, "")
 
-    val viewModel: HomeViewModel = hiltViewModel()
-    val accountName by viewModel.accountName.collectAsState()
-    val accountImageUrl by viewModel.accountImageUrl.collectAsState()
+    val homeViewModel: HomeViewModel = hiltViewModel()
+    val accountSettingsViewModel: AccountSettingsViewModel = hiltViewModel()
+    val accountName by homeViewModel.accountName.collectAsState()
+    val accountImageUrl by homeViewModel.accountImageUrl.collectAsState()
 
     var showToken: Boolean by remember { mutableStateOf(false) }
     var showTokenEditor by remember { mutableStateOf(false) }
@@ -157,8 +158,10 @@ fun AccountSettings(
                 trailingContent = {
                     if (isLoggedIn) {
                         OutlinedButton(onClick = {
-                            onInnerTubeCookieChange("")
-                            forgetAccount(context)
+                            accountSettingsViewModel.logoutAndClearSyncedContent(
+                                context,
+                                onInnerTubeCookieChange
+                            )
                         }) {
                             Text(stringResource(R.string.logout))
                         }

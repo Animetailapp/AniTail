@@ -41,6 +41,8 @@ data class SongEntity(
     val dateDownload: LocalDateTime? = LocalDateTime.now(),
     @ColumnInfo(defaultValue = "0")
     val isLocal: Boolean = false,
+    val libraryAddToken: String? = null,
+    val libraryRemoveToken: String? = null,
     @ColumnInfo(defaultValue = "1")
     val romanizeLyrics: Boolean = true
 ) {

@@ -523,6 +523,9 @@ class Migration21To22 : AutoMigrationSpec {
 
         if (!columnExists) {
             db.execSQL("ALTER TABLE song ADD COLUMN romanizeLyrics INTEGER NOT NULL DEFAULT 1")
+            // Add LibraryTokens
+            db.execSQL("ALTER TABLE song ADD COLUMN libraryAddToken TEXT DEFAULT ''")
+            db.execSQL("ALTER TABLE song ADD COLUMN libraryRemoveToken TEXT DEFAULT ''")
         }
     }
 }

@@ -10,6 +10,7 @@ import com.anitail.innertube.models.body.Action
 import com.anitail.innertube.models.body.BrowseBody
 import com.anitail.innertube.models.body.CreatePlaylistBody
 import com.anitail.innertube.models.body.EditPlaylistBody
+import com.anitail.innertube.models.body.FeedbackBody
 import com.anitail.innertube.models.body.GetQueueBody
 import com.anitail.innertube.models.body.GetSearchSuggestionsBody
 import com.anitail.innertube.models.body.GetTranscriptBody
@@ -245,6 +246,19 @@ class InnerTube {
                 index = index,
                 params = params,
                 continuation = continuation
+            )
+        )
+    }
+
+    suspend fun feedback(
+        client: YouTubeClient,
+        tokens: List<String>
+    ) = httpClient.post("feedback") {
+        ytClient(client, setLogin = true)
+        setBody(
+            FeedbackBody(
+                context = client.toContext(locale, visitorData, dataSyncId),
+                feedbackTokens = tokens
             )
         )
     }
