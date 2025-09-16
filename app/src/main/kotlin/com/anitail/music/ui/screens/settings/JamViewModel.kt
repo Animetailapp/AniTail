@@ -236,25 +236,25 @@ class JamViewModel(application: Application) : AndroidViewModel(application) {
                 val discoveredHosts = mutableListOf<HostInfo>()
                 val baseIp = _localIpAddress.value.substringBeforeLast('.') + "."
                 
-                // Para pruebas UI, convertir esto a un escaneo real
-                val testData = listOf(
-                    Triple(baseIp + "15", "Bedroom Speaker", 300L),
-                    Triple(baseIp + "23", "Living Room TV", 200L),
-                    Triple(baseIp + "45", "Kitchen Speaker", 400L),
-                    Triple(_localIpAddress.value, "This Device", 100L)
-                )
-                
                 // Actualizar UI con el progreso
                 withContext(Dispatchers.Main) {
                     // Establecer el modo de escaneo para mostrar la interfaz de progreso
                     _isScanning.value = true
                 }
-                  // Decidir qué implementación usar basado en un flag de desarrollo
-                val useTestData = false // Cambiar a false para usar implementación real
+                
+                // Decidir qué implementación usar basado en un flag de desarrollo
+                val useTestData = false // Cambiar a true para usar datos de prueba
                 val scanJobs = mutableListOf<Deferred<HostInfo?>>()
                 
                 if (useTestData) {
                     // Para pruebas: usar datos de prueba simulando un escaneo real
+                    val testData = listOf(
+                        Triple(baseIp + "15", "Bedroom Speaker", 300L),
+                        Triple(baseIp + "23", "Living Room TV", 200L),
+                        Triple(baseIp + "45", "Kitchen Speaker", 400L),
+                        Triple(_localIpAddress.value, "This Device", 100L)
+                    )
+                    
                     testData.forEach { (ip, name, delayTime) ->
                         val job = async(Dispatchers.IO) {
                             try {
