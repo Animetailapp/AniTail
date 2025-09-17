@@ -331,7 +331,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     universalCastManager = UniversalCastManager(
         context = this,
         onCastSessionStarted = { castCurrentToDevice() },
-        onDlnaSessionStarted = { handleDlnaSessionStart() }
+        onDlnaSessionStarted = { handleDlnaSessionStart() },
+        onAirPlaySessionStarted = { handleAirPlaySessionStart() }
     )
     universalCastManager?.start()
 
@@ -2142,6 +2143,30 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         }
     }
 
+    /** Handle AirPlay session start */
+    private fun handleAirPlaySessionStart() {
+        try {
+            scope.launch(Dispatchers.IO) {
+                val currentSong = currentSong.value
+                if (currentSong != null && universalCastManager != null) {
+                    val streamInfo = getStreamInfo(currentSong.id)
+                    if (streamInfo != null) {
+                        universalCastManager?.playMedia(
+                            mediaUrl = streamInfo.url,
+                            title = currentSong.song.title,
+                            artist = currentSong.song.artists.joinToString(", ") { it.name },
+                            albumArt = currentSong.song.thumbnailUrl,
+                            mimeType = streamInfo.mimeType
+                        )
+                        Timber.d("Started AirPlay playback for: ${currentSong.song.title}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error starting AirPlay playback")
+        }
+    }
+
     /** Cast current media to DLNA device */
     fun castCurrentToDlnaDevice() {
         try {
@@ -2153,6 +2178,20 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             }
         } catch (e: Exception) {
             Timber.e(e, "Error casting to DLNA device")
+        }
+    }
+
+    /** Cast current media to AirPlay device */
+    fun castCurrentToAirPlayDevice() {
+        try {
+            val airPlayManager = universalCastManager?.getAirPlayManager()
+            if (airPlayManager?.isConnected?.value == true) {
+                handleAirPlaySessionStart()
+            } else {
+                Timber.w("No AirPlay device connected")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error casting to AirPlay device")
         }
     }
 
