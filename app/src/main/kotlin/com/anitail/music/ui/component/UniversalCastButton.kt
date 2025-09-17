@@ -29,6 +29,7 @@ import androidx.mediarouter.media.MediaRouter
 import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.cast.CastingType
+import com.anitail.music.cast.AirPlayDevice
 import com.anitail.music.cast.DlnaDevice
 import com.anitail.music.cast.UniversalCastManager
 import com.anitail.music.cast.UniversalDevicePickerDialog
@@ -50,6 +51,10 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
             onDlnaSessionStarted = {
                 // Handle DLNA session start
                 Timber.d("DLNA session started")
+            },
+            onAirPlaySessionStarted = {
+                // Handle AirPlay session start
+                Timber.d("AirPlay session started")
             }
         )
     }
@@ -86,6 +91,11 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
                         // For DLNA, we need to handle playback differently
                         // The current media will be sent to DLNA device via UniversalCastManager
                         Timber.d("DLNA casting activated")
+                    }
+                    CastingType.AIRPLAY -> {
+                        // For AirPlay, we need to handle playback differently
+                        // The current media will be sent to AirPlay device via UniversalCastManager
+                        Timber.d("AirPlay casting activated")
                     }
                     CastingType.NONE -> service.returnToLocalPlayback()
                 }
@@ -124,6 +134,11 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
                             // or navigate to a DLNA-specific activity
                             Timber.d("DLNA device selected: ${castingState.deviceName}")
                         }
+                        CastingType.AIRPLAY -> {
+                            // For AirPlay, you might want to show a simple control dialog
+                            // or navigate to an AirPlay-specific activity
+                            Timber.d("AirPlay device selected: ${castingState.deviceName}")
+                        }
                         CastingType.NONE -> {
                             // This shouldn't happen but handle gracefully
                         }
@@ -153,6 +168,7 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
         if (showPicker) {
             UniversalDevicePickerDialog(
                 dlnaManager = universalCastManager.getDlnaManager(),
+                airPlayManager = universalCastManager.getAirPlayManager(),
                 onDismiss = { showPicker = false },
                 onCastDeviceSelected = { route ->
                     // Handle Cast device selection
@@ -163,6 +179,11 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
                     // Handle DLNA device selection  
                     universalCastManager.getDlnaManager().connectToDevice(dlnaDevice)
                     Timber.d("DLNA device selected: ${dlnaDevice.name}")
+                },
+                onAirPlayDeviceSelected = { airPlayDevice ->
+                    // Handle AirPlay device selection  
+                    universalCastManager.getAirPlayManager().connectToDevice(airPlayDevice)
+                    Timber.d("AirPlay device selected: ${airPlayDevice.name}")
                 }
             )
         }

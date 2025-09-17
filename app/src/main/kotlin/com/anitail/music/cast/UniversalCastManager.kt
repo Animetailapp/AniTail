@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.combine
 import timber.log.Timber
 
 enum class CastingType {
-    NONE, CAST, DLNA
+    NONE, CAST, DLNA, AIRPLAY
 }
 
 data class CastingState(
@@ -24,7 +24,8 @@ data class CastingState(
 class UniversalCastManager(
     private val context: Context,
     private val onCastSessionStarted: (() -> Unit)? = null,
-    private val onDlnaSessionStarted: (() -> Unit)? = null
+    private val onDlnaSessionStarted: (() -> Unit)? = null,
+    private val onAirPlaySessionStarted: (() -> Unit)? = null
 ) {
     private val _castingState = MutableStateFlow(CastingState(false, CastingType.NONE))
     val castingState: StateFlow<CastingState> = _castingState.asStateFlow()
@@ -44,6 +45,12 @@ class UniversalCastManager(
     // DLNA manager
     private val dlnaManager = DlnaManager(context) {
         onDlnaSessionStarted?.invoke()
+        updateCastingState()
+    }
+    
+    // AirPlay manager
+    private val airPlayManager = AirPlayManager(context) {
+        onAirPlaySessionStarted?.invoke()
         updateCastingState()
     }
     
@@ -75,6 +82,7 @@ class UniversalCastManager(
         try {
             castManager?.start()
             dlnaManager.start()
+            airPlayManager.start()
             
             // Add Cast session listener if Cast is available
             if (GooglePlayServicesUtils.isCastAvailable(context)) {
@@ -93,6 +101,7 @@ class UniversalCastManager(
         try {
             castManager?.stop()
             dlnaManager.stop()
+            airPlayManager.stop()
             
             // Remove Cast session listener if Cast is available
             if (GooglePlayServicesUtils.isCastAvailable(context)) {
@@ -109,6 +118,8 @@ class UniversalCastManager(
     
     fun getDlnaManager(): DlnaManager = dlnaManager
     
+    fun getAirPlayManager(): AirPlayManager = airPlayManager
+    
     fun isCastAvailable(): Boolean = GooglePlayServicesUtils.isCastAvailable(context)
     
     fun playMedia(mediaUrl: String, title: String, artist: String, albumArt: String? = null, mimeType: String = "audio/mpeg") {
@@ -119,6 +130,9 @@ class UniversalCastManager(
             }
             CastingType.DLNA -> {
                 dlnaManager.playMedia(mediaUrl, title, artist, albumArt, mimeType)
+            }
+            CastingType.AIRPLAY -> {
+                airPlayManager.playMedia(mediaUrl, title, artist, albumArt, mimeType)
             }
             CastingType.NONE -> {
                 Timber.w("No casting device connected")
@@ -135,6 +149,9 @@ class UniversalCastManager(
             CastingType.DLNA -> {
                 dlnaManager.pauseMedia()
             }
+            CastingType.AIRPLAY -> {
+                airPlayManager.pauseMedia()
+            }
             CastingType.NONE -> {
                 Timber.w("No casting device connected")
             }
@@ -150,6 +167,9 @@ class UniversalCastManager(
             CastingType.DLNA -> {
                 dlnaManager.stopMedia()
             }
+            CastingType.AIRPLAY -> {
+                airPlayManager.stopMedia()
+            }
             CastingType.NONE -> {
                 Timber.w("No casting device connected")
             }
@@ -161,6 +181,8 @@ class UniversalCastManager(
             val isCastActive = castManager?.isCasting?.value == true
             val isDlnaActive = dlnaManager.isConnected.value
             val selectedDlnaDevice = dlnaManager.selectedDevice.value
+            val isAirPlayActive = airPlayManager.isConnected.value
+            val selectedAirPlayDevice = airPlayManager.selectedDevice.value
             
             val newState = when {
                 isCastActive -> {
@@ -179,6 +201,13 @@ class UniversalCastManager(
                         isActive = true,
                         type = CastingType.DLNA,
                         deviceName = selectedDlnaDevice.name
+                    )
+                }
+                isAirPlayActive && selectedAirPlayDevice != null -> {
+                    CastingState(
+                        isActive = true,
+                        type = CastingType.AIRPLAY,
+                        deviceName = selectedAirPlayDevice.name
                     )
                 }
                 else -> {
