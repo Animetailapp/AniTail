@@ -17,7 +17,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
 import androidx.media3.cast.CastPlayer
-import com.anitail.music.cast.UniversalCastManager
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -62,6 +61,7 @@ import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.music.MainActivity
 import com.anitail.music.R
+import com.anitail.music.cast.UniversalCastManager
 import com.anitail.music.constants.AudioNormalizationKey
 import com.anitail.music.constants.AudioOffload
 import com.anitail.music.constants.AudioQualityKey
@@ -2123,13 +2123,14 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         try {
             scope.launch(Dispatchers.IO) {
                 val currentSong = currentSong.value
+                val artistName = currentSong?.song?.artistName ?: ""
                 if (currentSong != null && universalCastManager != null) {
                     val streamInfo = getStreamInfo(currentSong.id)
                     if (streamInfo != null) {
                         universalCastManager?.playMedia(
                             mediaUrl = streamInfo.url,
                             title = currentSong.song.title,
-                            artist = currentSong.song.artists.joinToString(", ") { it.name },
+                            artist = artistName,
                             albumArt = currentSong.song.thumbnailUrl,
                             mimeType = streamInfo.mimeType
                         )
