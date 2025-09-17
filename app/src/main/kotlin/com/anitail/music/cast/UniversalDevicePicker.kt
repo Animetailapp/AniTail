@@ -48,19 +48,22 @@ data class UniversalDevice(
     val isSelected: Boolean,
     val isConnecting: Boolean,
     val castRoute: MediaRouter.RouteInfo? = null,
-    val dlnaDevice: DlnaDevice? = null
+    val dlnaDevice: DlnaDevice? = null,
+    val airPlayDevice: AirPlayDevice? = null
 )
 
 enum class DeviceType {
-    CAST, DLNA
+    CAST, DLNA, AIRPLAY
 }
 
 @Composable
 fun UniversalDevicePickerDialog(
     dlnaManager: DlnaManager,
+    airPlayManager: AirPlayManager,
     onDismiss: () -> Unit,
     onCastDeviceSelected: (MediaRouter.RouteInfo) -> Unit,
-    onDlnaDeviceSelected: (DlnaDevice) -> Unit
+    onDlnaDeviceSelected: (DlnaDevice) -> Unit,
+    onAirPlayDeviceSelected: (AirPlayDevice) -> Unit
 ) {
     val context = LocalContext.current
     
@@ -90,6 +93,11 @@ fun UniversalDevicePickerDialog(
     val dlnaDevices by dlnaManager.discoveredDevices.collectAsState()
     val selectedDlnaDevice by dlnaManager.selectedDevice.collectAsState()
     val isDlnaConnected by dlnaManager.isConnected.collectAsState()
+    
+    // AirPlay setup
+    val airPlayDevices by airPlayManager.discoveredDevices.collectAsState()
+    val selectedAirPlayDevice by airPlayManager.selectedDevice.collectAsState()
+    val isAirPlayConnected by airPlayManager.isConnected.collectAsState()
 
     val callback = remember {
         object : MediaRouter.Callback() {
@@ -134,8 +142,8 @@ fun UniversalDevicePickerDialog(
         }
     }
 
-    // Combine Cast and DLNA devices into a unified list
-    val allDevices = remember(castRoutes, dlnaDevices, selectedDlnaDevice, isDlnaConnected, connectingDeviceId) {
+    // Combine Cast, DLNA, and AirPlay devices into a unified list
+    val allDevices = remember(castRoutes, dlnaDevices, airPlayDevices, selectedDlnaDevice, isDlnaConnected, selectedAirPlayDevice, isAirPlayConnected, connectingDeviceId) {
         val devices = mutableListOf<UniversalDevice>()
         
         // Add Cast devices
@@ -163,6 +171,20 @@ fun UniversalDevicePickerDialog(
                     isSelected = selectedDlnaDevice?.id == dlnaDevice.id && isDlnaConnected,
                     isConnecting = false, // DLNA connections are typically instant
                     dlnaDevice = dlnaDevice
+                )
+            )
+        }
+        
+        // Add AirPlay devices
+        airPlayDevices.forEach { airPlayDevice ->
+            devices.add(
+                UniversalDevice(
+                    id = "airplay_${airPlayDevice.id}",
+                    name = airPlayDevice.name,
+                    type = DeviceType.AIRPLAY,
+                    isSelected = selectedAirPlayDevice?.id == airPlayDevice.id && isAirPlayConnected,
+                    isConnecting = false, // AirPlay connections are typically instant
+                    airPlayDevice = airPlayDevice
                 )
             )
         }
@@ -195,7 +217,7 @@ fun UniversalDevicePickerDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            "Make sure your devices support Chromecast or DLNA/UPnP",
+                            "Make sure your devices support Chromecast, DLNA/UPnP, or AirPlay",
                             modifier = Modifier.padding(8.dp),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -226,6 +248,11 @@ fun UniversalDevicePickerDialog(
                                                     onDlnaDeviceSelected(dlnaDevice)
                                                 }
                                             }
+                                            DeviceType.AIRPLAY -> {
+                                                device.airPlayDevice?.let { airPlayDevice ->
+                                                    onAirPlayDeviceSelected(airPlayDevice)
+                                                }
+                                            }
                                         }
                                         onDismiss()
                                     }
@@ -237,6 +264,7 @@ fun UniversalDevicePickerDialog(
                                         when (device.type) {
                                             DeviceType.CAST -> R.drawable.ic_cast
                                             DeviceType.DLNA -> R.drawable.ic_cast // You may want to use a different icon for DLNA
+                                            DeviceType.AIRPLAY -> R.drawable.ic_cast // You may want to use a different icon for AirPlay
                                         }
                                     ),
                                     contentDescription = null,
@@ -264,6 +292,7 @@ fun UniversalDevicePickerDialog(
                                         text = when (device.type) {
                                             DeviceType.CAST -> "Chromecast"
                                             DeviceType.DLNA -> "DLNA/UPnP"
+                                            DeviceType.AIRPLAY -> "AirPlay"
                                         },
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
