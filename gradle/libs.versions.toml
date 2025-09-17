@@ -23,6 +23,7 @@ newpipe = "dev-SNAPSHOT"
 translate = "17.0.3"
 workRuntimeKtx = "2.11.0-alpha01"
 kuromojiIpadic = "0.9.0"
+cling = "2.1.2"
 
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.7.1" }
