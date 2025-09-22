@@ -28,6 +28,7 @@ class DlnaManager(
     private val onDlnaSessionStarted: (() -> Unit)? = null
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
+    private var monitorJob: kotlinx.coroutines.Job? = null
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
@@ -46,6 +47,17 @@ class DlnaManager(
     fun start() {
         try {
             deviceDiscovery.startDiscovery()
+            // Monitorizar desaparición del dispositivo seleccionado
+            monitorJob?.cancel()
+            monitorJob = scope.launch {
+                discoveredDevices.collect { devices ->
+                    val selected = _selectedDevice.value
+                    if (selected != null && devices.none { it.id == selected.id }) {
+                        Timber.w("Selected DLNA device disappeared, disconnecting: ${selected.name}")
+                        disconnect()
+                    }
+                }
+            }
             Timber.d("DLNA service started and searching for devices")
         } catch (e: Exception) {
             Timber.e(e, "Failed to start DLNA service")
@@ -54,6 +66,7 @@ class DlnaManager(
     
     fun stop() {
         try {
+            monitorJob?.cancel()
             deviceDiscovery.stopDiscovery()
             disconnect()
             Timber.d("DLNA service stopped")

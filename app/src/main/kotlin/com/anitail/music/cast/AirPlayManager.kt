@@ -1,6 +1,7 @@
 package com.anitail.music.cast
 
 import android.content.Context
+import android.provider.Settings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,7 +13,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import timber.log.Timber
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 data class AirPlayDevice(
@@ -25,14 +28,32 @@ data class AirPlayDevice(
 
 class AirPlayManager(
     private val context: Context,
-    private val onAirPlaySessionStarted: (() -> Unit)? = null
+    private val onAirPlaySessionStarted: (() -> Unit)? = null,
+    private val onAirPlayAuthRequired: (() -> Unit)? = null
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
+    private var monitorJob: kotlinx.coroutines.Job? = null
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .writeTimeout(15, TimeUnit.SECONDS)
         .build()
-    
+
+    // Stable device ID header expected by some AirPlay receivers
+    private val deviceId: String by lazy {
+        runCatching {
+            Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ANDROID_ID
+            )
+        }
+            .getOrNull()
+            ?.uppercase()
+            ?: UUID.randomUUID().toString().replace("-", "").uppercase()
+    }
+
+    private val sessionId: String by lazy { UUID.randomUUID().toString() }
+
     private val _isConnected = MutableStateFlow(false)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
     
@@ -46,6 +67,17 @@ class AirPlayManager(
     fun start() {
         try {
             deviceDiscovery.startDiscovery()
+            // Monitorizar desaparición del dispositivo seleccionado para auto-desconectar
+            monitorJob?.cancel()
+            monitorJob = scope.launch {
+                discoveredDevices.collect { devices ->
+                    val selected = _selectedDevice.value
+                    if (selected != null && devices.none { it.id == selected.id }) {
+                        Timber.w("Selected AirPlay device disappeared, disconnecting: ${selected.name}")
+                        disconnect()
+                    }
+                }
+            }
             Timber.d("AirPlay service started and searching for devices")
         } catch (e: Exception) {
             Timber.e(e, "Failed to start AirPlay service")
@@ -54,6 +86,7 @@ class AirPlayManager(
     
     fun stop() {
         try {
+            monitorJob?.cancel()
             deviceDiscovery.stopDiscovery()
             disconnect()
             Timber.d("AirPlay service stopped")
@@ -64,10 +97,18 @@ class AirPlayManager(
     
     fun connectToDevice(device: AirPlayDevice) {
         try {
+            // Bloquear conexiones RAOP (RTSP) por ahora: sólo soportamos HTTP AirPlay
+            if (device.serviceType.contains("_raop._tcp", ignoreCase = true)) {
+                Timber.w("Skipping RAOP device (unsupported for HTTP /play): ${device.name} ${device.host}:${device.port}")
+                onAirPlayAuthRequired?.invoke()
+                return
+            }
             _selectedDevice.value = device
             _isConnected.value = true
             onAirPlaySessionStarted?.invoke()
-            Timber.d("Connected to AirPlay device: ${device.name}")
+            Timber.d("Connected to AirPlay device: ${device.name} at http://${device.host}:${device.port}")
+            // Probe server-info for diagnostics (non-fatal)
+            scope.launch { probeServerInfo(device) }
         } catch (e: Exception) {
             Timber.e(e, "Failed to connect to AirPlay device: ${device.name}")
         }
@@ -88,9 +129,8 @@ class AirPlayManager(
         
         scope.launch {
             try {
-                // AirPlay uses HTTP POST to /play endpoint with media information
-                val playRequest = buildPlayRequest(mediaUrl, title, artist, albumArt, mimeType)
-                
+                // Minimal, compatible /play body
+                val playRequest = buildPlayRequest(mediaUrl)
                 val success = sendAirPlayRequest(
                     device = device,
                     endpoint = "play",
@@ -99,12 +139,18 @@ class AirPlayManager(
                 )
                 
                 if (success) {
-                    Timber.d("Successfully started AirPlay playback for: $title")
+                    Timber.d("AirPlay playback started: $title - $artist")
                 } else {
-                    Timber.e("Failed to start AirPlay playback")
+                    Timber.e("AirPlay playback request failed")
+                    // Resetear estado para no bloquear botón si falla
+                    _isConnected.value = false
+                    _selectedDevice.value = null
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Error playing media on AirPlay device")
+                // En fallos (incluido ProtocolException por RTSP), marcar desconexión
+                _isConnected.value = false
+                _selectedDevice.value = null
             }
         }
     }
@@ -141,7 +187,24 @@ class AirPlayManager(
             )
         }
     }
-    
+
+    private suspend fun probeServerInfo(device: AirPlayDevice) = withContext(Dispatchers.IO) {
+        runCatching {
+            val req = Request.Builder()
+                .url("http://${device.host}:${device.port}/server-info")
+                .header("User-Agent", "AirPlay/1.0")
+                .header("X-Apple-ProtocolVersion", "1.0")
+                .header("X-Apple-DeviceID", deviceId)
+                .get()
+                .build()
+            httpClient.newCall(req).execute().use { resp ->
+                val code = resp.code
+                val body = resp.body?.string()?.take(500)
+                Timber.d("AirPlay server-info: code=$code body=$body")
+            }
+        }.onFailure { Timber.w(it, "AirPlay server-info probe failed") }
+    }
+
     private suspend fun sendAirPlayRequest(
         device: AirPlayDevice,
         endpoint: String,
@@ -149,56 +212,62 @@ class AirPlayManager(
         method: String = "GET"
     ): Boolean = withContext(Dispatchers.IO) {
         try {
-            val requestBuilder = Request.Builder()
-                .url("http://${device.host}:${device.port}/$endpoint")
-                .header("User-Agent", "AniTail/1.0")
-                .header("Content-Type", "text/parameters")
-            
+            val url = "http://${device.host}:${device.port}/$endpoint"
+            val builder = Request.Builder()
+                .url(url)
+                .header("User-Agent", "AirPlay/1.0")
+                .header("X-Apple-ProtocolVersion", "1.0")
+                .header("X-Apple-DeviceID", deviceId)
+                .header("X-Apple-Client-Name", "Anitail Music on Android")
+                .header("X-Apple-Session-ID", sessionId)
+                .header("Accept", "*/*")
+                .header("Connection", "keep-alive")
+
             when (method) {
                 "POST" -> {
-                    val requestBody = (body ?: "").toRequestBody("text/parameters".toMediaType())
-                    requestBuilder.post(requestBody)
+                    val mt = "text/parameters; charset=utf-8".toMediaType()
+                    val rb = (body ?: "").toRequestBody(mt)
+                    builder.post(rb)
                 }
-                "GET" -> requestBuilder.get()
+
+                else -> builder.get()
             }
-            
-            val request = requestBuilder.build()
-            val response = httpClient.newCall(request).execute()
-            val success = response.isSuccessful
-            
-            if (success) {
-                Timber.d("AirPlay $endpoint request successful")
-            } else {
-                Timber.e("AirPlay $endpoint request failed with code: ${response.code}")
+
+            val request = builder.build()
+            httpClient.newCall(request).execute().use { response ->
+                return@withContext handleResponse(device, url, response)
             }
-            
-            response.close()
-            success
         } catch (e: Exception) {
-            Timber.e(e, "Error sending AirPlay request to endpoint: $endpoint")
+            // RAOP endpoints responden con RTSP y causan ProtocolException; tratar como fallo recuperable
+            Timber.e(e, "AirPlay request error for endpoint=/$endpoint")
             false
         }
     }
-    
-    private fun buildPlayRequest(mediaUrl: String, title: String, artist: String, albumArt: String?, mimeType: String): String {
-        val parameters = mutableListOf<String>()
-        
-        parameters.add("Content-Location: $mediaUrl")
-        parameters.add("Start-Position: 0")
-        
-        // Add metadata if available
-        if (title.isNotEmpty()) {
-            parameters.add("X-Apple-AssetKey: $title")
+
+    private fun handleResponse(device: AirPlayDevice, url: String, response: Response): Boolean {
+        val code = response.code
+        val isOk = response.isSuccessful
+        val bodyStr = runCatching { response.body?.string() ?: "" }.getOrElse { "" }
+        if (!isOk) {
+            Timber.e("AirPlay HTTP error $code for $url, body=${bodyStr.take(500)}")
+            if (code == 401 || code == 403) {
+                // Auth requerida: notificar y marcar desconectado
+                _isConnected.value = false
+                Timber.e("AirPlay authentication required for ${device.name} (${device.host}:${device.port}). Configure el dispositivo para permitir acceso o empareje en HomeKit.")
+                onAirPlayAuthRequired?.invoke()
+            }
+        } else {
+            Timber.d("AirPlay HTTP $code for $url")
         }
-        
-        if (artist.isNotEmpty()) {
-            parameters.add("X-Apple-Artist: $artist")
-        }
-        
-        albumArt?.let {
-            parameters.add("X-Apple-Artwork-URL: $it")
-        }
-        
-        return parameters.joinToString("\n")
+        return isOk
+    }
+
+    private fun buildPlayRequest(mediaUrl: String): String {
+        // AirPlay expects LF or CRLF separated parameters; use CRLF for compatibility
+        val lines = listOf(
+            "Content-Location: $mediaUrl",
+            "Start-Position: 0.0"
+        )
+        return lines.joinToString(separator = "\r\n", postfix = "\r\n")
     }
 }

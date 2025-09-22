@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,15 +47,22 @@ class AirPlayDeviceDiscovery(
     }
     
     fun stopDiscovery() {
-        try {
-            activeDiscoveryListeners.forEach { listener ->
+        var hadError = false
+        activeDiscoveryListeners.forEach { listener ->
+            try {
                 nsdManager?.stopServiceDiscovery(listener)
+            } catch (iae: IllegalArgumentException) {
+                // Listener was never registered or already unregistered; ignore
+                Timber.d("Ignoring stopServiceDiscovery for unregistered listener")
+            } catch (e: Exception) {
+                hadError = true
+                Timber.e(e, "Error stopping a discovery listener")
             }
-            activeDiscoveryListeners.clear()
-            _discoveredDevices.value = emptySet()
+        }
+        activeDiscoveryListeners.clear()
+        _discoveredDevices.value = emptySet()
+        if (!hadError) {
             Timber.d("Stopped AirPlay device discovery")
-        } catch (e: Exception) {
-            Timber.e(e, "Error stopping AirPlay device discovery")
         }
     }
     
@@ -137,7 +143,7 @@ class AirPlayDeviceDiscovery(
                     val host = info.host?.hostAddress
                     if (host != null && isValidAirPlayDevice(info)) {
                         val device = AirPlayDevice(
-                            id = "${host}:${info.port}",
+                            id = "${info.serviceName}@$host:${info.port}",
                             name = cleanDeviceName(info.serviceName),
                             host = host,
                             port = info.port,
@@ -175,17 +181,23 @@ class AirPlayDeviceDiscovery(
     }
     
     private fun addDevice(device: AirPlayDevice) {
-        val currentDevices = _discoveredDevices.value.toMutableSet()
-        if (currentDevices.add(device)) {
-            _discoveredDevices.value = currentDevices
+        val current = _discoveredDevices.value.toMutableSet()
+        // Con IDs únicos basados en serviceName@host:port, simplemente agregamos o actualizamos
+        val removed = current.removeAll { it.id == device.id }
+        if (removed) {
+            Timber.d("Updated AirPlay device: ${device.name} (id=${device.id})")
         }
+        current.add(device)
+        _discoveredDevices.value = current
+        Timber.d("Added AirPlay device: ${device.name} (id=${device.id})")
     }
     
     private fun removeDevice(serviceName: String) {
-        val currentDevices = _discoveredDevices.value.toMutableSet()
-        val removed = currentDevices.removeAll { it.name == serviceName }
+        val current = _discoveredDevices.value.toMutableSet()
+        // Buscar dispositivos que empiecen con el serviceName (ya que ID incluye serviceName)
+        val removed = current.removeAll { it.id.startsWith("$serviceName@") }
         if (removed) {
-            _discoveredDevices.value = currentDevices
+            _discoveredDevices.value = current
             Timber.d("AirPlay device removed: $serviceName")
         }
     }

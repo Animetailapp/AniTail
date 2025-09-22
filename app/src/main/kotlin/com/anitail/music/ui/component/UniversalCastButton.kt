@@ -25,12 +25,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.mediarouter.media.MediaRouter
 import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.cast.CastingType
-import com.anitail.music.cast.AirPlayDevice
-import com.anitail.music.cast.DlnaDevice
 import com.anitail.music.cast.UniversalCastManager
 import com.anitail.music.cast.UniversalDevicePickerDialog
 import timber.log.Timber
@@ -40,38 +37,44 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current
 
-    // Create universal cast manager
-    val universalCastManager = remember(context.applicationContext, playerConnection) {
-        UniversalCastManager(
+    // Usar el UniversalCastManager compartido del MusicService si está disponible; si no, crear fallback local
+    val sharedCastManager = playerConnection?.service?.getUniversalCastManager()
+    val universalCastManager =
+        remember(sharedCastManager, context.applicationContext, playerConnection) {
+            sharedCastManager ?: UniversalCastManager(
             context.applicationContext,
             onCastSessionStarted = {
-                // Synchronize automatically when a Cast session is detected
+                // Sincronizar con Cast cuando se usa el manager local
                 playerConnection?.service?.castCurrentToDevice()
             },
             onDlnaSessionStarted = {
-                // Handle DLNA session start
-                Timber.d("DLNA session started")
+                // Disparar casting DLNA cuando se usa el manager local
+                playerConnection?.service?.castCurrentToDlnaDevice()
             },
             onAirPlaySessionStarted = {
-                // Handle AirPlay session start
-                Timber.d("AirPlay session started")
+                // Disparar casting AirPlay cuando se usa el manager local
+                playerConnection?.service?.castCurrentToAirPlayDevice()
             }
         )
     }
 
-    // Collect casting state
+    // Estado de casting
     val castingState by universalCastManager.castingState.collectAsState()
     val isPreparing by playerConnection?.service?.isCastPreparing?.collectAsState() ?: remember { mutableStateOf(false) }
     
     var showPicker by remember { mutableStateOf(false) }
 
-    // Start/stop the manager
-    DisposableEffect(universalCastManager) {
-        universalCastManager.start()
-        onDispose { universalCastManager.stop() }
+    // Iniciar/detener el manager solo si usamos el fallback local; si es compartido, lo maneja el servicio
+    DisposableEffect(universalCastManager, sharedCastManager) {
+        if (sharedCastManager == null) {
+            universalCastManager.start()
+            onDispose { universalCastManager.stop() }
+        } else {
+            onDispose { }
+        }
     }
 
-    // UI colors based on casting state and theme
+    // Colores UI
     val primary = MaterialTheme.colorScheme.primary
     val outline = MaterialTheme.colorScheme.outline
     val tintColor = when {
@@ -80,7 +83,7 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
     }
     val bgColor = Color.Transparent
 
-    // Transfer playback when casting state changes
+    // Transferir reproducción cuando cambia el estado de casting (solo necesario con fallback local)
     LaunchedEffect(castingState) {
         val service = playerConnection?.service
         if (service != null) {
@@ -88,14 +91,14 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
                 when (castingState.type) {
                     CastingType.CAST -> service.castCurrentToDevice()
                     CastingType.DLNA -> {
-                        // For DLNA, we need to handle playback differently
-                        // The current media will be sent to DLNA device via UniversalCastManager
-                        Timber.d("DLNA casting activated")
+                        if (sharedCastManager == null) service.castCurrentToDlnaDevice() else Timber.d(
+                            "DLNA casting activated"
+                        )
                     }
                     CastingType.AIRPLAY -> {
-                        // For AirPlay, we need to handle playback differently
-                        // The current media will be sent to AirPlay device via UniversalCastManager
-                        Timber.d("AirPlay casting activated")
+                        if (sharedCastManager == null) service.castCurrentToAirPlayDevice() else Timber.d(
+                            "AirPlay casting activated"
+                        )
                     }
                     CastingType.NONE -> service.returnToLocalPlayback()
                 }
@@ -109,14 +112,14 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
             .size(40.dp)
             .clip(CircleShape)
             .border(
-                1.dp, 
-                if (castingState.isActive) primary.copy(alpha = 0.6f) else outline, 
+                1.dp,
+                if (castingState.isActive) primary.copy(alpha = 0.6f) else outline,
                 CircleShape
             )
             .background(bgColor, CircleShape)
             .clickable(enabled = !isPreparing) {
                 if (castingState.isActive) {
-                    // Show expanded controller based on casting type
+                    // Mostrar controlador según tipo
                     when (castingState.type) {
                         CastingType.CAST -> {
                             // Open Cast compose activity
@@ -129,18 +132,17 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
                                 )
                             }
                         }
+
                         CastingType.DLNA -> {
-                            // For DLNA, you might want to show a simple control dialog
-                            // or navigate to a DLNA-specific activity
                             Timber.d("DLNA device selected: ${castingState.deviceName}")
                         }
+
                         CastingType.AIRPLAY -> {
-                            // For AirPlay, you might want to show a simple control dialog
-                            // or navigate to an AirPlay-specific activity
                             Timber.d("AirPlay device selected: ${castingState.deviceName}")
                         }
+
                         CastingType.NONE -> {
-                            // This shouldn't happen but handle gracefully
+                            // No-op
                         }
                     }
                 } else {
@@ -171,17 +173,17 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
                 airPlayManager = universalCastManager.getAirPlayManager(),
                 onDismiss = { showPicker = false },
                 onCastDeviceSelected = { route ->
-                    // Handle Cast device selection
+                    // Selección Cast
                     route.select()
                     Timber.d("Cast device selected: ${route.name}")
                 },
                 onDlnaDeviceSelected = { dlnaDevice ->
-                    // Handle DLNA device selection  
+                    // Selección DLNA
                     universalCastManager.getDlnaManager().connectToDevice(dlnaDevice)
                     Timber.d("DLNA device selected: ${dlnaDevice.name}")
                 },
                 onAirPlayDeviceSelected = { airPlayDevice ->
-                    // Handle AirPlay device selection  
+                    // Selección AirPlay
                     universalCastManager.getAirPlayManager().connectToDevice(airPlayDevice)
                     Timber.d("AirPlay device selected: ${airPlayDevice.name}")
                 }

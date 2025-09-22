@@ -17,7 +17,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
 import androidx.media3.cast.CastPlayer
-import com.anitail.music.cast.UniversalCastManager
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -62,6 +61,7 @@ import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.music.MainActivity
 import com.anitail.music.R
+import com.anitail.music.cast.UniversalCastManager
 import com.anitail.music.constants.AudioNormalizationKey
 import com.anitail.music.constants.AudioOffload
 import com.anitail.music.constants.AudioQualityKey
@@ -332,7 +332,19 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         context = this,
         onCastSessionStarted = { castCurrentToDevice() },
         onDlnaSessionStarted = { handleDlnaSessionStart() },
-        onAirPlaySessionStarted = { handleAirPlaySessionStart() }
+        onAirPlaySessionStarted = { handleAirPlaySessionStart() },
+        onAirPlayAuthRequired = {
+            scope.launch(Dispatchers.Main) {
+                try {
+                    android.widget.Toast.makeText(
+                        this@MusicService,
+                        "Este dispositivo AirPlay requiere autenticación o emparejamiento. Revisa los ajustes de AirPlay/HomeKit (Permitir acceso: Todos / Desactivar verificación de dispositivo) o introduce la contraseña si aplica.",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                } catch (_: Exception) {
+                }
+            }
+        }
     )
     universalCastManager?.start()
 
@@ -2124,17 +2136,18 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         try {
             scope.launch(Dispatchers.IO) {
                 val currentSong = currentSong.value
+                val artistName = currentSong?.song?.artistName ?: ""
                 if (currentSong != null && universalCastManager != null) {
                     val streamInfo = getStreamInfo(currentSong.id)
                     if (streamInfo != null) {
                         universalCastManager?.playMedia(
                             mediaUrl = streamInfo.url,
                             title = currentSong.song.title,
-                            artist = currentSong.song.artists.joinToString(", ") { it.name },
+                            artist = artistName,
                             albumArt = currentSong.song.thumbnailUrl,
                             mimeType = streamInfo.mimeType
                         )
-                        Timber.d("Started DLNA playback for: ${currentSong.song.title}")
+                        Timber.d("Started DLNA playback for: ${'$'}{currentSong.song.title}")
                     }
                 }
             }
@@ -2148,17 +2161,33 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         try {
             scope.launch(Dispatchers.IO) {
                 val currentSong = currentSong.value
+                val artistName = currentSong?.song?.artistName ?: ""
                 if (currentSong != null && universalCastManager != null) {
+                    // Preferir formatos compatibles con AirPlay (AAC/HLS/MP3)
+                    val airPlayMimePrefs = setOf(
+                        "audio/mp4", // m4a/aac
+                        "audio/aac",
+                        "application/vnd.apple.mpegurl", // HLS
+                        "application/mpegurl",
+                        "application/x-mpegurl",
+                        "audio/mpeg" // mp3
+                    )
                     val streamInfo = getStreamInfo(currentSong.id)
                     if (streamInfo != null) {
+                        val mimeLower = streamInfo.mimeType.lowercase()
+                        if (!airPlayMimePrefs.contains(mimeLower)) {
+                            Timber.w("AirPlay may not support MIME: $mimeLower, attempting anyway")
+                        }
                         universalCastManager?.playMedia(
                             mediaUrl = streamInfo.url,
                             title = currentSong.song.title,
-                            artist = currentSong.song.artists.joinToString(", ") { it.name },
+                            artist = artistName,
                             albumArt = currentSong.song.thumbnailUrl,
                             mimeType = streamInfo.mimeType
                         )
-                        Timber.d("Started AirPlay playback for: ${currentSong.song.title}")
+                        Timber.d("Started AirPlay playback for: ${currentSong.song.title} (${streamInfo.mimeType})")
+                    } else {
+                        Timber.e("AirPlay streamInfo is null - no stream found")
                     }
                 }
             }
