@@ -2,6 +2,7 @@ package com.anitail.music.cast
 
 import android.content.Context
 import android.provider.Settings
+import android.util.Base64
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,8 +16,10 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import timber.log.Timber
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import kotlin.random.Random
 
 data class AirPlayDevice(
     val id: String,
@@ -59,6 +62,34 @@ class AirPlayManager(
     
     private val _selectedDevice = MutableStateFlow<AirPlayDevice?>(null)
     val selectedDevice: StateFlow<AirPlayDevice?> = _selectedDevice.asStateFlow()
+
+    // Auth state (PIN/password)
+    enum class AuthScheme { BASIC, DIGEST }
+    data class AuthChallenge(
+        val deviceId: String,
+        val deviceName: String,
+        val scheme: AuthScheme,
+        val realm: String? = null,
+        val nonce: String? = null,
+        val qop: String? = null,
+        val opaque: String? = null,
+        val algorithm: String? = null
+    )
+
+    data class Credentials(
+        val username: String,
+        val password: String,
+        var nc: Int = 0 // nonce count for digest
+    )
+
+    private val _authChallenge = MutableStateFlow<AuthChallenge?>(null)
+    val authChallenge: StateFlow<AuthChallenge?> = _authChallenge.asStateFlow()
+    private val deviceCredentials = mutableMapOf<String, Credentials>()
+    private var lastAuthRequired: Boolean = false
+
+    private data class PendingRequest(val endpoint: String, val method: String, val body: String?)
+
+    private var lastPendingRequest: PendingRequest? = null
     
     // Use enhanced device discovery for AirPlay devices
     private val deviceDiscovery = AirPlayDeviceDiscovery(context, scope)
@@ -117,6 +148,7 @@ class AirPlayManager(
     fun disconnect() {
         _selectedDevice.value = null
         _isConnected.value = false
+        _authChallenge.value = null
         Timber.d("Disconnected from AirPlay device")
     }
     
@@ -142,9 +174,13 @@ class AirPlayManager(
                     Timber.d("AirPlay playback started: $title - $artist")
                 } else {
                     Timber.e("AirPlay playback request failed")
-                    // Resetear estado para no bloquear botón si falla
-                    _isConnected.value = false
-                    _selectedDevice.value = null
+                    // Si fue por autenticación, mantener el dispositivo para reintentar tras credenciales
+                    if (!lastAuthRequired) {
+                        _isConnected.value = false
+                        _selectedDevice.value = null
+                    } else {
+                        Timber.w("AirPlay auth required; keeping device selected to retry after credentials")
+                    }
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Error playing media on AirPlay device")
@@ -233,6 +269,10 @@ class AirPlayManager(
                 else -> builder.get()
             }
 
+            lastPendingRequest = PendingRequest(endpoint = endpoint, method = method, body = body)
+            // Attach Authorization if we have credentials and/or a pending challenge
+            attachAuthorizationHeaderIfNeeded(device, method, "/$endpoint", builder)
+
             val request = builder.build()
             httpClient.newCall(request).execute().use { response ->
                 return@withContext handleResponse(device, url, response)
@@ -251,13 +291,23 @@ class AirPlayManager(
         if (!isOk) {
             Timber.e("AirPlay HTTP error $code for $url, body=${bodyStr.take(500)}")
             if (code == 401 || code == 403) {
-                // Auth requerida: notificar y marcar desconectado
+                // Intentar parsear desafío de autenticación
+                val wa = response.header("WWW-Authenticate").orEmpty()
+                val challenge = parseAuthChallenge(device, wa)
+                if (challenge != null) {
+                    _authChallenge.value = challenge
+                }
+                // Notificar UI
                 _isConnected.value = false
-                Timber.e("AirPlay authentication required for ${device.name} (${device.host}:${device.port}). Configure el dispositivo para permitir acceso o empareje en HomeKit.")
+                Timber.e("AirPlay authentication required for ${device.name} (${device.host}:${device.port}). WWW-Authenticate='$wa'")
                 onAirPlayAuthRequired?.invoke()
+                lastAuthRequired = true
             }
         } else {
             Timber.d("AirPlay HTTP $code for $url")
+            // Limpiar desafío si existía
+            _authChallenge.value = null
+            lastAuthRequired = false
         }
         return isOk
     }
@@ -270,4 +320,128 @@ class AirPlayManager(
         )
         return lines.joinToString(separator = "\r\n", postfix = "\r\n")
     }
+
+    // region Auth helpers
+    private fun parseAuthChallenge(device: AirPlayDevice, header: String): AuthChallenge? {
+        if (header.isBlank()) return null
+        val lower = header.lowercase()
+        val scheme = when {
+            lower.startsWith("basic") -> AuthScheme.BASIC
+            lower.startsWith("digest") -> AuthScheme.DIGEST
+            else -> return null
+        }
+
+        fun param(name: String): String? {
+            val regex = Regex("(?i)${name}\\s*=\\s*\"?([^,\"]+)\"?")
+            return regex.find(header)?.groupValues?.getOrNull(1)
+        }
+        return AuthChallenge(
+            deviceId = device.id,
+            deviceName = device.name,
+            scheme = scheme,
+            realm = param("realm"),
+            nonce = param("nonce"),
+            qop = param("qop"),
+            opaque = param("opaque"),
+            algorithm = param("algorithm")
+        )
+    }
+
+    private fun attachAuthorizationHeaderIfNeeded(
+        device: AirPlayDevice,
+        method: String,
+        uri: String,
+        builder: Request.Builder
+    ) {
+        val creds = deviceCredentials[device.id] ?: return
+        val challenge = _authChallenge.value
+        when (challenge?.scheme) {
+            AuthScheme.BASIC -> {
+                val token = Base64.encodeToString(
+                    "${creds.username}:${creds.password}".toByteArray(),
+                    Base64.NO_WRAP
+                )
+                builder.header("Authorization", "Basic $token")
+            }
+
+            AuthScheme.DIGEST -> {
+                val header = buildDigestAuthorizationHeader(method, uri, challenge, creds)
+                if (header != null) builder.header("Authorization", header)
+            }
+
+            else -> {}
+        }
+    }
+
+    private fun buildDigestAuthorizationHeader(
+        method: String,
+        uri: String,
+        ch: AuthChallenge,
+        creds: Credentials
+    ): String? {
+        val realm = ch.realm ?: return null
+        val nonce = ch.nonce ?: return null
+        val qop = ch.qop?.split(",")?.map { it.trim() }?.firstOrNull { it.equals("auth", true) }
+        val algorithm = (ch.algorithm ?: "MD5").uppercase()
+
+        fun md5Hex(s: String): String {
+            val md = MessageDigest.getInstance("MD5")
+            val bytes = md.digest(s.toByteArray())
+            return bytes.joinToString("") { String.format("%02x", it) }
+        }
+
+        val ha1 = if (algorithm == "MD5" || algorithm.isBlank()) {
+            md5Hex("${creds.username}:$realm:${creds.password}")
+        } else {
+            // Fallback to MD5
+            md5Hex("${creds.username}:$realm:${creds.password}")
+        }
+        val ha2 = md5Hex("$method:$uri")
+
+        val header = StringBuilder("Digest ")
+        val cnonce = Random.nextBytes(8).joinToString("") { String.format("%02x", it) }
+        val nc = (++creds.nc).toString(16).padStart(8, '0')
+        val response = if (qop != null) {
+            md5Hex("$ha1:$nonce:$nc:$cnonce:$qop:$ha2")
+        } else {
+            md5Hex("$ha1:$nonce:$ha2")
+        }
+
+        header.append("username=\"${creds.username}\",")
+        header.append("realm=\"$realm\",")
+        header.append("nonce=\"$nonce\",")
+        header.append("uri=\"$uri\",")
+        header.append("response=\"$response\",")
+        if (qop != null) {
+            header.append("qop=$qop,")
+            header.append("nc=$nc,")
+            header.append("cnonce=\"$cnonce\",")
+        }
+        ch.opaque?.let { header.append("opaque=\"$it\",") }
+        header.append("algorithm=$algorithm")
+        return header.toString()
+    }
+
+    fun providePinOrPassword(input: String, username: String = "AirPlay") {
+        val device = _selectedDevice.value ?: return
+        // Guardar credenciales y reintentar siguiente petición con Authorization
+        deviceCredentials[device.id] = Credentials(username = username, password = input)
+        Timber.d("Credentials provided for AirPlay device ${device.name} (scheme=${_authChallenge.value?.scheme})")
+        // Retry last pending request automatically
+        val pending = lastPendingRequest
+        if (pending != null) {
+            scope.launch {
+                val ok = sendAirPlayRequest(device, pending.endpoint, pending.body, pending.method)
+                Timber.d("Retry after auth result: $ok for ${pending.endpoint}")
+            }
+        }
+    }
+
+    fun cancelAuthentication() {
+        _authChallenge.value?.let { chal ->
+            Timber.w("Authentication canceled for device ${chal.deviceName}")
+        }
+        _authChallenge.value = null
+    }
+    // endregion
 }
