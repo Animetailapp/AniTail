@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -217,9 +218,28 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
 
         // Dialogo para PIN/Contraseña de AirPlay
         airPlayAuth?.let { chal ->
+            val isPassword = when (chal.scheme) {
+                com.anitail.music.cast.AirPlayManager.AuthScheme.BASIC -> true
+                com.anitail.music.cast.AirPlayManager.AuthScheme.DIGEST -> {
+                    val realm = chal.realm?.lowercase().orEmpty()
+                    // Para DIGEST, asume PIN por defecto; solo trata como contraseña si el realm lo sugiere explícitamente
+                    val indicatesPassword = listOf(
+                        "pass",
+                        "password",
+                        "pwd",
+                        "contraseña",
+                        "clave",
+                        "login",
+                        "user",
+                        "account"
+                    )
+                        .any { realm.contains(it) }
+                    indicatesPassword
+                }
+            }
             AirPlayAuthDialog(
                 deviceName = chal.deviceName,
-                isBasic = chal.scheme.name == "BASIC",
+                isPassword = isPassword,
                 onConfirm = { input ->
                     universalCastManager.getAirPlayManager().providePinOrPassword(input)
                 },
@@ -235,7 +255,7 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
 @Composable
 private fun AirPlayAuthDialog(
     deviceName: String,
-    isBasic: Boolean,
+    isPassword: Boolean,
     onConfirm: (String) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -250,10 +270,17 @@ private fun AirPlayAuthDialog(
                 .widthIn(min = 280.dp, max = 560.dp)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
-                Text("Autenticación AirPlay", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    stringResource(id = R.string.airplay_auth_title),
+                    style = MaterialTheme.typography.titleLarge
+                )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "$deviceName solicita ${if (isBasic) "contraseña" else "PIN"}",
+                    stringResource(
+                        id = R.string.airplay_auth_requires,
+                        deviceName,
+                        stringResource(if (isPassword) R.string.airplay_password else R.string.airplay_pin)
+                    ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
@@ -261,19 +288,21 @@ private fun AirPlayAuthDialog(
                     value = input,
                     onValueChange = { input = it },
                     singleLine = true,
-                    label = { Text(if (isBasic) "Contraseña" else "PIN") },
+                    label = { Text(stringResource(id = if (isPassword) R.string.airplay_password else R.string.airplay_pin)) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = if (isBasic) KeyboardType.Password else KeyboardType.NumberPassword
+                        keyboardType = if (isPassword) KeyboardType.Password else KeyboardType.NumberPassword
                     )
                 )
                 Spacer(Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { input = ""; onCancel() }) { Text("Cancelar") }
+                    TextButton(onClick = {
+                        input = ""; onCancel()
+                    }) { Text(stringResource(id = R.string.cancel)) }
                     TextButton(
                         onClick = { onConfirm(input); input = "" },
                         enabled = input.isNotBlank()
-                    ) { Text("Aceptar") }
+                    ) { Text(stringResource(id = R.string.ok)) }
                 }
             }
         }

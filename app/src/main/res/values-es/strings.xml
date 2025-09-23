@@ -756,4 +756,10 @@
     <string name="romanize_current_track">Romanizar la pista actual</string>
     <string name="audio_offload">Activar descarga</string>
     <string name="audio_offload_description">Usar la ruta de audio de descarga para la reproducción. Desactivar esto puede aumentar el consumo de energía, pero puede ser útil si experimentas problemas con la reproducción o el procesamiento posterior de audio</string>
+
+    <!-- Diálogo de autenticación AirPlay -->
+    <string name="airplay_auth_title">Autenticación AirPlay</string>
+    <string name="airplay_auth_requires">%1$s solicita %2$s</string>
+    <string name="airplay_password">Contraseña</string>
+    <string name="airplay_pin">PIN</string>
 </resources>

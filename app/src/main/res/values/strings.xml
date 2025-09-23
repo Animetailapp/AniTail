@@ -751,6 +751,12 @@
     <string name="disconnect_cast_title">Disconnect</string>
     <string name="disconnect_cast_message">Stop casting and disconnect from %1$s?</string>
 
+    <!-- AirPlay Authentication Dialog -->
+    <string name="airplay_auth_title">AirPlay authentication</string>
+    <string name="airplay_auth_requires">%1$s requires %2$s</string>
+    <string name="airplay_password">Password</string>
+    <string name="airplay_pin">PIN</string>
+
     <!-- Cast Settings -->
     <string name="enable_cast">Enable Cast</string>
     <string name="enable_cast_desc">Allow casting media to compatible devices. Requires Google Play Services.</string>
