@@ -58,7 +58,7 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current
 
-    // Usar el UniversalCastManager compartido del MusicService si está disponible; si no, crear fallback local
+    // Use shared UniversalCastManager from MusicService if available; otherwise create local fallback
     val sharedCastManager = playerConnection?.service?.getUniversalCastManager()
     val universalCastManager =
         remember(sharedCastManager, context.applicationContext, playerConnection) {
