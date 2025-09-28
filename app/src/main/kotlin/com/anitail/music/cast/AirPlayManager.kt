@@ -184,7 +184,7 @@ class AirPlayManager(
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Error playing media on AirPlay device")
-                // En fallos (incluido ProtocolException por RTSP), marcar desconexión
+                // On failures (including ProtocolException from RTSP), mark disconnection
                 _isConnected.value = false
                 _selectedDevice.value = null
             }
