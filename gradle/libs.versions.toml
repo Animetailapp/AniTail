@@ -21,7 +21,7 @@ ksp = "2.2.20-2.0.3"
 okhttp = "5.0.0-alpha.14"
 newpipe = "dev-SNAPSHOT"
 translate = "17.0.3"
-workRuntimeKtx = "2.11.0-alpha01"
+workRuntimeKtx = "2.11.0-beta01"
 kuromojiIpadic = "0.9.0"
 
 [libraries]
