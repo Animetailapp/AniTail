@@ -297,7 +297,8 @@ private fun AirPlayAuthDialog(
                 Spacer(Modifier.height(12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = {
-                        input = ""; onCancel()
+                        input = ""
+                        onCancel()
                     }) { Text(stringResource(id = R.string.cancel)) }
                     TextButton(
                         onClick = { onConfirm(input); input = "" },
