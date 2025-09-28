@@ -47,7 +47,7 @@ class DlnaManager(
     fun start() {
         try {
             deviceDiscovery.startDiscovery()
-            // Monitorizar desaparición del dispositivo seleccionado
+            // Monitor disappearance of selected device
             monitorJob?.cancel()
             monitorJob = scope.launch {
                 discoveredDevices.collect { devices ->
