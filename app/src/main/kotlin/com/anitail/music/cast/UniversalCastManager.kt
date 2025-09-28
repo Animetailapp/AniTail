@@ -109,7 +109,7 @@ class UniversalCastManager(
             }
             
             updateCastingState()
-            // Observar cambios de estado para actualizar la UI al instante (incluye desconexiones)
+            // Observe state changes to update UI instantly (includes disconnections)
             val castFlow: Flow<Boolean> = castManager?.isCasting ?: flowOf(false)
             stateJob?.cancel()
             stateJob = scope.launch {
