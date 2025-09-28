@@ -278,7 +278,7 @@ class AirPlayManager(
                 return@withContext handleResponse(device, url, response)
             }
         } catch (e: Exception) {
-            // RAOP endpoints responden con RTSP y causan ProtocolException; tratar como fallo recuperable
+            // RAOP endpoints respond with RTSP and cause ProtocolException; treat as recoverable failure
             Timber.e(e, "AirPlay request error for endpoint=/$endpoint")
             false
         }
