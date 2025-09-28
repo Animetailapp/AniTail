@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- Allow cleartext traffic by default (required for AirPlay on LAN) -->
+    <base-config cleartextTrafficPermitted="true" />
+
+    <!-- Excepciones/anchors específicos que ya estaban -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">ws.audioscrobbler.com</domain>
         <domain includeSubdomains="true">audioscrobbler.com</domain>

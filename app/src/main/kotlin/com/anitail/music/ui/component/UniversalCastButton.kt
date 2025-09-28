@@ -4,12 +4,27 @@ import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -17,6 +32,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,58 +40,76 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.mediarouter.media.MediaRouter
+import androidx.compose.ui.window.DialogProperties
 import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.cast.CastingType
-import com.anitail.music.cast.DlnaDevice
 import com.anitail.music.cast.UniversalCastManager
 import com.anitail.music.cast.UniversalDevicePickerDialog
 import timber.log.Timber
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current
 
-    // Create universal cast manager
-    val universalCastManager = remember(context.applicationContext, playerConnection) {
-        UniversalCastManager(
+    // Use shared UniversalCastManager from MusicService if available; otherwise create local fallback
+    val sharedCastManager = playerConnection?.service?.getUniversalCastManager()
+    val universalCastManager =
+        remember(sharedCastManager, context.applicationContext, playerConnection) {
+            sharedCastManager ?: UniversalCastManager(
             context.applicationContext,
             onCastSessionStarted = {
-                // Synchronize automatically when a Cast session is detected
+                // Sincronizar con Cast cuando se usa el manager local
                 playerConnection?.service?.castCurrentToDevice()
             },
             onDlnaSessionStarted = {
-                // Handle DLNA session start
-                Timber.d("DLNA session started")
+                // Disparar casting DLNA cuando se usa el manager local
+                playerConnection?.service?.castCurrentToDlnaDevice()
+            },
+            onAirPlaySessionStarted = {
+                // Disparar casting AirPlay cuando se usa el manager local
+                playerConnection?.service?.castCurrentToAirPlayDevice()
             }
         )
     }
 
-    // Collect casting state
+    // Estado de casting
     val castingState by universalCastManager.castingState.collectAsState()
     val isPreparing by playerConnection?.service?.isCastPreparing?.collectAsState() ?: remember { mutableStateOf(false) }
     
     var showPicker by remember { mutableStateOf(false) }
+    val airPlayAuth by universalCastManager.getAirPlayManager().authChallenge.collectAsState(null)
 
-    // Start/stop the manager
-    DisposableEffect(universalCastManager) {
-        universalCastManager.start()
-        onDispose { universalCastManager.stop() }
+    // Iniciar/detener el manager solo si usamos el fallback local; si es compartido, lo maneja el servicio
+    DisposableEffect(universalCastManager, sharedCastManager) {
+        if (sharedCastManager == null) {
+            universalCastManager.start()
+            onDispose { universalCastManager.stop() }
+        } else {
+            onDispose { }
+        }
     }
 
-    // UI colors based on casting state and theme
+    // Colores UI
     val primary = MaterialTheme.colorScheme.primary
     val outline = MaterialTheme.colorScheme.outline
     val tintColor = when {
         pureBlack -> if (castingState.isActive) primary else Color.White
         else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
     }
-    val bgColor = Color.Transparent
+    val bgColor = when {
+        pureBlack -> Color.Transparent
+        castingState.isActive -> MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+        else -> Color.Transparent
+    }
 
-    // Transfer playback when casting state changes
+    // Transferir reproducción cuando cambia el estado de casting (solo necesario con fallback local)
     LaunchedEffect(castingState) {
         val service = playerConnection?.service
         if (service != null) {
@@ -83,9 +117,14 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
                 when (castingState.type) {
                     CastingType.CAST -> service.castCurrentToDevice()
                     CastingType.DLNA -> {
-                        // For DLNA, we need to handle playback differently
-                        // The current media will be sent to DLNA device via UniversalCastManager
-                        Timber.d("DLNA casting activated")
+                        if (sharedCastManager == null) service.castCurrentToDlnaDevice() else Timber.d(
+                            "DLNA casting activated"
+                        )
+                    }
+                    CastingType.AIRPLAY -> {
+                        if (sharedCastManager == null) service.castCurrentToAirPlayDevice() else Timber.d(
+                            "AirPlay casting activated"
+                        )
                     }
                     CastingType.NONE -> service.returnToLocalPlayback()
                 }
@@ -99,14 +138,14 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
             .size(40.dp)
             .clip(CircleShape)
             .border(
-                1.dp, 
-                if (castingState.isActive) primary.copy(alpha = 0.6f) else outline, 
+                1.dp,
+                if (castingState.isActive) primary.copy(alpha = 0.6f) else outline,
                 CircleShape
             )
             .background(bgColor, CircleShape)
             .clickable(enabled = !isPreparing) {
                 if (castingState.isActive) {
-                    // Show expanded controller based on casting type
+                    // Mostrar controlador según tipo
                     when (castingState.type) {
                         CastingType.CAST -> {
                             // Open Cast compose activity
@@ -119,13 +158,17 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
                                 )
                             }
                         }
+
                         CastingType.DLNA -> {
-                            // For DLNA, you might want to show a simple control dialog
-                            // or navigate to a DLNA-specific activity
                             Timber.d("DLNA device selected: ${castingState.deviceName}")
                         }
+
+                        CastingType.AIRPLAY -> {
+                            Timber.d("AirPlay device selected: ${castingState.deviceName}")
+                        }
+
                         CastingType.NONE -> {
-                            // This shouldn't happen but handle gracefully
+                            // No-op
                         }
                     }
                 } else {
@@ -153,18 +196,116 @@ fun UniversalCastButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
         if (showPicker) {
             UniversalDevicePickerDialog(
                 dlnaManager = universalCastManager.getDlnaManager(),
+                airPlayManager = universalCastManager.getAirPlayManager(),
                 onDismiss = { showPicker = false },
                 onCastDeviceSelected = { route ->
-                    // Handle Cast device selection
+                    // Selección Cast
                     route.select()
                     Timber.d("Cast device selected: ${route.name}")
                 },
                 onDlnaDeviceSelected = { dlnaDevice ->
-                    // Handle DLNA device selection  
+                    // Selección DLNA
                     universalCastManager.getDlnaManager().connectToDevice(dlnaDevice)
                     Timber.d("DLNA device selected: ${dlnaDevice.name}")
+                },
+                onAirPlayDeviceSelected = { airPlayDevice ->
+                    // Selección AirPlay
+                    universalCastManager.getAirPlayManager().connectToDevice(airPlayDevice)
+                    Timber.d("AirPlay device selected: ${airPlayDevice.name}")
                 }
             )
+        }
+
+        // Dialogo para PIN/Contraseña de AirPlay
+        airPlayAuth?.let { chal ->
+            val isPassword = when (chal.scheme) {
+                com.anitail.music.cast.AirPlayManager.AuthScheme.BASIC -> true
+                com.anitail.music.cast.AirPlayManager.AuthScheme.DIGEST -> {
+                    val realm = chal.realm?.lowercase().orEmpty()
+                    // Para DIGEST, asume PIN por defecto; solo trata como contraseña si el realm lo sugiere explícitamente
+                    val indicatesPassword = listOf(
+                        "pass",
+                        "password",
+                        "pwd",
+                        "contraseña",
+                        "clave",
+                        "login",
+                        "user",
+                        "account"
+                    )
+                        .any { realm.contains(it) }
+                    indicatesPassword
+                }
+            }
+            AirPlayAuthDialog(
+                deviceName = chal.deviceName,
+                isPassword = isPassword,
+                onConfirm = { input ->
+                    universalCastManager.getAirPlayManager().providePinOrPassword(input)
+                },
+                onCancel = {
+                    universalCastManager.getAirPlayManager().cancelAuthentication()
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AirPlayAuthDialog(
+    deviceName: String,
+    isPassword: Boolean,
+    onConfirm: (String) -> Unit,
+    onCancel: () -> Unit
+) {
+    var input by rememberSaveable { mutableStateOf("") }
+    BasicAlertDialog(onDismissRequest = { onCancel() }, properties = DialogProperties()) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .padding(16.dp)
+                .widthIn(min = 280.dp, max = 560.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    stringResource(id = R.string.airplay_auth_title),
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    stringResource(
+                        id = R.string.airplay_auth_requires,
+                        deviceName,
+                        stringResource(if (isPassword) R.string.airplay_password else R.string.airplay_pin)
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { input = it },
+                    singleLine = true,
+                    label = { Text(stringResource(id = if (isPassword) R.string.airplay_password else R.string.airplay_pin)) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = if (isPassword) KeyboardType.Password else KeyboardType.NumberPassword
+                    )
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = {
+                        input = ""
+                        onCancel()
+                    }) { Text(stringResource(id = R.string.cancel)) }
+                    TextButton(
+                        onClick = { onConfirm(input); input = "" },
+                        enabled = input.isNotBlank()
+                    ) { Text(stringResource(id = R.string.ok)) }
+                }
+            }
         }
     }
 }

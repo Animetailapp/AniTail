@@ -5,14 +5,22 @@ import com.anitail.music.utils.GooglePlayServicesUtils
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.Session
 import com.google.android.gms.cast.framework.SessionManagerListener
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
 enum class CastingType {
-    NONE, CAST, DLNA
+    NONE, CAST, DLNA, AIRPLAY
 }
 
 data class CastingState(
@@ -24,8 +32,12 @@ data class CastingState(
 class UniversalCastManager(
     private val context: Context,
     private val onCastSessionStarted: (() -> Unit)? = null,
-    private val onDlnaSessionStarted: (() -> Unit)? = null
+    private val onDlnaSessionStarted: (() -> Unit)? = null,
+    private val onAirPlaySessionStarted: (() -> Unit)? = null,
+    private val onAirPlayAuthRequired: (() -> Unit)? = null
 ) {
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    private var stateJob: Job? = null
     private val _castingState = MutableStateFlow(CastingState(false, CastingType.NONE))
     val castingState: StateFlow<CastingState> = _castingState.asStateFlow()
     
@@ -47,6 +59,19 @@ class UniversalCastManager(
         updateCastingState()
     }
     
+    // AirPlay manager
+    private val airPlayManager = AirPlayManager(
+        context,
+        onAirPlaySessionStarted = {
+            onAirPlaySessionStarted?.invoke()
+            updateCastingState()
+        },
+        onAirPlayAuthRequired = {
+            Timber.e("AirPlay auth required callback invoked")
+            onAirPlayAuthRequired?.invoke()
+        }
+    )
+
     private val castSessionListener = object : SessionManagerListener<Session> {
         override fun onSessionStarted(session: Session, sessionId: String) {
             updateCastingState()
@@ -75,6 +100,7 @@ class UniversalCastManager(
         try {
             castManager?.start()
             dlnaManager.start()
+            airPlayManager.start()
             
             // Add Cast session listener if Cast is available
             if (GooglePlayServicesUtils.isCastAvailable(context)) {
@@ -83,6 +109,25 @@ class UniversalCastManager(
             }
             
             updateCastingState()
+            // Observe state changes to update UI instantly (includes disconnections)
+            val castFlow: Flow<Boolean> = castManager?.isCasting ?: flowOf(false)
+            stateJob?.cancel()
+            stateJob = scope.launch {
+                try {
+                    combine(
+                        castFlow,
+                        dlnaManager.isConnected,
+                        dlnaManager.selectedDevice,
+                        airPlayManager.isConnected,
+                        airPlayManager.selectedDevice
+                    ) { _, _, _, _, _ -> }
+                        .collect {
+                            updateCastingState()
+                        }
+                } catch (e: Exception) {
+                    Timber.e(e, "Error observing casting states")
+                }
+            }
             Timber.d("Universal Cast Manager started")
         } catch (e: Exception) {
             Timber.e(e, "Failed to start Universal Cast Manager")
@@ -91,8 +136,10 @@ class UniversalCastManager(
     
     fun stop() {
         try {
+            stateJob?.cancel()
             castManager?.stop()
             dlnaManager.stop()
+            airPlayManager.stop()
             
             // Remove Cast session listener if Cast is available
             if (GooglePlayServicesUtils.isCastAvailable(context)) {
@@ -104,10 +151,15 @@ class UniversalCastManager(
             Timber.d("Universal Cast Manager stopped")
         } catch (e: Exception) {
             Timber.e(e, "Error stopping Universal Cast Manager")
+        } finally {
+            // Cancel scope to prevent leaks
+            scope.coroutineContext.cancel()
         }
     }
     
     fun getDlnaManager(): DlnaManager = dlnaManager
+    
+    fun getAirPlayManager(): AirPlayManager = airPlayManager
     
     fun isCastAvailable(): Boolean = GooglePlayServicesUtils.isCastAvailable(context)
     
@@ -119,6 +171,9 @@ class UniversalCastManager(
             }
             CastingType.DLNA -> {
                 dlnaManager.playMedia(mediaUrl, title, artist, albumArt, mimeType)
+            }
+            CastingType.AIRPLAY -> {
+                airPlayManager.playMedia(mediaUrl, title, artist, albumArt, mimeType)
             }
             CastingType.NONE -> {
                 Timber.w("No casting device connected")
@@ -135,6 +190,9 @@ class UniversalCastManager(
             CastingType.DLNA -> {
                 dlnaManager.pauseMedia()
             }
+            CastingType.AIRPLAY -> {
+                airPlayManager.pauseMedia()
+            }
             CastingType.NONE -> {
                 Timber.w("No casting device connected")
             }
@@ -150,6 +208,9 @@ class UniversalCastManager(
             CastingType.DLNA -> {
                 dlnaManager.stopMedia()
             }
+            CastingType.AIRPLAY -> {
+                airPlayManager.stopMedia()
+            }
             CastingType.NONE -> {
                 Timber.w("No casting device connected")
             }
@@ -161,6 +222,8 @@ class UniversalCastManager(
             val isCastActive = castManager?.isCasting?.value == true
             val isDlnaActive = dlnaManager.isConnected.value
             val selectedDlnaDevice = dlnaManager.selectedDevice.value
+            val isAirPlayActive = airPlayManager.isConnected.value
+            val selectedAirPlayDevice = airPlayManager.selectedDevice.value
             
             val newState = when {
                 isCastActive -> {
@@ -179,6 +242,13 @@ class UniversalCastManager(
                         isActive = true,
                         type = CastingType.DLNA,
                         deviceName = selectedDlnaDevice.name
+                    )
+                }
+                isAirPlayActive && selectedAirPlayDevice != null -> {
+                    CastingState(
+                        isActive = true,
+                        type = CastingType.AIRPLAY,
+                        deviceName = selectedAirPlayDevice.name
                     )
                 }
                 else -> {

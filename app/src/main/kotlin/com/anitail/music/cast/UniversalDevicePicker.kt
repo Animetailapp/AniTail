@@ -39,6 +39,7 @@ import com.anitail.music.utils.GooglePlayServicesUtils
 import com.google.android.gms.cast.CastMediaControlIntent
 import com.google.android.gms.cast.framework.CastContext
 import kotlinx.coroutines.delay
+import timber.log.Timber
 
 // Combined device data class for both Cast and DLNA devices
 data class UniversalDevice(
@@ -48,25 +49,29 @@ data class UniversalDevice(
     val isSelected: Boolean,
     val isConnecting: Boolean,
     val castRoute: MediaRouter.RouteInfo? = null,
-    val dlnaDevice: DlnaDevice? = null
+    val dlnaDevice: DlnaDevice? = null,
+    val airPlayDevice: AirPlayDevice? = null
 )
 
 enum class DeviceType {
-    CAST, DLNA
+    CAST, DLNA, AIRPLAY
 }
 
 @Composable
 fun UniversalDevicePickerDialog(
     dlnaManager: DlnaManager,
+    airPlayManager: AirPlayManager,
     onDismiss: () -> Unit,
     onCastDeviceSelected: (MediaRouter.RouteInfo) -> Unit,
-    onDlnaDeviceSelected: (DlnaDevice) -> Unit
+    onDlnaDeviceSelected: (DlnaDevice) -> Unit,
+    onAirPlayDeviceSelected: (AirPlayDevice) -> Unit
 ) {
+    Timber.d("UniversalDevicePickerDialog opened")
     val context = LocalContext.current
     
     // Cast setup
     val castAvailable = GooglePlayServicesUtils.isCastAvailable(context)
-    val castContext = remember { 
+    remember {
         if (castAvailable) {
             runCatching { CastContext.getSharedInstance(context) }.getOrNull()
         } else null
@@ -90,6 +95,19 @@ fun UniversalDevicePickerDialog(
     val dlnaDevices by dlnaManager.discoveredDevices.collectAsState()
     val selectedDlnaDevice by dlnaManager.selectedDevice.collectAsState()
     val isDlnaConnected by dlnaManager.isConnected.collectAsState()
+    
+    // AirPlay setup
+    val airPlayDevices by airPlayManager.discoveredDevices.collectAsState()
+    val selectedAirPlayDevice by airPlayManager.selectedDevice.collectAsState()
+    val isAirPlayConnected by airPlayManager.isConnected.collectAsState()
+
+    // Debug: Log de dispositivos cuando cambian
+    LaunchedEffect(airPlayDevices) {
+        Timber.d("AirPlay devices updated: ${airPlayDevices.size} devices")
+        airPlayDevices.forEach { device ->
+            Timber.d("AirPlay device: ${device.name} (${device.serviceType}) id=${device.id}")
+        }
+    }
 
     val callback = remember {
         object : MediaRouter.Callback() {
@@ -103,7 +121,7 @@ fun UniversalDevicePickerDialog(
                 refreshCastRoutes(router)
 
             private fun refreshCastRoutes(router: MediaRouter) {
-                val selected = router.selectedRoute
+                router.selectedRoute
                 castRoutes = router.routes
                     .filter { it.isEnabled && !it.isDefault }
                     .filter {
@@ -134,16 +152,20 @@ fun UniversalDevicePickerDialog(
         }
     }
 
-    // Combine Cast and DLNA devices into a unified list
-    val allDevices = remember(castRoutes, dlnaDevices, selectedDlnaDevice, isDlnaConnected, connectingDeviceId) {
+    // Combine Cast, DLNA, and AirPlay devices into a unified list
+    val allDevices = remember(castRoutes, dlnaDevices, airPlayDevices, selectedDlnaDevice, isDlnaConnected, selectedAirPlayDevice, isAirPlayConnected, connectingDeviceId) {
         val devices = mutableListOf<UniversalDevice>()
+
+        Timber.d("Building device list - Cast: ${castRoutes.size}, DLNA: ${dlnaDevices.size}, AirPlay: ${airPlayDevices.size}")
         
         // Add Cast devices
         val selectedCastRoute = mediaRouter.selectedRoute
         castRoutes.forEach { route ->
+            val universalId = "cast_${route.id}"
+            Timber.d("Adding Cast device: ${route.name} -> universalId=$universalId")
             devices.add(
                 UniversalDevice(
-                    id = "cast_${route.id}",
+                    id = universalId,
                     name = route.name,
                     type = DeviceType.CAST,
                     isSelected = route == selectedCastRoute && selectedCastRoute != mediaRouter.defaultRoute,
@@ -155,19 +177,57 @@ fun UniversalDevicePickerDialog(
         
         // Add DLNA devices
         dlnaDevices.forEach { dlnaDevice ->
+            val universalId = "dlna_${dlnaDevice.id}"
+            Timber.d("Adding DLNA device: ${dlnaDevice.name} -> universalId=$universalId")
             devices.add(
                 UniversalDevice(
-                    id = "dlna_${dlnaDevice.id}",
+                    id = universalId,
                     name = dlnaDevice.name,
                     type = DeviceType.DLNA,
                     isSelected = selectedDlnaDevice?.id == dlnaDevice.id && isDlnaConnected,
-                    isConnecting = false, // DLNA connections are typically instant
+                    isConnecting = false,
                     dlnaDevice = dlnaDevice
                 )
             )
         }
-        
-        devices
+
+        // Add AirPlay devices (all supported service types)
+        val filteredAirPlayDevices = airPlayDevices
+            .filter { device ->
+                // For now, show only AirPlay HTTP services; RAOP (RTSP) is excluded to avoid errors
+                device.serviceType.contains("_airplay._tcp", ignoreCase = true)
+            }
+
+        Timber.d("Filtered AirPlay devices: ${filteredAirPlayDevices.size} out of ${airPlayDevices.size}")
+        filteredAirPlayDevices.forEach { airPlayDevice ->
+            val universalId = "airplay_${airPlayDevice.id}"
+            Timber.d("Adding AirPlay device: ${airPlayDevice.name} (${airPlayDevice.serviceType}) id=${airPlayDevice.id} -> universalId=$universalId")
+            devices.add(
+                UniversalDevice(
+                    id = universalId,
+                    name = airPlayDevice.name,
+                    type = DeviceType.AIRPLAY,
+                    isSelected = selectedAirPlayDevice?.id == airPlayDevice.id && isAirPlayConnected,
+                    isConnecting = false,
+                    airPlayDevice = airPlayDevice
+                )
+            )
+        }
+
+        // Deduplicate by unique id to ensure stable, unique keys in LazyColumn
+        Timber.d("Before deduplication: ${devices.size} devices")
+        devices.forEach { device ->
+            Timber.d("Device before dedup: ${device.name} (${device.type}) id=${device.id}")
+        }
+
+        val finalDevices = devices.distinctBy { it.id }
+        Timber.d("Final device count after deduplication: ${finalDevices.size} (was ${devices.size})")
+
+        finalDevices.forEach { device ->
+            Timber.d("Final device: ${device.name} (${device.type}) id=${device.id}")
+        }
+
+        finalDevices
     }
 
     AlertDialog(
@@ -195,13 +255,14 @@ fun UniversalDevicePickerDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            "Make sure your devices support Chromecast or DLNA/UPnP",
+                            "Make sure your devices support Chromecast, DLNA/UPnP, or AirPlay",
                             modifier = Modifier.padding(8.dp),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 } else {
+                    Timber.d("Showing ${allDevices.size} devices in picker")
                     LazyColumn(modifier = Modifier.fillMaxWidth()) {
                         items(allDevices, key = { it.id }) { device ->
                             Row(
@@ -221,9 +282,16 @@ fun UniversalDevicePickerDialog(
                                                     onCastDeviceSelected(route)
                                                 }
                                             }
+
                                             DeviceType.DLNA -> {
                                                 device.dlnaDevice?.let { dlnaDevice ->
                                                     onDlnaDeviceSelected(dlnaDevice)
+                                                }
+                                            }
+
+                                            DeviceType.AIRPLAY -> {
+                                                device.airPlayDevice?.let { airPlayDevice ->
+                                                    onAirPlayDeviceSelected(airPlayDevice)
                                                 }
                                             }
                                         }
@@ -237,6 +305,7 @@ fun UniversalDevicePickerDialog(
                                         when (device.type) {
                                             DeviceType.CAST -> R.drawable.ic_cast
                                             DeviceType.DLNA -> R.drawable.ic_cast // You may want to use a different icon for DLNA
+                                            DeviceType.AIRPLAY -> R.drawable.ic_cast // You may want to use a different icon for AirPlay
                                         }
                                     ),
                                     contentDescription = null,
@@ -264,6 +333,7 @@ fun UniversalDevicePickerDialog(
                                         text = when (device.type) {
                                             DeviceType.CAST -> "Chromecast"
                                             DeviceType.DLNA -> "DLNA/UPnP"
+                                            DeviceType.AIRPLAY -> "AirPlay"
                                         },
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
