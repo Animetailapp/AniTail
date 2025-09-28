@@ -98,7 +98,7 @@ class AirPlayManager(
     fun start() {
         try {
             deviceDiscovery.startDiscovery()
-            // Monitorizar desaparición del dispositivo seleccionado para auto-desconectar
+            // Monitor disappearance of selected device for auto-disconnect
             monitorJob?.cancel()
             monitorJob = scope.launch {
                 discoveredDevices.collect { devices ->
