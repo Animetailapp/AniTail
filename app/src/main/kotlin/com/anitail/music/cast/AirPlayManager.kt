@@ -128,7 +128,7 @@ class AirPlayManager(
     
     fun connectToDevice(device: AirPlayDevice) {
         try {
-            // Bloquear conexiones RAOP (RTSP) por ahora: sólo soportamos HTTP AirPlay
+            // Block RAOP (RTSP) connections for now: we only support HTTP AirPlay
             if (device.serviceType.contains("_raop._tcp", ignoreCase = true)) {
                 Timber.w("Skipping RAOP device (unsupported for HTTP /play): ${device.name} ${device.host}:${device.port}")
                 onAirPlayAuthRequired?.invoke()
