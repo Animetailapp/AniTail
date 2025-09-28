@@ -297,7 +297,7 @@ class AirPlayManager(
                 if (challenge != null) {
                     _authChallenge.value = challenge
                 }
-                // Notificar UI
+                // Notify UI
                 _isConnected.value = false
                 Timber.e("AirPlay authentication required for ${device.name} (${device.host}:${device.port}). WWW-Authenticate='$wa'")
                 onAirPlayAuthRequired?.invoke()
