@@ -152,7 +152,7 @@ class UniversalCastManager(
         } catch (e: Exception) {
             Timber.e(e, "Error stopping Universal Cast Manager")
         } finally {
-            // Cancelar scope para evitar fugas
+            // Cancel scope to prevent leaks
             scope.coroutineContext.cancel()
         }
     }
