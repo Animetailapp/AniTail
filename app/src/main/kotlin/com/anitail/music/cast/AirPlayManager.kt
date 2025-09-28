@@ -174,7 +174,7 @@ class AirPlayManager(
                     Timber.d("AirPlay playback started: $title - $artist")
                 } else {
                     Timber.e("AirPlay playback request failed")
-                    // Si fue por autenticación, mantener el dispositivo para reintentar tras credenciales
+                    // If it was due to authentication, keep device to retry after credentials
                     if (!lastAuthRequired) {
                         _isConnected.value = false
                         _selectedDevice.value = null
