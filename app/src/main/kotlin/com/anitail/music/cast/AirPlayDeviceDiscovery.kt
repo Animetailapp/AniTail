@@ -182,7 +182,7 @@ class AirPlayDeviceDiscovery(
     
     private fun addDevice(device: AirPlayDevice) {
         val current = _discoveredDevices.value.toMutableSet()
-        // Con IDs únicos basados en serviceName@host:port, simplemente agregamos o actualizamos
+        // With unique IDs based on serviceName@host:port, we simply add or update
         val removed = current.removeAll { it.id == device.id }
         if (removed) {
             Timber.d("Updated AirPlay device: ${device.name} (id=${device.id})")
