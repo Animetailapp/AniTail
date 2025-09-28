@@ -194,7 +194,7 @@ fun UniversalDevicePickerDialog(
         // Add AirPlay devices (all supported service types)
         val filteredAirPlayDevices = airPlayDevices
             .filter { device ->
-                // Por ahora mostramos solo servicios AirPlay HTTP; RAOP (RTSP) se excluye para evitar errores
+                // For now, show only AirPlay HTTP services; RAOP (RTSP) is excluded to avoid errors
                 device.serviceType.contains("_airplay._tcp", ignoreCase = true)
             }
 
