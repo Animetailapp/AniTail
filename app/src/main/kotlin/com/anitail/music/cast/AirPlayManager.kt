@@ -305,7 +305,7 @@ class AirPlayManager(
             }
         } else {
             Timber.d("AirPlay HTTP $code for $url")
-            // Limpiar desafío si existía
+            // Clear challenge if it existed
             _authChallenge.value = null
             lastAuthRequired = false
         }
