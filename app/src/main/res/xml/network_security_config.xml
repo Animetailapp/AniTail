@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Permitir tráfico cleartext por defecto (necesario para AirPlay en LAN) -->
+    <!-- Allow cleartext traffic by default (required for AirPlay on LAN) -->
     <base-config cleartextTrafficPermitted="true" />
 
     <!-- Excepciones/anchors específicos que ya estaban -->
