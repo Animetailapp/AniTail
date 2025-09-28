@@ -424,7 +424,7 @@ class AirPlayManager(
 
     fun providePinOrPassword(input: String, username: String = "AirPlay") {
         val device = _selectedDevice.value ?: return
-        // Guardar credenciales y reintentar siguiente petición con Authorization
+        // Save credentials and retry next request with Authorization
         deviceCredentials[device.id] = Credentials(username = username, password = input)
         Timber.d("Credentials provided for AirPlay device ${device.name} (scheme=${_authChallenge.value?.scheme})")
         // Retry last pending request automatically
