@@ -194,7 +194,7 @@ class AirPlayDeviceDiscovery(
     
     private fun removeDevice(serviceName: String) {
         val current = _discoveredDevices.value.toMutableSet()
-        // Buscar dispositivos que empiecen con el serviceName (ya que ID incluye serviceName)
+        // Look for devices that start with the serviceName (since ID includes serviceName)
         val removed = current.removeAll { it.id.startsWith("$serviceName@") }
         if (removed) {
             _discoveredDevices.value = current
