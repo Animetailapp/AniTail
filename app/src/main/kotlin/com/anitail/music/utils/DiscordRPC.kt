@@ -16,13 +16,28 @@ class DiscordRPC(
         timeStart: Long,
         timeEnd: Long
     ) = runCatching {
+        val primaryArtist = song.artists.firstOrNull()?.name ?: song.song.artistName
+        song.artists.joinToString { it.name }
+        val albumTitle = song.album?.title
+        val presenceState = buildString {
+            append(primaryArtist ?: context.getString(R.string.unknown))
+            if (!albumTitle.isNullOrBlank()) {
+                append(" • ")
+                append(albumTitle)
+            }
+        }
+        val largeAsset = song.song.thumbnailUrl?.let { RpcImage.ExternalImage(it) }
+            ?: RpcImage.DiscordImage("emojis/1372344240465645711.webp?quality=lossless")
+        val smallAsset =
+            song.artists.firstOrNull()?.thumbnailUrl?.let { RpcImage.ExternalImage(it) }
+                ?: RpcImage.DiscordImage("emojis/1372344240465645711.webp?quality=lossless")
+
         setActivity(
             name = context.getString(R.string.app_name).removeSuffix(" Debug"),
             details = song.song.title,
-            state = song.song.artistName ?: song.artists.joinToString { it.name },
-            largeImage = song.song.thumbnailUrl?.let { RpcImage.ExternalImage(it) },
-            smallImage = RpcImage.DiscordImage("emojis/1372344240465645711.webp?quality=lossless"
-            ),
+            state = presenceState,
+            largeImage = largeAsset,
+            smallImage = smallAsset,
             largeText = song.album?.title,
             smallText = song.artists.firstOrNull()?.name,
             buttons = listOf(

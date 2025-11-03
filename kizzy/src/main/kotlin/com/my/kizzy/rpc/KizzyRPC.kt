@@ -13,6 +13,7 @@
 package com.my.kizzy.rpc
 
 import com.my.kizzy.gateway.DiscordWebSocket
+import com.my.kizzy.gateway.GatewayConnectionState
 import com.my.kizzy.gateway.entities.presence.Activity
 import com.my.kizzy.gateway.entities.presence.Assets
 import com.my.kizzy.gateway.entities.presence.Metadata
@@ -23,6 +24,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 
 /**
@@ -32,12 +35,25 @@ open class KizzyRPC(token: String) {
     private val kizzyRepository = KizzyRepository()
     private val discordWebSocket = DiscordWebSocket(token)
 
+    val connectionState: StateFlow<GatewayConnectionState> = discordWebSocket.connectionState
+    val lastActivityAt: StateFlow<Long?> = discordWebSocket.lastActivityAt
+    val lastError: StateFlow<Throwable?> = discordWebSocket.lastError
+
     fun closeRPC() {
         discordWebSocket.close()
+        runBlocking { ArtworkCache.clear() }
     }
 
     fun isRpcRunning(): Boolean {
         return discordWebSocket.isWebSocketConnected()
+    }
+
+    suspend fun connect() {
+        discordWebSocket.connect()
+    }
+
+    suspend fun restartGateway() {
+        discordWebSocket.restart()
     }
 
     suspend fun setActivity(
