@@ -26,9 +26,13 @@ sealed class RpcImage {
         }
     }
 
-    class ExternalImage(val image: String) : RpcImage() {
+    class ExternalImage(
+        val image: String,
+        private val fallbackDiscordAsset: String? = null,
+    ) : RpcImage() {
         override suspend fun resolveImage(repository: KizzyRepository): String? {
-            return ArtworkCache.getOrFetch(image) { repository.getImage(image) }
+            val asset = ArtworkCache.getOrFetch(image) { repository.getImage(image) }
+            return asset ?: fallbackDiscordAsset?.let { "mp:${it}" }
         }
     }
 }

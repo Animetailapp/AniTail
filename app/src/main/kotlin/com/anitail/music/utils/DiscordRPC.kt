@@ -17,7 +17,6 @@ class DiscordRPC(
         timeEnd: Long
     ) = runCatching {
         val primaryArtist = song.artists.firstOrNull()?.name ?: song.song.artistName
-        song.artists.joinToString { it.name }
         val albumTitle = song.album?.title
         val presenceState = buildString {
             append(primaryArtist ?: context.getString(R.string.unknown))
@@ -26,11 +25,17 @@ class DiscordRPC(
                 append(albumTitle)
             }
         }
-        val largeAsset = song.song.thumbnailUrl?.let { RpcImage.ExternalImage(it) }
-            ?: RpcImage.DiscordImage("emojis/1372344240465645711.webp?quality=lossless")
+        val fallbackAsset = FALLBACK_DISCORD_ASSET
+        val largeAsset = song.song.thumbnailUrl?.let { RpcImage.ExternalImage(it, fallbackAsset) }
+            ?: RpcImage.DiscordImage(fallbackAsset)
         val smallAsset =
-            song.artists.firstOrNull()?.thumbnailUrl?.let { RpcImage.ExternalImage(it) }
-                ?: RpcImage.DiscordImage("emojis/1372344240465645711.webp?quality=lossless")
+            song.artists.firstOrNull()?.thumbnailUrl?.let {
+                RpcImage.ExternalImage(
+                    it,
+                    fallbackAsset
+                )
+            }
+                ?: RpcImage.DiscordImage(fallbackAsset)
 
         setActivity(
             name = context.getString(R.string.app_name).removeSuffix(" Debug"),
@@ -53,5 +58,7 @@ class DiscordRPC(
 
     companion object {
         private const val APPLICATION_ID = "1271273225120125040"
+        private const val FALLBACK_DISCORD_ASSET =
+            "emojis/1372344240465645711.webp?quality=lossless"
     }
 }
