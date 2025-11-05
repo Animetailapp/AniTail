@@ -168,8 +168,12 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
   @Inject lateinit var lyricsHelper: LyricsHelper
   @Inject lateinit var syncUtils: SyncUtils
+    @Inject
+    lateinit var downloadUtil: DownloadUtil
 
-  @Inject lateinit var lastFmService: LastFmService
+
+    @Inject
+    lateinit var lastFmService: LastFmService
 
   private var widgetUpdateJob: Job? = null
 
@@ -1195,13 +1199,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         // Check if auto-download on like is enabled and the song is now liked
         if (dataStore.get(AutoDownloadOnLikeKey, false) && song.liked) {
           // Trigger download for the liked song
-          val downloadRequest =
-              androidx.media3.exoplayer.offline.DownloadRequest.Builder(song.id, song.id.toUri())
-                  .setCustomCacheKey(song.id)
-                  .setData(song.title.toByteArray())
-                  .build()
-          androidx.media3.exoplayer.offline.DownloadService.sendAddDownload(
-              this@MusicService, ExoDownloadService::class.java, downloadRequest, false)
+            downloadUtil.downloadToMediaStore(it)
 
           // Download lyrics if auto-download lyrics is enabled
           if (dataStore.get(AutoDownloadLyricsKey, false)) {
@@ -1596,6 +1594,16 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     val songUrlCache = HashMap<String, Pair<String, Long>>()
     return ResolvingDataSource.Factory(createCacheDataSource()) { dataSpec ->
       val mediaId = dataSpec.key ?: error("No media id")
+        // Check for MediaStore URI first (local playback)
+        val song = runBlocking(Dispatchers.IO) {
+            database.song(mediaId).first()
+        }
+
+        if (song?.song?.mediaStoreUri != null) {
+            Timber.d("Playing from MediaStore: ${song.song.mediaStoreUri}")
+            scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
+            return@Factory dataSpec.withUri(song.song.mediaStoreUri.toUri())
+        }
 
       if (downloadCache.isCached(
           mediaId, dataSpec.position, if (dataSpec.length >= 0) dataSpec.length else 1) ||

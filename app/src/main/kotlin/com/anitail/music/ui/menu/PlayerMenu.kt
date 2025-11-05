@@ -57,10 +57,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.net.toUri
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import com.anitail.innertube.YouTube
@@ -78,6 +76,7 @@ import com.anitail.music.ui.component.BottomSheetState
 import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.utils.makeTimeString
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.log2
 import kotlin.math.pow
@@ -103,8 +102,9 @@ fun PlayerMenu(
     val activityResultLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
     val coroutineScope = rememberCoroutineScope()
+    val downloadUtil = LocalDownloadUtil.current
 
-    val download by LocalDownloadUtil.current.getDownload(mediaMetadata.id)
+    val download by downloadUtil.getDownload(mediaMetadata.id)
         .collectAsState(initial = null)
 
     val artists =
@@ -427,21 +427,15 @@ fun PlayerMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            database.transaction {
-                                insert(mediaMetadata)
+                            coroutineScope.launch(Dispatchers.IO) {
+                                database.transaction {
+                                    insert(mediaMetadata)
+                                }
+                                val song = database.song(mediaMetadata.id).first()
+                                song?.let {
+                                    downloadUtil.downloadToMediaStore(it)
+                                }
                             }
-                            val downloadRequest =
-                                DownloadRequest
-                                    .Builder(mediaMetadata.id, mediaMetadata.id.toUri())
-                                    .setCustomCacheKey(mediaMetadata.id)
-                                    .setData(mediaMetadata.title.toByteArray())
-                                    .build()
-                            DownloadService.sendAddDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                downloadRequest,
-                                false,
-                            )
                         }
                     )
                 }

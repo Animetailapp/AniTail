@@ -85,7 +85,7 @@ fun ContentSettings(
     val (contentLanguage, onContentLanguageChange) = rememberPreference(key = ContentLanguageKey, defaultValue = "system")
     val (contentCountry, onContentCountryChange) = rememberPreference(key = ContentCountryKey, defaultValue = "system")
     val (selectedLanguage, setSelectedLanguage) = rememberPreference(stringPreferencesKey("app_language"), "en")
-    val (hideExplicit, onHideExplicitChange) = rememberPreference(key = HideExplicitKey, defaultValue = false)
+    val (_, _) = rememberPreference(key = HideExplicitKey, defaultValue = false)
     val (proxyEnabled, onProxyEnabledChange) = rememberPreference(key = ProxyEnabledKey, defaultValue = false)
     val (proxyType, onProxyTypeChange) = rememberEnumPreference(key = ProxyTypeKey, defaultValue = Proxy.Type.HTTP)
     val (proxyUrl, onProxyUrlChange) = rememberPreference(key = ProxyUrlKey, defaultValue = "host:port")
@@ -278,13 +278,6 @@ fun ContentSettings(
  
                 onContentCountryChange(newValue)
            }
-        )
-
-        SwitchPreference(
-            title = { Text(stringResource(R.string.hide_explicit)) },
-            icon = { Icon(painterResource(R.drawable.explicit), null) },
-            checked = hideExplicit,
-            onCheckedChange = onHideExplicitChange,
         )
 
         PreferenceGroupTitle(title = stringResource(R.string.app_language))

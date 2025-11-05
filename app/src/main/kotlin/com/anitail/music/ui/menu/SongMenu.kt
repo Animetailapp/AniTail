@@ -1,6 +1,8 @@
 package com.anitail.music.ui.menu
 
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -81,12 +83,14 @@ import com.anitail.music.db.entities.SongArtistMap
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.ExoDownloadService
+import com.anitail.music.playback.MediaStoreDownloadManager
 import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.component.LocalBottomSheetPageState
 import com.anitail.music.ui.component.SongListItem
 import com.anitail.music.ui.component.TextFieldDialog
 import com.anitail.music.ui.utils.ShowMediaInfo
+import com.anitail.music.utils.PermissionHelper
 import com.anitail.music.viewmodels.CachePlaylistViewModel
 import com.anitail.music.viewmodels.LastFmViewModel
 import kotlinx.coroutines.Dispatchers
@@ -108,7 +112,10 @@ fun SongMenu(
     val playerConnection = LocalPlayerConnection.current ?: return
     val songState = database.song(originalSong.id).collectAsState(initial = originalSong)
     val song = songState.value ?: originalSong
-    val download by LocalDownloadUtil.current.getDownload(originalSong.id)
+    val downloadUtil = LocalDownloadUtil.current
+    val download by downloadUtil.getDownload(originalSong.id)
+        .collectAsState(initial = null)
+    val mediaStoreDownload by downloadUtil.getMediaStoreDownload(originalSong.id)
         .collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
     val syncUtils = LocalSyncUtils.current
@@ -118,6 +125,24 @@ fun SongMenu(
     val cacheViewModel = viewModel<CachePlaylistViewModel>()
     val lastFmViewModel: LastFmViewModel = hiltViewModel()
     val lastFmUiState by lastFmViewModel.uiState.collectAsStateWithLifecycle()
+
+    // Permission launcher for storage access
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions.values.all { it }) {
+            // All permissions granted, proceed with download
+            downloadUtil.downloadToMediaStore(song)
+            onDismiss()
+        } else {
+            // Permissions denied - show error message
+            android.widget.Toast.makeText(
+                context,
+                context.getString(R.string.storage_permission_required),
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+    }
 
     val rotationAnimation by animateFloatAsState(
         targetValue = refetchIconDegree,
@@ -679,6 +704,100 @@ fun SongMenu(
                                 downloadRequest,
                                 false,
                             )
+                        }
+                    )
+                }
+            }
+        }
+        item {
+            when (mediaStoreDownload?.status) {
+                MediaStoreDownloadManager.DownloadState.Status.COMPLETED -> {
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = stringResource(R.string.downloaded_to_device),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.download),
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            // TODO: Option to remove from MediaStore
+                            onDismiss()
+                        }
+                    )
+                }
+
+                MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING,
+                MediaStoreDownloadManager.DownloadState.Status.QUEUED -> {
+                    val downloadState = mediaStoreDownload!!
+                    ListItem(
+                        headlineContent = {
+                            Text(text = stringResource(R.string.downloading_to_device))
+                        },
+                        supportingContent = {
+                            Text(text = "${(downloadState.progress * 100).toInt()}%")
+                        },
+                        leadingContent = {
+                            CircularProgressIndicator(
+                                progress = { downloadState.progress },
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            downloadUtil.cancelMediaStoreDownload(song.id)
+                            onDismiss()
+                        }
+                    )
+                }
+
+                MediaStoreDownloadManager.DownloadState.Status.FAILED -> {
+                    val downloadState = mediaStoreDownload!!
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = stringResource(R.string.download_failed),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        },
+                        supportingContent = {
+                            Text(text = downloadState.error ?: "Unknown error")
+                        },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.info),
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            downloadUtil.retryMediaStoreDownload(song.id)
+                            onDismiss()
+                        }
+                    )
+                }
+
+                else -> {
+                    ListItem(
+                        headlineContent = { Text(text = stringResource(R.string.download_to_device)) },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.download),
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            if (PermissionHelper.hasMediaStoreWritePermission(context)) {
+                                downloadUtil.downloadToMediaStore(song)
+                                onDismiss()
+                            } else {
+                                val permissions = PermissionHelper.getRequiredWritePermissions()
+                                permissionLauncher.launch(permissions)
+                            }
                         }
                     )
                 }

@@ -123,6 +123,20 @@
     <string name="download">Download</string>
     <string name="downloading">Downloading</string>
     <string name="remove_download">Remove download</string>
+
+    <!-- MediaStore downloads -->
+    <string name="download_to_device">Download</string>
+    <string name="downloading_to_device">Downloading</string>
+    <string name="downloaded_to_device">Downloaded</string>
+    <string name="download_failed">Download failed</string>
+    <string name="retry_download">Retry download</string>
+    <string name="cancel_download">Cancel download</string>
+    <string name="remove_from_device">Remove from device</string>
+    <string name="storage_permission_required">Storage permission required</string>
+    <string name="storage_permission_rationale">This app needs storage permission to download music to your device\'s Music folder</string>
+    <string name="mediastore_downloads">Device downloads</string>
+    <string name="mediastore_size">Device storage used</string>
+    <string name="clear_mediastore_downloads">Clear device downloads</string>
     <string name="import_playlist">Import playlist</string>
     <string name="add_to_playlist">Add to playlist</string>
     <string name="view_artist">View artist</string>

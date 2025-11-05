@@ -41,9 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import coil.compose.AsyncImage
 import com.anitail.innertube.YouTube
@@ -70,6 +68,7 @@ import com.anitail.music.utils.joinByBullet
 import com.anitail.music.utils.makeTimeString
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -485,17 +484,16 @@ fun YouTubePlaylistMenu(
                                 )
                             },
                             modifier = Modifier.clickable {
-                                songs.forEach { song ->
-                                    val downloadRequest = DownloadRequest.Builder(song.id, song.id.toUri())
-                                        .setCustomCacheKey(song.id)
-                                        .setData(song.title.toByteArray())
-                                        .build()
-                                    DownloadService.sendAddDownload(
-                                        context,
-                                        ExoDownloadService::class.java,
-                                        downloadRequest,
-                                        false
-                                    )
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    songs.forEach { song ->
+                                        database.transaction {
+                                            insert(song.toMediaMetadata())
+                                        }
+                                        val dbSong = database.song(song.id).first()
+                                        dbSong?.let {
+                                            downloadUtil.downloadToMediaStore(it)
+                                        }
+                                    }
                                 }
                             }
                         )

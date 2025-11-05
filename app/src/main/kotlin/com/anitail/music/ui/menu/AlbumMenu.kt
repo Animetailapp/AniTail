@@ -68,6 +68,7 @@ import com.anitail.music.db.entities.Album
 import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.playback.ExoDownloadService
+import com.anitail.music.playback.MediaStoreDownloadManager
 import com.anitail.music.ui.component.AlbumListItem
 import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.component.ListItem
@@ -121,6 +122,35 @@ fun AlbumMenu(
                 } else {
                     STATE_STOPPED
                 }
+        }
+    }
+
+    var mediaStoreDownloadState by remember {
+        mutableStateOf<AlbumMediaStoreDownloadStatus>(AlbumMediaStoreDownloadStatus.NotDownloaded)
+    }
+
+    LaunchedEffect(songs) {
+        if (songs.isEmpty()) return@LaunchedEffect
+        downloadUtil.getAllMediaStoreDownloads().collect { states ->
+            val songStates = songs.mapNotNull { states[it.id] }
+            mediaStoreDownloadState = when {
+                songStates.isEmpty() -> AlbumMediaStoreDownloadStatus.NotDownloaded
+                songStates.all { it.status == MediaStoreDownloadManager.DownloadState.Status.COMPLETED } ->
+                    AlbumMediaStoreDownloadStatus.Completed
+
+                songStates.any {
+                    it.status == MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING ||
+                            it.status == MediaStoreDownloadManager.DownloadState.Status.QUEUED
+                } -> {
+                    val totalProgress = songStates.sumOf { it.progress.toDouble() } / songs.size
+                    AlbumMediaStoreDownloadStatus.Downloading(totalProgress.toFloat())
+                }
+
+                songStates.any { it.status == MediaStoreDownloadManager.DownloadState.Status.FAILED } ->
+                    AlbumMediaStoreDownloadStatus.Failed
+
+                else -> AlbumMediaStoreDownloadStatus.NotDownloaded
+            }
         }
     }
 
@@ -398,6 +428,100 @@ fun AlbumMenu(
             }
         }
         item {
+            when (mediaStoreDownloadState) {
+                is AlbumMediaStoreDownloadStatus.Completed -> {
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = stringResource(R.string.downloaded_to_device),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.download),
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            // TODO: Option to remove from MediaStore
+                            onDismiss()
+                        }
+                    )
+                }
+
+                is AlbumMediaStoreDownloadStatus.Downloading -> {
+                    val progress =
+                        (mediaStoreDownloadState as AlbumMediaStoreDownloadStatus.Downloading).progress
+                    ListItem(
+                        headlineContent = {
+                            Text(text = stringResource(R.string.downloading_to_device))
+                        },
+                        supportingContent = {
+                            Text(text = "${(progress * 100).toInt()}%")
+                        },
+                        leadingContent = {
+                            CircularProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            songs.forEach { song ->
+                                downloadUtil.cancelMediaStoreDownload(song.id)
+                            }
+                            onDismiss()
+                        }
+                    )
+                }
+
+                is AlbumMediaStoreDownloadStatus.Failed -> {
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = stringResource(R.string.download_failed),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        },
+                        supportingContent = {
+                            Text(text = stringResource(R.string.retry_download))
+                        },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.info),
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            songs.forEach { song ->
+                                downloadUtil.retryMediaStoreDownload(song.id)
+                            }
+                            onDismiss()
+                        }
+                    )
+                }
+
+                AlbumMediaStoreDownloadStatus.NotDownloaded -> {
+                    ListItem(
+                        headlineContent = { Text(text = stringResource(R.string.download_to_device)) },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.download),
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            songs.forEach { song ->
+                                downloadUtil.downloadToMediaStore(song)
+                            }
+                            onDismiss()
+                        }
+                    )
+                }
+            }
+        }
+        item {
             ListItem(
                 headlineContent = { Text(text = stringResource(R.string.view_artist)) },
                 leadingContent = {
@@ -463,4 +587,11 @@ fun AlbumMenu(
             )
         }
     }
+}
+
+private sealed class AlbumMediaStoreDownloadStatus {
+    object NotDownloaded : AlbumMediaStoreDownloadStatus()
+    object Completed : AlbumMediaStoreDownloadStatus()
+    data class Downloading(val progress: Float) : AlbumMediaStoreDownloadStatus()
+    object Failed : AlbumMediaStoreDownloadStatus()
 }

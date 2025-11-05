@@ -107,6 +107,7 @@ import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.util.Consumer
@@ -177,6 +178,7 @@ import com.anitail.music.ui.utils.appBarScrollBehavior
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.ui.utils.resetHeightOffset
 import com.anitail.music.utils.LocaleManager
+import com.anitail.music.utils.PermissionHelper
 import com.anitail.music.utils.SyncUtils
 import com.anitail.music.utils.Updater
 import com.anitail.music.utils.dataStore
@@ -235,6 +237,30 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    /**
+     * Request storage permissions at startup if not already granted.
+     * Required for MediaStore downloads to Music/Anitail folder.
+     */
+    private fun requestStoragePermissionsIfNeeded() {
+        // Check if permissions are already granted
+        if (PermissionHelper.hasMediaStoreWritePermission(this)) {
+            Timber.d("Storage permissions already granted")
+            return
+        }
+
+        // Get required permissions for current Android version
+        val permissions = PermissionHelper.getRequiredWritePermissions()
+        if (permissions.isEmpty()) {
+            // Android 10+ with no permissions needed (shouldn't happen with our fixed code)
+            Timber.d("No storage permissions required")
+            return
+        }
+
+        // Request permissions
+        Timber.d("Requesting storage permissions at startup: ${permissions.joinToString()}")
+        ActivityCompat.requestPermissions(this, permissions, 2000)
+    }
+
     override fun onStart() {
         super.onStart()
         startService(Intent(this, MusicService::class.java))
@@ -283,6 +309,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         window.decorView.layoutDirection = View.LAYOUT_DIRECTION_LTR
         WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        // Request storage permissions at startup for MediaStore downloads
+        requestStoragePermissionsIfNeeded()
 
         lifecycleScope.launch {
             dataStore.data

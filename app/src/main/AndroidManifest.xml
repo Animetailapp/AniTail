@@ -202,6 +202,10 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </service>
+    <service
+        android:name=".playback.MediaStoreDownloadService"
+        android:exported="false"
+        android:foregroundServiceType="dataSync" />
         <receiver
             android:name="androidx.media3.session.MediaButtonReceiver"
             android:exported="true">
