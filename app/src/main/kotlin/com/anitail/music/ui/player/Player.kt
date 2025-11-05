@@ -36,18 +36,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -56,6 +55,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -81,7 +81,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.DialogProperties
 import androidx.core.graphics.drawable.toBitmap
 import androidx.media3.common.C
 import androidx.media3.common.Player
@@ -93,6 +92,8 @@ import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.size.Size
+import com.anitail.innertube.YouTube
+import com.anitail.music.LocalDatabase
 import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.constants.DarkModeKey
@@ -110,6 +111,7 @@ import com.anitail.music.constants.UseNewPlayerDesignKey
 import com.anitail.music.extensions.togglePlayPause
 import com.anitail.music.extensions.toggleRepeatMode
 import com.anitail.music.models.MediaMetadata
+import com.anitail.music.ui.component.ActionPromptDialog
 import com.anitail.music.ui.component.BottomSheet
 import com.anitail.music.ui.component.BottomSheetState
 import com.anitail.music.ui.component.LocalBottomSheetPageState
@@ -117,6 +119,7 @@ import com.anitail.music.ui.component.LocalMenuState
 import com.anitail.music.ui.component.PlayerSliderTrack
 import com.anitail.music.ui.component.ResizableIconButton
 import com.anitail.music.ui.component.rememberBottomSheetState
+import com.anitail.music.ui.menu.AddToPlaylistDialog
 import com.anitail.music.ui.menu.PlayerMenu
 import com.anitail.music.ui.screens.settings.DarkMode
 import com.anitail.music.ui.utils.ShowMediaInfo
@@ -127,6 +130,7 @@ import com.anitail.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.saket.squiggles.SquigglySlider
 import kotlin.math.roundToInt
@@ -145,6 +149,8 @@ fun BottomSheetPlayer(
     val bottomSheetPageState = LocalBottomSheetPageState.current
 
     val playerConnection = LocalPlayerConnection.current ?: return
+    val coroutineScope = rememberCoroutineScope()
+    val database = LocalDatabase.current
     val (useNewPlayerDesign, _) = rememberPreference(
         UseNewPlayerDesignKey,
         defaultValue = true
@@ -165,6 +171,11 @@ fun BottomSheetPlayer(
         key = PlayerButtonsStyleKey,
         defaultValue = PlayerButtonsStyle.DEFAULT
     )
+
+    val textBackgroundColor = when (playerBackground) {
+        PlayerBackgroundStyle.DEFAULT -> MaterialTheme.colorScheme.onBackground
+        PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT -> Color.White
+    }
 
     val isSystemInDarkTheme = isSystemInDarkTheme()
     val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
@@ -220,6 +231,7 @@ fun BottomSheetPlayer(
     var showLyrics by rememberPreference(ShowLyricsKey, defaultValue = false)
 
     val sliderStyle by rememberEnumPreference(SliderStyleKey, SliderStyle.DEFAULT)
+    val shuffleModeEnabled by playerConnection.shuffleModeEnabled.collectAsState()
 
     var position by rememberSaveable(playbackState) {
         mutableLongStateOf(playerConnection.player.currentPosition)
@@ -360,68 +372,69 @@ fun BottomSheetPlayer(
         )
     }
 
-    val sleepTimerEnabled =
-        remember(
-            playerConnection.service.sleepTimer.triggerTime,
-            playerConnection.service.sleepTimer.pauseWhenSongEnd
-        ) {
-            playerConnection.service.sleepTimer.isActive
-        }
-
-    var sleepTimerTimeLeft by remember {
-        mutableLongStateOf(0L)
+    var showChoosePlaylistDialog by rememberSaveable {
+        mutableStateOf(false)
+    }
+    if (showChoosePlaylistDialog) {
+        AddToPlaylistDialog(
+            isVisible = true,
+            onGetSong = { playlist ->
+                mediaMetadata?.let { metadata ->
+                    database.transaction { insert(metadata) }
+                    coroutineScope.launch(Dispatchers.IO) {
+                        playlist.playlist.browseId?.let {
+                            YouTube.addToPlaylist(it, metadata.id)
+                        }
+                    }
+                    listOf(metadata.id)
+                } ?: emptyList()
+            },
+            onDismiss = { showChoosePlaylistDialog = false }
+        )
     }
 
-    LaunchedEffect(sleepTimerEnabled) {
-        if (sleepTimerEnabled) {
+    LaunchedEffect(playbackState) {
+        if (playbackState == STATE_READY) {
             while (isActive) {
-                sleepTimerTimeLeft =
-                    if (playerConnection.service.sleepTimer.pauseWhenSongEnd) {
-                        playerConnection.player.duration - playerConnection.player.currentPosition
-                    } else {
-                        playerConnection.service.sleepTimer.triggerTime - System.currentTimeMillis()
-                    }
-                delay(1000L)
+                delay(500)
+                position = playerConnection.player.currentPosition
+                duration = playerConnection.player.duration
             }
         }
     }
 
-    var showSleepTimerDialog by remember {
-        mutableStateOf(false)
-    }
 
-    var sleepTimerValue by remember {
-        mutableFloatStateOf(30f)
-    }
+    state.progress.coerceIn(0f, 1f)
+
+    var showSleepTimerDialog by rememberSaveable { mutableStateOf(false) }
+    var sleepTimerValue by remember { mutableFloatStateOf(30f) }
     if (showSleepTimerDialog) {
-        AlertDialog(
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-            onDismissRequest = { showSleepTimerDialog = false },
-            icon = {
-                Icon(
-                    painter = painterResource(R.drawable.bedtime),
-                    contentDescription = null
-                )
-            },
-            title = { Text(stringResource(R.string.sleep_timer)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showSleepTimerDialog = false
-                        playerConnection.service.sleepTimer.start(sleepTimerValue.roundToInt())
-                    },
+        ActionPromptDialog(
+            titleBar = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Text(stringResource(android.R.string.ok))
+                    Text(
+                        text = stringResource(R.string.sleep_timer),
+                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 1,
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
                 }
             },
-            dismissButton = {
-                TextButton(
-                    onClick = { showSleepTimerDialog = false },
-                ) {
-                    Text(stringResource(android.R.string.cancel))
-                }
+            onDismiss = { showSleepTimerDialog = false },
+            onConfirm = {
+                showSleepTimerDialog = false
+                playerConnection.service.sleepTimer.start(sleepTimerValue.roundToInt())
             },
-            text = {
+            onCancel = {
+                showSleepTimerDialog = false
+            },
+            onReset = {
+                sleepTimerValue = 30f // Default value
+            },
+            content = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = pluralStringResource(
@@ -432,18 +445,21 @@ fun BottomSheetPlayer(
                         style = MaterialTheme.typography.bodyLarge,
                     )
 
+                    Spacer(Modifier.height(16.dp))
+
                     Slider(
                         value = sleepTimerValue,
                         onValueChange = { sleepTimerValue = it },
                         valueRange = 5f..120f,
                         steps = (120 - 5) / 5 - 1,
+                        modifier = Modifier.fillMaxWidth()
                     )
-
+                    Spacer(Modifier.height(8.dp))
                     OutlinedButton(
                         onClick = {
                             showSleepTimerDialog = false
                             playerConnection.service.sleepTimer.start(-1)
-                        },
+                        }
                     ) {
                         Text(stringResource(R.string.end_of_song))
                     }
@@ -641,14 +657,14 @@ fun BottomSheetPlayer(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 if (useNewPlayerDesign) {
-                    val shareShape = RoundedCornerShape(
-                        topStart = 50.dp, bottomStart = 50.dp,
-                        topEnd = 10.dp, bottomEnd = 10.dp
+                    val addToPlaylistShape = RoundedCornerShape(
+                        topStart = 5.dp, bottomStart = 5.dp,
+                        topEnd = 50.dp, bottomEnd = 50.dp
                     )
 
                     val favShape = RoundedCornerShape(
-                        topStart = 10.dp, bottomStart = 10.dp,
-                        topEnd = 50.dp, bottomEnd = 50.dp
+                        topStart = 50.dp, bottomStart = 50.dp,
+                        topEnd = 5.dp, bottomEnd = 5.dp
                     )
 
                     Row(
@@ -658,7 +674,7 @@ fun BottomSheetPlayer(
                         Box(
                             modifier = Modifier
                                 .size(42.dp)
-                                .clip(shareShape)
+                                .clip(favShape)
                                 .background(textButtonColor)
                                 .clickable {
                                     menuState.show {
@@ -674,6 +690,9 @@ fun BottomSheetPlayer(
                                                 }
                                             },
                                             onDismiss = menuState::dismiss,
+                                            onShowSleepTimerDialog = {
+                                                showSleepTimerDialog = true
+                                            },
                                         )
                                     }
                                 }
@@ -691,18 +710,14 @@ fun BottomSheetPlayer(
                         Box(
                             modifier = Modifier
                                 .size(42.dp)
-                                .clip(favShape)
+                                .clip(addToPlaylistShape)
                                 .background(textButtonColor)
                                 .clickable {
-                                    playerConnection.toggleLike()
+                                    showChoosePlaylistDialog = true
                                 }
                         ) {
                             Image(
-                                painter = painterResource(
-                                    if (currentSong?.song?.liked == true)
-                                        R.drawable.favorite
-                                    else R.drawable.favorite_border
-                                ),
+                                painter = painterResource(R.drawable.playlist_add),
                                 contentDescription = null,
                                 colorFilter = ColorFilter.tint(iconButtonColor),
                                 modifier = Modifier
@@ -765,6 +780,9 @@ fun BottomSheetPlayer(
                                                 }
                                             },
                                             onDismiss = menuState::dismiss,
+                                            onShowSleepTimerDialog = {
+                                                showSleepTimerDialog = true
+                                            },
                                         )
                                     }
                                 },
@@ -909,8 +927,8 @@ fun BottomSheetPlayer(
                 ) {
                     val maxW = maxWidth
                     val playButtonHeight = maxW / 6f
-                    val playButtonWidth = playButtonHeight * 1.6f
-                    val sideButtonHeight = playButtonHeight * 0.8f
+                    val playButtonWidth = playButtonHeight * 1.1f
+                    val sideButtonHeight = playButtonHeight * 0.7f
                     val sideButtonWidth = sideButtonHeight * 1.3f
 
                     Row(
@@ -918,6 +936,29 @@ fun BottomSheetPlayer(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
+
+                        IconButton(
+                            onClick = { playerConnection.player.toggleRepeatMode() },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(
+                                    when (repeatMode) {
+                                        Player.REPEAT_MODE_OFF, Player.REPEAT_MODE_ALL -> R.drawable.repeat
+                                        Player.REPEAT_MODE_ONE -> R.drawable.repeat_one
+                                        else -> R.drawable.repeat
+                                    }
+                                ),
+                                contentDescription = "Repeat",
+                                tint = if (repeatMode == Player.REPEAT_MODE_OFF) textBackgroundColor.copy(
+                                    alpha = 0.4f
+                                )
+                                else textBackgroundColor,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(16.dp))
 
                         FilledTonalIconButton(
                             onClick = playerConnection::seekToPrevious,
@@ -986,6 +1027,25 @@ fun BottomSheetPlayer(
                                 painter = painterResource(R.drawable.skip_next),
                                 contentDescription = null,
                                 modifier = Modifier.size(32.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        IconButton(
+                            onClick = {
+                                playerConnection.player.shuffleModeEnabled =
+                                    !playerConnection.player.shuffleModeEnabled
+                            },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.shuffle),
+                                contentDescription = "shuffle",
+                                tint = if (shuffleModeEnabled) textBackgroundColor else textBackgroundColor.copy(
+                                    alpha = 0.4f
+                                ),
+                                modifier = Modifier.size(24.dp),
                             )
                         }
                     }
@@ -1314,6 +1374,7 @@ fun BottomSheetPlayer(
             textButtonColor = textButtonColor,
             iconButtonColor = iconButtonColor,
             pureBlack = pureBlack,
+            onShowSleepTimerDialog = { showSleepTimerDialog = true },
         )
     }
 }
