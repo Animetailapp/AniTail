@@ -2,6 +2,7 @@ package com.anitail.music.ui.screens.settings
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.text.format.DateUtils
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -64,6 +65,7 @@ import com.anitail.music.constants.DiscordTokenKey
 import com.anitail.music.constants.DiscordUsernameKey
 import com.anitail.music.constants.EnableDiscordRPCKey
 import com.anitail.music.db.entities.Song
+import com.anitail.music.playback.DiscordGatewayStatus
 import com.anitail.music.ui.component.IconButton
 import com.anitail.music.ui.component.PreferenceEntry
 import com.anitail.music.ui.component.PreferenceGroupTitle
@@ -83,6 +85,7 @@ fun DiscordSettings(
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val song by playerConnection.currentSong.collectAsState(null)
+    val discordPresence by playerConnection.service.discordPresence.collectAsState()
 
     val coroutineScope = rememberCoroutineScope()
 
@@ -113,6 +116,42 @@ fun DiscordSettings(
         remember(discordToken) {
             discordToken != ""
         }
+
+    val statusLabel = when {
+        discordPresence.status == DiscordGatewayStatus.CONNECTED && song == null ->
+            stringResource(R.string.discord_status_idle)
+
+        else ->
+            when (discordPresence.status) {
+                DiscordGatewayStatus.DISABLED -> stringResource(R.string.discord_status_disabled)
+                DiscordGatewayStatus.IDLE -> stringResource(R.string.discord_status_idle)
+                DiscordGatewayStatus.CONNECTING -> stringResource(R.string.discord_status_connecting)
+                DiscordGatewayStatus.CONNECTED -> stringResource(R.string.discord_status_connected)
+                DiscordGatewayStatus.RECONNECTING -> stringResource(R.string.discord_status_reconnecting)
+                DiscordGatewayStatus.ERROR -> stringResource(R.string.discord_status_error)
+            }
+    }
+    val lastSyncLabel =
+        discordPresence.lastSyncedAtEpochMillis?.let {
+            DateUtils
+                .getRelativeTimeSpanString(
+                    it,
+                    System.currentTimeMillis(),
+                    DateUtils.MINUTE_IN_MILLIS,
+                    DateUtils.FORMAT_ABBREV_RELATIVE,
+                )
+                .toString()
+        } ?: stringResource(R.string.discord_last_sync_never)
+    val refreshLabel =
+        if (discordPresence.manualRefreshInFlight) {
+            stringResource(R.string.discord_manual_refreshing)
+        } else {
+            stringResource(R.string.discord_manual_refresh)
+        }
+    val errorMessage = discordPresence.lastErrorMessage
+    val manualRefreshEnabled =
+        !discordPresence.manualRefreshInFlight &&
+                discordPresence.status != DiscordGatewayStatus.DISABLED
 
     Column(
         Modifier
@@ -213,6 +252,54 @@ fun DiscordSettings(
             onCheckedChange = onDiscordRPCChange,
             isEnabled = isLoggedIn,
         )
+
+        if (isLoggedIn) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    if (discordPresence.manualRefreshInFlight) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                        )
+                    }
+
+                    StatusRow(
+                        label = stringResource(R.string.discord_connection_state),
+                        value = statusLabel,
+                    )
+                    StatusRow(
+                        label = stringResource(R.string.discord_last_sync),
+                        value = lastSyncLabel,
+                    )
+
+                    if (!errorMessage.isNullOrBlank()) {
+                        Text(
+                            text = stringResource(R.string.discord_error_format, errorMessage),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = { playerConnection.service.requestDiscordPresenceRefresh() },
+                        enabled = manualRefreshEnabled,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(refreshLabel)
+                    }
+                }
+            }
+        }
 
         PreferenceGroupTitle(
             title = stringResource(R.string.preview),
@@ -442,4 +529,28 @@ fun formatTime(milliseconds: Long): String {
     val minutes = TimeUnit.MILLISECONDS.toMinutes(milliseconds)
     val seconds = TimeUnit.MILLISECONDS.toSeconds(milliseconds) % 60
     return String.format("%02d:%02d", minutes, seconds)
+}
+
+@Composable
+private fun StatusRow(
+    label: String,
+    value: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.secondary,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.End,
+        )
+    }
 }
