@@ -61,6 +61,7 @@ import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.music.MainActivity
 import com.anitail.music.R
+import com.anitail.music.cast.UniversalCastManager
 import com.anitail.music.constants.AudioNormalizationKey
 import com.anitail.music.constants.AudioOffload
 import com.anitail.music.constants.AudioQualityKey
@@ -232,7 +233,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   @Inject @DownloadCache lateinit var downloadCache: SimpleCache
 
   lateinit var player: ExoPlayer
-    private var castPlayer: CastPlayer? = null
+  private var castPlayer: CastPlayer? = null
+  private var universalCastManager: UniversalCastManager? = null
   private lateinit var mediaSession: MediaLibrarySession
 
   private var isAudioEffectSessionOpened = false
@@ -331,6 +333,27 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     val sessionToken = SessionToken(this, ComponentName(this, MusicService::class.java))
     val controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
     controllerFuture.addListener({ controllerFuture.get() }, MoreExecutors.directExecutor())
+
+    // Initialize Universal Cast Manager for both Cast and DLNA support
+    universalCastManager = UniversalCastManager(
+        context = this,
+        onCastSessionStarted = { castCurrentToDevice() },
+        onDlnaSessionStarted = { handleDlnaSessionStart() },
+        onAirPlaySessionStarted = { handleAirPlaySessionStart() },
+        onAirPlayAuthRequired = {
+            scope.launch(Dispatchers.Main) {
+                try {
+                    android.widget.Toast.makeText(
+                        this@MusicService,
+                        "Este dispositivo AirPlay requiere autenticación o emparejamiento. Revisa los ajustes de AirPlay/HomeKit (Permitir acceso: Todos / Desactivar verificación de dispositivo) o introduce la contraseña si aplica.",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                } catch (_: Exception) {
+                }
+            }
+        }
+    )
+    universalCastManager?.start()
 
         connectivityObserver = NetworkConnectivity(this)
 
@@ -1772,6 +1795,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   override fun onDestroy() {
       try {
           castPlayer?.release()
+          universalCastManager?.stop()
       } catch (_: Exception) {
       }
     stopPeriodicWidgetUpdates()
@@ -2114,6 +2138,102 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             // Cast log eliminado
         }
     }
+
+    /** Handle DLNA session start */
+    private fun handleDlnaSessionStart() {
+        try {
+            scope.launch(Dispatchers.IO) {
+                val currentSong = currentSong.value
+                val artistName = currentSong?.song?.artistName ?: ""
+                if (currentSong != null && universalCastManager != null) {
+                    val streamInfo = getStreamInfo(currentSong.id)
+                    if (streamInfo != null) {
+                        universalCastManager?.playMedia(
+                            mediaUrl = streamInfo.url,
+                            title = currentSong.song.title,
+                            artist = artistName,
+                            albumArt = currentSong.song.thumbnailUrl,
+                            mimeType = streamInfo.mimeType
+                        )
+                        Timber.d("Started DLNA playback for: ${'$'}{currentSong.song.title}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error starting DLNA playback")
+        }
+    }
+
+    /** Handle AirPlay session start */
+    private fun handleAirPlaySessionStart() {
+        try {
+            scope.launch(Dispatchers.IO) {
+                val currentSong = currentSong.value
+                val artistName = currentSong?.song?.artistName ?: ""
+                if (currentSong != null && universalCastManager != null) {
+                    // Preferir formatos compatibles con AirPlay (AAC/HLS/MP3)
+                    val airPlayMimePrefs = setOf(
+                        "audio/mp4", // m4a/aac
+                        "audio/aac",
+                        "application/vnd.apple.mpegurl", // HLS
+                        "application/mpegurl",
+                        "application/x-mpegurl",
+                        "audio/mpeg" // mp3
+                    )
+                    val streamInfo = getStreamInfo(currentSong.id)
+                    if (streamInfo != null) {
+                        val mimeLower = streamInfo.mimeType.lowercase()
+                        if (!airPlayMimePrefs.contains(mimeLower)) {
+                            Timber.w("AirPlay may not support MIME: $mimeLower, attempting anyway")
+                        }
+                        universalCastManager?.playMedia(
+                            mediaUrl = streamInfo.url,
+                            title = currentSong.song.title,
+                            artist = artistName,
+                            albumArt = currentSong.song.thumbnailUrl,
+                            mimeType = streamInfo.mimeType
+                        )
+                        Timber.d("Started AirPlay playback for: ${currentSong.song.title} (${streamInfo.mimeType})")
+                    } else {
+                        Timber.e("AirPlay streamInfo is null - no stream found")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error starting AirPlay playback")
+        }
+    }
+
+    /** Cast current media to DLNA device */
+    fun castCurrentToDlnaDevice() {
+        try {
+            val dlnaManager = universalCastManager?.getDlnaManager()
+            if (dlnaManager?.isConnected?.value == true) {
+                handleDlnaSessionStart()
+            } else {
+                Timber.w("No DLNA device connected")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error casting to DLNA device")
+        }
+    }
+
+    /** Cast current media to AirPlay device */
+    fun castCurrentToAirPlayDevice() {
+        try {
+            val airPlayManager = universalCastManager?.getAirPlayManager()
+            if (airPlayManager?.isConnected?.value == true) {
+                handleAirPlaySessionStart()
+            } else {
+                Timber.w("No AirPlay device connected")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error casting to AirPlay device")
+        }
+    }
+
+    /** Get universal cast manager for UI components */
+    fun getUniversalCastManager(): UniversalCastManager? = universalCastManager
 
   /** Starts periodic widget updates to show song progress */
   private fun startPeriodicWidgetUpdates() {

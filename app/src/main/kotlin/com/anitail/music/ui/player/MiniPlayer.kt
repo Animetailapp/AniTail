@@ -357,8 +357,8 @@ private fun NewMiniPlayer(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Botón Cast
-                com.anitail.music.ui.component.CastMiniPlayerButton(
+                // Botón Cast con soporte DLNA
+                com.anitail.music.ui.component.UniversalCastMiniPlayerButton(
                     pureBlack = pureBlack,
                     modifier = Modifier
                 )
