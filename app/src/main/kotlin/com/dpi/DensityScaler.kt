@@ -1,6 +1,7 @@
 package com.dpi
 
 import android.content.Context
+import timber.log.Timber
 
 /**
  * DensityScaler - Main entry point for screen density scaling.
@@ -37,11 +38,7 @@ class DensityScaler : BaseLifecycleContentProvider() {
                 val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 prefs.getFloat(KEY_DENSITY_SCALE, DEFAULT_SCALE_FACTOR)
             } catch (e: Exception) {
-                android.util.Log.w(
-                    "DensityScaler",
-                    "Failed to read scale factor from preferences",
-                    e
-                )
+                Timber.tag("DensityScaler").w(e, "Failed to read scale factor from preferences")
                 DEFAULT_SCALE_FACTOR
             }
         }
