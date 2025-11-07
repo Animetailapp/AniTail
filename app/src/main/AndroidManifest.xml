@@ -50,7 +50,13 @@
                 tools:node="remove" />
         </provider>
 
-        <activity
+    <provider
+        android:name="com.dpi.DensityScaler"
+        android:authorities="${applicationId}.com.dpi.DensityScaler"
+        android:enabled="true"
+        android:exported="false" />
+
+    <activity
             android:name=".installer.UpdateInstallerActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
