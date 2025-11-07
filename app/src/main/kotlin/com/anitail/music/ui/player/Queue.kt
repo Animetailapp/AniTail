@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -68,11 +69,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -130,7 +130,7 @@ fun Queue(
 ) {
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    LocalClipboardManager.current
+    LocalClipboard.current
     val menuState = LocalMenuState.current
     val bottomSheetPageState = LocalBottomSheetPageState.current
 
@@ -187,15 +187,17 @@ fun Queue(
 
     BottomSheet(
         state = state,
-        brushBackgroundColor = Brush.verticalGradient(
-            listOf(Color.Unspecified, Color.Unspecified),
-        ),
+        background = {
+            Box(Modifier
+                .fillMaxSize()
+                .background(Color.Unspecified))
+        },
         modifier = modifier,
         collapsedContent = {
             if (useNewPlayerDesign) {
                 // New design
                 Row(
-                    horizontalArrangement = Arrangement.Center,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -210,10 +212,6 @@ fun Queue(
                     val iconSize = 24.dp
                     val borderColor = TextBackgroundColor.copy(alpha = 0.35f)
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
                         Box(
                             modifier = Modifier
                                 .size(buttonSize)
@@ -221,8 +219,8 @@ fun Queue(
                                     RoundedCornerShape(
                                         topStart = 50.dp,
                                         bottomStart = 50.dp,
-                                        topEnd = 10.dp,
-                                        bottomEnd = 10.dp
+                                        topEnd = 5.dp,
+                                        bottomEnd = 5.dp
                                     )
                                 )
                                 .border(
@@ -231,8 +229,8 @@ fun Queue(
                                     RoundedCornerShape(
                                         topStart = 50.dp,
                                         bottomStart = 50.dp,
-                                        topEnd = 10.dp,
-                                        bottomEnd = 10.dp
+                                        topEnd = 5.dp,
+                                        bottomEnd = 5.dp
                                     )
                                 )
                                 .clickable {
@@ -309,6 +307,40 @@ fun Queue(
                                 tint = TextBackgroundColor
                             )
                         }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    Box(
+                        modifier = Modifier
+                            .size(buttonSize)
+                            .clip(CircleShape)
+                            .background(textButtonColor)
+                            .clickable {
+                                menuState.show {
+                                    PlayerMenu(
+                                        mediaMetadata = mediaMetadata,
+                                        navController = navController,
+                                        playerBottomSheetState = playerBottomSheetState,
+                                        onShowDetailsDialog = {
+                                            mediaMetadata?.id?.let {
+                                                bottomSheetPageState.show {
+                                                    ShowMediaInfo(it)
+                                                }
+                                            }
+                                        },
+                                        onDismiss = menuState::dismiss,
+                                        onShowSleepTimerDialog = onShowSleepTimerDialog,
+                                    )
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.more_vert),
+                            contentDescription = null,
+                            modifier = Modifier.size(iconSize),
+                            tint = iconButtonColor
+                        )
                     }
                 }
             } else {

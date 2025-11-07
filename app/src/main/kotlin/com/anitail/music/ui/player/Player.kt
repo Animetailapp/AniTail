@@ -196,7 +196,7 @@ fun BottomSheetPlayer(
                 if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON
             useDarkTheme && pureBlack
         }
-    val backgroundColor = if (useNewMiniPlayerDesign) {
+    if (useNewMiniPlayerDesign) {
         if (useBlackBackground && state.value > state.collapsedBound) {
             // Make background transparent when collapsed, gradually show when pulled up (same as normal mode)
             val progress =
@@ -346,7 +346,7 @@ fun BottomSheetPlayer(
         }
     }
 
-    val changeBound = state.expandedBound / 3
+    state.expandedBound / 3
 
     val TextBackgroundColor =
         when (playerBackground) {
@@ -491,72 +491,95 @@ fun BottomSheetPlayer(
             expandedBound = state.expandedBound,
         )
 
+    val bottomSheetBackgroundColor = when (playerBackground) {
+        PlayerBackgroundStyle.BLUR, PlayerBackgroundStyle.GRADIENT ->
+            MaterialTheme.colorScheme.surfaceContainer
+
+        else ->
+            if (useBlackBackground) Color.Black
+            else MaterialTheme.colorScheme.surfaceContainer
+    }
+
+    val backgroundAlpha = state.progress.coerceIn(0f, 1f)
+
     BottomSheet(
         state = state,
         modifier = modifier,
-        brushBackgroundColor = if (useNewMiniPlayerDesign) {
-            // New design with transparency effects
-            if (useBlackBackground) {
-                Brush.verticalGradient(
-                    colors = listOf(
-                        backgroundColor,
-                        backgroundColor,
-                    )
-                )
-            } else {
-                // Calculate transparency progress (new design)
-                val progress =
-                    ((state.value - state.collapsedBound) / (state.expandedBound - state.collapsedBound))
-                        .coerceIn(0f, 1f)
-
-                if (state.value > changeBound) {
-                    Brush.verticalGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.surfaceContainer.copy(alpha = progress),
-                            backgroundColor
-                        )
-                    )
-                } else if (gradientColors.size >= 2 && state.value > changeBound) {
-                    // Apply transparency to gradient colors
-                    val transparentGradientColors = gradientColors.map { color ->
-                        color.copy(alpha = color.alpha * progress)
+        background = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(bottomSheetBackgroundColor)
+            ) {
+                when (playerBackground) {
+                    PlayerBackgroundStyle.BLUR -> {
+                        AnimatedContent(
+                            targetState = mediaMetadata?.thumbnailUrl,
+                            transitionSpec = {
+                                fadeIn(tween(800)).togetherWith(fadeOut(tween(800)))
+                            },
+                            label = "blurBackground"
+                        ) { thumbnailUrl ->
+                            if (thumbnailUrl != null) {
+                                Box(modifier = Modifier.alpha(backgroundAlpha)) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(context)
+                                            .data(thumbnailUrl)
+                                            .size(100, 100)
+                                            .allowHardware(false)
+                                            .build(),
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .blur(if (useDarkTheme) 150.dp else 100.dp)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Black.copy(alpha = 0.3f))
+                                    )
+                                }
+                            }
+                        }
                     }
-                    Brush.verticalGradient(transparentGradientColors)
-                } else {
-                    Brush.verticalGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.surfaceContainer.copy(alpha = progress),
-                            MaterialTheme.colorScheme.surfaceContainer.copy(alpha = progress),
-                        )
-                    )
-                }
-            }
-        } else {
-            // Original gradient behavior (exactly as main branch)
-            if (useBlackBackground) {
-                Brush.verticalGradient(
-                    colors = listOf(
-                        backgroundColor,
-                        backgroundColor,
-                    )
-                )
-            } else {
-                if (state.value > changeBound) {
-                    Brush.verticalGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.surfaceContainer,
-                            backgroundColor
-                        )
-                    )
-                } else if (gradientColors.size >= 2 && state.value > changeBound) {
-                    Brush.verticalGradient(gradientColors)
-                } else {
-                    Brush.verticalGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.surfaceContainer,
-                            MaterialTheme.colorScheme.surfaceContainer,
-                        )
-                    )
+
+                    PlayerBackgroundStyle.GRADIENT -> {
+                        AnimatedContent(
+                            targetState = gradientColors,
+                            transitionSpec = {
+                                fadeIn(tween(800)).togetherWith(fadeOut(tween(800)))
+                            },
+                            label = "gradientBackground"
+                        ) { colors ->
+                            if (colors.isNotEmpty()) {
+                                val gradientColorStops = if (colors.size >= 3) {
+                                    arrayOf(
+                                        0.0f to colors[0],
+                                        0.5f to colors[1],
+                                        1.0f to colors[2]
+                                    )
+                                } else {
+                                    arrayOf(
+                                        0.0f to colors[0],
+                                        0.6f to colors[0].copy(alpha = 0.7f),
+                                        1.0f to Color.Black
+                                    )
+                                }
+                                Box(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .alpha(backgroundAlpha)
+                                        .background(Brush.verticalGradient(colorStops = gradientColorStops))
+                                        .background(Color.Black.copy(alpha = 0.2f))
+                                )
+                            }
+                        }
+                    }
+
+                    else -> {
+                        PlayerBackgroundStyle.DEFAULT
+                    }
                 }
             }
         },
@@ -677,28 +700,15 @@ fun BottomSheetPlayer(
                                 .clip(favShape)
                                 .background(textButtonColor)
                                 .clickable {
-                                    menuState.show {
-                                        PlayerMenu(
-                                            mediaMetadata = mediaMetadata,
-                                            navController = navController,
-                                            playerBottomSheetState = state,
-                                            onShowDetailsDialog = {
-                                                mediaMetadata.id.let {
-                                                    bottomSheetPageState.show {
-                                                        ShowMediaInfo(it)
-                                                    }
-                                                }
-                                            },
-                                            onDismiss = menuState::dismiss,
-                                            onShowSleepTimerDialog = {
-                                                showSleepTimerDialog = true
-                                            },
-                                        )
-                                    }
+                                    playerConnection.toggleLike()
                                 }
                         ) {
                             Image(
-                                painter = painterResource(R.drawable.more_vert),
+                                painter = painterResource(
+                                    if (currentSong?.song?.liked == true)
+                                        R.drawable.favorite
+                                    else R.drawable.favorite_border
+                                ),
                                 contentDescription = null,
                                 colorFilter = ColorFilter.tint(iconButtonColor),
                                 modifier = Modifier
@@ -1308,35 +1318,6 @@ fun BottomSheetPlayer(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.basicMarquee()
                             )
-                        }
-                        if (useNewPlayerDesign) {
-                            // Share button on the right
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(textButtonColor.copy(alpha = 0.8f))
-                                    .clickable {
-                                        val intent = Intent().apply {
-                                            action = Intent.ACTION_SEND
-                                            type = "text/plain"
-                                            putExtra(
-                                                Intent.EXTRA_TEXT,
-                                                "https://music.youtube.com/watch?v=${mediaMetadata?.id}"
-                                            )
-                                        }
-                                        context.startActivity(Intent.createChooser(intent, null))
-                                    }
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.share),
-                                    contentDescription = "Share",
-                                    tint = iconButtonColor,
-                                    modifier = Modifier
-                                        .align(Alignment.Center)
-                                        .size(22.dp)
-                                )
-                            }
                         }
                     }
                     
