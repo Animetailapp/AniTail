@@ -48,13 +48,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.net.toUri
 import androidx.media3.exoplayer.offline.Download.STATE_COMPLETED
 import androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING
 import androidx.media3.exoplayer.offline.Download.STATE_QUEUED
 import androidx.media3.exoplayer.offline.Download.STATE_STOPPED
-import androidx.media3.exoplayer.offline.DownloadRequest
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.anitail.innertube.YouTube
@@ -67,7 +64,6 @@ import com.anitail.music.constants.ListThumbnailSize
 import com.anitail.music.db.entities.Album
 import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
-import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.MediaStoreDownloadManager
 import com.anitail.music.ui.component.AlbumListItem
 import com.anitail.music.ui.component.ListDialog
@@ -350,84 +346,6 @@ fun AlbumMenu(
             )
         }
         item {
-            when (downloadState) {
-                STATE_COMPLETED -> {
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                text = stringResource(R.string.remove_download),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        },
-                        leadingContent = {
-                            Icon(
-                                painter = painterResource(R.drawable.offline),
-                                contentDescription = null,
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            songs.forEach { song ->
-                                DownloadService.sendRemoveDownload(
-                                    context,
-                                    ExoDownloadService::class.java,
-                                    song.id,
-                                    false,
-                                )
-                            }
-                        }
-                    )
-                }
-                STATE_QUEUED, STATE_DOWNLOADING -> {
-                    ListItem(
-                        headlineContent = { Text(text = stringResource(R.string.downloading)) },
-                        leadingContent = {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            songs.forEach { song ->
-                                DownloadService.sendRemoveDownload(
-                                    context,
-                                    ExoDownloadService::class.java,
-                                    song.id,
-                                    false,
-                                )
-                            }
-                        }
-                    )
-                }
-                else -> {
-                    ListItem(
-                        headlineContent = { Text(text = stringResource(R.string.download)) },
-                        leadingContent = {
-                            Icon(
-                                painter = painterResource(R.drawable.download),
-                                contentDescription = null,
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            songs.forEach { song ->
-                                val downloadRequest =
-                                    DownloadRequest
-                                        .Builder(song.id, song.id.toUri())
-                                        .setCustomCacheKey(song.id)
-                                        .setData(song.song.title.toByteArray())
-                                        .build()
-                                DownloadService.sendAddDownload(
-                                    context,
-                                    ExoDownloadService::class.java,
-                                    downloadRequest,
-                                    false,
-                                )
-                            }
-                        }
-                    )
-                }
-            }
-        }
-        item {
             when (mediaStoreDownloadState) {
                 is AlbumMediaStoreDownloadStatus.Completed -> {
                     ListItem(
@@ -504,7 +422,7 @@ fun AlbumMenu(
 
                 AlbumMediaStoreDownloadStatus.NotDownloaded -> {
                     ListItem(
-                        headlineContent = { Text(text = stringResource(R.string.download_to_device)) },
+                        headlineContent = { Text(text = stringResource(R.string.download)) },
                         leadingContent = {
                             Icon(
                                 painter = painterResource(R.drawable.download),

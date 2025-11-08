@@ -18,7 +18,6 @@
     <string name="mood_and_genres">Stemmingen en genres</string>
     <string name="account">Account</string>
     <string name="quick_picks">Snelle keuzes</string>
-    <string name="quick_picks_empty">Beluister een aantal nummers om je snelle keuzes te genereren</string>
     <string name="new_release_albums">Nieuwe albums</string>
 
     <!-- History -->
@@ -29,8 +28,6 @@
 
     <!-- Stats -->
     <string name="most_played_songs">Meest afgespeelde nummers</string>
-    <string name="most_played_artists">Meest afgespeelde artiesten</string>
-    <string name="most_played_albums">Meest afgespeelde artiesten</string>
 
     <!-- Search -->
     <string name="search">Zoeken</string>
@@ -47,11 +44,9 @@
     <string name="filter_playlists">Afspeellijsten</string>
     <string name="filter_community_playlists">Afspeellijsten van de community</string>
     <string name="filter_featured_playlists">Voorgestelde afspeellijsten</string>
-    <string name="filter_bookmarked">Gebookmarked</string>
     <string name="no_results_found">Geen resultaten gevonden</string>
 
     <!-- Artist screen -->
-    <string name="from_your_library">Verwijderen van bibliotheek</string>
 
     <!-- Playlist -->
     <string name="liked_songs">Favoriete nummers</string>
@@ -59,7 +54,6 @@
     <string name="playlist_is_empty">Afspeellijst is leeg</string>
 
     <!-- Button -->
-    <string name="retry">Opnieuw</string>
     <string name="radio">Radio</string>
     <string name="shuffle">Shuffle</string>
     <string name="reset">Reset</string>
@@ -85,7 +79,6 @@
     <string name="delete">Verwijderen</string>
     <string name="remove_from_history">Verwijder uit geschiedenis</string>
     <string name="search_online">Zoek online</string>
-    <string name="sync">Synchroniseer</string>
     <string name="advanced">Geavanceerd</string>
 
     <!-- Sort menu -->
@@ -110,25 +103,18 @@
     <string name="unknown">Onbekend</string>
     <string name="copied">Gekopieerd naar klembord</string>
 
-    <string name="edit_lyrics">Bewerk songtekst</string>
     <string name="search_lyrics">Zoek naar songtekst</string>
 
     <string name="edit_song">Bewerk nummer</string>
     <string name="song_title">Titel nummer</string>
     <string name="song_artists">Artiesten nummer</string>
-    <string name="error_song_title_empty">Titel van nummer mag niet leeg zijn.</string>
-    <string name="error_song_artist_empty">Artiest kan niet leeg zijn.</string>
     <string name="save">Opslaan</string>
 
-    <string name="choose_playlist">Kies afspeellijst</string>
     <string name="edit_playlist">Bewerk afspeellijst</string>
     <string name="create_playlist">Afspeellijst maken</string>
     <string name="playlist_name">Playlist name</string>
-    <string name="error_playlist_name_empty">Afspeellijstnaam mag niet leeg zijn.</string>
 
-    <string name="edit_artist">Bewerk artiest</string>
     <string name="artist_name">Artiest naam</string>
-    <string name="error_artist_name_empty">Artiestennaam mag niet leeg zijn.</string>
 
     <!-- Noun -->
     <plurals name="n_song">
@@ -161,7 +147,6 @@
     </plurals>
 
     <!-- Snackbar -->
-    <string name="playlist_imported">Afspeellijst geimporteerd</string>
     <string name="removed_song_from_playlist">\"%s\" van afspeelijst verwijderd</string>
     <string name="playlist_synced">Playlist synced</string>
     <string name="undo">Ongedaan maken</string>
@@ -174,9 +159,7 @@
         <item quantity="one">1 minuut</item>
         <item quantity="other">%d minuten</item>
     </plurals>
-    <string name="error_no_stream">Geen stream beschikbaar</string>
     <string name="error_no_internet">Geen netwerkverbinding</string>
-    <string name="error_timeout">Timeout</string>
     <string name="error_unknown">Onbekende fout</string>
 
     <!-- Player action -->
@@ -205,7 +188,6 @@
     <string name="dark_theme_follow_system">Volg systeem</string>
     <string name="pure_black">Zuiver zwart</string>
     <string name="default_open_tab">Standaard tabblad</string>
-    <string name="customize_navigation_tabs">Pas tabbladen aan</string>
     <string name="lyrics_text_position">Songtekst positie</string>
     <string name="left">Links</string>
     <string name="center">Midden</string>
@@ -219,7 +201,6 @@
     <string name="enable_proxy">Proxy inschakelen</string>
     <string name="proxy_type">Proxy type</string>
     <string name="proxy_url">Proxy URL</string>
-    <string name="restart_to_take_effect">Herstart om effect te hebben</string>
 
     <string name="player_and_audio">Speler en geluid</string>
     <string name="audio_quality">Geluidskwaliteit</string>
@@ -232,15 +213,12 @@
     <string name="equalizer">Equalizer</string>
 
     <string name="storage">Opslag</string>
-    <string name="cache">Cache</string>
     <string name="image_cache">Afbeeldingen Cache</string>
     <string name="song_cache">Nummer Cache</string>
     <string name="max_cache_size">Maximale cache grootte</string>
     <string name="unlimited">Ongelimiteerd</string>
     <string name="clear_all_downloads">Wis alle downloads</string>
-    <string name="max_image_cache_size">Max. grootte cache voor afbeeldingen</string>
     <string name="clear_image_cache">Wis afbeeldingen cache</string>
-    <string name="max_song_cache_size">Max. grootte cache voor nummers</string>
     <string name="clear_song_cache">Wis nummer cache</string>
     <string name="size_used">%s gebruikt</string>
 
@@ -256,13 +234,11 @@
     <string name="backup_restore">Backup en herstel</string>
     <string name="backup">Backup</string>
     <string name="restore">Herstellen</string>
-    <string name="imported_playlist">Afspeellijst geimporteerd</string>
     <string name="backup_create_success">Back-up succesvol gemaakt.</string>
     <string name="backup_create_failed">Back-up maken mislukt.</string>
     <string name="restore_failed">Fout bij terugzetten back-up.</string>
 
     <string name="about">Over</string>
-    <string name="app_version">App versie</string>
 
     <string name="new_version_available">Nieuwe versie beschikbaar</string>
     <string name="translation_models">Vertaalmodellen</string>

@@ -18,7 +18,6 @@
     <string name="mood_and_genres">Mood and Genres</string>
     <string name="account">Account</string>
     <string name="quick_picks">Quick picks</string>
-    <string name="quick_picks_empty">Listen to songs to generate your quick picks</string>
     <string name="new_release_albums">New release albums</string>
 
     <!-- History -->
@@ -29,8 +28,6 @@
 
     <!-- Stats -->
     <string name="most_played_songs">Most played songs</string>
-    <string name="most_played_artists">Most played artists</string>
-    <string name="most_played_albums">Most played albums</string>
 
     <!-- Search -->
     <string name="search">തിരയുക</string>
@@ -47,11 +44,9 @@
     <string name="filter_playlists">പ്ലേലിസ്റ്റുകൾ</string>
     <string name="filter_community_playlists">കമ്മ്യൂണിറ്റി പ്ലേലിസ്റ്റുകൾ</string>
     <string name="filter_featured_playlists">തിരഞ്ഞെടുത്ത പ്ലേലിസ്റ്റുകൾ</string>
-    <string name="filter_bookmarked">Bookmarked</string>
     <string name="no_results_found">No results found</string>
 
     <!-- Artist screen -->
-    <string name="from_your_library">നിങ്ങളുടെ ലൈബ്രറിയിൽ നിന്ന്</string>
 
     <!-- Playlist -->
     <string name="liked_songs">ഇഷ്ടപ്പെട്ട പാട്ടുകൾ</string>
@@ -59,7 +54,6 @@
     <string name="playlist_is_empty">The playlist is empty</string>
 
     <!-- Button -->
-    <string name="retry">വീണ്ടും ശ്രമിക്കുക</string>
     <string name="radio">റേഡിയോ</string>
     <string name="shuffle">ഷഫിൾ</string>
     <string name="reset">Reset</string>
@@ -85,7 +79,6 @@
     <string name="delete">ഡിലീറ്റ്</string>
     <string name="remove_from_history">Remove from history</string>
     <string name="search_online">Search online</string>
-    <string name="sync">Sync</string>
     <string name="advanced">Advanced</string>
 
     <!-- Sort menu -->
@@ -110,25 +103,18 @@
     <string name="unknown">Unknown</string>
     <string name="copied">്ലിപ്പ്ബോർഡിലേക്ക് പകർത്തി</string>
 
-    <string name="edit_lyrics">Edit lyrics</string>
     <string name="search_lyrics">Search lyrics</string>
 
     <string name="edit_song">ഗാനം എഡിറ്റ് ചെയ്യുക</string>
     <string name="song_title">പാട്ടിന്റെ പേര്</string>
     <string name="song_artists">പാട്ടുകാരൻ</string>
-    <string name="error_song_title_empty">ഗാനത്തിന്റെ പേര് ശൂന്യമാക്കാൻ കഴിയില്ല.</string>
-    <string name="error_song_artist_empty">പാട്ടുകാരൻ ശൂന്യമായിരിക്കാൻ കഴിയില്ല.</string>
     <string name="save">സേവ്</string>
 
-    <string name="choose_playlist">പ്ലേലിസ്റ്റ് തിരഞ്ഞെടുക്കുക</string>
     <string name="edit_playlist">പ്ലേലിസ്റ്റ് എഡിറ്റ് ചെയ്യുക</string>
     <string name="create_playlist">പ്ലേലിസ്റ്റ് സൃഷ്ടിക്കുക</string>
     <string name="playlist_name">പ്ലേലിസ്റ്റ് പേര്</string>
-    <string name="error_playlist_name_empty">പ്ലേലിസ്റ്റിന്റെ പേര് ശൂന്യമാക്കാൻ കഴിയില്ല.</string>
 
-    <string name="edit_artist">എഡിറ്റ് ആർട്ടിസ്റ്റ്</string>
     <string name="artist_name">കലാകാരന്റെ പേര്</string>
-    <string name="error_artist_name_empty">കലാകാരന്റെ പേര് ശൂന്യമാക്കാൻ കഴിയില്ല.</string>
 
     <!-- Noun -->
     <plurals name="n_song">
@@ -161,7 +147,6 @@
     </plurals>
 
     <!-- Snackbar -->
-    <string name="playlist_imported">പ്ലേലിസ്റ്റ് ഇറക്കുമതി ചെയ്തു</string>
     <string name="removed_song_from_playlist">Removed \"%s\" from playlist</string>
     <string name="playlist_synced">Playlist synced</string>
     <string name="undo">Undo</string>
@@ -174,9 +159,7 @@
         <item quantity="one">1 minute</item>
         <item quantity="other">%d minutes</item>
     </plurals>
-    <string name="error_no_stream">No stream available</string>
     <string name="error_no_internet">No network connection</string>
-    <string name="error_timeout">Timeout</string>
     <string name="error_unknown">Unknown error</string>
 
     <!-- Player action -->
@@ -205,7 +188,6 @@
     <string name="dark_theme_follow_system">സിസ്റ്റം പിന്തുടരുക</string>
     <string name="pure_black">Pure black</string>
     <string name="default_open_tab">സ്ഥിര ഓപ്പൺ ടാബ്</string>
-    <string name="customize_navigation_tabs">Customize navigation tabs</string>
     <string name="lyrics_text_position">Lyrics text position</string>
     <string name="left">Left</string>
     <string name="center">Center</string>
@@ -219,7 +201,6 @@
     <string name="enable_proxy">പ്രോക്സി പ്രവർത്തനക്ഷമമാക്കുക</string>
     <string name="proxy_type">പ്രോക്സി തരം</string>
     <string name="proxy_url">പ്രോക്സി URL</string>
-    <string name="restart_to_take_effect">പ്രാബല്യത്തിൽ വരാൻ പുനരാരംഭിക്കുക</string>
 
     <string name="player_and_audio">പ്ലെയറും ഓഡിയോയും</string>
     <string name="audio_quality">ഓഡിയോ നിലവാരം</string>
@@ -232,15 +213,12 @@
     <string name="equalizer">ഇക്വലൈസർ</string>
 
     <string name="storage">Storage</string>
-    <string name="cache">Cache</string>
     <string name="image_cache">Image Cache</string>
     <string name="song_cache">Song Cache</string>
     <string name="max_cache_size">Max cache size</string>
     <string name="unlimited">Unlimited</string>
     <string name="clear_all_downloads">Clear all downloads</string>
-    <string name="max_image_cache_size">Max image cache size</string>
     <string name="clear_image_cache">Clear image cache</string>
-    <string name="max_song_cache_size">Max song cache size</string>
     <string name="clear_song_cache">Clear song cache</string>
     <string name="size_used">%s used</string>
 
@@ -256,13 +234,11 @@
     <string name="backup_restore">ബാക്കപ്പും വീണ്ടെടുക്കലും</string>
     <string name="backup">ബാക്കപ്പ്</string>
     <string name="restore">വീണ്ടെടുക്കൽ</string>
-    <string name="imported_playlist">Imported playlist</string>
     <string name="backup_create_success">ബാക്കപ്പ് സൃഷ്‌ടിച്ചു</string>
     <string name="backup_create_failed">ബാക്കപ്പ് സൃഷ്ടിക്കാൻ കഴിഞ്ഞില്ല</string>
     <string name="restore_failed">ബാക്കപ്പ് പുനഃസ്ഥാപിക്കാൻ കഴിഞ്ഞില്ല</string>
 
     <string name="about">കുറിച്ച്</string>
-    <string name="app_version">അപ്ലിക്കേഷൻ പതിപ്പ്</string>
 
     <string name="new_version_available">New version available</string>
     <string name="translation_models">Translation Models</string>

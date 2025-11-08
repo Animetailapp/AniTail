@@ -58,13 +58,9 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadRequest
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.anitail.innertube.YouTube
@@ -82,7 +78,6 @@ import com.anitail.music.db.entities.Song
 import com.anitail.music.db.entities.SongArtistMap
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.models.toMediaMetadata
-import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.MediaStoreDownloadManager
 import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.ListDialog
@@ -113,8 +108,6 @@ fun SongMenu(
     val songState = database.song(originalSong.id).collectAsState(initial = originalSong)
     val song = songState.value ?: originalSong
     val downloadUtil = LocalDownloadUtil.current
-    val download by downloadUtil.getDownload(originalSong.id)
-        .collectAsState(initial = null)
     val mediaStoreDownload by downloadUtil.getMediaStoreDownload(originalSong.id)
         .collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
@@ -638,78 +631,6 @@ fun SongMenu(
             }
         }
         item {
-            when (download?.state) {
-                Download.STATE_COMPLETED -> {
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                text = stringResource(R.string.remove_download),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        },
-                        leadingContent = {
-                            Icon(
-                                painter = painterResource(R.drawable.offline),
-                                contentDescription = null,
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false,
-                            )
-                        }
-                    )
-                }
-                Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
-                    ListItem(
-                        headlineContent = { Text(text = stringResource(R.string.downloading)) },
-                        leadingContent = {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false,
-                            )
-                        }
-                    )
-                }
-                else -> {
-                    ListItem(
-                        headlineContent = { Text(text = stringResource(R.string.download)) },
-                        leadingContent = {
-                            Icon(
-                                painter = painterResource(R.drawable.download),
-                                contentDescription = null,
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            val downloadRequest =
-                                DownloadRequest
-                                    .Builder(song.id, song.id.toUri())
-                                    .setCustomCacheKey(song.id)
-                                    .setData(song.song.title.toByteArray())
-                                    .build()
-                            DownloadService.sendAddDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                downloadRequest,
-                                false,
-                            )
-                        }
-                    )
-                }
-            }
-        }
-        item {
             when (mediaStoreDownload?.status) {
                 MediaStoreDownloadManager.DownloadState.Status.COMPLETED -> {
                     ListItem(
@@ -783,7 +704,7 @@ fun SongMenu(
 
                 else -> {
                     ListItem(
-                        headlineContent = { Text(text = stringResource(R.string.download_to_device)) },
+                        headlineContent = { Text(text = stringResource(R.string.download)) },
                         leadingContent = {
                             Icon(
                                 painter = painterResource(R.drawable.download),
