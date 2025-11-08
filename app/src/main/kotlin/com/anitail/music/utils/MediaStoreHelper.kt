@@ -351,4 +351,84 @@ class MediaStoreHelper(private val context: Context) {
     fun getAnitailFolderPath(): String {
         return "${Environment.DIRECTORY_MUSIC}/$Anitail_FOLDER"
     }
+
+    /**
+     * Calculate the total size of all files in the Anitail folder
+     *
+     * @return Total size in bytes of all Anitail files
+     */
+    suspend fun getAnitailFolderSize(): Long = withContext(Dispatchers.IO) {
+        try {
+            val projection = arrayOf(MediaStore.Audio.Media.SIZE)
+            val selection = "${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ?"
+            val selectionArgs = arrayOf("%$Anitail_FOLDER%")
+
+            context.contentResolver.query(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                var totalSize = 0L
+                val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
+                while (cursor.moveToNext()) {
+                    val size = cursor.getLong(sizeColumn)
+                    totalSize += size
+                }
+                totalSize
+            } ?: 0L
+        } catch (e: Exception) {
+            Timber.e(e, "Error calculating Anitail folder size: ${e.message}")
+            0L
+        }
+    }
+
+    /**
+     * Delete all files in the Anitail folder from MediaStore
+     *
+     * @return Number of files deleted
+     */
+    suspend fun deleteAnitailFolderContents(): Int = withContext(Dispatchers.IO) {
+        try {
+            val projection = arrayOf(MediaStore.Audio.Media._ID)
+            val selection = "${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ?"
+            val selectionArgs = arrayOf("%$Anitail_FOLDER%")
+
+            val urisToDelete = mutableListOf<Uri>()
+            context.contentResolver.query(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idColumn)
+                    val contentUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                    } else {
+                        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+                    }
+                    urisToDelete.add(Uri.withAppendedPath(contentUri, id.toString()))
+                }
+            }
+
+            var deletedCount = 0
+            urisToDelete.forEach { uri ->
+                val deleted = context.contentResolver.delete(uri, null, null)
+                if (deleted > 0) {
+                    deletedCount++
+                    Timber.d("Deleted from MediaStore: $uri")
+                }
+            }
+
+            Timber.d("Deleted $deletedCount files from Anitail folder")
+            deletedCount
+        } catch (e: Exception) {
+            Timber.e(e, "Error deleting Anitail folder contents: ${e.message}")
+            0
+        }
+    }
 }

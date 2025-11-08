@@ -108,6 +108,7 @@ enum class NotificationButtonType {
 
 val MaxImageCacheSizeKey = intPreferencesKey("maxImageCacheSize")
 val MaxSongCacheSizeKey = intPreferencesKey("maxSongCacheSize")
+val MaxDownloadSizeKey = intPreferencesKey("maxDownloadSize")
 val JamEnabledKey = booleanPreferencesKey("jam_enabled")
 val JamHostKey = booleanPreferencesKey("jam_host")
 val JamHostIpKey = stringPreferencesKey("jam_host_ip")
