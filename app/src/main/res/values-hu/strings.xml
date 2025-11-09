@@ -18,7 +18,6 @@
     <string name="mood_and_genres">Hangulatok és műfajok</string>
     <string name="account">Fiók</string>
     <string name="quick_picks">Gyors választás</string>
-    <string name="quick_picks_empty">Hallgasson meg néhány dalt a gyors választások elkészítéséhez</string>
     <string name="new_release_albums">Új kiadású albumok</string>
 
     <!-- History -->
@@ -29,8 +28,6 @@
 
     <!-- Stats -->
     <string name="most_played_songs">A legtöbbet játszott dalok</string>
-    <string name="most_played_artists">A legtöbbet játszott előadók</string>
-    <string name="most_played_albums">A legtöbbet játszott albumok</string>
 
     <!-- Search -->
     <string name="search">Keresés</string>
@@ -47,11 +44,9 @@
     <string name="filter_playlists">Listák</string>
     <string name="filter_community_playlists">Közösségi listák</string>
     <string name="filter_featured_playlists">Kiemelt lejátszási listák</string>
-    <string name="filter_bookmarked">Könyvjelzőzött</string>
     <string name="no_results_found">Nincs találat</string>
 
     <!-- Artist screen -->
-    <string name="from_your_library">Saját könyvtárból</string>
 
     <!-- Playlist -->
     <string name="liked_songs">Kedvelt dalok</string>
@@ -59,7 +54,6 @@
     <string name="playlist_is_empty">A lejátszólista üres</string>
 
     <!-- Button -->
-    <string name="retry">Újra</string>
     <string name="radio">Rádió</string>
     <string name="shuffle">Keverés</string>
     <string name="reset">Visszaállítás</string>
@@ -85,7 +79,6 @@
     <string name="delete">Eltávolítás</string>
     <string name="remove_from_history">Eltávolítás az előzményekból</string>
     <string name="search_online">Keresés online</string>
-    <string name="sync">Szinkronizálás</string>
     <string name="advanced">Haladó</string>
 
     <!-- Sort menu -->
@@ -110,25 +103,18 @@
     <string name="unknown">Ismeretlen</string>
     <string name="copied">Vágólapra másolva</string>
 
-    <string name="edit_lyrics">Dalszöveg szerkesztése</string>
     <string name="search_lyrics">Dalszöveg keresése</string>
 
     <string name="edit_song">Dal szerkesztése</string>
     <string name="song_title">Dal címe</string>
     <string name="song_artists">Dal előadói</string>
-    <string name="error_song_title_empty">A cím nem lehet üres.</string>
-    <string name="error_song_artist_empty">Az előadó nem lehet üres.</string>
     <string name="save">Mentés</string>
 
-    <string name="choose_playlist">Válasszon lejátszólistát</string>
     <string name="edit_playlist">Lejátszólista szerkesztése</string>
     <string name="create_playlist">Lista létrehozás</string>
     <string name="playlist_name">Lista neve</string>
-    <string name="error_playlist_name_empty">A lejátszólista neve nem lehet üres.</string>
 
-    <string name="edit_artist">Előadó szerkesztése</string>
     <string name="artist_name">Előadó neve</string>
-    <string name="error_artist_name_empty">Az előadó neve nem lehet üres.</string>
 
     <!-- Noun -->
     <plurals name="n_song">
@@ -161,7 +147,6 @@
     </plurals>
 
     <!-- Snackbar -->
-    <string name="playlist_imported">Lista importálva</string>
     <string name="removed_song_from_playlist">\"%s\" eltávolítva a lejátszólistából</string>
     <string name="playlist_synced">Lejátszólista szinkronban</string>
     <string name="undo">Visszavonás</string>
@@ -174,9 +159,7 @@
         <item quantity="one">1 perc</item>
         <item quantity="other">%d perc</item>
     </plurals>
-    <string name="error_no_stream">Nincs elérhető adatfolyam</string>
     <string name="error_no_internet">Nincs hálózati kapcsolat</string>
-    <string name="error_timeout">Időtúllépés</string>
     <string name="error_unknown">Ismeretlen hiba</string>
 
     <!-- Player action -->
@@ -205,7 +188,6 @@
     <string name="dark_theme_follow_system">Rendszer szerint</string>
     <string name="pure_black">Tiszta fekete</string>
     <string name="default_open_tab">Alapértelmezett nyitott lap</string>
-    <string name="customize_navigation_tabs">A navigációs lapok testreszabása</string>
     <string name="lyrics_text_position">Dalszöveg pozíciója</string>
     <string name="left">Balra</string>
     <string name="center">Középre</string>
@@ -219,7 +201,6 @@
     <string name="enable_proxy">Proxy bekapcsolása</string>
     <string name="proxy_type">Proxy típusa</string>
     <string name="proxy_url">Proxy URL</string>
-    <string name="restart_to_take_effect">Indítsa újra, hogy életbe lépjen</string>
 
     <string name="player_and_audio">Lejátszó és hang</string>
     <string name="audio_quality">Hangminőség</string>
@@ -232,15 +213,12 @@
     <string name="equalizer">Equalizer</string>
 
     <string name="storage">Tárhely</string>
-    <string name="cache">Gyorsítótár</string>
     <string name="image_cache">Kép gyorsítótár</string>
     <string name="song_cache">Dal gyorsítótár</string>
     <string name="max_cache_size">Max. gyorsítótár méret</string>
     <string name="unlimited">Korlátlan</string>
     <string name="clear_all_downloads">Minden letöltés törlése</string>
-    <string name="max_image_cache_size">Max. kép gyorsítótár</string>
     <string name="clear_image_cache">Kép gyorsítótár törlése</string>
-    <string name="max_song_cache_size">Max. dal gyorsítótár</string>
     <string name="clear_song_cache">Dal gyorsítótár törlése</string>
     <string name="size_used">%s használva</string>
 
@@ -256,13 +234,11 @@
     <string name="backup_restore">Bizt. mentés és visszaállítás</string>
     <string name="backup">Biztonsági mentés</string>
     <string name="restore">Visszaállítás</string>
-    <string name="imported_playlist">Importált lejátszási lista</string>
     <string name="backup_create_success">A biztonsági mentés sikeresen létrehozva</string>
     <string name="backup_create_failed">Nem sikerült biztonsági mentést készíteni</string>
     <string name="restore_failed">Nem sikerült visszaállítani a biztonsági másolatot</string>
 
     <string name="about">Rólunk</string>
-    <string name="app_version">Alkalmazásverzió</string>
 
     <string name="new_version_available">Új verzió érhető el</string>
     <string name="translation_models">Fordítási modellek</string>

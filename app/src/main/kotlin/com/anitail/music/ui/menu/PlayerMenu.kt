@@ -5,6 +5,7 @@ import android.media.audiofx.AudioEffect
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -56,10 +57,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.net.toUri
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import com.anitail.innertube.YouTube
@@ -75,7 +74,9 @@ import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.BigSeekBar
 import com.anitail.music.ui.component.BottomSheetState
 import com.anitail.music.ui.component.ListDialog
+import com.anitail.music.utils.makeTimeString
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.log2
 import kotlin.math.pow
@@ -89,17 +90,21 @@ fun PlayerMenu(
     isQueueTrigger: Boolean? = false,
     onShowDetailsDialog: () -> Unit,
     onDismiss: () -> Unit,
+    onShowSleepTimerDialog: () -> Unit,
 ) {
     mediaMetadata ?: return
     val context = LocalContext.current
     val database = LocalDatabase.current
     val playerConnection = LocalPlayerConnection.current ?: return
     val playerVolume = playerConnection.service.playerVolume.collectAsState()
+    val sleepTimer = playerConnection.service.sleepTimer
+
     val activityResultLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { }
     val coroutineScope = rememberCoroutineScope()
+    val downloadUtil = LocalDownloadUtil.current
 
-    val download by LocalDownloadUtil.current.getDownload(mediaMetadata.id)
+    val download by downloadUtil.getDownload(mediaMetadata.id)
         .collectAsState(initial = null)
 
     val artists =
@@ -422,25 +427,42 @@ fun PlayerMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            database.transaction {
-                                insert(mediaMetadata)
+                            coroutineScope.launch(Dispatchers.IO) {
+                                database.transaction {
+                                    insert(mediaMetadata)
+                                }
+                                val song = database.song(mediaMetadata.id).first()
+                                song?.let {
+                                    downloadUtil.downloadToMediaStore(it)
+                                }
                             }
-                            val downloadRequest =
-                                DownloadRequest
-                                    .Builder(mediaMetadata.id, mediaMetadata.id.toUri())
-                                    .setCustomCacheKey(mediaMetadata.id)
-                                    .setData(mediaMetadata.title.toByteArray())
-                                    .build()
-                            DownloadService.sendAddDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                downloadRequest,
-                                false,
-                            )
                         }
                     )
                 }
             }
+        }
+        item {
+            ListItem(
+                headlineContent = { Text(text = stringResource(R.string.share)) },
+                leadingContent = {
+                    Icon(
+                        painter = painterResource(R.drawable.share),
+                        contentDescription = null,
+                    )
+                },
+                modifier = Modifier.clickable {
+                    val intent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        type = "text/plain"
+                        putExtra(
+                            Intent.EXTRA_TEXT,
+                            "https://music.youtube.com/watch?v=${mediaMetadata.id}"
+                        )
+                    }
+                    context.startActivity(Intent.createChooser(intent, null))
+                    onDismiss()
+                }
+            )
         }
         item {
             ListItem(
@@ -457,6 +479,37 @@ fun PlayerMenu(
                 }
             )
         }
+
+        item {
+            ListItem(
+                headlineContent = {
+                    AnimatedContent(
+                        label = "sleepTimer",
+                        targetState = sleepTimer.isActive,
+                    ) { enabled ->
+                        if (enabled) {
+                            Text(text = makeTimeString(sleepTimer.timeLeft))
+                        } else {
+                            Text(text = stringResource(id = R.string.sleep_timer))
+                        }
+                    }
+                },
+                leadingContent = {
+                    Icon(
+                        painter = painterResource(id = R.drawable.bedtime),
+                        contentDescription = null,
+                    )
+                },
+                modifier = Modifier.clickable {
+                    if (sleepTimer.isActive) {
+                        sleepTimer.clear()
+                    } else {
+                        onShowSleepTimerDialog()
+                    }
+                }
+            )
+        }
+
         if (isQueueTrigger != true) {
             item {
                 ListItem(

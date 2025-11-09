@@ -66,12 +66,14 @@ import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.constants.MaxImageCacheSizeKey
 import com.anitail.music.constants.MaxSongCacheSizeKey
+import com.anitail.music.constants.MaxDownloadSizeKey
 import com.anitail.music.extensions.tryOrNull
 import com.anitail.music.ui.component.AnimatedIconButton
 import com.anitail.music.ui.component.EnhancedListPreference
 import com.anitail.music.ui.component.EnhancedPreferenceEntry
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.ui.utils.formatFileSize
+import com.anitail.music.utils.MediaStoreHelper
 import com.anitail.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -89,11 +91,16 @@ fun StorageSettings(
     val imageDiskCache = context.imageLoader.diskCache ?: return
     val playerCache = LocalPlayerConnection.current?.service?.playerCache ?: return
     val downloadCache = LocalPlayerConnection.current?.service?.downloadCache ?: return
+    val mediaStoreHelper = remember { MediaStoreHelper(context) }
 
     val coroutineScope = rememberCoroutineScope()
     val (maxImageCacheSize, onMaxImageCacheSizeChange) = rememberPreference(
         key = MaxImageCacheSizeKey,
         defaultValue = 512
+    )
+    val (maxDownloadSize, onMaxDownloadSizeChange) = rememberPreference(
+        key = MaxDownloadSizeKey,
+        defaultValue = -1
     )
     val (maxSongCacheSize, onMaxSongCacheSizeChange) = rememberPreference(
         key = MaxSongCacheSizeKey,
@@ -105,6 +112,7 @@ fun StorageSettings(
     var downloadCacheSize by remember {
         mutableStateOf(tryOrNull { downloadCache.cacheSpace } ?: 0)
     }
+    var downloadedSongsSize by remember { mutableStateOf(0L) }
     var isRefreshing by remember { mutableStateOf(false) }
     var showDownloadClearConfirm by remember { mutableStateOf(false) }
     var showSongCacheClearConfirm by remember { mutableStateOf(false) }
@@ -124,6 +132,9 @@ fun StorageSettings(
     val downloadCachePercentage = if (downloadCacheSize > 0) {
         (downloadCacheSize.toFloat() / (8192 * 1024 * 1024L)).coerceIn(0f, 1f) * 100
     } else 0f
+    val downloadedSongsPercentage = if (maxDownloadSize != -1 && downloadedSongsSize > 0) {
+        (downloadedSongsSize.toFloat() / (maxDownloadSize * 1024 * 1024L)).coerceIn(0f, 1f) * 100
+    } else 0f
 
     // Refresh cache information periodically
     LaunchedEffect(Unit) {
@@ -131,6 +142,7 @@ fun StorageSettings(
             imageCacheSize = imageDiskCache.size
             playerCacheSize = tryOrNull { playerCache.cacheSpace } ?: 0
             downloadCacheSize = tryOrNull { downloadCache.cacheSpace } ?: 0
+            downloadedSongsSize = mediaStoreHelper.getAnitailFolderSize()
             delay(500)
         }
     }
@@ -143,6 +155,7 @@ fun StorageSettings(
                 imageCacheSize = imageDiskCache.size
                 playerCacheSize = tryOrNull { playerCache.cacheSpace } ?: 0
                 downloadCacheSize = tryOrNull { downloadCache.cacheSpace } ?: 0
+                downloadedSongsSize = mediaStoreHelper.getAnitailFolderSize()
                 delay(800) // Show refresh animation for a minimum time
                 isRefreshing = false
             }
@@ -231,9 +244,9 @@ fun StorageSettings(
                     StorageItem(
                         title = stringResource(R.string.downloaded_songs),
                         icon = R.drawable.download,
-                        size = downloadCacheSize,
-                        progress = downloadCachePercentage,
-                        maxSize = null
+                        size = downloadedSongsSize,
+                        progress = downloadedSongsPercentage,
+                        maxSize = if (maxDownloadSize != -1) maxDownloadSize * 1024 * 1024L else null
                     )
 
                     StorageItem(
@@ -260,9 +273,23 @@ fun StorageSettings(
                 icon = R.drawable.download
             ) {
                 Text(
-                    text = stringResource(R.string.size_used, formatFileSize(downloadCacheSize)),
+                    text = stringResource(R.string.size_used, formatFileSize(downloadedSongsSize)),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                )
+
+                EnhancedListPreference(
+                    title = stringResource(R.string.max_cache_size),
+                    icon = R.drawable.settings,
+                    selectedValue = maxDownloadSize,
+                    values = listOf(512, 1024, 2048, 4096, 8192, -1),
+                    valueText = {
+                        if (it == -1) stringResource(R.string.unlimited) else formatFileSize(it * 1024 * 1024L)
+                    },
+                    onValueSelected = {
+                        onMaxDownloadSizeChange(it)
+                        refreshCacheInfo()
+                    },
                 )
 
                 EnhancedPreferenceEntry(
@@ -390,9 +417,12 @@ fun StorageSettings(
             message = stringResource(R.string.clear_downloads_confirmation),
             onConfirm = {
                 coroutineScope.launch(Dispatchers.IO) {
+                    // Clear download cache
                     downloadCache.keys.forEach { key ->
                         downloadCache.removeResource(key)
                     }
+                    // Clear MediaStore files
+                    mediaStoreHelper.deleteAnitailFolderContents()
                     refreshCacheInfo()
                 }
                 showDownloadClearConfirm = false
@@ -579,13 +609,15 @@ fun StorageItem(
             )
         }
 
-        Text(
-            text = "${progress.toInt()}%",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 8.dp),
-            textAlign = TextAlign.End
-        )
+        if (maxSize != null) {
+            Text(
+                text = "${progress.toInt()}%",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 8.dp),
+                textAlign = TextAlign.End
+            )
+        }
     }
 }
 

@@ -23,7 +23,6 @@
     <string name="mood_and_genres">المزاج والأنواع</string>
     <string name="account">الحساب</string>
     <string name="quick_picks">الإختيارات السريعة</string>
-    <string name="quick_picks_empty">استمع إلى الأغاني لإنشاء اختيارات سريعة</string>
     <string name="new_release_albums">إصدارات جديدة</string>
     <string name="forgotten_favorites">الإستماع مجدداً</string>
     <string name="similar_to">مشابه لـ</string>
@@ -38,20 +37,12 @@
 
     <!-- المخططات البيانية-->
     <string name="charts"></string>
-    <string name="back_button_desc">للخلف</string>
-    <string name="no_title">لا يوجد عنوان</string>
     <string name="unknown_artist">فنان غير معروف</string>
-    <string name="unknown_item_type">نوع العنصر غير معروف</string>
-    <string name="loading_charts">جاري تحميل المخططات...</string>
-    <string name="retry_button">إعادة المحاولة</string>
-    <string name="album_cover_desc">غلاف الألبوم</string>
     <string name="top_music_videos">أفضل مقاطع الفيديو الموسيقية</string>
     <string name="trending">الأكثر رواجًا</string>
 
     <!-- الاحصائيات -->
     <string name="most_played_songs">الأغاني الأكثر تشغيلًا</string>
-    <string name="most_played_artists">الفنانون الأكثر تشغيلًا</string>
-    <string name="most_played_albums">الألبومات الأكثر تشغيلًا</string>
     <string name="weeks">أسابيع</string>
     <string name="months">شهور</string>
     <string name="years">سنين</string>
@@ -72,11 +63,9 @@
     <string name="filter_playlists">قوائم التشغيل</string>
     <string name="filter_community_playlists">قوائم تشغيل المجتمع</string>
     <string name="filter_featured_playlists">قوائم التشغيل المميزة</string>
-    <string name="filter_bookmarked">المفضلة</string>
     <string name="no_results_found">لم يتم العثور على نتائج</string>
 
     <!-- صفحة الفنان -->
-    <string name="from_your_library">من مكتبتك</string>
 
     <!-- صفحة الالبومات -->
     <string name="other_versions">إصدارات أخرى</string>
@@ -86,10 +75,8 @@
     <string name="offline">التحميلات</string>
     <string name="my_top">الأعلي إستماع : </string>
     <string name="cached_playlist">الأغاني المخزنة مؤقتًا</string>
-    <string name="library_song_empty">ستظهر أغاني المكتبة هنا</string>
     <string name="library_artist_empty">سيظهر هنا الفنانين</string>
     <string name="library_album_empty">ستظهر ألبومات المكتبة هنا</string>
-    <string name="library_playlist_empty">ستظهر قوائم التشغيل الخاصة بك هنا</string>
 
     <!-- قوائم التشغيل -->
     <string name="liked_songs">الأغاني المفضلة</string>
@@ -103,7 +90,6 @@
     <string name="elements_selected">%1$d عنصر محدد</string>
 
     <!-- الازرار -->
-    <string name="retry">إعادة المحاولة</string>
     <string name="radio">راديو</string>
     <string name="shuffle">تشغيل عشوائي</string>
     <string name="reset">إعادة تعيين</string>
@@ -131,7 +117,6 @@
     <string name="delete">حذف</string>
     <string name="remove_from_history">إزالة من التاريخ</string>
     <string name="search_online">البحث على الإنترنت</string>
-    <string name="sync">مزامنة</string>
     <string name="advanced">متقدم</string>
     <string name="select">تحديد الكل</string>
     <string name="remove_from_playlist">إزالة من قائمة التشغيل</string>
@@ -160,23 +145,16 @@
     <string name="file_size">حجم الملف</string>
     <string name="unknown">غير معروف</string>
     <string name="copied">نسخ إلى الحافظة</string>
-    <string name="edit_lyrics">تعديل الكلمات</string>
     <string name="search_lyrics">البحث عن الكلمات</string>
     <string name="edit_song">تعديل الأغنية</string>
     <string name="song_title">عنوان الأغنية</string>
     <string name="song_artists">فنانو الأغنية</string>
-    <string name="error_song_title_empty">لا يمكن أن يكون عنوان الأغنية فارغًا.</string>
-    <string name="error_song_artist_empty">لا يمكن أن يكون فنان الأغنية فارغًا.</string>
     <string name="save">حفظ</string>
-    <string name="choose_playlist">اختيار قائمة التشغيل</string>
     <string name="edit_playlist">تعديل قائمة التشغيل</string>
     <string name="create_playlist">إنشاء قائمة تشغيل</string>
     <string name="playlist_name">اسم قائمة التشغيل</string>
-    <string name="error_playlist_name_empty">لا يمكن أن يكون اسم قائمة التشغيل فارغًا.</string>
     <string name="already_in_playlist">موجود بالفعل في قائمة التشغيل:</string>
-    <string name="edit_artist">تعديل الفنان</string>
     <string name="artist_name">اسم الفنان</string>
-    <string name="error_artist_name_empty">لا يمكن أن يكون اسم الفنان فارغًا.</string>
 
     <string name="duplicates">مكرر</string>
     <string name="skip_duplicates">تخطي المكرر</string>
@@ -285,7 +263,6 @@
     </plurals>
 
     <!-- شريط التنبيه -->
-    <string name="playlist_imported">تم استيراد قائمة التشغيل</string>
     <string name="removed_song_from_playlist">تمت إزالة \"%s\" من قائمة التشغيل</string>
     <string name="playlist_synced">تمت مزامنة قائمة التشغيل</string>
     <string name="undo">تراجع</string>
@@ -295,9 +272,7 @@
     <string name="sleep_timer">مؤقت النوم</string>
     <string name="end_of_song">نهاية الأغنية</string>
 
-    <string name="error_no_stream">لا يوجد بث متاح</string>
     <string name="error_no_internet">لا يوجد اتصال بالشبكة</string>
-    <string name="error_timeout">انتهاء المهلة</string>
     <string name="error_unknown">خطأ غير معروف</string>
     <string name="seek_backward">للخلف 5 ثواني</string>
     <string name="seek_forward">للأمام 5 ثواني</string>
@@ -320,11 +295,9 @@
 
     <!-- الإعدادات -->
     <string name="settings">الإعدادات</string>
-    <string name="login_settings">إعدادات تسجيل الدخول</string>
     <string name="use_login_for_browse">استخدم تسجيل الدخول لتصفح المزيد من المحتوي</string>
     <string name="use_login_for_browse_desc">يمكن أن يعرض الألبومات الخاصة بالمشتركين والمزيد من المحتوي</string>
 
-    <string name="general_settings">الإعدادات العامة</string>
 
     <string name="appearance">المظهر</string>
     <string name="enable_dynamic_theme">تفعيل السمة الديناميكية</string>
@@ -335,20 +308,16 @@
     <string name="player_buttons_style">ألوان أزرار المشغل</string>
     <string name="default_style">افتراضي</string>
     <string name="secondary_color_style">اللون الثانوي للتطبيق</string>
-    <string name="enable_squiggly_slider">تمكين الشريط المتعرج</string>
     <string name="enable_swipe_thumbnail">تمكين التمرير لتغيير الأغنية</string>
     <string name="dark_theme">السمة الداكنة</string>
     <string name="dark_theme_on">تشغيل</string>
     <string name="dark_theme_off">إيقاف</string>
     <string name="dark_theme_follow_system">اتباع النظام</string>
     <string name="pure_black">أسود نقي</string>
-    <string name="customize_navigation_tabs">تخصيص علامات التبويب</string>
-    <string name="player_text_alignment">موضع إسم الفنان والأغنية</string>
     <string name="lyrics_text_position">موضع نص كلمات الأغاني</string>
     <string name="swipe_song_to_add">مرر الأغنية إلى اليمين لتشغيلها بعد الأغنية الحالية أو إلى اليسار لإضافتها إلى قائمة الانتظار</string>
     <string name="theme">السمة</string>
     <string name="player">المشغل</string>
-    <string name="sided">جانبي</string>
     <string name="left">يسار</string>
     <string name="center">وسط</string>
     <string name="right">يمين</string>
@@ -391,18 +360,11 @@
     <string name="default_lib_chips">تغيير الشريحة الافتراضية للمكتبة</string>
     <string name="set_quick_picks">ضبط الاختيارات السريعة</string>
     <string name="last_song_listened">بناءً على آخر أغنية تم الاستماع إليها</string>
-    <string name="restart_to_take_effect">أعد التشغيل لتفعيل التغييرات</string>
     <string name="app_language">لغة التطبيق</string>
-    <string name="configure_app_language">تكوين لغة التطبيق</string>
-    <string name="intent_app_language_not_found">لم يتمكن التطبيق من العثور على إعدادات لغة التطبيق، يرجى تكوينها يدويًا</string>
-    <string name="open_supported_links">فتح الروابط المدعومة</string>
-    <string name="configure_supported_links">تكوين الروابط المدعومة</string>
-    <string name="intent_supported_links_not_found">لم يتمكن التطبيق من العثور على الإعدادات ، يرجى تكوينها يدويًا</string>
 
     <string name="player_and_audio">المشغل والصوت</string>
     <string name="audio_quality">جودة الصوت</string>
     <string name="audio_quality_auto">تلقائي</string>
-    <string name="audio_quality_max">أعلي إرتفاع (تجريبي)</string>
     <string name="audio_quality_high">مرتفعة</string>
     <string name="audio_quality_low">منخفضة</string>
     <string name="queue">قائمة الإنتظار</string>
@@ -418,32 +380,22 @@
     <string name="auto_skip_next_on_error_desc">تأكد من تجربة التشغيل المتواصلة</string>
     <string name="stop_music_on_task_clear">إيقاف الموسيقى عند تنظيف الذاكرة العشوائية</string>
     <string name="equalizer">مُعادل الصوت</string>
-    <string name="min_playback_duration_title">الحد الأدنى لمدة التشغيل</string>
-    <string name="min_playback_duration_description">الحد الأدنى لمدة تشغيل الأغنية قبل اعتبارها مُشغّلة</string>
-    <string name="percentage_format">%d%%</string>
-    <string name="minimum_playback_duration">الحد الأدنى لمدة التشغيل</string>
 
     <string name="storage">التخزين</string>
-    <string name="cache">التخزين المؤقت</string>
     <string name="image_cache">التخزين المؤقت للصور</string>
     <string name="song_cache">التخزين المؤقت للأغاني</string>
     <string name="max_cache_size">الحد الأقصى لحجم التخزين المؤقت</string>
     <string name="unlimited">غير محدود</string>
     <string name="clear_all_downloads">مسح جميع التنزيلات</string>
-    <string name="max_image_cache_size">الحد الأقصى لحجم التخزين المؤقت للصور</string>
     <string name="clear_image_cache">مسح التخزين المؤقت للصور</string>
-    <string name="max_song_cache_size">الحد الأقصى لحجم التخزين المؤقت للأغاني</string>
     <string name="clear_song_cache">مسح التخزين المؤقت للأغاني</string>
     <string name="size_used">تم استخدام %s</string>
-    <string name="clear_song_cache_dialog">هل أنت متأكد أنك تريد مسح كافة الأغاني المخزنة مؤقتًا؟</string>
  
-     <string name="clear_downloads_dialog">هل أنت متأكد أنك تريد مسح كافة التنزيلات؟</string>
 
     <string name="privacy">الخصوصية</string>
     <string name="listen_history">سجل الاستماع</string>
     <string name="search_history">سجل البحث</string>
     <string name="pause_listen_history">إيقاف سجل الاستماع مؤقتاً</string>
-    <string name="pause_remote_listen_history">إيقاف مشاركة سجل الاستماع مع YouTube Music</string>
     <string name="clear_listen_history">مسح سجل الاستماع</string>
     <string name="clear_listen_history_confirm">هل أنت متأكد من أنك تريد مسح جميع سجل الاستماع؟</string>
     <string name="pause_search_history">إيقاف سجل البحث مؤقتاً</string>
@@ -457,12 +409,10 @@
     <string name="disable_screenshot">تعطيل لقطة الشاشة</string>
     <string name="disable_screenshot_desc">عندما يكون هذا الخيار قيد التشغيل، يتم تعطيل لقطات الشاشة وعرض التطبيقات في "التطبيقات قيد التشغيل"</string>
 
-    <string name="hide_explicit">إخفاء المحتوى الصريح</string>
 
     <string name="backup_restore">النسخ الاحتياطي والاستعادة</string>
     <string name="backup">نسخ احتياطي</string>
     <string name="restore">استعادة</string>
-    <string name="imported_playlist">قائمة التشغيل المستوردة</string>
     <string name="backup_create_success">تم إنشاء النسخ الاحتياطي بنجاح</string>
     <string name="backup_create_failed">تعذر إنشاء النسخ الاحتياطي</string>
     <string name="restore_failed">فشل في استعادة النسخ الاحتياطي</string>
@@ -481,7 +431,6 @@
 
 
     <string name="about">حول</string>
-    <string name="app_version">إصدار التطبيق</string>
 
     <string name="new_version_available">إصدار جديد متاح</string>
     <string name="translation_models">نماذج الترجمة</string>

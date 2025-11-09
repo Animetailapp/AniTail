@@ -107,6 +107,7 @@ import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.util.Consumer
@@ -145,6 +146,7 @@ import com.anitail.music.constants.StopMusicOnTaskClearKey
 import com.anitail.music.constants.UseNewMiniPlayerDesignKey
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.SearchHistory
+import com.anitail.music.downloads.DownloadLibraryRepository
 import com.anitail.music.extensions.toEnum
 import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.DownloadUtil
@@ -177,6 +179,7 @@ import com.anitail.music.ui.utils.appBarScrollBehavior
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.ui.utils.resetHeightOffset
 import com.anitail.music.utils.LocaleManager
+import com.anitail.music.utils.PermissionHelper
 import com.anitail.music.utils.SyncUtils
 import com.anitail.music.utils.Updater
 import com.anitail.music.utils.dataStore
@@ -212,6 +215,9 @@ class MainActivity : AppCompatActivity() {
     @Inject
     lateinit var syncUtils: SyncUtils
 
+    @Inject
+    lateinit var downloadLibraryRepository: DownloadLibraryRepository
+
     private lateinit var navController: NavHostController
     private var pendingIntent: Intent? = null
     private var latestVersionName by mutableStateOf(BuildConfig.VERSION_NAME)
@@ -234,6 +240,30 @@ class MainActivity : AppCompatActivity() {
                 playerConnection = null
             }
         }
+
+    /**
+     * Request storage permissions at startup if not already granted.
+     * Required for MediaStore downloads to Music/Anitail folder.
+     */
+    private fun requestStoragePermissionsIfNeeded() {
+        // Check if permissions are already granted
+        if (PermissionHelper.hasMediaStoreWritePermission(this)) {
+            Timber.d("Storage permissions already granted")
+            return
+        }
+
+        // Get required permissions for current Android version
+        val permissions = PermissionHelper.getRequiredWritePermissions()
+        if (permissions.isEmpty()) {
+            // Android 10+ with no permissions needed (shouldn't happen with our fixed code)
+            Timber.d("No storage permissions required")
+            return
+        }
+
+        // Request permissions
+        Timber.d("Requesting storage permissions at startup: ${permissions.joinToString()}")
+        ActivityCompat.requestPermissions(this, permissions, 2000)
+    }
 
     override fun onStart() {
         super.onStart()
@@ -284,6 +314,9 @@ class MainActivity : AppCompatActivity() {
         window.decorView.layoutDirection = View.LAYOUT_DIRECTION_LTR
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        // Request storage permissions at startup for MediaStore downloads
+        requestStoragePermissionsIfNeeded()
+
         lifecycleScope.launch {
             dataStore.data
                 .map { it[DisableScreenshotKey] ?: false }
@@ -306,6 +339,10 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Timber.e(e, "Failed to check backup permissions")
             }
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            downloadLibraryRepository.cleanupOrphans()
         }
 
         setContent {
@@ -687,6 +724,7 @@ class MainActivity : AppCompatActivity() {
                         LocalPlayerConnection provides playerConnection,
                         LocalPlayerAwareWindowInsets provides playerAwareWindowInsets,
                         LocalDownloadUtil provides downloadUtil,
+                        LocalDownloadLibraryRepository provides downloadLibraryRepository,
                         LocalShimmerTheme provides ShimmerTheme,
                         LocalSyncUtils provides syncUtils,
                     ) {
@@ -1384,4 +1422,6 @@ val LocalPlayerAwareWindowInsets =
     compositionLocalOf<WindowInsets> { error("No WindowInsets provided") }
 val LocalDownloadUtil = staticCompositionLocalOf<DownloadUtil> { error("No DownloadUtil provided") }
 val LocalSyncUtils = staticCompositionLocalOf<SyncUtils> { error("No SyncUtils provided") }
+val LocalDownloadLibraryRepository =
+    staticCompositionLocalOf<DownloadLibraryRepository> { error("No DownloadLibraryRepository provided") }
 

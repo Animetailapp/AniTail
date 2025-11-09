@@ -11,6 +11,8 @@ import java.time.ZoneOffset
 val DynamicThemeKey = booleanPreferencesKey("dynamicTheme")
 val DarkModeKey = stringPreferencesKey("darkMode")
 val PureBlackKey = booleanPreferencesKey("pureBlack")
+val DensityScaleKey = floatPreferencesKey("density_scale_factor")
+val CustomDensityScaleKey = floatPreferencesKey("custom_density_scale_value")
 val DefaultOpenTabKey = stringPreferencesKey("defaultOpenTab")
 val SlimNavBarKey = booleanPreferencesKey("slimNavBar")
 val GridItemsSizeKey = stringPreferencesKey("gridItemSize")
@@ -28,6 +30,19 @@ val AutoBackupUseCustomLocationKey = booleanPreferencesKey("autoBackupUseCustomL
 val UseNewPlayerDesignKey = booleanPreferencesKey("useNewPlayerDesign")
 val UseNewMiniPlayerDesignKey = booleanPreferencesKey("useNewMiniPlayerDesign")
 
+
+enum class DensityScale(val value: Float, val label: String) {
+    NATIVE(1.0f, "Native (100%)"),
+    COMPACT(0.75f, "Compact (75%)"),
+    VERY_COMPACT(0.65f, "Very Compact (65%)"),
+    ULTRA_COMPACT(0.55f, "Ultra Compact (55%)"),
+    CUSTOM(-1f, "Custom"),
+    ;
+
+    companion object {
+        fun fromValue(value: Float): DensityScale = entries.find { it.value == value } ?: CUSTOM
+    }
+}
 
 enum class SliderStyle {
     DEFAULT,
@@ -93,6 +108,7 @@ enum class NotificationButtonType {
 
 val MaxImageCacheSizeKey = intPreferencesKey("maxImageCacheSize")
 val MaxSongCacheSizeKey = intPreferencesKey("maxSongCacheSize")
+val MaxDownloadSizeKey = intPreferencesKey("maxDownloadSize")
 val JamEnabledKey = booleanPreferencesKey("jam_enabled")
 val JamHostKey = booleanPreferencesKey("jam_host")
 val JamHostIpKey = stringPreferencesKey("jam_host_ip")

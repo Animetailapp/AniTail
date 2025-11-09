@@ -1,6 +1,8 @@
 package com.anitail.music.ui.menu
 
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -56,13 +58,9 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadRequest
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.anitail.innertube.YouTube
@@ -80,13 +78,14 @@ import com.anitail.music.db.entities.Song
 import com.anitail.music.db.entities.SongArtistMap
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.models.toMediaMetadata
-import com.anitail.music.playback.ExoDownloadService
+import com.anitail.music.playback.MediaStoreDownloadManager
 import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.component.LocalBottomSheetPageState
 import com.anitail.music.ui.component.SongListItem
 import com.anitail.music.ui.component.TextFieldDialog
 import com.anitail.music.ui.utils.ShowMediaInfo
+import com.anitail.music.utils.PermissionHelper
 import com.anitail.music.viewmodels.CachePlaylistViewModel
 import com.anitail.music.viewmodels.LastFmViewModel
 import kotlinx.coroutines.Dispatchers
@@ -108,7 +107,8 @@ fun SongMenu(
     val playerConnection = LocalPlayerConnection.current ?: return
     val songState = database.song(originalSong.id).collectAsState(initial = originalSong)
     val song = songState.value ?: originalSong
-    val download by LocalDownloadUtil.current.getDownload(originalSong.id)
+    val downloadUtil = LocalDownloadUtil.current
+    val mediaStoreDownload by downloadUtil.getMediaStoreDownload(originalSong.id)
         .collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
     val syncUtils = LocalSyncUtils.current
@@ -118,6 +118,24 @@ fun SongMenu(
     val cacheViewModel = viewModel<CachePlaylistViewModel>()
     val lastFmViewModel: LastFmViewModel = hiltViewModel()
     val lastFmUiState by lastFmViewModel.uiState.collectAsStateWithLifecycle()
+
+    // Permission launcher for storage access
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions.values.all { it }) {
+            // All permissions granted, proceed with download
+            downloadUtil.downloadToMediaStore(song)
+            onDismiss()
+        } else {
+            // Permissions denied - show error message
+            android.widget.Toast.makeText(
+                context,
+                context.getString(R.string.storage_permission_required),
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+    }
 
     val rotationAnimation by animateFloatAsState(
         targetValue = refetchIconDegree,
@@ -613,50 +631,77 @@ fun SongMenu(
             }
         }
         item {
-            when (download?.state) {
-                Download.STATE_COMPLETED -> {
+            when (mediaStoreDownload?.status) {
+                MediaStoreDownloadManager.DownloadState.Status.COMPLETED -> {
                     ListItem(
                         headlineContent = {
                             Text(
-                                text = stringResource(R.string.remove_download),
-                                color = MaterialTheme.colorScheme.error
+                                text = stringResource(R.string.downloaded_to_device),
+                                color = MaterialTheme.colorScheme.primary
                             )
                         },
                         leadingContent = {
                             Icon(
-                                painter = painterResource(R.drawable.offline),
+                                painter = painterResource(R.drawable.download),
                                 contentDescription = null,
                             )
                         },
                         modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false,
-                            )
+                            // TODO: Option to remove from MediaStore
+                            onDismiss()
                         }
                     )
                 }
-                Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
+
+                MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING,
+                MediaStoreDownloadManager.DownloadState.Status.QUEUED -> {
+                    val downloadState = mediaStoreDownload!!
                     ListItem(
-                        headlineContent = { Text(text = stringResource(R.string.downloading)) },
+                        headlineContent = {
+                            Text(text = stringResource(R.string.downloading_to_device))
+                        },
+                        supportingContent = {
+                            Text(text = "${(downloadState.progress * 100).toInt()}%")
+                        },
                         leadingContent = {
                             CircularProgressIndicator(
+                                progress = { downloadState.progress },
                                 modifier = Modifier.size(24.dp),
                                 strokeWidth = 2.dp
                             )
                         },
                         modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false,
-                            )
+                            downloadUtil.cancelMediaStoreDownload(song.id)
+                            onDismiss()
                         }
                     )
                 }
+
+                MediaStoreDownloadManager.DownloadState.Status.FAILED -> {
+                    val downloadState = mediaStoreDownload!!
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = stringResource(R.string.download_failed),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        },
+                        supportingContent = {
+                            Text(text = downloadState.error ?: "Unknown error")
+                        },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.info),
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            downloadUtil.retryMediaStoreDownload(song.id)
+                            onDismiss()
+                        }
+                    )
+                }
+
                 else -> {
                     ListItem(
                         headlineContent = { Text(text = stringResource(R.string.download)) },
@@ -667,18 +712,13 @@ fun SongMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            val downloadRequest =
-                                DownloadRequest
-                                    .Builder(song.id, song.id.toUri())
-                                    .setCustomCacheKey(song.id)
-                                    .setData(song.song.title.toByteArray())
-                                    .build()
-                            DownloadService.sendAddDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                downloadRequest,
-                                false,
-                            )
+                            if (PermissionHelper.hasMediaStoreWritePermission(context)) {
+                                downloadUtil.downloadToMediaStore(song)
+                                onDismiss()
+                            } else {
+                                val permissions = PermissionHelper.getRequiredWritePermissions()
+                                permissionLauncher.launch(permissions)
+                            }
                         }
                     )
                 }

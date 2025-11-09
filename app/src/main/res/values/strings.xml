@@ -19,7 +19,6 @@
     <string name="mood_and_genres">Mood and Genres</string>
     <string name="account">Account</string>
     <string name="quick_picks">Quick picks</string>
-    <string name="quick_picks_empty">Listen to songs to generate your quick picks</string>
     <string name="new_release_albums">New releases</string>
     <string name="forgotten_favorites">Forgotten favorites</string>
     <string name="similar_to">Similar to</string>
@@ -36,20 +35,12 @@
 
     <!-- Charts -->
     <string name="charts">Charts</string>
-    <string name="back_button_desc">Back</string>
-    <string name="no_title">No title</string>
     <string name="unknown_artist">Unknown artist</string>
-    <string name="unknown_item_type">Unknown item type</string>
-    <string name="loading_charts">Loading charts…</string>
-    <string name="retry_button">Retry</string>
-    <string name="album_cover_desc">Album cover</string>
     <string name="top_music_videos">Top Music Videos</string>
     <string name="trending">Trending</string>
 
     <!-- Stats -->
     <string name="most_played_songs">Most played songs</string>
-    <string name="most_played_artists">Most played artists</string>
-    <string name="most_played_albums">Most played albums</string>
     <string name="weeks">Weeks</string>
     <string name="months">Months</string>
     <string name="years">Years</string>
@@ -70,11 +61,9 @@
     <string name="filter_playlists">Playlists</string>
     <string name="filter_community_playlists">Community playlists</string>
     <string name="filter_featured_playlists">Featured playlists</string>
-    <string name="filter_bookmarked">Bookmarked</string>
     <string name="no_results_found">No results found</string>
 
     <!-- Artist screen -->
-    <string name="from_your_library">From your library</string>
 
     <!-- Album screen -->
     <string name="other_versions">Other versions</string>
@@ -84,10 +73,8 @@
     <string name="offline">Downloaded</string>
     <string name="my_top">My Top</string>
     <string name="cached_playlist">Cached</string>
-    <string name="library_song_empty">Library songs will show up here</string>
     <string name="library_artist_empty">Library artists will show up here</string>
     <string name="library_album_empty">Library albums will show up here</string>
-    <string name="library_playlist_empty">Your playlists will show up here</string>
 
     <!-- Playlist -->
     <string name="liked_songs">Liked songs</string>
@@ -101,7 +88,6 @@
     <string name="allows_for_sync_witch_youtube">Note: This allows for syncing with YouTube Music. This is NOT changeable later.</string>
 
     <!-- Button -->
-    <string name="retry">Retry</string>
     <string name="radio">Radio</string>
     <string name="shuffle">Shuffle</string>
     <string name="reset">Reset</string>
@@ -112,10 +98,8 @@
     <string name="start_radio">Start radio</string>
     <string name="play">Play</string>
     <string name="play_next">Play next</string>
-    <string name="added_to_play_next">Added to play next</string>
 
     <string name="add_to_queue">Add to queue</string>
-    <string name="added_to_queue">Added to the queue</string>
     <string name="add_to_library">Add to library</string>
     <string name="remove_from_library">Remove from library</string>
     <string name="remove_from_playlist">Remove from playlist</string>
@@ -123,6 +107,13 @@
     <string name="download">Download</string>
     <string name="downloading">Downloading</string>
     <string name="remove_download">Remove download</string>
+
+    <!-- MediaStore downloads -->
+    <string name="downloading_to_device">Downloading</string>
+    <string name="downloaded_to_device">Downloaded</string>
+    <string name="download_failed">Download failed</string>
+    <string name="retry_download">Retry download</string>
+    <string name="storage_permission_required">Storage permission required</string>
     <string name="import_playlist">Import playlist</string>
     <string name="add_to_playlist">Add to playlist</string>
     <string name="view_artist">View artist</string>
@@ -137,7 +128,6 @@
     <string name="delete">Delete</string>
     <string name="remove_from_history">Remove from history</string>
     <string name="search_online">Search online</string>
-    <string name="sync">Sync</string>
     <string name="advanced">Advanced</string>
     <string name="select">Select all</string>
     <string name="like_all">Like all</string>
@@ -168,7 +158,6 @@
     <string name="copied">Copied to clipboard</string>
     <string name="link_copied">Link copied to clipboard</string>
 
-    <string name="edit_lyrics">Edit lyrics</string>
     <string name="search_lyrics">Search lyrics</string>
     <string name="lyrics">Lyrics</string>
     <string name="lyrics_auto_scroll">Auto scroll lyrics</string>
@@ -177,20 +166,14 @@
     <string name="edit_song">Edit song</string>
     <string name="song_title">Song title</string>
     <string name="song_artists">Song artists</string>
-    <string name="error_song_title_empty">Song title cannot be empty.</string>
-    <string name="error_song_artist_empty">Song artist cannot be empty.</string>
     <string name="save">Save</string>
 
-    <string name="choose_playlist">Choose playlist</string>
     <string name="edit_playlist">Edit playlist</string>
     <string name="create_playlist">Create playlist</string>
     <string name="playlist_name">Playlist name</string>
-    <string name="error_playlist_name_empty">Playlist name cannot be empty.</string>
     <string name="already_in_playlist">Already in playlist:</string>
 
-    <string name="edit_artist">Edit artist</string>
     <string name="artist_name">Artist name</string>
-    <string name="error_artist_name_empty">Artist name cannot be empty.</string>
 
     <string name="duplicates">Duplicates</string>
     <string name="skip_duplicates">Skip duplicates</string>
@@ -245,8 +228,6 @@
     </plurals>
 
     <!-- Snackbar -->
-    <string name="playlist_imported">Playlist imported</string>
-    <string name="imported_playlist">Imported playlist</string>
     <string name="removed_song_from_playlist">Removed \"%s\" from playlist</string>
     <string name="playlist_synced">Playlist synced</string>
     <string name="undo">Undo</string>
@@ -260,9 +241,7 @@
         <item quantity="one">1 minute</item>
         <item quantity="other">%d minutes</item>
     </plurals>
-    <string name="error_no_stream">No stream available</string>
     <string name="error_no_internet">No network connection</string>
-    <string name="error_timeout">Timeout</string>
     <string name="error_unknown">Unknown error</string>
     <string name="seek_backward">5 seconds backward</string>
     <string name="seek_forward">5 seconds forward</string>
@@ -278,12 +257,12 @@
     <!-- Cast / Queue management -->
     <string name="manage_queue">Manage queue</string>
     <string name="queue_empty">Queue is empty</string>
-    <string name="remove_from_queue">Remove from queue</string>
 
     <!-- Queue Title -->
     <string name="queue_all_songs">All songs</string>
     <string name="queue_searched_songs">Searched songs</string>
     <string name="similar_content">Similar content</string>
+    <string name="offline_player_empty_state_title">No downloads yet</string>
 
     <!-- Notification name -->
     <string name="music_player">Music Player</string>
@@ -299,11 +278,9 @@
     <string name="category_content">Content</string>
     <string name="category_player">Player</string>
     <string name="category_system">System</string>
-    <string name="login_settings">Login settings</string>
     <string name="use_login_for_browse">Use login for browsing more content</string>
     <string name="use_login_for_browse_desc">This can shows more content if you are logged in with YTMusic account</string>
 
-    <string name="general_settings">General settings</string>
 
     <string name="appearance">Appearance</string>
     <string name="theme">Theme</string>
@@ -320,15 +297,11 @@
     <string name="player_buttons_style">Player button colors</string>
     <string name="default_style">Default</string>
     <string name="secondary_color_style">Secondary</string>
-    <string name="enable_squiggly_slider">Enable squiggly slider</string>
     <string name="enable_swipe_thumbnail">Enable swipe to change song</string>
     <string name="swipe_song_to_add">Swipe song to right for play next or left for adding to queue</string>
     <string name="pure_black">Pure black</string>
-    <string name="customize_navigation_tabs">Customize navigation tabs</string>
     <string name="player">Player</string>
-    <string name="player_text_alignment">Player text alignment</string>
     <string name="lyrics_text_position">Lyrics text position</string>
-    <string name="sided">Sided</string>
     <string name="left">Left</string>
     <string name="center">Center</string>
     <string name="right">Right</string>
@@ -336,10 +309,8 @@
     <string name="lyrics_font_size">Lyrics font size</string>
     <string name="lyrics_custom_font">Lyrics font style</string>
     <string name="use_system_font">Use system font</string>
-    <string name="load_custom_font">Load custom font</string>
     <string name="smooth_lyrics_animation">Smooth lyrics animation</string>
     <string name="font_size_preview">Sample lyrics text for preview</string>
-    <string name="select_font_file">Select font file (.ttf/.otf)</string>
     <string name="font_loading_error">Error loading font file</string>
     <string name="font_loaded_successfully">Font loaded successfully</string>
     <string name="grid_cell_size">Grid cell size</string>
@@ -386,20 +357,13 @@
     <string name="default_lib_chips">Change default library chip</string>
     <string name="set_quick_picks">Set quick picks</string>
     <string name="last_song_listened">Based on last song listened</string>
-    <string name="restart_to_take_effect">Restart to take effect</string>
     <string name="app_language">App language</string>
-    <string name="configure_app_language">Configure app languages</string>
-    <string name="intent_app_language_not_found">Couldn\'t find app language settings, please configure them manually</string>
-    <string name="open_supported_links">Open supported link by default</string>
-    <string name="configure_supported_links">Configure supported links</string>
-    <string name="intent_supported_links_not_found">Couldn\'t find supported links settings, please configure them manually</string>
     <string name="enable_kugou">Enable KuGou lyrics provider</string>
     <string name="enable_lrclib">Enable LrcLib lyrics provider</string>
     <string name="set_first_lyrics_provider">Preferred lyrics provider</string>
 
     <string name="player_and_audio">Player and audio</string>
     <string name="audio_quality">Audio quality</string>
-    <string name="audio_quality_max">Max (beta)</string>
     <string name="audio_quality_auto">Auto</string>
     <string name="audio_quality_high">High</string>
     <string name="audio_quality_low">Low</string>
@@ -420,33 +384,23 @@
     <string name="auto_download_on_like_desc">Automatically download songs when you like them</string>
     <string name="auto_download_lyrics">Auto download lyrics</string>
     <string name="auto_download_lyrics_desc">Automatically download lyrics for downloaded songs</string>
-    <string name="min_playback_duration_title">Minimum playback duration</string>
-    <string name="min_playback_duration_description">The minimum amount of a song that must be played before it is considered \"played\"</string>
-    <string name="percentage_format">%d%%</string>
-    <string name="minimum_playback_duration">Minimum playback duration</string>
 
     <string name="storage">Storage</string>
-    <string name="cache">Cache</string>
     <string name="image_cache">Image Cache</string>
     <string name="song_cache">Song Cache</string>
     <string name="max_cache_size">Max cache size</string>
     <string name="unlimited">Unlimited</string>
     <string name="clear_all_downloads">Clear all downloads</string>
-    <string name="max_image_cache_size">Max image cache size</string>
     <string name="clear_image_cache">Clear image cache</string>
-    <string name="max_song_cache_size">Max song cache size</string>
     <string name="clear_song_cache">Clear song cache</string>
     <string name="size_used">%s used</string>
-    <string name="clear_song_cache_dialog">  Are you sure you want to clear all cached songs?</string>
 
-    <string name="clear_downloads_dialog">  Are you sure you want to clear all downloads?</string>
 
 
     <string name="privacy">Privacy</string>
     <string name="listen_history">Listen History</string>
     <string name="search_history">Search History</string>
     <string name="pause_listen_history">Pause listen history</string>
-    <string name="pause_remote_listen_history">Pause share listen history with YouTube Music</string>
     <string name="clear_listen_history">Clear listen history</string>
     <string name="clear_listen_history_confirm">Are you sure you want to clear all listen history?</string>
     <string name="pause_search_history">Pause search history</string>
@@ -455,7 +409,6 @@
     <string name="disable_screenshot">Disable screenshot</string>
     <string name="disable_screenshot_desc">When this option is on, screenshots and the app\'s view in Recents are disabled.</string>
 
-    <string name="hide_explicit">Hide explicit content</string>
 
     <string name="backup_restore">Backup and restore</string>
     <string name="backup">Backup</string>
@@ -468,7 +421,6 @@
     <string name="dismiss">Dismiss</string>
     <string name="options">Options</string>
     <string name="preview">Preview</string>
-    <string name="login_failed">Login failed</string>
     <string name="not_logged_in_youtube">Not logged in to YouTube</string>
     <string name="enable_discord_rpc">Enable Rich Presence</string>
     <string name="discord_connection_state">Connection</string>
@@ -494,18 +446,13 @@
     <string name="release_notes">Release Notes</string>
     <!--about screen-->
     <string name="about">About</string>
-    <string name="app_version">App version</string>
     <string name="links_about" translatable="false">Links</string>
     <string name="developer_about" translatable="false">Developers</string>
     <string name="build_type">App Status |</string>
     <string name="version">Version |</string>
     <string name="official_build" translatable="false">Build |</string>
-    <string name="official">Official and Verified</string>
     <string name="device">Device |</string>
-    <string name="donate_info">Support me and projects</string>
-    <string name="developer">Developer</string>
     <string name="info_dev">Developed by a technology enthusiast</string>
-    <string name="info_app">Information</string>
     <string name="other_apps">Other Android Apps</string>
     <string name="other_apps_info">All Animetailapp Software android apps</string>
     <string name="my_channel">Discord Server</string>
@@ -544,12 +491,7 @@
     <string name="instruction_5">5. Accept the terms of service and click "Save".</string>
     <string name="instruction_6">You’ll be redirected to a new page. Click on Settings, then copy the Client ID and Client Secret, and paste them into the text fields below in this app.</string>
     <string name="instruction_7">Now, click the <b>Authorize and Continue</b> button below and login with your account from which you want to import from, and Authorize and Continue, which will redirect you to a site which should start from <b>http://127.0.0.1:8888/?code=</b>\n\nPaste that entire URL in the below text field which says <b>Authorization Code</b> and click the <b>Authenticate</b> button.</string>
-    <string name="instruction_8">Make sure to click "Add" once you ve entered the local path above.</string>
-    <string name="instruction_9">Toggle <b>Web API</b>. The checkbox should now have a tick mark.</string>
     <string name="instructions_title">Instructions to get required credentials</string>
-    <string name="spotify_dashboard">Spotify for developers dashboard</string>
-    <string name="spotify_redirect_uri">http://127.0.0.1:8888</string>
-    <string name="spotify_redirect_uri_label">Redirect URIs</string>
     <string name="authorize_and_continue">Authorize and Continue</string>
     <string name="authenticate">Authenticate</string>
     <string name="import_in_progress">Import in progress…</string>
@@ -598,8 +540,6 @@
     <string name="upload_error">Error uploading backup. Please try again.</string>
     <string name="enable_backup_upload">Enable backup upload</string>
     <string name="enable_backup_upload_desc">Automatically upload your backup to a temporary cloud storage for sharing</string>
-    <string name="run_backup_now">Run backup now</string>
-    <string name="run_backup_now_desc">Create a backup immediately without waiting for the scheduled time</string>
     <!-- JAM LAN Sync -->
     <string name="jam_lan_sync">JAM LAN Sync</string>
     <string name="jam_enable_lan_sync">Enable LAN sync</string>
@@ -607,7 +547,6 @@
     <string name="jam_host_mode">Host (server)</string>
     <string name="jam_client_mode">Client</string>
     <string name="jam_host_ip">Host IP</string>
-    <string name="jam_clients_connect_info">Clients can connect using your local IP address</string>
     <string name="jam_show_connection_history">Show connection history</string>
     <string name="jam_hide_connection_history">Hide connection history</string>
     <string name="jam_active_connections">Active connections</string>
@@ -632,11 +571,9 @@
     <string name="jam_manual_entry">Manual entry</string>
     <string name="jam_recent_connections">Recent connections</string>
     <string name="jam_hide">Hide</string>
-    <string name="jam_show">Show</string>
 
     <!-- Auto Update -->
     <string name="update_settings">Update settings</string>
-    <string name="auto_updates">Automatic Updates</string>
     <string name="auto_update_enabled">Enable automatic updates</string>
     <string name="auto_update_enabled_description">Automatically check for and download new updates</string>
     <string name="update_check_frequency">Update check frequency</string>
@@ -692,11 +629,7 @@
     <string name="tap_to_set_background">Tap to set background image</string>
     <string name="enter_image_url">Enter image URL</string>
     <string name="image_url">Image URL</string>
-    <string name="error_loading_image">Error loading image</string>
     <string name="background_image">Background Image</string>
-    <string name="image_url_hint">Enter the URL of an image (JPG, PNG, etc.). Make sure the URL starts with http:// or https://</string>
-    <string name="set_background_image">Set background image</string>
-    <string name="remove_background_image">Remove background image</string>
     <!-- Last.fm -->
     <string name="lastfm_settings">Last.fm</string>
     <string name="login_to_lastfm">Login to Last.fm</string>
@@ -713,38 +646,25 @@
     <string name="password">Password</string>
 
     <!-- Last.fm Extended Settings -->
-    <string name="profile_info">Profile Information</string>
     <string name="scrobble_progress">Scrobble Progress</string>
     <string name="user_country">Country: %s</string>
     <string name="user_age">Age: %s</string>
-    <string name="user_friends">Friends: %d</string>
     <string name="pending_scrobbles">Pending scrobbles: %d</string>
     <string name="scrobbles_synced">All scrobbles synced</string>
     <string name="lastfm_profile_picture">Last.fm Profile Picture</string>
-    <string name="show_lastfm_avatar">Show Last.fm avatar</string>
-    <string name="show_lastfm_avatar_description">Display your Last.fm profile picture in the app</string>
-    <string name="lastfm_theme">Last.fm Theme</string>
-    <string name="lastfm_theme_description">Use a Last.fm specific dark/light theme</string>
-    <string name="sync_progress_indicator">Sync Progress</string>
     <string name="syncing_scrobbles">Syncing scrobbles…</string>
     <string name="recent_tracks">Recent Tracks</string>
-    <string name="view_recent_tracks">View recent tracks</string>
     <string name="top_tracks">Top Tracks</string>
-    <string name="view_top_tracks">View top tracks</string>
     <string name="top_artists">Top Artists</string>
-    <string name="view_top_artists">View top artists</string>
     <string name="no_top_tracks_data">No top tracks data available. Listen to more music to see your statistics!</string>
     <string name="no_recent_tracks_data">No recent tracks data available.</string>
     <string name="no_top_artists_data">No top artists data available. Listen to more music to see your statistics!</string>
     <string name="retry_pending_scrobbles">Retry pending scrobbles</string>
     <string name="clear_pending_scrobbles">Clear pending scrobbles</string>
-    <string name="scrobble_queue_management">Scrobble Queue</string>
    <string name="lyrics_romanize_japanese">Romanize Japanese Lyrics</string>
     <string name="lyrics_romanize_korean">Romanize Korean Lyrics</string>
-    <string name="lyrics_romanize_chinese">Romanize Chinese Lyrics</string>
     <string name="new_player_design">New player design</string>
     <string name="swipe_sensitivity">Swipe sensitivity</string>
-    <string name="swipe_sensitivity_desc">Adjust how sensitive swipe gestures are for changing songs</string>
     <string name="subscribed">Subscribed</string>
     <string name="subscribe">Subscribe</string>
     <string name="new_mini_player_design">New mini player design</string>
@@ -766,7 +686,6 @@
     <!-- Cast Settings -->
     <string name="enable_cast">Enable Cast</string>
     <string name="enable_cast_desc">Allow casting media to compatible devices. Requires Google Play Services.</string>
-    <string name="cast_unavailable">Cast unavailable</string>
     <string name="cast_requires_google_play_services">Cast functionality requires Google Play Services to be available on your device.</string>
 
     <!-- Cast queue loading progress -->
@@ -795,7 +714,6 @@
     <string name="line_by_line_option_desc">The Cyrillic language will be detected line by line instead of the entire song.</string>
     <string name="line_by_line_dialog_title">Are you sure?</string>
     <string name="line_by_line_dialog_desc">This is a hit or miss experimental feature. \n\nBy default, language is determined from the whole song, but with this option on, it will be determined line by line instead. This will allow multi-language songs to work BUT the language might not always be correct (for example if there is a Ukrainian lyric that doesn\'t contain any Ukrainian-specific letters, it might be romanized as Russian instead). \n\nIf you do not have issues, it is recommended to keep this option off.</string>
-    <string name="line_by_line_dialog_enable">Enable</string>
     <string name="romanize_current_track">Romanize current track</string>
     <!-- Offload -->
     <string name="audio_offload">Enable offload</string>

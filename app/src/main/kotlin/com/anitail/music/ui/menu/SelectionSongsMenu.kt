@@ -29,11 +29,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import com.anitail.innertube.YouTube
 import com.anitail.music.LocalDatabase
@@ -50,6 +48,7 @@ import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.DefaultDialog
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -111,10 +110,6 @@ fun SelectionSongMenu(
 
     var showChoosePlaylistDialog by rememberSaveable {
         mutableStateOf(false)
-    }
-
-    val notAddedList by remember {
-        mutableStateOf(mutableListOf<Song>())
     }
 
     AddToPlaylistDialog(
@@ -337,18 +332,7 @@ fun SelectionSongMenu(
                         },
                         modifier = Modifier.clickable {
                             songSelection.forEach { song ->
-                                val downloadRequest =
-                                    DownloadRequest
-                                        .Builder(song.id, song.id.toUri())
-                                        .setCustomCacheKey(song.id)
-                                        .setData(song.song.title.toByteArray())
-                                        .build()
-                                DownloadService.sendAddDownload(
-                                    context,
-                                    ExoDownloadService::class.java,
-                                    downloadRequest,
-                                    false,
-                                )
+                                downloadUtil.downloadToMediaStore(song)
                             }
                         }
                     )
@@ -435,10 +419,6 @@ fun SelectionMediaMetadataMenu(
 
     var showChoosePlaylistDialog by rememberSaveable {
         mutableStateOf(false)
-    }
-
-    val notAddedList by remember {
-        mutableStateOf(mutableListOf<Song>())
     }
 
     AddToPlaylistDialog(
@@ -700,19 +680,11 @@ fun SelectionMediaMetadataMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            songSelection.forEach { song ->
-                                val downloadRequest =
-                                    DownloadRequest
-                                        .Builder(song.id, song.id.toUri())
-                                        .setCustomCacheKey(song.id)
-                                        .setData(song.title.toByteArray())
-                                        .build()
-                                DownloadService.sendAddDownload(
-                                    context,
-                                    ExoDownloadService::class.java,
-                                    downloadRequest,
-                                    false,
-                                )
+                            coroutineScope.launch(Dispatchers.IO) {
+                                songSelection.forEach { mediaMetadata ->
+                                    val song = database.song(mediaMetadata.id).first()
+                                    song?.let { downloadUtil.downloadToMediaStore(it) }
+                                }
                             }
                         }
                     )
