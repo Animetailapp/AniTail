@@ -146,6 +146,7 @@ import com.anitail.music.constants.StopMusicOnTaskClearKey
 import com.anitail.music.constants.UseNewMiniPlayerDesignKey
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.SearchHistory
+import com.anitail.music.downloads.DownloadLibraryRepository
 import com.anitail.music.extensions.toEnum
 import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.DownloadUtil
@@ -213,6 +214,9 @@ class MainActivity : AppCompatActivity() {
 
     @Inject
     lateinit var syncUtils: SyncUtils
+
+    @Inject
+    lateinit var downloadLibraryRepository: DownloadLibraryRepository
 
     private lateinit var navController: NavHostController
     private var pendingIntent: Intent? = null
@@ -335,6 +339,10 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Timber.e(e, "Failed to check backup permissions")
             }
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            downloadLibraryRepository.cleanupOrphans()
         }
 
         setContent {
@@ -716,6 +724,7 @@ class MainActivity : AppCompatActivity() {
                         LocalPlayerConnection provides playerConnection,
                         LocalPlayerAwareWindowInsets provides playerAwareWindowInsets,
                         LocalDownloadUtil provides downloadUtil,
+                        LocalDownloadLibraryRepository provides downloadLibraryRepository,
                         LocalShimmerTheme provides ShimmerTheme,
                         LocalSyncUtils provides syncUtils,
                     ) {
@@ -1413,4 +1422,6 @@ val LocalPlayerAwareWindowInsets =
     compositionLocalOf<WindowInsets> { error("No WindowInsets provided") }
 val LocalDownloadUtil = staticCompositionLocalOf<DownloadUtil> { error("No DownloadUtil provided") }
 val LocalSyncUtils = staticCompositionLocalOf<SyncUtils> { error("No SyncUtils provided") }
+val LocalDownloadLibraryRepository =
+    staticCompositionLocalOf<DownloadLibraryRepository> { error("No DownloadLibraryRepository provided") }
 

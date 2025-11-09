@@ -20,7 +20,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
@@ -58,6 +60,9 @@ constructor(
     // Concurrent download limiter (max 3 simultaneous downloads)
     private val downloadSemaphore = Semaphore(MAX_CONCURRENT_DOWNLOADS)
 
+    // Mutex to protect against duplicate downloads from concurrent requests
+    private val downloadMutex = Mutex()
+
     // Download state tracking
     private val _downloadStates = MutableStateFlow<Map<String, DownloadState>>(emptyMap())
     val downloadStates: StateFlow<Map<String, DownloadState>> = _downloadStates.asStateFlow()
@@ -71,7 +76,7 @@ constructor(
         private const val MAX_RETRY_ATTEMPTS = 3
         private const val INITIAL_RETRY_DELAY_MS = 1000L
         private const val RETRY_BACKOFF_MULTIPLIER = 2.0
-        private const val DEFAULT_AUDIO_FORMAT = "opus"
+        private const val UNKNOWN_ARTIST_NAME = "Unknown Artist"
     }
 
     /**
@@ -102,51 +107,67 @@ constructor(
      */
     fun downloadSong(song: Song) {
         scope.launch {
-            // Start notification service
+
             MediaStoreDownloadService.Companion.start(context)
-            // Check if already downloading or completed
-            val currentState = _downloadStates.value[song.id]
-            if (currentState?.status == DownloadState.Status.DOWNLOADING ||
-                currentState?.status == DownloadState.Status.COMPLETED
-            ) {
-                Timber.Forest.d("Song ${song.song.title} is already downloading or completed")
-                return@launch
-            }
+            downloadMutex.withLock {
+                // Check if already downloading or completed
+                val currentState = _downloadStates.value[song.id]
+                if (currentState?.status == DownloadState.Status.DOWNLOADING ||
+                    currentState?.status == DownloadState.Status.COMPLETED
+                ) {
+                    Timber.Forest.d("Song ${song.song.title} is already downloading or completed (status: ${currentState.status})")
+                    return@launch
+                }
 
-            // Check if already exists in MediaStore
-            val existingFile = mediaStoreHelper.findExistingFile(
-                title = song.song.title,
-                artist = song.artists.firstOrNull()?.name ?: "Unknown"
-            )
-            if (existingFile != null) {
-                Timber.Forest.d("Song ${song.song.title} already exists in MediaStore")
-                updateDownloadState(
-                    song.id,
-                    DownloadState(
-                        songId = song.id,
-                        status = DownloadState.Status.COMPLETED,
-                        progress = 1f
-                    )
-                )
-                markSongAsDownloaded(song.id, existingFile.toString())
-                return@launch
-            }
-
-            // Add to queue
-            synchronized(downloadQueue) {
-                if (!downloadQueue.any { it.id == song.id }) {
-                    downloadQueue.add(song)
+                // Check if already downloaded in database (has mediaStoreUri)
+                if (!song.song.mediaStoreUri.isNullOrEmpty()) {
+                    Timber.Forest.d("Song ${song.song.title} is already downloaded in database: ${song.song.mediaStoreUri}")
                     updateDownloadState(
                         song.id,
                         DownloadState(
                             songId = song.id,
-                            status = DownloadState.Status.QUEUED
+                            status = DownloadState.Status.COMPLETED,
+                            progress = 1f
                         )
                     )
+                    return@launch
+                }
+
+                // Check if already exists in MediaStore
+                val primaryArtist = resolvePrimaryArtist(song)
+
+                val existingFile = mediaStoreHelper.findExistingFile(
+                    title = song.song.title,
+                    artist = primaryArtist
+                )
+                if (existingFile != null) {
+                    Timber.Forest.d("Song ${song.song.title} already exists in MediaStore: $existingFile")
+                    updateDownloadState(
+                        song.id,
+                        DownloadState(
+                            songId = song.id,
+                            status = DownloadState.Status.COMPLETED,
+                            progress = 1f
+                        )
+                    )
+                    markSongAsDownloaded(song.id, existingFile.toString())
+                    return@launch
+                }
+
+                // Add to queue
+                synchronized(downloadQueue) {
+                    if (!downloadQueue.any { it.id == song.id }) {
+                        downloadQueue.add(song)
+                        updateDownloadState(
+                            song.id,
+                            DownloadState(
+                                songId = song.id,
+                                status = DownloadState.Status.QUEUED
+                            )
+                        )
+                    }
                 }
             }
-
-            // Start download
             processQueue()
         }
     }
@@ -158,16 +179,14 @@ constructor(
      */
     fun cancelDownload(songId: String) {
         scope.launch {
-            // Cancel active download
+
             activeDownloads[songId]?.cancel()
             activeDownloads.remove(songId)
 
-            // Remove from queue
             synchronized(downloadQueue) {
                 downloadQueue.removeAll { it.id == songId }
             }
 
-            // Update state
             updateDownloadState(
                 songId,
                 DownloadState(
@@ -206,29 +225,30 @@ constructor(
     /**
      * Process the download queue
      */
-    private suspend fun processQueue() {
+    private fun processQueue() {
         val song = synchronized(downloadQueue) {
             downloadQueue.firstOrNull()
         } ?: return
 
-        // Try to acquire semaphore (limit concurrent downloads)
-        if (downloadSemaphore.tryAcquire()) {
-            val job = scope.launch {
-                try {
-                    performDownload(song)
-                } finally {
-                    downloadSemaphore.release()
-                    synchronized(downloadQueue) {
-                        downloadQueue.remove(song)
-                    }
-                    activeDownloads.remove(song.id)
-
-                    // Process next item in queue
-                    processQueue()
-                }
-            }
-            activeDownloads[song.id] = job
+        if (!downloadSemaphore.tryAcquire()) {
+            return
         }
+
+        synchronized(downloadQueue) {
+            downloadQueue.remove(song)
+        }
+
+        val job = scope.launch {
+            try {
+                performDownload(song)
+            } finally {
+                downloadSemaphore.release()
+                activeDownloads.remove(song.id)
+
+                processQueue()
+            }
+        }
+        activeDownloads[song.id] = job
     }
 
     /**
@@ -257,28 +277,25 @@ constructor(
 
                 val format = playbackData.format
                 val downloadUrl = playbackData.streamUrl
-
-                // Create temporary file for download
-                val tempFile =
-                    File(context.cacheDir, "temp_${song.id}.${format.mimeType.substringAfter("/")}")
+                val tempFileName = "temp_${song.id}_${System.currentTimeMillis()}_${retryAttempt}.${
+                    format.mimeType.substringAfter("/")
+                }"
+                val tempFile = File(context.cacheDir, tempFileName)
 
                 try {
-                    // Download to temp file
-                    downloadFile(downloadUrl, tempFile, song.id)
 
-                    // Verify temp file was created
-                    Timber.Forest.d("Temp file created: ${tempFile.exists()}, size: ${tempFile.length()} bytes, path: ${tempFile.absolutePath}")
+                    downloadFile(downloadUrl, tempFile, song.id)
 
                     if (!tempFile.exists() || tempFile.length() == 0L) {
                         throw Exception("Download failed - temp file not created or empty")
                     }
-
                     // Get audio metadata
                     val title = song.song.title
-                    val artist = song.artists.firstOrNull()?.name ?: "Unknown Artist"
+                    val artist = resolvePrimaryArtist(song)
                     val album = song.album?.title
-                    val duration = song.song.duration?.times(1000L) // Convert to milliseconds
-                    // Force MP3 extension for MediaStore compatibility (Android doesn't support audio/webm)
+                    val duration = song.song.duration.takeIf { it > 0 }
+                        ?.times(1000L) // Convert to milliseconds
+                    val year = song.song.year
                     val extension = "mp3"
                     val mimeType = mediaStoreHelper.getMimeType(extension)
 
@@ -291,7 +308,8 @@ constructor(
                         title = title,
                         artist = artist,
                         album = album,
-                        durationMs = duration
+                        durationMs = duration,
+                        year = year
                     )
 
                     if (uri != null) {
@@ -308,14 +326,17 @@ constructor(
                         // Update database with MediaStore URI
                         markSongAsDownloaded(song.id, uri.toString())
 
-                        Timber.Forest.d("Download completed: ${song.song.title} -> $uri")
                     } else {
                         throw Exception("Failed to save file to MediaStore")
                     }
                 } finally {
-                    // Clean up temp file
-                    if (tempFile.exists()) {
-                        tempFile.delete()
+                    try {
+                        if (tempFile.exists()) {
+                            tempFile.delete()
+                            Timber.Forest.d("Cleaned up temp file: ${tempFile.absolutePath}")
+                        }
+                    } catch (e: Exception) {
+                        Timber.Forest.w(e, "Failed to delete temp file: ${tempFile.absolutePath}")
                     }
                 }
 
@@ -324,7 +345,6 @@ constructor(
                     e,
                     "Download failed for ${song.song.title} (attempt ${retryAttempt + 1}): ${e.message}"
                 )
-                Timber.Forest.e("Error type: ${e.javaClass.simpleName}")
 
                 // Retry logic with exponential backoff
                 if (retryAttempt < MAX_RETRY_ATTEMPTS) {
@@ -384,14 +404,11 @@ constructor(
 
             // Check response code
             val responseCode = connection.responseCode
-            Timber.Forest.d("Download HTTP response: $responseCode for songId: $songId")
-
             if (responseCode !in 200..299) {
                 throw Exception("HTTP error $responseCode: ${connection.responseMessage}")
             }
 
             val contentLength = connection.contentLength
-            Timber.Forest.d("Download content length: $contentLength bytes")
             var totalBytesRead = 0L
 
             connection.getInputStream().use { input ->
@@ -445,23 +462,13 @@ constructor(
                     )
                 )
             }
+            Timber.d("Marked song as downloaded: ${song.song.title}, URI: $mediaStoreUri")
         }
     }
 
-    /**
-     * Get the download state for a song
-     */
-    fun getDownloadState(songId: String): DownloadState? {
-        return _downloadStates.value[songId]
-    }
-
-
-    /**
-     * Clear completed downloads from state
-     */
-    fun clearCompletedDownloads() {
-        _downloadStates.value = _downloadStates.value.filterValues {
-            it.status != DownloadState.Status.COMPLETED
-        }
+    private fun resolvePrimaryArtist(song: Song): String {
+        val relationArtist = song.artists.firstOrNull()?.name?.takeIf { it.isNotBlank() }
+        val entityArtist = song.song.artistName?.takeIf { it.isNotBlank() }
+        return relationArtist ?: entityArtist ?: UNKNOWN_ARTIST_NAME
     }
 }

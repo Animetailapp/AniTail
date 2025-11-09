@@ -25,7 +25,7 @@ import java.io.InputStream
 class MediaStoreHelper(private val context: Context) {
 
     companion object {
-        private const val Anitail_FOLDER = "Anitail"
+        internal const val ANITAIL_FOLDER_NAME = "Anitail"
         private const val MAX_FILENAME_LENGTH = 200
 
         // Supported audio MIME types
@@ -60,7 +60,8 @@ class MediaStoreHelper(private val context: Context) {
         title: String,
         artist: String,
         album: String? = null,
-        durationMs: Long? = null
+        durationMs: Long? = null,
+        year: Int? = null
     ): Uri? = withContext(Dispatchers.IO) {
         try {
             val sanitizedFileName = sanitizeFileName(fileName)
@@ -80,12 +81,7 @@ class MediaStoreHelper(private val context: Context) {
             // Prepare ContentValues with metadata
             // Organize files: Music/Anitail/{Artist}/{Album}/Song.mp3 or Music/Anitail/{Artist}/Song.mp3
             val sanitizedArtist = sanitizeFolderName(artist)
-            val relativePath = if (!album.isNullOrBlank()) {
-                val sanitizedAlbum = sanitizeFolderName(album)
-                "${Environment.DIRECTORY_MUSIC}/$Anitail_FOLDER/$sanitizedArtist/$sanitizedAlbum"
-            } else {
-                "${Environment.DIRECTORY_MUSIC}/$Anitail_FOLDER/$sanitizedArtist"
-            }
+            val relativePath = buildRelativePathInternal(artist = sanitizedArtist, album = album)
             Timber.d("RELATIVE_PATH: $relativePath")
 
             val contentValues = ContentValues().apply {
@@ -93,8 +89,13 @@ class MediaStoreHelper(private val context: Context) {
                 put(MediaStore.Audio.Media.MIME_TYPE, mimeType)
                 put(MediaStore.Audio.Media.TITLE, title)
                 put(MediaStore.Audio.Media.ARTIST, artist)
+                put(MediaStore.Audio.Media.ALBUM_ARTIST, artist)
                 album?.let { put(MediaStore.Audio.Media.ALBUM, it) }
                 durationMs?.let { put(MediaStore.Audio.Media.DURATION, it) }
+                year?.let { put(MediaStore.Audio.Media.YEAR, it) }
+                put(MediaStore.Audio.Media.IS_MUSIC, 1)
+                put(MediaStore.Audio.Media.DATE_ADDED, System.currentTimeMillis() / 1000)
+                put(MediaStore.Audio.Media.DATE_MODIFIED, System.currentTimeMillis() / 1000)
 
                 // Set relative path for Android 10+ (API 29+)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -107,11 +108,7 @@ class MediaStoreHelper(private val context: Context) {
             }
 
             // Insert the file entry into MediaStore
-            val audioCollection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-            } else {
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-            }
+            val audioCollection = audioCollectionUri()
 
             Timber.d("Audio collection URI: $audioCollection")
 
@@ -174,7 +171,8 @@ class MediaStoreHelper(private val context: Context) {
         title: String,
         artist: String,
         album: String? = null,
-        durationMs: Long? = null
+        durationMs: Long? = null,
+        year: Int? = null
     ): Uri? = withContext(Dispatchers.IO) {
         try {
             if (!tempFile.exists()) {
@@ -198,7 +196,8 @@ class MediaStoreHelper(private val context: Context) {
                     title = title,
                     artist = artist,
                     album = album,
-                    durationMs = durationMs
+                    durationMs = durationMs,
+                    year = year
                 )
             }
         } catch (e: Exception) {
@@ -220,15 +219,17 @@ class MediaStoreHelper(private val context: Context) {
                 val projection = arrayOf(
                     MediaStore.Audio.Media._ID,
                     MediaStore.Audio.Media.TITLE,
-                    MediaStore.Audio.Media.ARTIST
+                    MediaStore.Audio.Media.ARTIST,
+                    MediaStore.Audio.Media.RELATIVE_PATH
                 )
 
+                // Search only in Anitail folder
                 val selection =
-                    "${MediaStore.Audio.Media.TITLE} = ? AND ${MediaStore.Audio.Media.ARTIST} = ?"
-                val selectionArgs = arrayOf(title, artist)
+                    "${MediaStore.Audio.Media.TITLE} = ? AND ${MediaStore.Audio.Media.ARTIST} = ? AND ${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ?"
+                val selectionArgs = arrayOf(title, artist, anitailRelativePathLikeArg())
 
                 context.contentResolver.query(
-                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    audioCollectionUri(),
                     projection,
                     selection,
                     selectionArgs,
@@ -237,13 +238,7 @@ class MediaStoreHelper(private val context: Context) {
                     if (cursor.moveToFirst()) {
                         val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
                         val id = cursor.getLong(idColumn)
-                        val contentUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            MediaStore.Audio.Media.getContentUri(
-                                MediaStore.VOLUME_EXTERNAL_PRIMARY
-                            )
-                        } else {
-                            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-                        }
+                        val contentUri = audioCollectionUri()
                         Uri.withAppendedPath(contentUri, id.toString())
                     } else {
                         null
@@ -349,7 +344,7 @@ class MediaStoreHelper(private val context: Context) {
      * @return Folder path string
      */
     fun getAnitailFolderPath(): String {
-        return "${Environment.DIRECTORY_MUSIC}/$Anitail_FOLDER"
+        return "${Environment.DIRECTORY_MUSIC}/$ANITAIL_FOLDER_NAME"
     }
 
     /**
@@ -361,7 +356,7 @@ class MediaStoreHelper(private val context: Context) {
         try {
             val projection = arrayOf(MediaStore.Audio.Media.SIZE)
             val selection = "${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ?"
-            val selectionArgs = arrayOf("%$Anitail_FOLDER%")
+            val selectionArgs = arrayOf("%$ANITAIL_FOLDER_NAME%")
 
             context.contentResolver.query(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
@@ -393,7 +388,7 @@ class MediaStoreHelper(private val context: Context) {
         try {
             val projection = arrayOf(MediaStore.Audio.Media._ID)
             val selection = "${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ?"
-            val selectionArgs = arrayOf("%$Anitail_FOLDER%")
+            val selectionArgs = arrayOf("%$ANITAIL_FOLDER_NAME%")
 
             val urisToDelete = mutableListOf<Uri>()
             context.contentResolver.query(
@@ -431,4 +426,23 @@ class MediaStoreHelper(private val context: Context) {
             0
         }
     }
+
+    internal fun buildRelativePathInternal(artist: String, album: String?): String {
+        return if (!album.isNullOrBlank()) {
+            val sanitizedAlbum = sanitizeFolderName(album)
+            "${Environment.DIRECTORY_MUSIC}/$ANITAIL_FOLDER_NAME/$artist/$sanitizedAlbum"
+        } else {
+            "${Environment.DIRECTORY_MUSIC}/$ANITAIL_FOLDER_NAME/$artist"
+        }
+    }
+
+    internal fun audioCollectionUri(): Uri {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        } else {
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        }
+    }
+
+    internal fun anitailRelativePathLikeArg(): String = "%$ANITAIL_FOLDER_NAME%"
 }

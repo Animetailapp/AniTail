@@ -7,8 +7,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.database.SQLException
+import android.media.MediaMetadataRetriever
 import android.media.audiofx.AudioEffect
 import android.net.ConnectivityManager
+import android.net.Uri
 import android.os.Binder
 import android.os.Build
 import android.os.Looper
@@ -850,6 +852,27 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     val song = database.song(mediaId).first()
     val mediaMetadata =
         withContext(Dispatchers.Main) { player.findNextMediaItemById(mediaId)?.metadata } ?: return
+      val localMetadata = song?.song?.mediaStoreUri?.let { loadLocalAudioMetadata(it.toUri()) }
+      if (localMetadata != null) {
+          val localDurationSeconds =
+              localMetadata.durationMs?.takeIf { it > 0 }?.div(1000L)?.toInt()
+          val updatedSongEntity = song.song.copy(
+              title = song.song.title.ifBlank { localMetadata.title ?: song.song.title },
+              artistName = song.song.artistName ?: localMetadata.artist,
+              albumName = song.song.albumName ?: localMetadata.album,
+              duration = when {
+                  song.song.duration > 0 -> song.song.duration
+                  localDurationSeconds != null && localDurationSeconds > 0 -> localDurationSeconds
+                  else -> song.song.duration
+              }
+          )
+          if (updatedSongEntity != song.song) {
+              database.query { upsert(updatedSongEntity) }
+          }
+          if (playbackData == null) {
+              return
+          }
+      }
     val duration =
         song?.song?.duration?.takeIf { it != -1 }
             ?: mediaMetadata.duration.takeIf { it != -1 }
@@ -875,6 +898,35 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       }
     }
   }
+
+    private fun loadLocalAudioMetadata(uri: Uri): LocalAudioMetadata? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(applicationContext, uri)
+            LocalAudioMetadata(
+                title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE),
+                artist =
+                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                        ?: retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST),
+                album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM),
+                durationMs =
+                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                        ?.toLongOrNull(),
+            )
+        } catch (error: Throwable) {
+            Timber.w(error, "Failed to read local audio metadata for %s", uri)
+            null
+        } finally {
+            runCatching { retriever.release() }
+        }
+    }
+
+    private data class LocalAudioMetadata(
+        val title: String?,
+        val artist: String?,
+        val album: String?,
+        val durationMs: Long?,
+    )
 
   fun playQueue(queue: Queue, playWhenReady: Boolean = true, skipJamBroadcast: Boolean = false) {
     if (!scope.isActive) scope = CoroutineScope(Dispatchers.Main) + Job()

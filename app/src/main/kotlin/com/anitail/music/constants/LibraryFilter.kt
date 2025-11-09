@@ -6,4 +6,5 @@ enum class LibraryFilter {
     ALBUMS,
     PLAYLISTS,
     LIBRARY,
+    DOWNLOADED,
 }
