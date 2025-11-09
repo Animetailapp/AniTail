@@ -249,6 +249,7 @@
     <string name="queue_all_songs">Todas las canciones</string>
     <string name="queue_searched_songs">Canciones buscadas</string>
     <string name="similar_content">Contenido similar</string>
+    <string name="offline_player_empty_state_title">Aún no hay descargas.</string>
 
     <!-- Nombre de notificación -->
     <string name="music_player">Reproductor de música</string>
