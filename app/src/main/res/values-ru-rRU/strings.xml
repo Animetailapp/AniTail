@@ -20,7 +20,6 @@
     <string name="mood_and_genres">Настроение и жанры</string>
     <string name="account">Аккаунт</string>
     <string name="quick_picks">Быстрый выбор</string>
-    <string name="quick_picks_empty">Послушайте несколько песен, чтобы создать ваш быстрый выбор</string>
     <string name="new_release_albums">Новые релизы альбомов</string>
     <string name="forgotten_favorites">Забытые любимые песни</string>
     <string name="similar_to">Похожие на</string>
@@ -35,8 +34,6 @@
 
     <!-- Stats -->
     <string name="most_played_songs">Самые популярные песни</string>
-    <string name="most_played_artists">Самые популярные исполнители</string>
-    <string name="most_played_albums">Самые популярные альбомы</string>
 
     <!-- Search -->
     <string name="search">Поиск</string>
@@ -53,11 +50,9 @@
     <string name="filter_playlists">Плейлисты</string>
     <string name="filter_community_playlists">Плейлисты сообщества</string>
     <string name="filter_featured_playlists">Избранные плейлисты</string>
-    <string name="filter_bookmarked">Добавлено в закладки</string>
     <string name="no_results_found">Результаты не найдены</string>
 
     <!-- Artist screen -->
-    <string name="from_your_library">Из вашей библиотеки</string>
 
     <!-- Playlist -->
     <string name="liked_songs">Любимые треки</string>
@@ -65,7 +60,6 @@
     <string name="playlist_is_empty">Плейлист пуст</string>
 
     <!-- Button -->
-    <string name="retry">Повторить</string>
     <string name="radio">Радио</string>
     <string name="shuffle">Перемешать</string>
     <string name="reset">Сбросить</string>
@@ -91,7 +85,6 @@
     <string name="delete">Удалить</string>
     <string name="remove_from_history">Удалить из истории</string>
     <string name="search_online">Поиск в Интернете</string>
-    <string name="sync">Синхронизация</string>
     <string name="advanced">Контроль аудио</string>
 
     <!-- Sort menu -->
@@ -116,25 +109,18 @@
     <string name="unknown">Неизвестно</string>
     <string name="copied">Скопировано</string>
 
-    <string name="edit_lyrics">Редактировать текст песни</string>
     <string name="search_lyrics">Поиск текста песни</string>
 
     <string name="edit_song">Редактировать композицию</string>
     <string name="song_title">Название композиции</string>
     <string name="song_artists">Исполнители композиции</string>
-    <string name="error_song_title_empty">Укажите название композиции</string>
-    <string name="error_song_artist_empty">Укажите исполнителей композиции</string>
     <string name="save">Сохранить</string>
 
-    <string name="choose_playlist">Выбрать плейлист</string>
     <string name="edit_playlist">Редактировать плейлист</string>
     <string name="create_playlist">Создать плейлист</string>
     <string name="playlist_name">Название плейлиста</string>
-    <string name="error_playlist_name_empty">Укажите название плейлиста</string>
 
-    <string name="edit_artist">Редактировать исполнителя</string>
     <string name="artist_name">Имя исполнителя</string>
-    <string name="error_artist_name_empty">Укажите имя исполнителя</string>
 
     <!-- Noun -->
     <plurals name="n_song">
@@ -181,7 +167,6 @@
     </plurals>
 
     <!-- Snackbar -->
-    <string name="playlist_imported">Плейлист импортирован</string>
     <string name="removed_song_from_playlist">«%s» удалено из списка воспроизведения</string>
     <string name="playlist_synced">Плейлист синхронизирован</string>
     <string name="undo">Отменить</string>
@@ -196,9 +181,7 @@
         <item quantity="many">%d минут</item>
         <item quantity="other">%d минут</item>
     </plurals>
-    <string name="error_no_stream">Нет доступных потоков</string>
     <string name="error_no_internet">Нет подключения к сети</string>
-    <string name="error_timeout">Тайм-аут</string>
     <string name="error_unknown">Неизвестная ошибка</string>
 
     <!-- Player action -->
@@ -227,7 +210,6 @@
     <string name="dark_theme_follow_system">Использовать настройки системы</string>
     <string name="pure_black">Режим чистого черного цвета</string>
     <string name="default_open_tab">Вкладка навигации по умолчанию</string>
-    <string name="customize_navigation_tabs">Настройка вкладок навигации</string>
     <string name="lyrics_text_position">Расположение текста песни</string>
     <string name="left">Слева</string>
     <string name="center">По центру</string>
@@ -241,7 +223,6 @@
     <string name="enable_proxy">Включить прокси</string>
     <string name="proxy_type">Тип прокси</string>
     <string name="proxy_url">URL прокси</string>
-    <string name="restart_to_take_effect">Перезапуск приложения</string>
 
     <string name="player_and_audio">Плеер и аудио</string>
     <string name="audio_quality">Качество аудио</string>
@@ -254,15 +235,12 @@
     <string name="equalizer">Эквалайзер</string>
 
     <string name="storage">Хранилище</string>
-    <string name="cache">Кэш</string>
     <string name="image_cache">Кэш изображений</string>
     <string name="song_cache">Кэш аудио</string>
     <string name="max_cache_size">Максимальный размер кэша</string>
     <string name="unlimited">Неограниченно</string>
     <string name="clear_all_downloads">Очистить все загрузки</string>
-    <string name="max_image_cache_size">Макс. размер кэша изображений</string>
     <string name="clear_image_cache">Очистить кэш изображений</string>
-    <string name="max_song_cache_size">Макс. размер кэша аудио</string>
     <string name="clear_song_cache">Очистить кэш аудио</string>
     <string name="size_used">%s использовано</string>
 
@@ -278,13 +256,11 @@
     <string name="backup_restore">Резервное копирование</string>
     <string name="backup">Создать резервную копию</string>
     <string name="restore">Восстановить из резервной копии</string>
-    <string name="imported_playlist">Импортированный плейлист</string>
     <string name="backup_create_success">Резервная копия создана успешно</string>
     <string name="backup_create_failed">Не удалось создать резервную копию</string>
     <string name="restore_failed">Не удалось восстановить резервную копию</string>
 
     <string name="about">О приложении</string>
-    <string name="app_version">Версия приложения</string>
 
     <string name="new_version_available">Доступна новая версия</string>
     <string name="translation_models">Модели перевода</string>

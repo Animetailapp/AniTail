@@ -18,7 +18,6 @@
     <string name="mood_and_genres">Mood and Genres</string>
     <string name="account">Account</string>
     <string name="quick_picks">Quick picks</string>
-    <string name="quick_picks_empty">Listen to songs to generate your quick picks</string>
     <string name="new_release_albums">New release albums</string>
 
     <!-- History -->
@@ -29,8 +28,6 @@
 
     <!-- Stats -->
     <string name="most_played_songs">Most played songs</string>
-    <string name="most_played_artists">Most played artists</string>
-    <string name="most_played_albums">Most played albums</string>
 
     <!-- Search -->
     <string name="search">Etsi</string>
@@ -47,11 +44,9 @@
     <string name="filter_playlists">Soittolistat</string>
     <string name="filter_community_playlists">Community playlists</string>
     <string name="filter_featured_playlists">Featured playlists</string>
-    <string name="filter_bookmarked">Bookmarked</string>
     <string name="no_results_found">No results found</string>
 
     <!-- Artist screen -->
-    <string name="from_your_library">From your library</string>
 
     <!-- Playlist -->
     <string name="liked_songs">Liked songs</string>
@@ -59,7 +54,6 @@
     <string name="playlist_is_empty">The playlist is empty</string>
 
     <!-- Button -->
-    <string name="retry">Toisto</string>
     <string name="radio">Radio</string>
     <string name="shuffle">Sekoita</string>
     <string name="reset">Reset</string>
@@ -85,7 +79,6 @@
     <string name="delete">Poista</string>
     <string name="remove_from_history">Remove from history</string>
     <string name="search_online">Search online</string>
-    <string name="sync">Sync</string>
     <string name="advanced">Advanced</string>
 
     <!-- Sort menu -->
@@ -110,25 +103,18 @@
     <string name="unknown">Unknown</string>
     <string name="copied">Copied to clipboard</string>
 
-    <string name="edit_lyrics">Edit lyrics</string>
     <string name="search_lyrics">Search lyrics</string>
 
     <string name="edit_song">Muokkaa kappaletta</string>
     <string name="song_title">Kappaleen nimi</string>
     <string name="song_artists">Artisti</string>
-    <string name="error_song_title_empty">Kappaleen nimi ei voi olla tyhjä.</string>
-    <string name="error_song_artist_empty">Artistin nimi ei voi olla tyhjä.</string>
     <string name="save">Tallenna</string>
 
-    <string name="choose_playlist">Valitse soittolista</string>
     <string name="edit_playlist">Muokkaa soittolistaa</string>
     <string name="create_playlist">Luo soittolista</string>
     <string name="playlist_name">Soittolistan nimi</string>
-    <string name="error_playlist_name_empty">Soittolistan nimi ei voi olla tyhjä.</string>
 
-    <string name="edit_artist">Muokkaa artistia</string>
     <string name="artist_name">Artistin nimi</string>
-    <string name="error_artist_name_empty">Artistin nimi ei voi olla tyhjä.</string>
 
     <!-- Noun -->
     <plurals name="n_song">
@@ -161,7 +147,6 @@
     </plurals>
 
     <!-- Snackbar -->
-    <string name="playlist_imported">Playlist imported</string>
     <string name="removed_song_from_playlist">Removed \"%s\" from playlist</string>
     <string name="playlist_synced">Playlist synced</string>
     <string name="undo">Undo</string>
@@ -174,9 +159,7 @@
         <item quantity="one">1 minute</item>
         <item quantity="other">%d minutes</item>
     </plurals>
-    <string name="error_no_stream">No stream available</string>
     <string name="error_no_internet">No network connection</string>
-    <string name="error_timeout">Timeout</string>
     <string name="error_unknown">Unknown error</string>
 
     <!-- Player action -->
@@ -205,7 +188,6 @@
     <string name="dark_theme_follow_system">Järjestelmän teeman mukainen</string>
     <string name="pure_black">Pure black</string>
     <string name="default_open_tab">Default open tab</string>
-    <string name="customize_navigation_tabs">Customize navigation tabs</string>
     <string name="lyrics_text_position">Lyrics text position</string>
     <string name="left">Left</string>
     <string name="center">Center</string>
@@ -219,7 +201,6 @@
     <string name="enable_proxy">Enable proxy</string>
     <string name="proxy_type">Proxy type</string>
     <string name="proxy_url">Proxy URL</string>
-    <string name="restart_to_take_effect">Restart to take effect</string>
 
     <string name="player_and_audio">Player and audio</string>
     <string name="audio_quality">Audio quality</string>
@@ -232,15 +213,12 @@
     <string name="equalizer">Equalizer</string>
 
     <string name="storage">Storage</string>
-    <string name="cache">Cache</string>
     <string name="image_cache">Image Cache</string>
     <string name="song_cache">Song Cache</string>
     <string name="max_cache_size">Max cache size</string>
     <string name="unlimited">Unlimited</string>
     <string name="clear_all_downloads">Clear all downloads</string>
-    <string name="max_image_cache_size">Max image cache size</string>
     <string name="clear_image_cache">Clear image cache</string>
-    <string name="max_song_cache_size">Max song cache size</string>
     <string name="clear_song_cache">Clear song cache</string>
     <string name="size_used">%s used</string>
 
@@ -256,13 +234,11 @@
     <string name="backup_restore">Backup and restore</string>
     <string name="backup">Backup</string>
     <string name="restore">Restore</string>
-    <string name="imported_playlist">Imported playlist</string>
     <string name="backup_create_success">Backup created successfully</string>
     <string name="backup_create_failed">Couldn\'t create backup</string>
     <string name="restore_failed">Failed to restore backup</string>
 
     <string name="about">Tietoa</string>
-    <string name="app_version">Sovelluksen versio</string>
 
     <string name="new_version_available">New version available</string>
     <string name="translation_models">Translation Models</string>

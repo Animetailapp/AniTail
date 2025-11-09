@@ -33,9 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import com.anitail.innertube.YouTube
 import com.anitail.music.LocalDatabase
@@ -47,6 +45,7 @@ import com.anitail.music.db.entities.PlaylistSong
 import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.playback.ExoDownloadService
+import com.anitail.music.playback.MediaStoreDownloadManager
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.DefaultDialog
@@ -110,6 +109,35 @@ fun PlaylistMenu(
                 } else {
                     Download.STATE_STOPPED
                 }
+        }
+    }
+
+    var mediaStoreDownloadState by remember {
+        mutableStateOf<PlaylistMediaStoreDownloadStatus>(PlaylistMediaStoreDownloadStatus.NotDownloaded)
+    }
+
+    LaunchedEffect(songs) {
+        if (songs.isEmpty()) return@LaunchedEffect
+        downloadUtil.getAllMediaStoreDownloads().collect { states ->
+            val songStates = songs.mapNotNull { states[it.id] }
+            mediaStoreDownloadState = when {
+                songStates.isEmpty() -> PlaylistMediaStoreDownloadStatus.NotDownloaded
+                songStates.all { it.status == MediaStoreDownloadManager.DownloadState.Status.COMPLETED } ->
+                    PlaylistMediaStoreDownloadStatus.Completed
+
+                songStates.any {
+                    it.status == MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING ||
+                            it.status == MediaStoreDownloadManager.DownloadState.Status.QUEUED
+                } -> {
+                    val totalProgress = songStates.sumOf { it.progress.toDouble() } / songs.size
+                    PlaylistMediaStoreDownloadStatus.Downloading(totalProgress.toFloat())
+                }
+
+                songStates.any { it.status == MediaStoreDownloadManager.DownloadState.Status.FAILED } ->
+                    PlaylistMediaStoreDownloadStatus.Failed
+
+                else -> PlaylistMediaStoreDownloadStatus.NotDownloaded
+            }
         }
     }
 
@@ -383,41 +411,81 @@ fun PlaylistMenu(
         }
         if (downloadPlaylist != true) {
             item {
-                when (downloadState) {
-                    Download.STATE_COMPLETED -> {
+                when (mediaStoreDownloadState) {
+                    is PlaylistMediaStoreDownloadStatus.Completed -> {
                         ListItem(
                             headlineContent = {
                                 Text(
-                                    text = stringResource(R.string.remove_download),
-                                    color = MaterialTheme.colorScheme.error
+                                    text = stringResource(R.string.downloaded_to_device),
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             },
                             leadingContent = {
                                 Icon(
-                                    painter = painterResource(R.drawable.offline),
+                                    painter = painterResource(R.drawable.download),
                                     contentDescription = null,
                                 )
                             },
                             modifier = Modifier.clickable {
-                                showRemoveDownloadDialog = true
+                                // TODO: Option to remove from MediaStore
+                                onDismiss()
                             }
                         )
                     }
-                    Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
+
+                    is PlaylistMediaStoreDownloadStatus.Downloading -> {
+                        val progress =
+                            (mediaStoreDownloadState as PlaylistMediaStoreDownloadStatus.Downloading).progress
                         ListItem(
-                            headlineContent = { Text(text = stringResource(R.string.downloading)) },
+                            headlineContent = {
+                                Text(text = stringResource(R.string.downloading_to_device))
+                            },
+                            supportingContent = {
+                                Text(text = "${(progress * 100).toInt()}%")
+                            },
                             leadingContent = {
                                 CircularProgressIndicator(
+                                    progress = { progress },
                                     modifier = Modifier.size(24.dp),
                                     strokeWidth = 2.dp
                                 )
                             },
                             modifier = Modifier.clickable {
-                                showRemoveDownloadDialog = true
+                                songs.forEach { song ->
+                                    downloadUtil.cancelMediaStoreDownload(song.id)
+                                }
+                                onDismiss()
                             }
                         )
                     }
-                    else -> {
+
+                    is PlaylistMediaStoreDownloadStatus.Failed -> {
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = stringResource(R.string.download_failed),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            },
+                            supportingContent = {
+                                Text(text = stringResource(R.string.retry_download))
+                            },
+                            leadingContent = {
+                                Icon(
+                                    painter = painterResource(R.drawable.info),
+                                    contentDescription = null,
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                songs.forEach { song ->
+                                    downloadUtil.retryMediaStoreDownload(song.id)
+                                }
+                                onDismiss()
+                            }
+                        )
+                    }
+
+                    PlaylistMediaStoreDownloadStatus.NotDownloaded -> {
                         ListItem(
                             headlineContent = { Text(text = stringResource(R.string.download)) },
                             leadingContent = {
@@ -428,19 +496,9 @@ fun PlaylistMenu(
                             },
                             modifier = Modifier.clickable {
                                 songs.forEach { song ->
-                                    val downloadRequest =
-                                        DownloadRequest
-                                            .Builder(song.id, song.id.toUri())
-                                            .setCustomCacheKey(song.id)
-                                            .setData(song.song.title.toByteArray())
-                                            .build()
-                                    DownloadService.sendAddDownload(
-                                        context,
-                                        ExoDownloadService::class.java,
-                                        downloadRequest,
-                                        false,
-                                    )
+                                    downloadUtil.downloadToMediaStore(song)
                                 }
+                                onDismiss()
                             }
                         )
                     }
@@ -486,4 +544,11 @@ fun PlaylistMenu(
             }
         }
     }
+}
+
+private sealed class PlaylistMediaStoreDownloadStatus {
+    object NotDownloaded : PlaylistMediaStoreDownloadStatus()
+    object Completed : PlaylistMediaStoreDownloadStatus()
+    data class Downloading(val progress: Float) : PlaylistMediaStoreDownloadStatus()
+    object Failed : PlaylistMediaStoreDownloadStatus()
 }

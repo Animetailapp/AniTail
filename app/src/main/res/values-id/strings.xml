@@ -17,7 +17,6 @@
     <string name="mood_and_genres">Mood dan Genre</string>
     <string name="account">Akun</string>
     <string name="quick_picks">Pilihan cepat</string>
-    <string name="quick_picks_empty">Dengarkan lagu untuk menghasilkan pilihan cepat Anda</string>
     <string name="new_release_albums">Album baru dirilis</string>
 
     <!-- History -->
@@ -28,8 +27,6 @@
 
     <!-- Stats -->
     <string name="most_played_songs">Lagu yang paling sering dimainkan</string>
-    <string name="most_played_artists">Artis yang paling sering dimainkan</string>
-    <string name="most_played_albums">Album yang paling sering dimainkan</string>
 
     <!-- Search -->
     <string name="search">Cari</string>
@@ -46,11 +43,9 @@
     <string name="filter_playlists">Daftar putar</string>
     <string name="filter_community_playlists">Daftar putar komunitas</string>
     <string name="filter_featured_playlists">Daftar putar unggulan</string>
-    <string name="filter_bookmarked">Ditandai</string>
     <string name="no_results_found">Tidak ada hasil</string>
 
     <!-- Artist screen -->
-    <string name="from_your_library">Dari perpustakaan Anda</string>
 
     <!-- Playlist -->
     <string name="liked_songs">Lagu yang disukai</string>
@@ -58,7 +53,6 @@
     <string name="playlist_is_empty">Playlist kosong</string>
 
     <!-- Button -->
-    <string name="retry">Coba kembali</string>
     <string name="radio">Radio</string>
     <string name="shuffle">Acak</string>
     <string name="reset">Reset</string>
@@ -84,7 +78,6 @@
     <string name="delete">Hapus</string>
     <string name="remove_from_history">Hapus dari histori</string>
     <string name="search_online">Cari secara online</string>
-    <string name="sync">Sinkron</string>
     <string name="advanced">Lanjutan</string>
 
     <!-- Sort menu -->
@@ -109,25 +102,18 @@
     <string name="unknown">Tidak diketahui</string>
     <string name="copied">Disalin ke papan klip</string>
 
-    <string name="edit_lyrics">Edit lirik</string>
     <string name="search_lyrics">Cari lirik</string>
 
     <string name="edit_song">Edit lagu</string>
     <string name="song_title">Judul lagu</string>
     <string name="song_artists">Artis lagu</string>
-    <string name="error_song_title_empty">Judul lagu wajib diisi.</string>
-    <string name="error_song_artist_empty">Artis lagu wajib diisi.</string>
     <string name="save">Simpan</string>
 
-    <string name="choose_playlist">Pilih daftar putar</string>
     <string name="edit_playlist">Sunting daftar putar</string>
     <string name="create_playlist">Buat daftar putar</string>
     <string name="playlist_name">Nama daftar putar</string>
-    <string name="error_playlist_name_empty">Nama daftar putar wajib diisi.</string>
 
-    <string name="edit_artist">Sunting artis</string>
     <string name="artist_name">Nama artis</string>
-    <string name="error_artist_name_empty">Nama artis wajib diisi.</string>
 
     <!-- Noun -->
     <plurals name="n_song">
@@ -153,7 +139,6 @@
     </plurals>
 
     <!-- Snackbar -->
-    <string name="playlist_imported">Daftar putar dipindahkan</string>
     <string name="removed_song_from_playlist">\"%s\" dihapus dari daftar putar</string>
     <string name="playlist_synced">Daftar putar disinkronkan</string>
     <string name="undo">Urungkan</string>
@@ -165,9 +150,7 @@
     <plurals name="minute">
         <item quantity="other">%d menit</item>
     </plurals>
-    <string name="error_no_stream">Tidak ada stream yang tersedia</string>
     <string name="error_no_internet">Tidak ada koneksi jaringan</string>
-    <string name="error_timeout">Waktu habis</string>
     <string name="error_unknown">Kesalahan yang tidak diketahui</string>
 
     <!-- Player action -->
@@ -196,7 +179,6 @@
     <string name="dark_theme_follow_system">Ikuti sistem</string>
     <string name="pure_black">Hitam murni</string>
     <string name="default_open_tab">Tab buka bawaan</string>
-    <string name="customize_navigation_tabs">Sesuaikan tab navigasi</string>
     <string name="lyrics_text_position">Posisi teks lirik</string>
     <string name="left">Kiri</string>
     <string name="center">Tengah</string>
@@ -210,7 +192,6 @@
     <string name="enable_proxy">Aktifkan proxy</string>
     <string name="proxy_type">Tipe proxy</string>
     <string name="proxy_url">URL proxy</string>
-    <string name="restart_to_take_effect">Mulai ulang agar berlaku</string>
 
     <string name="player_and_audio">Pemutar dan audio</string>
     <string name="audio_quality">Kualitas audio</string>
@@ -223,15 +204,12 @@
     <string name="equalizer">Ekualiser</string>
 
     <string name="storage">Penyimpanan</string>
-    <string name="cache">Data sementara (cache)</string>
     <string name="image_cache">Image Cache</string>
     <string name="song_cache">Song Cache</string>
     <string name="max_cache_size">Max cache size</string>
     <string name="unlimited">Unlimited</string>
     <string name="clear_all_downloads">Clear all downloads</string>
-    <string name="max_image_cache_size">Ukuran gambar data sementara (cache) maksimum</string>
     <string name="clear_image_cache">Bersihkan gambar data sementara (cache)</string>
-    <string name="max_song_cache_size">Ukuran lagu data sementara (cache) maksimum</string>
     <string name="clear_song_cache">Clear song cache</string>
     <string name="size_used">%s digunakan</string>
 
@@ -248,13 +226,11 @@
     <string name="backup_restore">Cadangkan dan pulihkan</string>
     <string name="backup">Cadangkan</string>
     <string name="restore">Pulihkan</string>
-    <string name="imported_playlist">Daftar putar diimpor</string>
     <string name="backup_create_success">Cadangan berhasil dibuat</string>
     <string name="backup_create_failed">Tidak dapat membuat cadangan</string>
     <string name="restore_failed">Gagal untuk memulihkan cadangan</string>
 
     <string name="about">Tentang</string>
-    <string name="app_version">Versi aplikasi</string>
 
     <string name="new_version_available">Versi baru tersedia</string>
     <string name="translation_models">Model Terjemahan</string>

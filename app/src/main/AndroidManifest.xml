@@ -50,7 +50,13 @@
                 tools:node="remove" />
         </provider>
 
-        <activity
+    <provider
+        android:name="com.dpi.DensityScaler"
+        android:authorities="${applicationId}.com.dpi.DensityScaler"
+        android:enabled="true"
+        android:exported="false" />
+
+    <activity
             android:name=".installer.UpdateInstallerActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
@@ -202,6 +208,10 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </service>
+    <service
+        android:name=".playback.MediaStoreDownloadService"
+        android:exported="false"
+        android:foregroundServiceType="dataSync" />
         <receiver
             android:name="androidx.media3.session.MediaButtonReceiver"
             android:exported="true">

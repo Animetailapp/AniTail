@@ -42,7 +42,9 @@ data class SongEntity(
     @ColumnInfo(defaultValue = "0")
     val isLocal: Boolean = false,
     @ColumnInfo(defaultValue = "1")
-    val romanizeLyrics: Boolean = true
+    val romanizeLyrics: Boolean = true,
+    @ColumnInfo(name = "mediaStoreUri", defaultValue = "NULL")
+    val mediaStoreUri: String? = null
 ) {
     fun localToggleLike() = copy(
         liked = !liked,

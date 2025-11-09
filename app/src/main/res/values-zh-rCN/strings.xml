@@ -17,7 +17,6 @@
     <string name="mood_and_genres">Mood and Genres</string>
     <string name="account">Account</string>
     <string name="quick_picks">歌曲快选</string>
-    <string name="quick_picks_empty">Listen to songs to generate your quick picks</string>
     <string name="new_release_albums">新专辑</string>
 
     <!-- History -->
@@ -28,8 +27,6 @@
 
     <!-- Stats -->
     <string name="most_played_songs">最常播放</string>
-    <string name="most_played_artists">Most played artists</string>
-    <string name="most_played_albums">Most played albums</string>
 
     <!-- Search -->
     <string name="search">搜索</string>
@@ -46,11 +43,9 @@
     <string name="filter_playlists">播放列表</string>
     <string name="filter_community_playlists">社区播放列表</string>
     <string name="filter_featured_playlists">精选播放列表</string>
-    <string name="filter_bookmarked">Bookmarked</string>
     <string name="no_results_found">找不到结果</string>
 
     <!-- Artist screen -->
-    <string name="from_your_library">来自您的媒体库</string>
 
     <!-- Playlist -->
     <string name="liked_songs">喜欢的歌曲</string>
@@ -58,7 +53,6 @@
     <string name="playlist_is_empty">播放列表为空</string>
 
     <!-- Button -->
-    <string name="retry">重试</string>
     <string name="radio">电台</string>
     <string name="shuffle">随机播放</string>
     <string name="reset">Reset</string>
@@ -84,7 +78,6 @@
     <string name="delete">移除</string>
     <string name="remove_from_history">从记录中移除</string>
     <string name="search_online">在线搜索</string>
-    <string name="sync">同步</string>
     <string name="advanced">Advanced</string>
 
     <!-- Sort menu -->
@@ -109,25 +102,18 @@
     <string name="unknown">未知</string>
     <string name="copied">已复制到剪贴板</string>
 
-    <string name="edit_lyrics">编辑歌词</string>
     <string name="search_lyrics">搜索歌词</string>
 
     <string name="edit_song">编辑歌曲</string>
     <string name="song_title">歌名</string>
     <string name="song_artists">音乐人</string>
-    <string name="error_song_title_empty">歌名不能为空</string>
-    <string name="error_song_artist_empty">音乐人不能为空</string>
     <string name="save">保存</string>
 
-    <string name="choose_playlist">选择播放列表</string>
     <string name="edit_playlist">编辑播放列表</string>
     <string name="create_playlist">新建播放列表</string>
     <string name="playlist_name">名称</string>
-    <string name="error_playlist_name_empty">播放列表名称不能为空</string>
 
-    <string name="edit_artist">编辑音乐人</string>
     <string name="artist_name">音乐人名称</string>
-    <string name="error_artist_name_empty">音乐人名称不能为空</string>
 
     <!-- Noun -->
     <plurals name="n_song">
@@ -153,7 +139,6 @@
     </plurals>
 
     <!-- Snackbar -->
-    <string name="playlist_imported">已导入此播放列表</string>
     <string name="removed_song_from_playlist">Removed \"%s\" from playlist</string>
     <string name="playlist_synced">Playlist synced</string>
     <string name="undo">Undo</string>
@@ -165,9 +150,7 @@
     <plurals name="minute">
         <item quantity="other">%d 分钟</item>
     </plurals>
-    <string name="error_no_stream">没有可用音源</string>
     <string name="error_no_internet">没有网络连接</string>
-    <string name="error_timeout">连接超时</string>
     <string name="error_unknown">未知错误</string>
 
     <!-- Player action -->
@@ -196,7 +179,6 @@
     <string name="dark_theme_follow_system">跟随系统</string>
     <string name="pure_black">纯黑</string>
     <string name="default_open_tab">默认启动选项卡</string>
-    <string name="customize_navigation_tabs">自定义导航选项卡</string>
     <string name="lyrics_text_position">歌词文字位置</string>
     <string name="left">靠左</string>
     <string name="center">置中</string>
@@ -210,7 +192,6 @@
     <string name="enable_proxy">启用代理</string>
     <string name="proxy_type">代理类型</string>
     <string name="proxy_url">代理 URL</string>
-    <string name="restart_to_take_effect">重启以应用变更</string>
 
     <string name="player_and_audio">播放器与音频</string>
     <string name="audio_quality">音质</string>
@@ -223,15 +204,12 @@
     <string name="equalizer">均衡器</string>
 
     <string name="storage">储存</string>
-    <string name="cache">缓存</string>
     <string name="image_cache">图像缓存</string>
     <string name="song_cache">歌曲缓存</string>
     <string name="max_cache_size">最大缓存大小</string>
     <string name="unlimited">无限制</string>
     <string name="clear_all_downloads">Clear all downloads</string>
-    <string name="max_image_cache_size">图像缓存大小</string>
     <string name="clear_image_cache">清除图像缓存</string>
-    <string name="max_song_cache_size">歌曲缓存大小</string>
     <string name="clear_song_cache">清除歌曲缓存</string>
     <string name="size_used">已使用 %s</string>
 
@@ -247,13 +225,11 @@
     <string name="backup_restore">备份与还原</string>
     <string name="backup">备份</string>
     <string name="restore">还原</string>
-    <string name="imported_playlist">Imported playlist</string>
     <string name="backup_create_success">成功新建备份</string>
     <string name="backup_create_failed">无法新建备份</string>
     <string name="restore_failed">无法还原备份</string>
 
     <string name="about">关于</string>
-    <string name="app_version">应用版本</string>
 
     <string name="new_version_available">New version available</string>
     <string name="translation_models">Translation Models</string>

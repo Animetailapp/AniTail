@@ -96,7 +96,7 @@
 ## Queue Persistence Rules
 # Keep queue-related classes to prevent serialization issues in release builds
 -keep class com.anitail.music.models.PersistQueue { *; }
--keep class com.metrolist.music.playback.queues.** { *; }
+-keep class com.anitail.music.playback.queues.** { *; }
 
 # Keep serialization methods for queue persistence
 -keepclassmembers class * implements java.io.Serializable {

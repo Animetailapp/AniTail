@@ -95,11 +95,9 @@ import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEachIndexed
 import androidx.compose.ui.util.fastSumBy
 import androidx.compose.ui.zIndex
-import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -1261,19 +1259,7 @@ fun LocalPlaylistHeader(
                             IconButton(
                                 onClick = {
                                     songs.forEach { song ->
-                                        val downloadRequest = DownloadRequest
-                                            .Builder(song.song.id, song.song.id.toUri())
-                                            .setCustomCacheKey(song.song.id)
-                                            .setData(
-                                                song.song.song.title
-                                                    .toByteArray(),
-                                            ).build()
-                                        DownloadService.sendAddDownload(
-                                            context,
-                                            ExoDownloadService::class.java,
-                                            downloadRequest,
-                                            false,
-                                        )
+                                        downloadUtil.downloadToMediaStore(song.song)
                                     }
                                 },
                                 modifier = Modifier.size(40.dp)

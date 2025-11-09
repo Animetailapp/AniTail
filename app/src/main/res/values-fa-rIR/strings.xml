@@ -18,7 +18,6 @@
     <string name="mood_and_genres">حالت و سبک</string>
     <string name="account">حساب</string>
     <string name="quick_picks">انتخاب‌های سریع</string>
-    <string name="quick_picks_empty">به ترانه‌ها گوش دهید تا انتخاب سریع خود ساخته شود</string>
     <string name="new_release_albums">مجموعه‌های منتشرشده‌ی جدید</string>
 
     <!-- History -->
@@ -29,8 +28,6 @@
 
     <!-- Stats -->
     <string name="most_played_songs">بیشترین ترانه‌های پخش‌شده</string>
-    <string name="most_played_artists">بیشترین هنرمندهای پخش‌شده</string>
-    <string name="most_played_albums">بیشترین مجموعه‌های پخش‌شده</string>
 
     <!-- Search -->
     <string name="search">جستجو</string>
@@ -47,11 +44,9 @@
     <string name="filter_playlists">لیست‌پخش‌ها</string>
     <string name="filter_community_playlists">لیست‌پخش‌های انجمن</string>
     <string name="filter_featured_playlists">لیست‌پخش‌های ویژه</string>
-    <string name="filter_bookmarked">نشانک‌گذاری‌شده</string>
     <string name="no_results_found">نتیجه‌ای پیدا نشد</string>
 
     <!-- Artist screen -->
-    <string name="from_your_library">از کتاب‌خانه شما</string>
 
     <!-- Playlist -->
     <string name="liked_songs">ترانه‌های موردپسند</string>
@@ -59,7 +54,6 @@
     <string name="playlist_is_empty">لیست‌پخش خالی است</string>
 
     <!-- Button -->
-    <string name="retry">تلاش‌مجدد</string>
     <string name="radio">رادیو</string>
     <string name="shuffle">بُرزدن</string>
     <string name="reset">بازنشانی</string>
@@ -85,7 +79,6 @@
     <string name="delete">حذف</string>
     <string name="remove_from_history">حذف از تاریخچه</string>
     <string name="search_online">جستجوی برخط</string>
-    <string name="sync">همگام‌سازی</string>
     <string name="advanced">پیشرفته</string>
 
     <!-- Sort menu -->
@@ -110,25 +103,18 @@
     <string name="unknown">ناشناخته</string>
     <string name="copied">در بریده‌دان کپی‌شد</string>
 
-    <string name="edit_lyrics">ویرایش متن‌ترانه</string>
     <string name="search_lyrics">جستجوی متن‌ترانه</string>
 
     <string name="edit_song">ویرایش ترانه</string>
     <string name="song_title">عنوان ترانه</string>
     <string name="song_artists">هنرمند ترانه</string>
-    <string name="error_song_title_empty">عنوان ترانه نمی تواند خالی باشد.</string>
-    <string name="error_song_artist_empty">هنرمند ترانه نمی تواند خالی باشد.</string>
     <string name="save">ذخیره</string>
 
-    <string name="choose_playlist">انتخاب لیست‌پخش</string>
     <string name="edit_playlist">ویرایش لیست‌پخش</string>
     <string name="create_playlist">ایجاد لیست‌پخش</string>
     <string name="playlist_name">نام لیست‌پخش</string>
-    <string name="error_playlist_name_empty">نام لیست‌پخش نمی تواند خالی باشد.</string>
 
-    <string name="edit_artist">ویرایش هنرمند</string>
     <string name="artist_name">نام هنرمند</string>
-    <string name="error_artist_name_empty">نام هنرمند نمی تواند خالی باشد.</string>
 
     <!-- Noun -->
     <plurals name="n_song">
@@ -161,7 +147,6 @@
     </plurals>
 
     <!-- Snackbar -->
-    <string name="playlist_imported">لیست‌پخش واردشد</string>
     <string name="removed_song_from_playlist">«%s» از لیست‌پخش حذف شد</string>
     <string name="playlist_synced">لیست‌پخش همگام‌شد</string>
     <string name="undo">واگرد</string>
@@ -174,9 +159,7 @@
         <item quantity="one" tools:ignore="ImpliedQuantity">۱ دقیقه</item>
         <item quantity="other">%d دقیقه</item>
     </plurals>
-    <string name="error_no_stream">جریانی در دسترس نیست</string>
     <string name="error_no_internet">بدون اتصال به شبکه</string>
-    <string name="error_timeout">اتمام وقت</string>
     <string name="error_unknown">خطای ناشناخته</string>
 
     <!-- Player action -->
@@ -205,7 +188,6 @@
     <string name="dark_theme_follow_system">پیروی از سیستم</string>
     <string name="pure_black">مشکی خالص</string>
     <string name="default_open_tab">زبانه باز پیش‌فرض</string>
-    <string name="customize_navigation_tabs">سفارشی‌کردن زبانه‌های ناوبری</string>
     <string name="lyrics_text_position">موقعیت متن ترانه</string>
     <string name="left">چپ</string>
     <string name="center">وسط</string>
@@ -219,7 +201,6 @@
     <string name="enable_proxy">فعال‌کردن پروکسی</string>
     <string name="proxy_type">نوع پروکسی</string>
     <string name="proxy_url">آدرس‌اینترنتی پروکسی</string>
-    <string name="restart_to_take_effect">راه‌اندازی‌مجدد برای اعمال اثر</string>
 
     <string name="player_and_audio">پخش‌کننده و صدا</string>
     <string name="audio_quality">کیفیت صدا</string>
@@ -232,15 +213,12 @@
     <string name="equalizer">اکولایزر</string>
 
     <string name="storage">ذخیره‌سازی</string>
-    <string name="cache">حافظه‌ی‌پنهان</string>
     <string name="image_cache">حافظه‌‌ی‌پنهان تصویر</string>
     <string name="song_cache">حافظه‌‌ی‌پنهان ترانه</string>
     <string name="max_cache_size">حداکثر اندازه‌ی حافظه‌ی‌پنهان</string>
     <string name="unlimited">نامحدود</string>
     <string name="clear_all_downloads">پاک‌کردن تمامی بارگیری‌ها</string>
-    <string name="max_image_cache_size">بیشترین اندازه‌ی حافظه‌ی‌پنهان تصویر</string>
     <string name="clear_image_cache">پاک‌کردن حافظه‌‌ی‌پنهان تصویر</string>
-    <string name="max_song_cache_size">بیشترین اندازه‌ی حافظه‌ی‌پنهان ترانه</string>
     <string name="clear_song_cache">پاک‌کردن حافظه‌‌ی‌پنهان ترانه</string>
     <string name="size_used">%s استفاده‌شده‌است</string>
 
@@ -256,13 +234,11 @@
     <string name="backup_restore">پشتیبان‌گیری و بازگردانی</string>
     <string name="backup">پشتیبان‌گیری</string>
     <string name="restore">بازگردانی</string>
-    <string name="imported_playlist">لیست‌پخش واردشد</string>
     <string name="backup_create_success">پشتیبان باموفقیت ایجادشد</string>
     <string name="backup_create_failed">پشتیبان ایجاد نشد</string>
     <string name="restore_failed">بازیابی پشتیبان انجام‌نشد</string>
 
     <string name="about">درباره</string>
-    <string name="app_version">نسخه‌ی برنامه</string>
 
     <string name="new_version_available">نسخه‌ی جدید دردسترس‌است</string>
     <string name="translation_models">نمونه‌های ترجمه</string>

@@ -42,6 +42,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.anitail.innertube.utils.parseCookieString
+import com.anitail.music.LocalDownloadLibraryRepository
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.R
 import com.anitail.music.constants.CONTENT_TYPE_HEADER
@@ -106,6 +107,10 @@ fun LibraryPlaylistsScreen(
 
     val topSize by viewModel.topValue.collectAsState(initial = 50)
 
+    val downloadRepository = LocalDownloadLibraryRepository.current
+    val downloads by downloadRepository.observeDownloads().collectAsState()
+    val downloadedSongsCount = downloads.size
+
     val likedPlaylist =
         Playlist(
             playlist = PlaylistEntity(
@@ -122,7 +127,7 @@ fun LibraryPlaylistsScreen(
                 id = UUID.randomUUID().toString(),
                 name = stringResource(R.string.offline)
             ),
-            songCount = 0,
+            songCount = downloadedSongsCount,
             songThumbnails = emptyList(),
         )
 
