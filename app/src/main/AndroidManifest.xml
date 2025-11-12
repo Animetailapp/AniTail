@@ -211,8 +211,14 @@
     <service
         android:name=".playback.MediaStoreDownloadService"
         android:exported="false"
-        android:foregroundServiceType="dataSync" />
-        <receiver
+        android:foregroundServiceType="dataSync">
+        <intent-filter>
+            <action android:name="com.anitail.music.CANCEL_DOWNLOAD" />
+            <category android:name="android.intent.category.DEFAULT" />
+        </intent-filter>
+    </service>
+
+    <receiver
             android:name="androidx.media3.session.MediaButtonReceiver"
             android:exported="true">
             <intent-filter>
