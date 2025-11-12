@@ -167,11 +167,13 @@ fun Thumbnail(
         if (isAnimatingTransition) return
 
         val nextUrl = if (direction) {
-            playerConnection.player.previousMediaItemIndex.takeIf { it != -1 }?.let {
+            playerConnection.player.previousMediaItemIndex.takeIf { it >= 0 && it < playerConnection.player.mediaItemCount }
+                ?.let {
                 playerConnection.player.getMediaItemAt(it).mediaMetadata.artworkUri?.toString()
             }
         } else {
-            playerConnection.player.nextMediaItemIndex.takeIf { it != -1 }?.let {
+            playerConnection.player.nextMediaItemIndex.takeIf { it >= 0 && it < playerConnection.player.mediaItemCount }
+                ?.let {
                 playerConnection.player.getMediaItemAt(it).mediaMetadata.artworkUri?.toString()
             }
         }
@@ -205,14 +207,17 @@ fun Thumbnail(
             offsetX > threshold -> {
                 isPreviewingNextSong = true
                 previewImage =
-                    playerConnection.player.previousMediaItemIndex.takeIf { it != -1 }?.let {
+                    playerConnection.player.previousMediaItemIndex.takeIf { it >= 0 && it < playerConnection.player.mediaItemCount }
+                        ?.let {
                         playerConnection.player.getMediaItemAt(it).mediaMetadata.artworkUri?.toString()
                     }
             }
 
             offsetX < -threshold -> {
                 isPreviewingNextSong = true
-                previewImage = playerConnection.player.nextMediaItemIndex.takeIf { it != -1 }?.let {
+                previewImage =
+                    playerConnection.player.nextMediaItemIndex.takeIf { it >= 0 && it < playerConnection.player.mediaItemCount }
+                        ?.let {
                     playerConnection.player.getMediaItemAt(it).mediaMetadata.artworkUri?.toString()
                 }
             }
@@ -309,12 +314,12 @@ fun Thumbnail(
                                             (isRightSwipe && canSkipPrevious) || (!isRightSwipe && canSkipNext)
                                         if (canSwipe) {
                                             val targetThumbnailUrl = if (isRightSwipe) {
-                                                playerConnection.player.previousMediaItemIndex.takeIf { it != -1 }
+                                                playerConnection.player.previousMediaItemIndex.takeIf { it >= 0 && it < playerConnection.player.mediaItemCount }
                                                     ?.let {
                                                         playerConnection.player.getMediaItemAt(it).mediaMetadata.artworkUri?.toString()
                                                     }
                                             } else {
-                                                playerConnection.player.nextMediaItemIndex.takeIf { it != -1 }
+                                                playerConnection.player.nextMediaItemIndex.takeIf { it >= 0 && it < playerConnection.player.mediaItemCount }
                                                     ?.let {
                                                         playerConnection.player.getMediaItemAt(it).mediaMetadata.artworkUri?.toString()
                                                     }

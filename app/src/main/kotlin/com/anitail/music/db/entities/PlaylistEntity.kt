@@ -1,7 +1,6 @@
 package com.anitail.music.db.entities
 
 import androidx.compose.runtime.Immutable
-import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.anitail.innertube.YouTube
@@ -20,7 +19,6 @@ data class PlaylistEntity(
     val browseId: String? = null,
     val createdAt: LocalDateTime? = LocalDateTime.now(),
     val lastUpdateTime: LocalDateTime? = LocalDateTime.now(),
-    @ColumnInfo(name = "isEditable", defaultValue = true.toString())
     val isEditable: Boolean = true,
     val bookmarkedAt: LocalDateTime? = null,
     val remoteSongCount: Int? = null,

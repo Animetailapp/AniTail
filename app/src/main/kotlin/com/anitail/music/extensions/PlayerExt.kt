@@ -92,13 +92,20 @@ val Player.mediaItems: List<MediaItem>
             override val size: Int
                 get() = mediaItemCount
 
-            override fun get(index: Int): MediaItem = getMediaItemAt(index)
+            override fun get(index: Int): MediaItem {
+                require(index >= 0) { "Index should be non-negative" }
+                require(index < mediaItemCount) { "Index $index out of bounds for mediaItemCount $mediaItemCount" }
+                return getMediaItemAt(index)
+            }
         }
 
 fun Player.findNextMediaItemById(mediaId: String): MediaItem? {
-    for (i in currentMediaItemIndex until mediaItemCount) {
-        if (getMediaItemAt(i).mediaId == mediaId) {
-            return getMediaItemAt(i)
+    val count = mediaItemCount
+    for (i in currentMediaItemIndex until count) {
+        if (i >= 0 && i < count) {
+            if (getMediaItemAt(i).mediaId == mediaId) {
+                return getMediaItemAt(i)
+            }
         }
     }
     return null
