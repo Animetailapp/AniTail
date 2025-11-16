@@ -11,6 +11,7 @@ import com.anitail.music.utils.dataStore
 import com.anitail.music.utils.reportException
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -111,14 +112,18 @@ constructor(
         }
 
         val allResult = mutableListOf<LyricsResult>()
-        currentLyricsJob = CoroutineScope(SupervisorJob()).launch {
+        currentLyricsJob = CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             lyricsProviders.forEach { provider ->
-                if (provider.isEnabled(context)) {
+                if (!provider.isEnabled(context)) return@forEach
+
+                runCatching {
                     provider.getAllLyrics(mediaId, songTitle, songArtists, duration) { lyrics ->
                         val result = LyricsResult(provider.name, lyrics)
                         allResult += result
                         callback(result)
                     }
+                }.onFailure {
+                    reportException(it)
                 }
             }
             cache.put(cacheKey, allResult)

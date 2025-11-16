@@ -24,9 +24,12 @@ import io.ktor.websocket.CloseReason.Codes.NORMAL
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -37,11 +40,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 import java.util.logging.Level
 import java.util.logging.Level.INFO
+import java.util.logging.Level.WARNING
 import java.util.logging.Logger
 import kotlin.coroutines.CoroutineContext
 import kotlin.math.pow
@@ -57,8 +62,16 @@ open class DiscordWebSocket(
     private val client: HttpClient = HttpClient {
         install(WebSockets)
     }
+    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        if (throwable is CancellationException) return@CoroutineExceptionHandler
+        lastErrorInternal.value = throwable
+        connectionStateInternal.value = GatewayConnectionState.Error(throwable)
+        Logger.getLogger("Kizzy").log(WARNING, "Gateway coroutine failure", throwable)
+    }
+
     private val job = SupervisorJob()
-    override val coroutineContext: CoroutineContext = job + Dispatchers.Default
+    override val coroutineContext: CoroutineContext =
+        job + Dispatchers.Default + coroutineExceptionHandler
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -320,14 +333,35 @@ open class DiscordWebSocket(
     }
 
     private suspend inline fun <reified T> send(op: OpCode, d: T?) {
-        val session = websocket ?: error("Gateway socket is not open")
+        val session = websocket
+        if (session == null) {
+            Logger.getLogger("Kizzy")
+                .log(WARNING, "Gateway: Tried to send $op while socket is null")
+            return
+        }
+
         val payload = json.encodeToString(
             Payload(
                 op = op,
                 d = json.encodeToJsonElement(d),
             )
         )
-        session.send(Frame.Text(payload))
+
+        try {
+            session.send(Frame.Text(payload))
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (t: Throwable) {
+            lastErrorInternal.value = t
+            connectionStateInternal.value = GatewayConnectionState.Error(t)
+            Logger.getLogger("Kizzy").log(WARNING, "Gateway: Failed sending $op", t)
+
+            withContext(NonCancellable) {
+                connectionMutex.withLock {
+                    closeActiveSocket()
+                }
+            }
+        }
     }
 
     private suspend fun closeActiveSocket() {
