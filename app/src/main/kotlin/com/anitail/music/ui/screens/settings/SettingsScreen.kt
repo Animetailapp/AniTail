@@ -51,6 +51,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,6 +69,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.navigation.NavController
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.anitail.music.viewmodels.HomeViewModel
+import com.anitail.music.constants.PreferredAvatarSourceKey
+import com.anitail.music.constants.AvatarSource
+import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.BuildConfig
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.R
@@ -116,6 +122,11 @@ fun SettingsScreen(
     val scrollState = rememberScrollState()
 
     val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+
+    val homeViewModel: HomeViewModel = hiltViewModel()
+    val accountName by homeViewModel.accountName.collectAsState()
+    val discordUsername by homeViewModel.discordUsername.collectAsState()
+    val (preferredAvatarSource) = rememberEnumPreference(PreferredAvatarSourceKey, defaultValue = AvatarSource.YOUTUBE)
 
     val greetingText = remember(currentHour) {
         when (currentHour) {
@@ -362,9 +373,13 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(4.dp))
+                            val displayName = when (preferredAvatarSource) {
+                                AvatarSource.YOUTUBE -> accountName.takeUnless { it.isBlank() || it == "Guest" }
+                                AvatarSource.DISCORD -> discordUsername
+                            } ?: Build.MODEL
                             Text(
-                                text = "${Build.MODEL}",
-                                style = MaterialTheme.typography.labelMedium,
+                                text = displayName,
+                                style = MaterialTheme.typography.bodyLarge,
                                 color = colorScheme.onSurfaceVariant
                             )
                         }

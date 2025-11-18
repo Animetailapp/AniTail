@@ -1,6 +1,7 @@
 package com.anitail.music.viewmodels
 
 import android.content.Context
+import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.anitail.innertube.YouTube
@@ -12,6 +13,10 @@ import com.anitail.innertube.pages.ExplorePage
 import com.anitail.innertube.pages.HomePage
 import com.anitail.innertube.utils.completed
 import com.anitail.music.constants.DiscordTokenKey
+import com.anitail.music.constants.AccountNameKey
+import com.anitail.music.constants.AccountImageUrlKey
+import com.anitail.music.constants.DiscordUsernameKey
+import com.anitail.music.constants.DiscordAvatarUrlKey
 import com.anitail.music.constants.HideExplicitKey
 import com.anitail.music.constants.QuickPicks
 import com.anitail.music.constants.QuickPicksKey
@@ -74,6 +79,22 @@ class HomeViewModel @Inject constructor(
 
     // Discord avatar URL state
     val discordAvatarUrl = MutableStateFlow<String?>(null)
+    // Discord username state
+    val discordUsername = MutableStateFlow<String?>(null)
+
+    init {
+        try {
+            val cachedName = context.dataStore[AccountNameKey]
+            if (!cachedName.isNullOrBlank()) accountName.value = cachedName
+            val cachedAccountImage = context.dataStore[AccountImageUrlKey]
+            if (!cachedAccountImage.isNullOrBlank()) accountImageUrl.value = cachedAccountImage
+            val cachedDiscordName = context.dataStore[DiscordUsernameKey]
+            if (!cachedDiscordName.isNullOrBlank()) discordUsername.value = cachedDiscordName
+            val cachedDiscordAvatar = context.dataStore[DiscordAvatarUrlKey]
+            if (!cachedDiscordAvatar.isNullOrBlank()) discordAvatarUrl.value = cachedDiscordAvatar
+        } catch (_: Exception) {
+        }
+    }
 
     private suspend fun getQuickPicks(){
         when (quickPicksEnum.first()) {
@@ -113,8 +134,17 @@ class HomeViewModel @Inject constructor(
 
         if (YouTube.cookie != null) {
             YouTube.accountInfo().onSuccess { info ->
-                accountName.value = info.name
-                accountImageUrl.value = info.thumbnailUrl
+                val name = info.name
+                val image = info.thumbnailUrl
+                accountName.value = name
+                accountImageUrl.value = image
+                try {
+                    context.dataStore.edit { prefs ->
+                        prefs[AccountNameKey] = name
+                        if (!image.isNullOrBlank()) prefs[AccountImageUrlKey] = image else prefs.remove(AccountImageUrlKey)
+                    }
+                } catch (_: Exception) {
+                }
             }.onFailure {
                 reportException(it)
             }
@@ -262,18 +292,31 @@ class HomeViewModel @Inject constructor(
             context.dataStore.data.map { it[DiscordTokenKey] ?: "" }.distinctUntilChanged().collect { token ->
                 if (token.isNotEmpty()) {
                     runCatching {
-                        KizzyRPC.getUserInfo(token)
-                    }.onSuccess { result ->
-                        result.getOrNull()?.avatarUrl?.let {
-                            discordAvatarUrl.value = it
-                        } ?: run {
+                            KizzyRPC.getUserInfo(token)
+                        }.onSuccess { result ->
+                            val info = result.getOrNull()
+                            if (info != null) {
+                                val dAvatar = info.avatarUrl
+                                val dUser = info.name.takeIf { it.isNotEmpty() } ?: info.username.takeIf { it.isNotEmpty() }
+                                discordAvatarUrl.value = dAvatar
+                                discordUsername.value = dUser
+                                try {
+                                    context.dataStore.edit { prefs ->
+                                        if (!dUser.isNullOrBlank()) prefs[DiscordUsernameKey] = dUser else prefs.remove(DiscordUsernameKey)
+                                        if (!dAvatar.isNullOrBlank()) prefs[DiscordAvatarUrlKey] = dAvatar else prefs.remove(DiscordAvatarUrlKey)
+                                    }
+                                } catch (_: Exception) {}
+                            } else {
+                                discordAvatarUrl.value = null
+                                discordUsername.value = null
+                            }
+                        }.onFailure {
                             discordAvatarUrl.value = null
+                            discordUsername.value = null
                         }
-                    }.onFailure {
-                        discordAvatarUrl.value = null
-                    }
                 } else {
                     discordAvatarUrl.value = null
+                    discordUsername.value = null
                 }
             }
 

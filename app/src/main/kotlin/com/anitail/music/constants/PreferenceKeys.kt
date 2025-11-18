@@ -122,6 +122,7 @@ val DiscordTokenKey = stringPreferencesKey("discordToken")
 val DiscordInfoDismissedKey = booleanPreferencesKey("discordInfoDismissed")
 val DiscordUsernameKey = stringPreferencesKey("discordUsername")
 val DiscordNameKey = stringPreferencesKey("discordName")
+val DiscordAvatarUrlKey = stringPreferencesKey("discordAvatarUrl")
 
 // Last.fm preferences
 val LastFmEnabledKey = booleanPreferencesKey("lastFmEnabled")
@@ -385,6 +386,7 @@ val InnerTubeCookieKey = stringPreferencesKey("innerTubeCookie")
 val AccountNameKey = stringPreferencesKey("accountName")
 val AccountEmailKey = stringPreferencesKey("accountEmail")
 val AccountChannelHandleKey = stringPreferencesKey("accountChannelHandle")
+val AccountImageUrlKey = stringPreferencesKey("accountImageUrl")
 val UseLoginForBrowse = booleanPreferencesKey("useLoginForBrowse")
 
 val LanguageCodeToName =
