@@ -317,6 +317,11 @@
     <string name="small">Small</string>
     <string name="big">Big</string>
     <string name="player_slider_style">Player slider style</string>
+    <string name="display_density_title">Display density</string>
+    <string name="display_density_summary">Fine-tune how large UI elements appear</string>
+    <string name="display_density_custom_label">Custom (%1$d%%)</string>
+    <string name="custom_density_title">Custom display density</string>
+    <string name="custom_density_summary">Enter a value between 50% and 120%. Lower values show more content, higher values make everything larger.</string>
     <string name="default_">Default</string>
     <string name="squiggly">Squiggly</string>
     <string name="slim">Slim</string>

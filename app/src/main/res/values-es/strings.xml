@@ -297,6 +297,11 @@
     <string name="small">Pequeño</string>
     <string name="big">Grande</string>
     <string name="player_slider_style">Estilo del deslizador del reproductor</string>
+    <string name="display_density_title">Densidad de pantalla</string>
+    <string name="display_density_summary">Ajusta qué tan grande se ve la interfaz</string>
+    <string name="display_density_custom_label">Personalizado (%1$d%%)</string>
+    <string name="custom_density_title">Densidad de pantalla personalizada</string>
+    <string name="custom_density_summary">Ingresa un valor entre 50% y 120%. Los valores más bajos muestran más contenido, los valores más altos agrandan todos los elementos.</string>
     <string name="default_">Predeterminado</string>
     <string name="squiggly">Ondulado</string>
     <string name="slim">Delgado</string>

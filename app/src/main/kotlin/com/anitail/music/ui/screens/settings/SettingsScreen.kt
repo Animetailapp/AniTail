@@ -1,46 +1,70 @@
 package com.anitail.music.ui.screens.settings
 
-import android.content.ActivityNotFoundException
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.navigation.NavController
@@ -48,14 +72,37 @@ import com.anitail.music.BuildConfig
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.R
 import com.anitail.music.ui.component.IconButton
-import com.anitail.music.ui.screens.settings.designs.IconResource
-import com.anitail.music.ui.screens.settings.designs.SettingCategory
-import com.anitail.music.ui.screens.settings.designs.SettingsBox
-import com.anitail.music.ui.screens.settings.designs.shapeManager
 import com.anitail.music.ui.utils.backToMain
 import java.util.Calendar
+import androidx.compose.material3.IconButton as M3IconButton
 
-@Suppress("UNUSED_PARAMETER")
+// Data class para definir cada opción de configuración y poder buscarla
+
+data class SettingOptionData(
+    val id: String,
+    val title: String,
+    val subtitle: String? = null,
+    val section: String? = null
+)
+
+data class MatchedItem(
+    val item: SettingItemData,
+    val matchedOptions: List<SettingOptionData> = emptyList()
+)
+
+data class SettingItemData(
+    val id: String,
+    val title: String,
+    val iconRes: Int,
+    val category: String,
+    val iconColor: Color,
+    val onClick: () -> Unit,
+    val badge: (@Composable BoxScope.() -> Unit)? = null,
+    val subtitle: String? = null,
+    val optionsProvider: (() -> List<SettingOptionData>)? = null,
+)
+
+@SuppressLint("LocalContextGetResourceValueCall")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -64,259 +111,596 @@ fun SettingsScreen(
     latestVersionName: String,
 ) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
     val isAndroid12OrLater = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val scrollState = rememberScrollState()
 
-    // Greeting message based on time of day
-    val welcomeMessage = remember {
-        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        when (hour) {
+    val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+
+    val greetingText = remember(currentHour) {
+        when (currentHour) {
             in 6..11 -> context.getString(R.string.good_morning)
             in 12..18 -> context.getString(R.string.good_afternoon)
             else -> context.getString(R.string.good_evening)
         }
     }
-    val timeBasedImage = remember {
-        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        when (hour) {
+
+    val timeBasedImage = remember(currentHour) {
+        when (currentHour) {
             in 6..11 -> R.drawable.ic_user_device_day
             in 12..18 -> R.drawable.ic_user_device_afternoon
             else -> R.drawable.ic_user_device_night
         }
     }
 
+    val colorScheme = colorScheme
+    val cardBackgroundColor = remember(currentHour, colorScheme) {
+        when (currentHour) {
+            in 6..11 -> colorScheme.primary.copy(alpha = 0.1f)
+            in 12..18 -> colorScheme.primary.copy(alpha = 0.1f)
+            else -> colorScheme.primary.copy(alpha = 0.1f)
+        }
+    }
 
-    Column(
-        modifier = Modifier
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Horizontal))
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
-    ) {
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Top
-                )
+    val allSettings = remember(latestVersionName) {
+        val list = mutableListOf<SettingItemData>()
+        fun optionsFor(id: String): () -> List<SettingOptionData> =
+            { SettingsSearchOptions.forItem(id, context) }
+
+        list.add(
+            SettingItemData(
+                "appearance",
+                context.getString(R.string.appearance),
+                R.drawable.palette,
+                context.getString(R.string.category_interface),
+                Color(0xFF5C6BC0),
+                { navController.navigate("settings/appearance") },
+                optionsProvider = optionsFor("appearance")
+            )
+        )
+        list.add(
+            SettingItemData(
+                "account",
+                context.getString(R.string.account),
+                R.drawable.account,
+                context.getString(R.string.category_interface),
+                Color(0xFFAB47BC),
+                { navController.navigate("settings/account") },
+                optionsProvider = optionsFor("account")
+            )
+        )
+        list.add(
+            SettingItemData(
+                "lastfm",
+                context.getString(R.string.lastfm_settings),
+                R.drawable.music_note,
+                context.getString(R.string.category_interface),
+                Color(0xFFEF5350),
+                { navController.navigate("settings/lastfm") },
+                optionsProvider = optionsFor("lastfm")
             )
         )
 
-        Card(
-            modifier = Modifier
-                .fillMaxSize(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Image(
-                    painter = painterResource(id = timeBasedImage),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(170.dp)
-                        .padding(end = 24.dp)
-                )
-                Column(
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = welcomeMessage,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "${stringResource(R.string.device)} ${Build.MODEL}\n(${Build.DEVICE})",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        // Interface category
-        SettingCategory(title = stringResource(id = R.string.category_interface))
-        SettingsBox(
-            title = stringResource(R.string.appearance),
-            icon = IconResource.Drawable(painterResource(R.drawable.palette)),
-            shape = shapeManager(isFirst = true),
-            onClick = { navController.navigate("settings/appearance") }
+        list.add(
+            SettingItemData(
+                "content",
+                context.getString(R.string.content),
+                R.drawable.language,
+                context.getString(R.string.category_content),
+                Color(0xFF26A69A),
+                { navController.navigate("settings/content") },
+                optionsProvider = optionsFor("content")
+            )
         )
-        SettingsBox(
-            title = stringResource(R.string.account),
-            icon = IconResource.Drawable(painterResource(R.drawable.account)),
-            shape = shapeManager(),
-            onClick = { navController.navigate("settings/account") }
+        list.add(
+            SettingItemData(
+                "player",
+                context.getString(R.string.player_and_audio),
+                R.drawable.play,
+                context.getString(R.string.category_player),
+                Color(0xFFFFA726),
+                { navController.navigate("settings/player") },
+                optionsProvider = optionsFor("player")
+            )
         )
-        SettingsBox(
-            title = stringResource(R.string.lastfm_settings),
-            icon = IconResource.Drawable(painterResource(R.drawable.music_note)),
-            shape = shapeManager(isLast = true),
-            onClick = { navController.navigate("settings/lastfm") }
+        list.add(
+            SettingItemData(
+                "jam",
+                context.getString(R.string.jam_lan_sync),
+                R.drawable.sync,
+                context.getString(R.string.category_player),
+                Color(0xFF42A5F5),
+                { navController.navigate("settings/jam") },
+                optionsProvider = optionsFor("jam")
+            )
+        )
+        list.add(
+            SettingItemData(
+                "privacy",
+                context.getString(R.string.privacy),
+                R.drawable.security,
+                context.getString(R.string.category_content),
+                Color(0xFF78909C),
+                { navController.navigate("settings/privacy") },
+                optionsProvider = optionsFor("privacy")
+            )
         )
 
-        // Content category
-        SettingCategory(title = stringResource(id = R.string.category_content))
-        SettingsBox(
-            title = stringResource(R.string.content),
-            icon = IconResource.Drawable(painterResource(R.drawable.language)),
-            shape = shapeManager(isFirst = true),
-            onClick = { navController.navigate("settings/content") }
+        list.add(
+            SettingItemData(
+                "storage",
+                context.getString(R.string.storage),
+                R.drawable.storage,
+                context.getString(R.string.category_system),
+                Color(0xFF8D6E63),
+                { navController.navigate("settings/storage") },
+                optionsProvider = optionsFor("storage")
+            )
         )
-        SettingsBox(
-            title = stringResource(R.string.privacy),
-            icon = IconResource.Drawable(painterResource(R.drawable.security)),
-            shape = shapeManager(isLast = true),
-            onClick = { navController.navigate("settings/privacy") }
-        )
-
-        // Player category
-        SettingCategory(title = stringResource(id = R.string.category_player))
-        SettingsBox(
-            title = stringResource(R.string.player_and_audio),
-            icon = IconResource.Drawable(painterResource(R.drawable.play)),
-            shape = shapeManager(isFirst = true),
-            onClick = { navController.navigate("settings/player") }
-        )
-        SettingsBox(
-            title = stringResource(R.string.jam_lan_sync),
-            icon = IconResource.Drawable(painterResource(R.drawable.sync)),
-            shape = shapeManager(isLast = true),
-            onClick = { navController.navigate("settings/jam") }
+        list.add(
+            SettingItemData(
+                "backup",
+                context.getString(R.string.backup_restore),
+                R.drawable.restore,
+                context.getString(R.string.category_system),
+                Color(0xFF5C6BC0),
+                { navController.navigate("settings/backup_restore") },
+                optionsProvider = optionsFor("backup")
+            )
         )
 
-        // System category
-        SettingCategory(title = stringResource(id = R.string.category_system))
-        SettingsBox(
-            title = stringResource(R.string.storage),
-            icon = IconResource.Drawable(painterResource(R.drawable.storage)),
-            shape = shapeManager(isFirst = true),
-            onClick = { navController.navigate("settings/storage") }
-        )
-        SettingsBox(
-            title = stringResource(R.string.backup_restore),
-            icon = IconResource.Drawable(painterResource(R.drawable.restore)),
-            shape = shapeManager(),
-            onClick = { navController.navigate("settings/backup_restore") }
-        )
-        SettingsBox(
-            title = stringResource(R.string.update_settings),
-            content = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
-                ) {
-                    // Icon with optional badge
-                    androidx.compose.foundation.layout.Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                            .then(Modifier),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        BadgedBox(badge = {
-                            if (latestVersionName != BuildConfig.VERSION_NAME) {
-                                Badge { }
-                            }
-                        }) {
-                            Icon(
-                                painter = painterResource(R.drawable.update),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.padding(start = 16.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.update_settings),
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowForwardIos,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            },
-            shape = shapeManager(),
-            onClick = { navController.navigate("settings/updates") }
+        val hasUpdate = latestVersionName != BuildConfig.VERSION_NAME
+        val updateBadge: (@Composable BoxScope.() -> Unit)? = if (hasUpdate) {
+            { Badge() }
+        } else null
+        list.add(
+            SettingItemData(
+                id = "update",
+                title = context.getString(R.string.update_settings),
+                iconRes = R.drawable.update,
+                category = context.getString(R.string.category_system),
+                iconColor = if (hasUpdate) Color(0xFF66BB6A) else Color(0xFFBDBDBD),
+                onClick = { navController.navigate("settings/updates") },
+                badge = updateBadge,
+                subtitle = if (hasUpdate) context.getString(R.string.new_version_available) else null,
+                optionsProvider = optionsFor("update")
+            )
         )
 
         if (isAndroid12OrLater) {
-            SettingsBox(
-                title = stringResource(R.string.default_links),
-                icon = IconResource.Drawable(painterResource(R.drawable.link)),
-                shape = shapeManager(),
-                onClick = {
-                    try {
-                        val intent = Intent(
-                            Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS,
-                            "package:${context.packageName}".toUri()
+            list.add(
+                SettingItemData(
+                    "links",
+                    context.getString(R.string.default_links),
+                    R.drawable.link,
+                    "More",
+                    Color(0xFF29B6F6),
+                    {
+                        try {
+                            val intent = Intent(
+                                Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS,
+                                "package:${context.packageName}".toUri()
+                            )
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            Toast.makeText(
+                                context,
+                                R.string.open_app_settings_error,
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    })
+            )
+        }
+        list.add(
+            SettingItemData(
+                "about",
+                context.getString(R.string.about),
+                R.drawable.info,
+                "More",
+                Color(0xFF7E57C2),
+                { navController.navigate("settings/about") },
+                optionsProvider = optionsFor("about")
+            )
+        )
+
+        list
+    }
+
+    var searchQuery by remember { mutableStateOf("") }
+
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.settings), fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(
+                        onClick = navController::navigateUp,
+                        onLongClick = navController::backToMain
+                    ) {
+                        Icon(painterResource(R.drawable.arrow_back), contentDescription = null)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                scrollBehavior = scrollBehavior
+            )
+        },
+        contentWindowInsets = LocalPlayerAwareWindowInsets.current
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp)
+                .verticalScroll(scrollState)
+        ) {
+            AnimatedVisibility(visible = searchQuery.isEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 16.dp)
+                        .height(140.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBackgroundColor)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .padding(start = 24.dp, top = 16.dp, bottom = 16.dp)
+                                .weight(1f),
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = greetingText,
+                                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "${Build.MODEL}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Image(
+                            painter = painterResource(id = timeBasedImage),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .aspectRatio(1f)
+                                .padding(end = 8.dp),
+                            alignment = Alignment.CenterEnd
                         )
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        context.startActivity(intent)
-                    } catch (e: Exception) {
-                        when (e) {
-                            is ActivityNotFoundException, is SecurityException -> {
-                                Toast.makeText(
-                                    context,
-                                    R.string.open_app_settings_error,
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                            else -> {
-                                Toast.makeText(
-                                    context,
-                                    R.string.open_app_settings_error,
-                                    Toast.LENGTH_LONG
-                                ).show()
+                    }
+                }
+            }
+
+            SearchBarField(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                onClear = {
+                    searchQuery = ""
+                    focusManager.clearFocus()
+                }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (searchQuery.isEmpty()) {
+                val categories = allSettings.map { it.category }.distinct()
+
+                categories.forEach { category ->
+                    val itemsInCategory = allSettings.filter { it.category == category }
+
+                    SettingsGroupTitle(category)
+                    SettingsGroupCard {
+                        itemsInCategory.forEachIndexed { index, item ->
+                            SettingsItem(
+                                title = item.title,
+                                subtitle = item.subtitle,
+                                iconRes = item.iconRes,
+                                iconColor = item.iconColor,
+                                badge = item.badge,
+                                onClick = item.onClick
+                            )
+                            if (index < itemsInCategory.lastIndex) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(start = 56.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                )
                             }
                         }
                     }
                 }
-            )
-        }
-        SettingsBox(
-            title = stringResource(R.string.about),
-            icon = IconResource.Drawable(painterResource(R.drawable.info)),
-            shape = shapeManager(isLast = true),
-            onClick = { navController.navigate("settings/about") }
-        )
-        Spacer(
-            Modifier.windowInsetsPadding(
-                LocalPlayerAwareWindowInsets.current.only(
-                    WindowInsetsSides.Bottom
-                )
-            )
-        )
-        Spacer(modifier = Modifier.height(16.dp))
+            } else {
+                val categoriesAll = allSettings.map { it.category }.distinct()
+                val filteredByCategory = categoriesAll.mapNotNull { category ->
+                    val itemsInCategory = allSettings.filter { it.category == category }
+                    val matchedItems = itemsInCategory.mapNotNull { item ->
+                        if (category.contains(searchQuery, ignoreCase = true)) {
+                            MatchedItem(item)
+                        } else {
+                            val itemMatches = item.title.contains(searchQuery, ignoreCase = true) ||
+                                    (item.subtitle?.contains(
+                                        searchQuery,
+                                        ignoreCase = true
+                                    ) == true) ||
+                                    item.id.contains(searchQuery, ignoreCase = true)
 
-    }
+                            val options = item.optionsProvider?.invoke().orEmpty()
+                            val matchedOptions = options.filter { opt ->
+                                opt.title.contains(searchQuery, ignoreCase = true) ||
+                                        (opt.subtitle?.contains(
+                                            searchQuery,
+                                            ignoreCase = true
+                                        ) == true) ||
+                                        opt.id.contains(searchQuery, ignoreCase = true)
+                            }
 
-    TopAppBar(
-        title = { Text(stringResource(R.string.settings)) },
-        navigationIcon = {
-            IconButton(
-                onClick = navController::navigateUp,
-                onLongClick = navController::backToMain
-            ) {
-                Icon(
-                    painterResource(R.drawable.arrow_back),
-                    contentDescription = null
-                )
+                            if (itemMatches) MatchedItem(item)
+                            else if (matchedOptions.isNotEmpty()) MatchedItem(item, matchedOptions)
+                            else null
+                        }
+                    }
+                    if (matchedItems.isNotEmpty()) category to matchedItems else null
+                }
+
+                if (filteredByCategory.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No settings found", color = MaterialTheme.colorScheme.outline)
+                    }
+                } else {
+                    Text(
+                        "Search Results",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    filteredByCategory.forEach { (category, matchedItems) ->
+                        SettingsGroupTitle(category)
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            matchedItems.forEach { matched ->
+                                val item = matched.item
+                                if (matched.matchedOptions.isEmpty()) {
+                                    SearchResultCard(
+                                        title = item.title,
+                                        description = item.subtitle,
+                                        label = item.category,
+                                        iconRes = item.iconRes,
+                                        iconColor = item.iconColor,
+                                        onClick = item.onClick
+                                    )
+                                } else {
+                                    matched.matchedOptions.forEach { opt ->
+                                        SearchResultCard(
+                                            title = opt.title,
+                                            description = opt.subtitle,
+                                            label = listOfNotNull(
+                                                item.title,
+                                                opt.section
+                                            ).joinToString(" • "),
+                                            iconRes = item.iconRes,
+                                            iconColor = item.iconColor,
+                                            onClick = item.onClick
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
+            Text(
+                text = "Version ${BuildConfig.VERSION_NAME}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+            Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+}
+
+// --- COMPONENTES AUXILIARES ---
+
+@Composable
+fun SearchBarField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = { Text("Search settings...") },
+        leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                M3IconButton(onClick = onClear) {
+                    Icon(Icons.Rounded.Close, contentDescription = "Clear")
+                }
+            }
+        },
+        shape = RoundedCornerShape(16.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = colorScheme.primary.copy(alpha = 0.5f),
+            unfocusedBorderColor = Color.Transparent,
+            focusedContainerColor = colorScheme.surfaceContainer,
+            unfocusedContainerColor = colorScheme.surfaceContainerHigh
+        ),
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { defaultKeyboardAction(ImeAction.Search) })
     )
 }
 
+@Composable
+fun SettingsGroupTitle(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        color = colorScheme.primary,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(start = 12.dp, bottom = 8.dp, top = 24.dp)
+    )
+}
+
+@Composable
+fun SettingsGroupCard(content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = colorScheme.surfaceContainerLow),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(content = content)
+    }
+}
+
+@Composable
+fun SettingsItem(
+    title: String,
+    subtitle: String? = null,
+    iconRes: Int,
+    iconColor: Color,
+    badge: (@Composable BoxScope.() -> Unit)? = null,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(iconColor.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                painter = painterResource(id = iconRes),
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = colorScheme.onSurface,
+                fontWeight = FontWeight.Medium
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        if (badge != null) {
+            BadgedBox(badge = badge) { }
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.ArrowForwardIos,
+            contentDescription = null,
+            tint = colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+            modifier = Modifier.size(14.dp)
+        )
+    }
+}
+
+@Composable
+fun SearchResultCard(
+    title: String,
+    description: String?,
+    label: String,
+    iconRes: Int,
+    iconColor: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(28.dp),
+        tonalElevation = 2.dp,
+        color = colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(iconColor.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = null,
+                    tint = iconColor,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colorScheme.primary.copy(alpha = 0.9f)
+                )
+                description?.let {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.ArrowForwardIos,
+                contentDescription = null,
+                tint = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}

@@ -214,7 +214,7 @@ fun AppearanceSettings(
 
                     if (FontUtils.isValidFontFile(destFile.absolutePath)) {
                         onLyricsCustomFontPathChange(destFile.absolutePath)
-                        FontUtils.clearCache() // Clear cache to reload new font
+                        FontUtils.clearCache()
                         Toast.makeText(
                             context,
                             context.getString(R.string.font_loaded_successfully),
@@ -474,15 +474,17 @@ fun AppearanceSettings(
         }
 
         ListPreference(
-            title = { Text("Display Density") },
+            title = { Text(stringResource(R.string.display_density_title)) },
             icon = { Icon(painterResource(R.drawable.grid_view), null) },
             selectedValue = densityScale,
             values = DensityScale.entries.map { it.value },
             valueText = { scale ->
                 val densityEnum = DensityScale.fromValue(scale)
                 if (densityEnum == DensityScale.CUSTOM) {
-                    // Show the actual custom percentage value
-                    "Custom (${(customDensityValue * 100).toInt()}%)"
+                    context.getString(
+                        R.string.display_density_custom_label,
+                        (customDensityValue * 100).toInt()
+                    )
                 } else {
                     densityEnum.label
                 }
@@ -695,7 +697,7 @@ fun AppearanceSettings(
                 buttons = {
                     TextButton(
                         onClick = {
-                            tempFontSize = 20f // Reset to default
+                            tempFontSize = 20f
                         }
                     ) {
                         Text(stringResource(R.string.reset))
@@ -770,11 +772,8 @@ fun AppearanceSettings(
             icon = { Icon(painterResource(R.drawable.format_align_left), null) },
             onClick = {
                 if (lyricsCustomFontPath.isEmpty()) {
-                    // Load custom font
                     fontPickerLauncher.launch("*/*")
                 } else {
-                    // Show options to change or reset
-                    // For now, just reset to system font
                     onLyricsCustomFontPathChange("")
                     FontUtils.clearCache()
                 }
@@ -930,12 +929,12 @@ fun AppearanceSettings(
 
                             // Write to SharedPreferences
                             context.getSharedPreferences(
-                                "metrolist_settings",
+                                "anitail_settings",
                                 android.content.Context.MODE_PRIVATE
                             )
-                                .edit()
-                                .putFloat("density_scale_factor", value)
-                                .apply()
+                                .edit {
+                                    putFloat("density_scale_factor", value)
+                                }
 
                             showCustomDensityDialog = false
                             showRestartDialog = true
@@ -952,11 +951,11 @@ fun AppearanceSettings(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Custom Display Density",
+                    text = stringResource(R.string.custom_density_title),
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(
-                    text = "Enter a value between 50% and 120%. Lower values show more content, higher values make everything larger.",
+                    text = stringResource(R.string.custom_density_summary),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
