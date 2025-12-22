@@ -104,6 +104,7 @@ import com.anitail.music.extensions.findNextMediaItemById
 import com.anitail.music.extensions.mediaItems
 import com.anitail.music.extensions.metadata
 import com.anitail.music.extensions.setOffloadEnabled
+import com.anitail.music.extensions.toEnum
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.lyrics.LyricsHelper
 import com.anitail.music.models.PersistQueue
@@ -203,8 +204,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
     private val streamUrlCache = HashMap<String, StreamInfo>()
 
-  private val audioQuality by
-      enumPreference(this, AudioQualityKey, com.anitail.music.constants.AudioQuality.AUTO)
+    private lateinit var audioQuality: com.anitail.music.constants.AudioQuality
+
   private val buttonType by
       enumPreference(this, NotificationButtonTypeKey, NotificationButtonType.CLOSE)
 
@@ -229,7 +230,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       currentMediaMetadata.flatMapLatest { mediaMetadata -> database.format(mediaMetadata?.id) }
 
   private val normalizeFactor = MutableStateFlow(1f)
-  val playerVolume = MutableStateFlow(dataStore.get(PlayerVolumeKey, 1f).coerceIn(0f, 1f))
+    lateinit var playerVolume: MutableStateFlow<Float>
 
   lateinit var sleepTimer: SleepTimer
 
@@ -339,6 +340,9 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     controllerFuture.addListener({ controllerFuture.get() }, MoreExecutors.directExecutor())
 
         connectivityObserver = NetworkConnectivity(this)
+        audioQuality =
+            dataStore.get(AudioQualityKey).toEnum(com.anitail.music.constants.AudioQuality.AUTO)
+        playerVolume = MutableStateFlow(dataStore.get(PlayerVolumeKey, 1f).coerceIn(0f, 1f))
 
         scope.launch {
             connectivityObserver.networkStatus.collect { isConnected ->
