@@ -161,6 +161,7 @@
     <string name="search_lyrics">Search lyrics</string>
     <string name="lyrics">Lyrics</string>
     <string name="lyrics_auto_scroll">Auto scroll lyrics</string>
+    <string name="lyrics_glow_effect">Enable glowing lyrics effect</string>
 
 
     <string name="edit_song">Edit song</string>

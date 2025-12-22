@@ -47,6 +47,7 @@ import com.anitail.music.constants.EnableKugouKey
 import com.anitail.music.constants.EnableLrcLibKey
 import com.anitail.music.constants.HideExplicitKey
 import com.anitail.music.constants.LanguageCodeToName
+import com.anitail.music.constants.LyricsGlowEffectKey
 import com.anitail.music.constants.PreferredLyricsProvider
 import com.anitail.music.constants.PreferredLyricsProviderKey
 import com.anitail.music.constants.ProxyEnabledKey
@@ -82,18 +83,18 @@ fun ContentSettings(
     val localeManager = remember { LocaleManager(context) }
     val languages = listOf(SYSTEM_DEFAULT) + LanguageCodeToName.keys.toList()
 
-    val (contentLanguage, onContentLanguageChange) = rememberPreference(key = ContentLanguageKey, defaultValue = "system")
-    val (contentCountry, onContentCountryChange) = rememberPreference(key = ContentCountryKey, defaultValue = "system")
-    val (selectedLanguage, setSelectedLanguage) = rememberPreference(stringPreferencesKey("app_language"), "en")
+    val (contentLanguage, _) = rememberPreference(key = ContentLanguageKey, defaultValue = "system")
+    val (contentCountry, _) = rememberPreference(key = ContentCountryKey, defaultValue = "system")
+    val (selectedLanguage, _) = rememberPreference(stringPreferencesKey("app_language"), "en")
     val (_, _) = rememberPreference(key = HideExplicitKey, defaultValue = false)
     val (proxyEnabled, onProxyEnabledChange) = rememberPreference(key = ProxyEnabledKey, defaultValue = false)
-    val (proxyType, onProxyTypeChange) = rememberEnumPreference(key = ProxyTypeKey, defaultValue = Proxy.Type.HTTP)
-    val (proxyUrl, onProxyUrlChange) = rememberPreference(key = ProxyUrlKey, defaultValue = "host:port")
-    val (proxyUsername, onProxyUsernameChange) = rememberPreference(
+    val (proxyType, _) = rememberEnumPreference(key = ProxyTypeKey, defaultValue = Proxy.Type.HTTP)
+    val (proxyUrl, _) = rememberPreference(key = ProxyUrlKey, defaultValue = "host:port")
+    val (proxyUsername, _) = rememberPreference(
         key = ProxyUsernameKey,
         defaultValue = "username"
     )
-    val (proxyPassword, onProxyPasswordChange) = rememberPreference(
+    val (proxyPassword, _) = rememberPreference(
         key = ProxyPasswordKey,
         defaultValue = "password"
     )
@@ -104,6 +105,10 @@ fun ContentSettings(
             key = PreferredLyricsProviderKey,
             defaultValue = PreferredLyricsProvider.LRCLIB,
         )
+    val (lyricsGlowEffect, onLyricsGlowEffectChange) = rememberPreference(
+        key = LyricsGlowEffectKey,
+        defaultValue = false
+    )
     val (lengthTop, onLengthTopChange) = rememberPreference(key = TopSize, defaultValue = "50")
     val (quickPicks, onQuickPicksChange) = rememberEnumPreference(key = QuickPicksKey, defaultValue = QuickPicks.QUICK_PICKS)
 
@@ -347,6 +352,12 @@ fun ContentSettings(
                 }
             },
             onValueSelected = onPreferredProviderChange,
+        )
+        SwitchPreference(
+            title = { Text(stringResource(R.string.lyrics_glow_effect)) },
+            icon = { Icon(painterResource(R.drawable.lyrics), null) },
+            checked = lyricsGlowEffect,
+            onCheckedChange = onLyricsGlowEffectChange,
         )
 
         PreferenceEntry(
