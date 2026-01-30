@@ -41,7 +41,7 @@ jobs:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
 
       - name: Upload APK
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: app-universal-debug
           path: app/build/outputs/apk/universal/debug/*.apk
