@@ -121,3 +121,7 @@
 -keep class androidx.media3.** { *; }
 -keep interface androidx.media3.** { *; }
 -dontwarn androidx.media3.**
+
+# Suppress warnings for com.google.re2j reported by R8
+-dontwarn com.google.re2j.Matcher
+-dontwarn com.google.re2j.Pattern
