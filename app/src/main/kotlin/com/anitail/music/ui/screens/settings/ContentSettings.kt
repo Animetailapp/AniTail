@@ -83,18 +83,33 @@ fun ContentSettings(
     val localeManager = remember { LocaleManager(context) }
     val languages = listOf(SYSTEM_DEFAULT) + LanguageCodeToName.keys.toList()
 
-    val (contentLanguage, _) = rememberPreference(key = ContentLanguageKey, defaultValue = "system")
-    val (contentCountry, _) = rememberPreference(key = ContentCountryKey, defaultValue = "system")
-    val (selectedLanguage, _) = rememberPreference(stringPreferencesKey("app_language"), "en")
+    val (contentLanguage, onContentLanguageChange) = rememberPreference(
+        key = ContentLanguageKey,
+        defaultValue = "system"
+    )
+    val (contentCountry, onContentCountryChange) = rememberPreference(
+        key = ContentCountryKey,
+        defaultValue = "system"
+    )
+    val (selectedLanguage, setSelectedLanguage) = rememberPreference(
+        stringPreferencesKey("app_language"),
+        "en"
+    )
     val (_, _) = rememberPreference(key = HideExplicitKey, defaultValue = false)
     val (proxyEnabled, onProxyEnabledChange) = rememberPreference(key = ProxyEnabledKey, defaultValue = false)
-    val (proxyType, _) = rememberEnumPreference(key = ProxyTypeKey, defaultValue = Proxy.Type.HTTP)
-    val (proxyUrl, _) = rememberPreference(key = ProxyUrlKey, defaultValue = "host:port")
-    val (proxyUsername, _) = rememberPreference(
+    val (proxyType, onProxyTypeChange) = rememberEnumPreference(
+        key = ProxyTypeKey,
+        defaultValue = Proxy.Type.HTTP
+    )
+    val (proxyUrl, onProxyUrlChange) = rememberPreference(
+        key = ProxyUrlKey,
+        defaultValue = "host:port"
+    )
+    val (proxyUsername, onProxyUsernameChange) = rememberPreference(
         key = ProxyUsernameKey,
         defaultValue = "username"
     )
-    val (proxyPassword, _) = rememberPreference(
+    val (proxyPassword, onProxyPasswordChange) = rememberPreference(
         key = ProxyPasswordKey,
         defaultValue = "password"
     )

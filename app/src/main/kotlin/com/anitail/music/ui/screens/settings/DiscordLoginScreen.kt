@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.CookieManager
-import android.webkit.JavascriptInterface
 import android.webkit.JsResult
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -35,6 +34,7 @@ import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicInteger
 
 @SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,6 +43,11 @@ fun DiscordLoginScreen(navController: NavController) {
     val scope = rememberCoroutineScope()
     var discordToken by rememberPreference(DiscordTokenKey, "")
     var webView: WebView? = null
+
+    // Constants for extraction
+    val TOKEN_EXTRACTION_DELAY = 2000L
+    val MAX_RETRY_ATTEMPTS = 5
+    val MIN_TOKEN_LENGTH = 50
 
     AndroidView(
         modifier = Modifier
@@ -69,53 +74,48 @@ fun DiscordLoginScreen(navController: NavController) {
 
                 WebStorage.getInstance().deleteAllData()
 
-                addJavascriptInterface(object {
-                    @JavascriptInterface
-                    fun onRetrieveToken(token: String) {
-                        Log.d("DiscordWebView", "Token: $token")
-                        if (token != "null" && token != "error") {
-                            discordToken = token
-                            scope.launch(Dispatchers.Main) {
-                                webView?.loadUrl("about:blank")
-                                navController.navigateUp()
-                            }
-                        }
-                    }
-                }, "Android")
-
                 webViewClient = object : WebViewClient() {
-                    override fun onPageFinished(view: WebView, url: String) {
+                    override fun onPageFinished(view: WebView, url: String?) {
+                        if (url.isNullOrBlank()) return
+
+                        // If we're already navigated away or token exists, skip
+                        if (discordToken.isNotEmpty()) return
+
                         if (url.contains("/channels/@me") || url.contains("/app")) {
-                            view.evaluateJavascript(
-                                """
-                                (function() {
-                                    try {
-                                        var token = localStorage.getItem("token");
-                                        if (token) {
-                                            Android.onRetrieveToken(token.slice(1, -1));
+                            // Use a robust extraction strategy with retries
+                            val attemptCounter = AtomicInteger(0)
+
+                            fun tryExtract() {
+                                if (discordToken.isNotEmpty()) return
+                                val attempt = attemptCounter.get()
+                                if (attempt >= MAX_RETRY_ATTEMPTS) {
+                                    Log.e("DiscordWebView", "Max extraction attempts reached")
+                                    return
+                                }
+
+                                postDelayed({
+                                    evaluateJavascript(getTokenExtractionScript()) { result ->
+                                        val token = result?.trim('"')?.replace("\\\"", "") ?: ""
+                                        Log.d(
+                                            "DiscordWebView",
+                                            "Extraction attempt ${attempt + 1}, token length=${token.length}"
+                                        )
+                                        if (isValidToken(token, MIN_TOKEN_LENGTH)) {
+                                            Log.i("DiscordWebView", "Valid token extracted")
+                                            discordToken = token
+                                            scope.launch(Dispatchers.Main) {
+                                                loadUrl("about:blank")
+                                                navController.navigateUp()
+                                            }
                                         } else {
-                                            // fallback إلى alert (منطق kizzy)
-                                            var i = document.createElement('iframe');
-                                            document.body.appendChild(i);
-                                            setTimeout(function() {
-                                                try {
-                                                    var alt = i.contentWindow.localStorage.token;
-                                                    if (alt) {
-                                                        alert(alt.slice(1, -1));
-                                                    } else {
-                                                        alert("null");
-                                                    }
-                                                } catch (e) {
-                                                    alert("error");
-                                                }
-                                            }, 1000);
+                                            attemptCounter.incrementAndGet()
+                                            tryExtract()
                                         }
-                                    } catch (e) {
-                                        alert("error");
                                     }
-                                })();
-                                """.trimIndent(), null
-                            )
+                                }, TOKEN_EXTRACTION_DELAY)
+                            }
+
+                            tryExtract()
                         }
                     }
 
@@ -132,7 +132,12 @@ fun DiscordLoginScreen(navController: NavController) {
                         message: String,
                         result: JsResult
                     ): Boolean {
-                        if (message != "null" && message != "error") {
+                        // Some extraction fallbacks alert the token — validate it before using
+                        if (message != "null" && message != "error" && isValidToken(
+                                message,
+                                MIN_TOKEN_LENGTH
+                            )
+                        ) {
                             discordToken = message
                             scope.launch(Dispatchers.Main) {
                                 view.loadUrl("about:blank")
@@ -168,4 +173,69 @@ fun DiscordLoginScreen(navController: NavController) {
     BackHandler(enabled = webView?.canGoBack() == true) {
         webView?.goBack()
     }
+}
+
+// Helper: JS extraction script (adapted from KizzyRPC / Saikou implementations)
+private fun getTokenExtractionScript(): String {
+    return """
+            (function() {
+                try {
+                    // Method 1: Webpack chunks (modern Discord)
+                    const w = (typeof webpackChunkdiscord_app !== 'undefined') ? webpackChunkdiscord_app.push([[""],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]) || m : null;
+                    if (w) {
+                        const req = m.find(m => m?.exports?.default?.getToken !== void 0)?.exports?.default;
+                        if (req && req.getToken) {
+                            const token = req.getToken();
+                            if (token) return token;
+                        }
+                    }
+                } catch(e){}
+
+                try {
+                    // Method 2: Alternative webpack approach
+                    let token = null;
+                    if (typeof webpackChunkdiscord_app !== 'undefined') {
+                        webpackChunkdiscord_app.push([[Math.random()], {}, (r) => {
+                            for (const m in r.c) {
+                                const exp = r.c[m].exports;
+                                if (!exp) continue;
+                                if (exp.default && exp.default.getToken) token = exp.default.getToken();
+                                if (exp.getToken) token = exp.getToken();
+                            }
+                        }]);
+                        if (token) return token;
+                    }
+                } catch(e){}
+
+                try {
+                    // Method 3: scan localStorage
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        const value = localStorage.getItem(key);
+                        if (!value) continue;
+                        const cleaned = value.replace(/['"]/g, '');
+                        if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(cleaned)) return cleaned;
+                    }
+                } catch(e){}
+
+                try {
+                    const storageToken = localStorage.getItem('token');
+                    if (storageToken) {
+                        const cleaned = storageToken.replace(/['"]/g, '');
+                        if (cleaned) return cleaned;
+                    }
+                } catch(e){}
+
+                return 'NO_TOKEN';
+            })();
+        """.trimIndent()
+}
+
+private fun isValidToken(token: String, minLength: Int = 50): Boolean {
+    return token.isNotEmpty() &&
+            token != "NO_TOKEN" &&
+            token != "null" &&
+            token != "undefined" &&
+            token.length > minLength &&
+            Regex("^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$").matches(token)
 }
