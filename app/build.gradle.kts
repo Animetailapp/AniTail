@@ -213,7 +213,7 @@ dependencies {
 
     implementation(libs.hilt)
     implementation(libs.jsoup)
-    kapt(libs.hilt.compiler)
+    ksp(libs.hilt.compiler)
 
     implementation(projects.innertube)
     implementation(projects.kugou)
