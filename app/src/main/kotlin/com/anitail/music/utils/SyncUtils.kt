@@ -7,6 +7,7 @@ import com.anitail.innertube.models.ArtistItem
 import com.anitail.innertube.models.PlaylistItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.utils.completed
+import com.anitail.music.constants.LastCloudSyncKey
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.ArtistEntity
 import com.anitail.music.db.entities.PlaylistEntity
@@ -20,6 +21,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import java.time.LocalDateTime
 import javax.inject.Inject
@@ -36,6 +40,7 @@ constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
 ) {
   private val syncScope = CoroutineScope(Dispatchers.IO)
+    private val cloudSyncMutex = Mutex()
 
   fun likeSong(s: SongEntity) {
     syncScope.launch {
@@ -265,7 +270,29 @@ constructor(
         }
     }
 
-    suspend fun syncCloud(): String? = coroutineScope {
+    companion object {
+        private const val SYNC_THROTTLE_MS = 30 * 60 * 1000L // 30 minutes
+        private const val SYNC_TIMEOUT_MS = 60_000L // 60 seconds
+    }
+
+    suspend fun syncCloud(force: Boolean = false): String? = coroutineScope {
+        // Skip if database is being restored
+        if (!database.isSafeToUse()) {
+            Timber.d("syncCloud: Skipping - database is being restored")
+            return@coroutineScope null
+        }
+
+        // Throttling: skip if synced recently (unless forced)
+        if (!force) {
+            val lastSync = context.dataStore.data.first()[LastCloudSyncKey] ?: 0L
+            val now = System.currentTimeMillis()
+            if (now - lastSync < SYNC_THROTTLE_MS) {
+                val minutesAgo = (now - lastSync) / 60000
+                Timber.d("syncCloud: Skipping - last sync was $minutesAgo min ago")
+                return@coroutineScope null
+            }
+        }
+
         // First, try to restore sign-in session
         if (!googleDriveSyncManager.isSignedIn()) {
             Timber.d("syncCloud: Not signed in, attempting silent sign-in...")
@@ -279,9 +306,35 @@ constructor(
 
         Timber.d("syncCloud: Starting cloud sync...")
 
-        // 1. Download latest backup (ZIP file)
-        val tempZipFile = java.io.File(context.cacheDir, "temp_sync.zip")
-        val downloadResult = googleDriveSyncManager.downloadLatestBackup(tempZipFile)
+        // Wrap entire sync in timeout to prevent hangs
+        val result = withTimeoutOrNull(SYNC_TIMEOUT_MS) {
+            syncCloudInternal()
+        }
+
+        if (result == null) {
+            Timber.e("syncCloud: Timed out after ${SYNC_TIMEOUT_MS / 1000}s")
+            return@coroutineScope "Sync timed out"
+        }
+
+        // Update last sync timestamp on success
+        if (result.startsWith("Sincronización") || result.startsWith("Copia inicial")) {
+            context.dataStore.edit { it[LastCloudSyncKey] = System.currentTimeMillis() }
+        }
+
+        return@coroutineScope result
+    }
+
+    private suspend fun syncCloudInternal(): String? = cloudSyncMutex.withLock {
+        coroutineScope {
+            // Check if database is still safe to use
+            if (!database.isSafeToUse()) {
+                Timber.d("syncCloudInternal: Database not available, aborting sync")
+                return@coroutineScope null
+            }
+
+            // 1. Download latest backup (ZIP file)
+            val tempZipFile = java.io.File(context.cacheDir, "temp_sync.zip")
+            val downloadResult = googleDriveSyncManager.downloadLatestBackup(tempZipFile)
 
         if (downloadResult.isSuccess) {
             // 2. Unzip and extract all files
@@ -329,8 +382,41 @@ constructor(
                     return@coroutineScope "Backup corrupto o incompleto"
                 }
 
-                // 3. Merge database
-                databaseMerger.mergeDatabase(tempDbFile)
+                // 3. Merge database (check if still safe) with retry logic
+                if (!database.isSafeToUse()) {
+                    Timber.d("syncCloud: Database closed during sync, aborting")
+                    return@coroutineScope null
+                }
+
+                // Checkpoint WAL to ensure all data is written to main db file
+                try {
+                    database.checkpoint()
+                } catch (e: Exception) {
+                    Timber.w(e, "Checkpoint before merge failed, continuing anyway")
+                }
+
+                // Retry merge up to 3 times with delays to allow pending transactions to complete
+                var mergeSuccess = false
+                var lastMergeError: Exception? = null
+                for (attempt in 1..3) {
+                    try {
+                        databaseMerger.mergeDatabase(tempDbFile)
+                        mergeSuccess = true
+                        break
+                    } catch (e: IllegalStateException) {
+                        lastMergeError = e
+                        if (e.message?.contains("transactions in progress") == true && attempt < 3) {
+                            Timber.w("Merge attempt $attempt failed due to pending transactions, retrying...")
+                            kotlinx.coroutines.delay(500L * attempt) // Progressive delay
+                        } else {
+                            throw e
+                        }
+                    }
+                }
+
+                if (!mergeSuccess && lastMergeError != null) {
+                    throw lastMergeError
+                }
 
                 // 4. Restore settings if present
                 if (tempSettingsFile.exists() && tempSettingsFile.length() > 0L) {
@@ -372,6 +458,11 @@ constructor(
             // 7. Upload merged database with all files
             val mergedBackupZip = java.io.File(context.cacheDir, "merged_backup.zip")
             try {
+                // Check if database is still available before accessing it
+                if (!database.isSafeToUse()) {
+                    Timber.d("syncCloud: Database closed before upload, aborting")
+                    return@coroutineScope null
+                }
                 java.io.FileOutputStream(mergedBackupZip).use { fos ->
                     java.util.zip.ZipOutputStream(java.io.BufferedOutputStream(fos)).use { zos ->
                         // Add DB
@@ -428,6 +519,11 @@ constructor(
             Timber.d("syncCloud: No remote backup found, uploading initial backup...")
             val localBackupZip = java.io.File(context.cacheDir, "initial_backup.zip")
             try {
+                // Check if database is still available before accessing it
+                if (!database.isSafeToUse()) {
+                    Timber.d("syncCloud: Database closed before initial upload, aborting")
+                    return@coroutineScope null
+                }
                 java.io.FileOutputStream(localBackupZip).use { fos ->
                     java.util.zip.ZipOutputStream(java.io.BufferedOutputStream(fos)).use { zos ->
                         zos.putNextEntry(java.util.zip.ZipEntry(com.anitail.music.db.InternalDatabase.DB_NAME))
@@ -477,7 +573,8 @@ constructor(
                 localBackupZip.delete()
             }
         }
-        return@coroutineScope null
+            return@coroutineScope null
+        }
     }
 
     private suspend fun createAccountsJson(): String {

@@ -2,11 +2,10 @@ package com.anitail.music.db
 
 import android.content.Context
 import androidx.sqlite.db.SupportSQLiteDatabase
+import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
-
-import dagger.hilt.android.qualifiers.ApplicationContext
 
 class DatabaseMerger @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -21,6 +20,16 @@ class DatabaseMerger @Inject constructor(
         val currentDb = musicDatabase.openHelper.writableDatabase
 
         try {
+            // Ensure WAL checkpoint is done before merge to avoid conflicts
+            try {
+                currentDb.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
+            } catch (e: Exception) {
+                Timber.w(e, "WAL checkpoint failed, continuing anyway")
+            }
+
+            // Small delay to allow any pending transactions to complete
+            Thread.sleep(100)
+            
             // Attach the remote database
             // Note: We need to use the raw SQLite path for ATTACH DATABASE
             val attachQuery = "ATTACH DATABASE '${remoteDbFile.absolutePath}' AS remote_db"
@@ -126,9 +135,57 @@ class DatabaseMerger @Inject constructor(
     }
 
     private fun mergeHistory(db: SupportSQLiteDatabase) {
-        // Insert events that don't exist locally.
-        // Ensure we only insert events for songs that exist in the main database to avoid foreign key violations.
+        // First, insert artists that are referenced by songs in remote events
+        // This must happen before inserting songs to avoid foreign key issues
+        val insertArtistsForEventsQuery = """
+            INSERT OR IGNORE INTO main.artist
+            SELECT a.* FROM remote_db.artist a
+            WHERE a.id IN (
+                SELECT DISTINCT sam.artistId FROM remote_db.song_artist_map sam
+                WHERE sam.songId IN (SELECT DISTINCT songId FROM remote_db.event)
+            )
+        """
+        db.execSQL(insertArtistsForEventsQuery)
 
+        // Insert albums that are referenced by songs in remote events
+        val insertAlbumsForEventsQuery = """
+            INSERT OR IGNORE INTO main.album
+            SELECT a.* FROM remote_db.album a
+            WHERE a.id IN (
+                SELECT DISTINCT s.albumId FROM remote_db.song s
+                WHERE s.id IN (SELECT DISTINCT songId FROM remote_db.event)
+                AND s.albumId IS NOT NULL
+            )
+        """
+        db.execSQL(insertAlbumsForEventsQuery)
+
+        // Insert songs that are referenced in remote events but don't exist locally
+        // This ensures we can insert the history events without foreign key violations
+        val insertMissingSongsForEventsQuery = """
+            INSERT OR IGNORE INTO main.song 
+            SELECT s.* FROM remote_db.song s
+            WHERE s.id IN (SELECT DISTINCT songId FROM remote_db.event)
+            AND s.id NOT IN (SELECT id FROM main.song)
+        """
+        db.execSQL(insertMissingSongsForEventsQuery)
+
+        // Also need to insert related artist mappings for those songs
+        val insertArtistMappingsQuery = """
+            INSERT OR IGNORE INTO main.song_artist_map
+            SELECT * FROM remote_db.song_artist_map
+            WHERE songId IN (SELECT DISTINCT songId FROM remote_db.event)
+        """
+        db.execSQL(insertArtistMappingsQuery)
+
+        // Insert song-album mappings for those songs
+        val insertAlbumMappingsQuery = """
+            INSERT OR IGNORE INTO main.song_album_map
+            SELECT * FROM remote_db.song_album_map
+            WHERE songId IN (SELECT DISTINCT songId FROM remote_db.event)
+        """
+        db.execSQL(insertAlbumMappingsQuery)
+        
+        // Insert events that don't exist locally.
         val insertHistoryQuery = """
              INSERT INTO main.event (songId, timestamp, playTime)
              SELECT songId, timestamp, playTime FROM remote_db.event

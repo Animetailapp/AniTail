@@ -20,23 +20,22 @@ import com.anitail.music.extensions.zipInputStream
 import com.anitail.music.extensions.zipOutputStream
 import com.anitail.music.playback.MusicService
 import com.anitail.music.playback.MusicService.Companion.PERSISTENT_QUEUE_FILE
-import com.anitail.music.utils.reportException
 import com.anitail.music.utils.GoogleDriveSyncManager
+import com.anitail.music.utils.reportException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import javax.inject.Inject
 import kotlin.system.exitProcess
-import timber.log.Timber
 
 @HiltViewModel
 class BackupRestoreViewModel @Inject constructor(
@@ -71,7 +70,7 @@ class BackupRestoreViewModel @Inject constructor(
             _syncMessage.value = "Iniciando..."
 
             try {
-                val resultMessage = syncUtils.syncCloud()
+                val resultMessage = syncUtils.syncCloud(force = true)
                 _syncMessage.value = resultMessage ?: "Sincronización completada"
             } catch (e: Exception) {
                 Timber.e(e, "Sync failed")
@@ -176,6 +175,7 @@ class BackupRestoreViewModel @Inject constructor(
                                 runBlocking(Dispatchers.IO) {
                                     database.checkpoint()
                                 }
+                                MusicDatabase.isRestoring.set(true)
                                 database.close()
                                 FileOutputStream(database.openHelper.writableDatabase.path).use { outputStream ->
                                     inputStream.copyTo(outputStream)
@@ -244,6 +244,7 @@ class BackupRestoreViewModel @Inject constructor(
                                 runBlocking(Dispatchers.IO) {
                                     database.checkpoint()
                                 }
+                                MusicDatabase.isRestoring.set(true)
                                 database.close()
                                 FileOutputStream(database.openHelper.writableDatabase.path).use { outputStream ->
                                     inputStream.copyTo(outputStream)

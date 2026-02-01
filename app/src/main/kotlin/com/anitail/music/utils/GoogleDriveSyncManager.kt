@@ -230,7 +230,7 @@ class GoogleDriveSyncManager @Inject constructor(
                     id = file.id,
                     name = file.name,
                     createdTime = file.createdTime?.value ?: 0L,
-                    size = file.size ?: 0L
+                    size = file.size?.toLong() ?: 0L
                 )
             } ?: emptyList()
 

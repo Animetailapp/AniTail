@@ -53,6 +53,8 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
     val isRefreshing = MutableStateFlow(false)
     val isLoading = MutableStateFlow(false)
+    val isSyncing = MutableStateFlow(false)
+    val syncStatus = MutableStateFlow<String?>(null)
 
     private val quickPicksEnum = context.dataStore.data.map {
         it[QuickPicksKey].toEnum(QuickPicks.QUICK_PICKS)
@@ -289,40 +291,53 @@ class HomeViewModel @Inject constructor(
     init {
         viewModelScope.launch(Dispatchers.IO) {
             load()
+        }
 
-            // Cloud Sync (Smart Merge) - Launch first, before any collect blocks
-            launch {
-                // Wait a bit for initial sign-in restore
-                kotlinx.coroutines.delay(2000)
-                Timber.d("HomeViewModel: Starting cloud sync...")
-                try {
-                    val result = syncUtils.syncCloud()
+        // Cloud Sync (Smart Merge) - with throttling built into syncCloud()
+        viewModelScope.launch(Dispatchers.IO) {
+            Timber.d("HomeViewModel: Starting cloud sync...")
+            isSyncing.value = true
+            syncStatus.value = "Sincronizando..."
+            try {
+                val result = syncUtils.syncCloud()
+                if (result != null) {
                     Timber.d("HomeViewModel: Cloud sync result: $result")
-                } catch (e: Exception) {
-                    Timber.e(e, "HomeViewModel: Cloud sync failed")
+                    syncStatus.value = result
+                } else {
+                    syncStatus.value = null
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "HomeViewModel: Cloud sync failed")
+                syncStatus.value = "Error de sincronización"
+            } finally {
+                isSyncing.value = false
+                // Clear status after 3 seconds
+                kotlinx.coroutines.delay(3000)
+                syncStatus.value = null
+            }
+        }
+
+        // YouTube Music sync
+        viewModelScope.launch(Dispatchers.IO) {
+            val isSyncEnabled = context.dataStore.data
+                .map { it[YtmSyncKey] ?: true }
+                .distinctUntilChanged()
+                .first()
+
+            if (isSyncEnabled) {
+                supervisorScope {
+                    launch { syncUtils.syncLikedSongs() }
+                    launch { syncUtils.syncLibrarySongs() }
+                    launch { syncUtils.syncSavedPlaylists() }
+                    launch { syncUtils.syncLikedAlbums() }
+                    launch { syncUtils.syncArtistsSubscriptions() }
+                    launch { syncUtils.syncWatchHistory() }
                 }
             }
+        }
 
-            // YouTube Music sync
-            launch {
-                val isSyncEnabled = context.dataStore.data
-                    .map { it[YtmSyncKey] ?: true }
-                    .distinctUntilChanged()
-                    .first()
-
-                if (isSyncEnabled) {
-                    supervisorScope {
-                        launch { syncUtils.syncLikedSongs() }
-                        launch { syncUtils.syncLibrarySongs() }
-                        launch { syncUtils.syncSavedPlaylists() }
-                        launch { syncUtils.syncLikedAlbums() }
-                        launch { syncUtils.syncArtistsSubscriptions() }
-                        launch { syncUtils.syncWatchHistory() }
-                    }
-                }
-            }
-
-            // Listen for Discord token changes and fetch Discord avatar (this collect never ends)
+        // Listen for Discord token changes and fetch Discord avatar
+        viewModelScope.launch(Dispatchers.IO) {
             context.dataStore.data.map { it[DiscordTokenKey] ?: "" }.distinctUntilChanged().collect { token ->
                 if (token.isNotEmpty()) {
                     runCatching {

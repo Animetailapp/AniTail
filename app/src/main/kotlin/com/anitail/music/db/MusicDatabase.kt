@@ -39,10 +39,25 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.Date
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MusicDatabase(
     private val delegate: InternalDatabase,
 ) : DatabaseDao by delegate.dao {
+    companion object {
+        /**
+         * Flag to indicate database is being restored.
+         * When true, sync operations should be skipped to avoid "already-closed" errors.
+         */
+        val isRestoring = AtomicBoolean(false)
+    }
+
+    /**
+     * Checks if the database is currently safe to use (not being restored).
+     */
+    fun isSafeToUse(): Boolean {
+        return !isRestoring.get()
+    }
     val openHelper: SupportSQLiteOpenHelper
         get() = delegate.openHelper
 
@@ -134,11 +149,31 @@ abstract class InternalDatabase : RoomDatabase() {
                     .addCallback(object : Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             super.onOpen(db)
+
+                            // Ensure Room's internal invalidation tracking table exists
+                            // This is needed when restoring from older backups that might not have it
+                            try {
+                                db.execSQL(
+                                    """
+                                    CREATE TABLE IF NOT EXISTS room_table_modification_log (
+                                        table_id INTEGER PRIMARY KEY NOT NULL,
+                                        invalidated INTEGER NOT NULL DEFAULT 0
+                                    )
+                                """
+                                )
+                            } catch (e: Exception) {
+                                // Table might already exist, ignore
+                            }
+                            
                             // Clean up orphaned records that reference non-existent songs
-                            db.execSQL("DELETE FROM event WHERE songId NOT IN (SELECT id FROM song)")
-                            db.execSQL("DELETE FROM playlist_song_map WHERE songId NOT IN (SELECT id FROM song)")
-                            db.execSQL("DELETE FROM song_artist_map WHERE songId NOT IN (SELECT id FROM song)")
-                            db.execSQL("DELETE FROM song_album_map WHERE songId NOT IN (SELECT id FROM song)")
+                            try {
+                                db.execSQL("DELETE FROM event WHERE songId NOT IN (SELECT id FROM song)")
+                                db.execSQL("DELETE FROM playlist_song_map WHERE songId NOT IN (SELECT id FROM song)")
+                                db.execSQL("DELETE FROM song_artist_map WHERE songId NOT IN (SELECT id FROM song)")
+                                db.execSQL("DELETE FROM song_album_map WHERE songId NOT IN (SELECT id FROM song)")
+                            } catch (e: Exception) {
+                                // Ignore cleanup errors
+                            }
                         }
                     })
                     .build(),

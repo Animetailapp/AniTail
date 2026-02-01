@@ -36,6 +36,7 @@ import com.anitail.music.constants.VisitorDataKey
 import com.anitail.music.extensions.toEnum
 import com.anitail.music.extensions.toInetSocketAddress
 import com.anitail.music.services.AutoBackupWorker
+import com.anitail.music.services.SyncWorker
 import com.anitail.music.services.UpdateCheckWorker
 import com.anitail.music.utils.dataStore
 import com.anitail.music.utils.get
@@ -99,6 +100,13 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
             AutoBackupWorker.schedulePeriodicOnly(this)
         } catch (e: Exception) {
             Timber.e(e, "Failed to schedule auto backups")
+        }
+
+        // Schedule periodic cloud sync (Google Drive)
+        try {
+            SyncWorker.schedule(this)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to schedule cloud sync")
         }
 
         val locale = Locale.getDefault()
