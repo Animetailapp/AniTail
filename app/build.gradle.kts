@@ -158,6 +158,8 @@ android {
             excludes += "META-INF/NOTICE.md"
             excludes += "META-INF/CONTRIBUTORS.md"
             excludes += "META-INF/LICENSE.md"
+            excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/INDEX.LIST"
         }
     }
 }
@@ -239,4 +241,10 @@ dependencies {
 
     // On-device translation for lyrics (ML Kit)
     implementation(libs.translate)
+
+    // Google Drive Sync
+    implementation(libs.play.services.auth)
+    implementation(libs.google.api.client.android)
+    implementation(libs.google.api.services.drive)
+    implementation(libs.google.auth.library.oauth2.http)
 }

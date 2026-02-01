@@ -131,6 +131,16 @@ abstract class InternalDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2,
                     )
+                    .addCallback(object : Callback() {
+                        override fun onOpen(db: SupportSQLiteDatabase) {
+                            super.onOpen(db)
+                            // Clean up orphaned records that reference non-existent songs
+                            db.execSQL("DELETE FROM event WHERE songId NOT IN (SELECT id FROM song)")
+                            db.execSQL("DELETE FROM playlist_song_map WHERE songId NOT IN (SELECT id FROM song)")
+                            db.execSQL("DELETE FROM song_artist_map WHERE songId NOT IN (SELECT id FROM song)")
+                            db.execSQL("DELETE FROM song_album_map WHERE songId NOT IN (SELECT id FROM song)")
+                        }
+                    })
                     .build(),
             )
     }

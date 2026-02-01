@@ -125,3 +125,48 @@
 # Suppress warnings for com.google.re2j reported by R8
 -dontwarn com.google.re2j.Matcher
 -dontwarn com.google.re2j.Pattern
+
+## Google API Client Libraries (Drive API, OAuth)
+# Keep all Google API client model classes for JSON parsing
+-keep class com.google.api.client.** { *; }
+-keep class com.google.api.services.** { *; }
+-keep class com.google.auth.** { *; }
+
+# Keep GenericJson implementations used by Drive API
+-keepclassmembers class * extends com.google.api.client.json.GenericJson {
+    *;
+}
+
+# Keep Key annotation used for JSON field mapping
+-keepattributes *Annotation*
+-keep class com.google.api.client.util.Key
+
+# Prevent obfuscation of classes that use @Key annotation
+-keepclassmembers class * {
+    @com.google.api.client.util.Key <fields>;
+}
+
+# Google HTTP Client
+-dontwarn com.google.api.client.http.**
+-keep class com.google.api.client.http.** { *; }
+-keep class com.google.api.client.json.** { *; }
+-keep class com.google.api.client.util.** { *; }
+
+# Google OAuth2
+-keep class com.google.api.client.googleapis.** { *; }
+-dontwarn com.google.api.client.googleapis.**
+
+# Please add these rules to your existing keep rules in order to suppress warnings.
+# This is generated automatically by the Android Gradle plugin.
+-dontwarn javax.naming.InvalidNameException
+-dontwarn javax.naming.NamingException
+-dontwarn javax.naming.directory.Attribute
+-dontwarn javax.naming.directory.Attributes
+-dontwarn javax.naming.ldap.LdapName
+-dontwarn javax.naming.ldap.Rdn
+-dontwarn org.ietf.jgss.GSSContext
+-dontwarn org.ietf.jgss.GSSCredential
+-dontwarn org.ietf.jgss.GSSException
+-dontwarn org.ietf.jgss.GSSManager
+-dontwarn org.ietf.jgss.GSSName
+-dontwarn org.ietf.jgss.Oid

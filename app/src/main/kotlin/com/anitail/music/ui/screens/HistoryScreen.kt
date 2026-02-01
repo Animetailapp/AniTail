@@ -141,17 +141,21 @@ fun HistoryScreen(
 
     val filteredEvents = remember(events, query) {
         if (query.text.isEmpty()) {
-            events
+            events.mapValues { (_, songs) ->
+                songs.filter { it.song != null }
+            }.filterValues { it.isNotEmpty() }
         } else {
             events.mapValues { (_, songs) ->
                 songs.filter { event ->
-                    event.song.song.title.contains(query.text, ignoreCase = true) ||
-                            event.song.artists.any {
-                                it.name.contains(
-                                    query.text,
-                                    ignoreCase = true
-                                )
-                            }
+                    event.song != null && (
+                            event.song.song.title.contains(query.text, ignoreCase = true) ||
+                                    event.song.artists.any {
+                                        it.name.contains(
+                                            query.text,
+                                            ignoreCase = true
+                                        )
+                                    }
+                            )
                 }
             }.filterValues { it.isNotEmpty() }
         }
@@ -294,10 +298,11 @@ fun HistoryScreen(
                         key = { index, wrappedItem -> "${dateAgo}_${wrappedItem.item.event.id}_$index" }
                     ) { index, wrappedItem ->
                         val event = wrappedItem.item
-                        SongListItem(
-                            song = event.song,
-                            isActive = event.song.id == mediaMetadata?.id,
-                            isPlaying = isPlaying,
+                        if (event.song != null) {
+                            SongListItem(
+                                song = event.song,
+                                isActive = event.song.id == mediaMetadata?.id,
+                                isPlaying = isPlaying,
                             showInLibraryIcon = true,
                             isSelected = wrappedItem.isSelected && selection,
 
@@ -333,7 +338,7 @@ fun HistoryScreen(
                                                 playerConnection.playQueue(
                                                     ListQueue(
                                                         title = dateAgoToString(dateAgo),
-                                                        items = currentDateWrappedItems.map { it.item.song.toMediaItem() },
+                                                        items = currentDateWrappedItems.map { it.item.song!!.toMediaItem() },
                                                         startIndex = index
                                                     )
                                                 )
@@ -354,7 +359,9 @@ fun HistoryScreen(
                                 .animateItem()
                         )
                     }
-                }
+
+            }
+        }
             }
         }
 
@@ -381,7 +388,7 @@ fun HistoryScreen(
                     playerConnection.playQueue(
                         ListQueue(
                             title = context.getString(R.string.history),
-                            items = allWrappedItems.map { it.item.song.toMediaItem() }.shuffled()
+                            items = allWrappedItems.map { it.item.song!!.toMediaItem() }.shuffled()
                         )
                     )
                 }
@@ -482,7 +489,7 @@ fun HistoryScreen(
                             SelectionMediaMetadataMenu(
                                 songSelection = allWrappedItems
                                     .filter { it.isSelected }
-                                    .map { it.item.song.toMediaItem().metadata!! },
+                                    .map { it.item.song!!.toMediaItem().metadata!! },
                                 onDismiss = menuState::dismiss,
                                 clearAction = { selection = false },
                                 currentItems = emptyList()
@@ -508,3 +515,4 @@ fun HistoryScreen(
         }
     )
 }
+

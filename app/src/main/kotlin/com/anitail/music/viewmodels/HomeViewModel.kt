@@ -12,11 +12,11 @@ import com.anitail.innertube.models.filterExplicit
 import com.anitail.innertube.pages.ExplorePage
 import com.anitail.innertube.pages.HomePage
 import com.anitail.innertube.utils.completed
-import com.anitail.music.constants.DiscordTokenKey
-import com.anitail.music.constants.AccountNameKey
 import com.anitail.music.constants.AccountImageUrlKey
-import com.anitail.music.constants.DiscordUsernameKey
+import com.anitail.music.constants.AccountNameKey
 import com.anitail.music.constants.DiscordAvatarUrlKey
+import com.anitail.music.constants.DiscordTokenKey
+import com.anitail.music.constants.DiscordUsernameKey
 import com.anitail.music.constants.HideExplicitKey
 import com.anitail.music.constants.QuickPicks
 import com.anitail.music.constants.QuickPicksKey
@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
@@ -288,7 +289,40 @@ class HomeViewModel @Inject constructor(
     init {
         viewModelScope.launch(Dispatchers.IO) {
             load()
-            // Listen for Discord token changes and fetch Discord avatar
+
+            // Cloud Sync (Smart Merge) - Launch first, before any collect blocks
+            launch {
+                // Wait a bit for initial sign-in restore
+                kotlinx.coroutines.delay(2000)
+                Timber.d("HomeViewModel: Starting cloud sync...")
+                try {
+                    val result = syncUtils.syncCloud()
+                    Timber.d("HomeViewModel: Cloud sync result: $result")
+                } catch (e: Exception) {
+                    Timber.e(e, "HomeViewModel: Cloud sync failed")
+                }
+            }
+
+            // YouTube Music sync
+            launch {
+                val isSyncEnabled = context.dataStore.data
+                    .map { it[YtmSyncKey] ?: true }
+                    .distinctUntilChanged()
+                    .first()
+
+                if (isSyncEnabled) {
+                    supervisorScope {
+                        launch { syncUtils.syncLikedSongs() }
+                        launch { syncUtils.syncLibrarySongs() }
+                        launch { syncUtils.syncSavedPlaylists() }
+                        launch { syncUtils.syncLikedAlbums() }
+                        launch { syncUtils.syncArtistsSubscriptions() }
+                        launch { syncUtils.syncWatchHistory() }
+                    }
+                }
+            }
+
+            // Listen for Discord token changes and fetch Discord avatar (this collect never ends)
             context.dataStore.data.map { it[DiscordTokenKey] ?: "" }.distinctUntilChanged().collect { token ->
                 if (token.isNotEmpty()) {
                     runCatching {
@@ -317,21 +351,6 @@ class HomeViewModel @Inject constructor(
                 } else {
                     discordAvatarUrl.value = null
                     discordUsername.value = null
-                }
-            }
-
-            val isSyncEnabled = context.dataStore.data
-                .map { it[YtmSyncKey] ?: true }
-                .distinctUntilChanged()
-                .first()
-
-            if (isSyncEnabled) {
-                supervisorScope {
-                    launch { syncUtils.syncLikedSongs() }
-                    launch { syncUtils.syncLibrarySongs() }
-                    launch { syncUtils.syncSavedPlaylists() }
-                    launch { syncUtils.syncLikedAlbums() }
-                    launch { syncUtils.syncArtistsSubscriptions() }
                 }
             }
         }

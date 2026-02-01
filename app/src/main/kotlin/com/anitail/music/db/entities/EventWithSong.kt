@@ -13,5 +13,5 @@ data class EventWithSong(
         parentColumn = "songId",
         entityColumn = "id",
     )
-    val song: Song,
+    val song: Song?,
 )

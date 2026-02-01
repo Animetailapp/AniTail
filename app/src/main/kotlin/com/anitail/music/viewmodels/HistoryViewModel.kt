@@ -60,7 +60,7 @@ constructor(
                             }
                         },
                     ).mapValues { entry ->
-                        entry.value.distinctBy { it.song.id }
+                        entry.value.distinctBy { it.song?.id }
                     }
             }.stateIn(viewModelScope, SharingStarted.Lazily, emptyMap())
 

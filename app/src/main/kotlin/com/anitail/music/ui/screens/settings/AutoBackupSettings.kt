@@ -1,5 +1,6 @@
 package com.anitail.music.ui.screens.settings
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -14,8 +15,12 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.core.net.toUri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.foundation.layout.Arrangement.Center
 import androidx.compose.foundation.layout.Arrangement.SpaceBetween
 import androidx.compose.foundation.layout.Box
@@ -58,6 +63,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -97,6 +104,7 @@ import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+@SuppressLint("LocalContextGetResourceValueCall")
 @RequiresApi(Build.VERSION_CODES.M)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -115,55 +123,53 @@ fun AutoBackupSettings(
 
     val (backupCount, _) = rememberPreference(AutoBackupKeepCountKey, defaultValue = 5)
 
-    val (useCustomLocation, _) =
+    val (_, _) =
         rememberPreference(AutoBackupUseCustomLocationKey, defaultValue = false)
 
-    val (customLocation, _) = rememberPreference(AutoBackupCustomLocationKey, defaultValue = "")
+    val (_, _) = rememberPreference(AutoBackupCustomLocationKey, defaultValue = "")
 
     // State for frequency selection dialog
     var showFrequencyDialog by remember { mutableStateOf(false) }
 
     // State to track if a manual backup is in progress
-    var isManualBackupInProgress by remember { mutableStateOf(false) }
 
     // File picker for custom location
-    val directoryPicker =
-        rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.OpenDocumentTree(),
-            onResult = { uri ->
-                if (uri != null) {
-                    try {
-                        // Get persist permissions for the directory
-                        val flag =
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                        context.contentResolver.takePersistableUriPermission(uri, flag)
+    rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree(),
+        onResult = { uri ->
+            if (uri != null) {
+                try {
+                    // Get persist permissions for the directory
+                    val flag =
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    context.contentResolver.takePersistableUriPermission(uri, flag)
 
-                        // Save the location
-                        coroutineScope.launch {
-                            context.dataStore.edit { preferences ->
-                                preferences[AutoBackupCustomLocationKey] = uri.toString()
-                            }
+                    // Save the location
+                    coroutineScope.launch {
+                        context.dataStore.edit { preferences ->
+                            preferences[AutoBackupCustomLocationKey] = uri.toString()
                         }
-
-                        // Show toast confirmation
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.backup_custom_location),
-                            Toast.LENGTH_SHORT
-                        )
-                            .show()
-                    } catch (e: Exception) {
-                        Timber.e(e, "Failed to get permissions for the selected directory")
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.error_unknown),
-                            Toast.LENGTH_SHORT
-                        )
-                            .show()
                     }
+
+                    // Show toast confirmation
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.backup_custom_location),
+                        Toast.LENGTH_SHORT
+                    )
+                        .show()
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to get permissions for the selected directory")
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.error_unknown),
+                        Toast.LENGTH_SHORT
+                    )
+                        .show()
                 }
             }
-        )
+        }
+    )
 
     Scaffold(
         topBar = {
@@ -186,7 +192,8 @@ fun AutoBackupSettings(
     ) { paddingValues ->
         Column(
             modifier =
-                Modifier.padding(paddingValues)
+                Modifier
+                    .padding(paddingValues)
                     .windowInsetsPadding(
                         LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Bottom)
                     )
@@ -261,40 +268,93 @@ fun AutoBackupSettings(
                     steps = 19
                 )
 
-                //                // Custom location settings
-                //                PreferenceGroupTitle(
-                //                    title = stringResource(R.string.backup_custom_location)
-                //                )
-                //
-                //                SwitchPreference(
-                //                    title = {
-                // Text(stringResource(R.string.auto_backup_custom_location)) },
-                //                    description =
-                // stringResource(R.string.auto_backup_custom_location_desc),
-                //                    icon = { Icon(painterResource(R.drawable.storage), null) },
-                //                    checked = useCustomLocation,
-                //                    onCheckedChange = { enabled ->
-                //                        coroutineScope.launch {
-                //                            context.dataStore.edit { preferences ->
-                //                                preferences[AutoBackupUseCustomLocationKey] =
-                // enabled
-                //                            }
-                //                        }
-                //                    }
-                //                )
-                //
-                //                if (useCustomLocation) {
-                //                    PreferenceEntry(
-                //                        title = { Text(stringResource(R.string.select_folder)) },
-                //                        description = if (customLocation.isEmpty())
-                //                            stringResource(R.string.no_folder_selected)
-                //                        else
-                //                            customLocation.toUri().path ?: customLocation,
-                //                        icon = { Icon(painterResource(R.drawable.storage), null)
-                // },
-                //                        onClick = { directoryPicker.launch(null) }
-                //                    )
-                //                }
+                // Native Google Drive Backup
+                PreferenceGroupTitle(
+                    title = stringResource(R.string.google_drive_backup)
+                )
+
+                // ViewModel integration
+                val backupViewModel: BackupRestoreViewModel = hiltViewModel()
+                val signedInAccount by backupViewModel.signedInAccount.collectAsState()
+
+                // ActivityResultLauncher for Google Sign-In
+                val signInLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.StartActivityForResult()
+                ) { result ->
+                    backupViewModel.handleSignInResult(result)
+                }
+
+                if (signedInAccount != null) {
+                    val isSyncing by backupViewModel.isSyncing.collectAsState()
+                    val syncMessage by backupViewModel.syncMessage.collectAsState()
+
+                    PreferenceEntry(
+                        title = {
+                            Text(
+                                stringResource(
+                                    R.string.signed_in_as,
+                                    signedInAccount?.email ?: ""
+                                )
+                            )
+                        },
+                        description = stringResource(R.string.google_drive_backup_desc),
+                        icon = { Icon(painterResource(R.drawable.google), null) },
+                        onClick = { /* Show drive backups */ }
+                    )
+
+                    PreferenceEntry(
+                        title = { Text("Sincronizar ahora (Smart Merge)") },
+                        description = syncMessage ?: "Fusionar datos con la nube",
+                        icon = {
+                            if (isSyncing) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(Icons.Default.Sync, null)
+                            }
+                        },
+                        onClick = {
+                            if (!isSyncing) {
+                                backupViewModel.syncWithDrive()
+                            }
+                        }
+                    )
+
+                    PreferenceEntry(
+                        title = { Text(stringResource(R.string.backup_to_drive_now)) },
+                        icon = { Icon(painterResource(R.drawable.backup), null) },
+                        onClick = {
+                            backupViewModel.backupToDrive(context)
+                        }
+                    )
+
+                    PreferenceEntry(
+                        title = { Text(stringResource(R.string.restore_from_drive)) },
+                        icon = { Icon(painterResource(R.drawable.restore), null) },
+                        onClick = {
+                            backupViewModel.restoreFromDrive(context)
+                        }
+                    )
+
+                    PreferenceEntry(
+                        title = { Text(stringResource(R.string.sign_out_google)) },
+                        icon = { Icon(painterResource(R.drawable.logout), null) },
+                        onClick = {
+                            backupViewModel.signOut()
+                        }
+                    )
+                } else {
+                    PreferenceEntry(
+                        title = { Text(stringResource(R.string.sign_in_with_google)) },
+                        description = stringResource(R.string.google_drive_backup_desc),
+                        icon = { Icon(painterResource(R.drawable.google), null) },
+                        onClick = {
+                            signInLauncher.launch(backupViewModel.getSignInIntent())
+                        }
+                    )
+                }
             }
 
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
@@ -503,7 +563,8 @@ fun AutoBackupSettings(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier =
-                            Modifier.fillMaxWidth()
+                            Modifier
+                                .fillMaxWidth()
                                 .clickable {
                                     val newFrequency =
                                         when (index) {
@@ -569,8 +630,8 @@ private fun DiagnosticCard(title: String, content: String) {
                             radius = 24.dp,
                             color = MaterialTheme.colorScheme.primary
                         ),
-                    ) { 
-                        expanded = !expanded 
+                    ) {
+                        expanded = !expanded
                     }
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = SpaceBetween,

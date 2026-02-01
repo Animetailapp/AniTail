@@ -630,6 +630,18 @@
     <string name="loading">Loading info…</string>
     <string name="no_diagnostic_data">No diagnostic data available</string>
     <string name="ok">OK</string>
+    <string name="sync_with_google_drive">Google Drive Sync / Custom Location</string>
+    <string name="sync_google_drive_desc">Select a folder (e.g. in Google Drive) to automatically sync your backups to the cloud.</string>
+    <string name="restore_from_custom_location">Restore from Custom Location</string>
+    <string name="select_drive_folder">Select Folder (Drive/Local)</string>
+    <string name="google_drive_backup">Google Drive Backup</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="sign_out_google">Sign out from Google</string>
+    <string name="signed_in_as">Signed in as %s</string>
+    <string name="google_drive_backup_desc">Automatically backup to your Google Drive</string>
+    <string name="backup_to_drive_now">Backup to Drive now</string>
+    <string name="restore_from_drive">Restore from Drive</string>
+    <string name="drive_backups">Drive Backups</string>
 
     <!-- Custom Background Image -->
     <string name="tap_to_set_background">Tap to set background image</string>

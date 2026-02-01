@@ -177,7 +177,7 @@ interface DatabaseDao {
     fun albumSongs(albumId: String): Flow<List<Song>>
 
     @Transaction
-    @Query("SELECT * FROM playlist_song_map WHERE playlistId = :playlistId ORDER BY position")
+    @Query("SELECT playlist_song_map.* FROM playlist_song_map INNER JOIN song ON playlist_song_map.songId = song.id WHERE playlistId = :playlistId ORDER BY position")
     fun playlistSongs(playlistId: String): Flow<List<PlaylistSong>>
 
     @Transaction
@@ -919,16 +919,19 @@ interface DatabaseDao {
     ): Flow<List<Playlist>>
 
     @Transaction
-    @Query("SELECT * FROM event ORDER BY rowId DESC")
+    @Query("SELECT event.* FROM event INNER JOIN song ON event.songId = song.id ORDER BY event.rowId DESC")
     fun events(): Flow<List<EventWithSong>>
 
     @Transaction
-    @Query("SELECT * FROM event ORDER BY rowId ASC LIMIT 1")
+    @Query("SELECT event.* FROM event INNER JOIN song ON event.songId = song.id ORDER BY event.rowId ASC LIMIT 1")
     fun firstEvent(): Flow<EventWithSong?>
 
     @Transaction
     @Query("DELETE FROM event")
     fun clearListenHistory()
+
+    @Query("DELETE FROM event WHERE songId NOT IN (SELECT id FROM song)")
+    fun cleanupOrphanedEvents()
 
     @Transaction
     @Query("SELECT * FROM search_history WHERE `query` LIKE :query || '%' ORDER BY id DESC")

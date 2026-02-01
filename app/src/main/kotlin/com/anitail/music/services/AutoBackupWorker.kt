@@ -48,7 +48,10 @@ import java.util.concurrent.TimeUnit
 class AutoBackupWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted workerParams: WorkerParameters,
-    private val database: MusicDatabase
+    private val database: MusicDatabase,
+    private val googleDriveSyncManager: com.anitail.music.utils.GoogleDriveSyncManager,
+    private val databaseMerger: com.anitail.music.db.DatabaseMerger,
+    private val syncUtils: com.anitail.music.utils.SyncUtils
 ) : CoroutineWorker(context, workerParams) {
 
     // Factory for creating AutoBackupWorker instances with Hilt
@@ -541,6 +544,16 @@ class AutoBackupWorker @AssistedInject constructor(
             // Create the backup file
             createBackup(Uri.fromFile(backupFile))
 
+            // Upload to Drive if signed in
+            if (googleDriveSyncManager.isSignedIn()) {
+                val uploadResult = googleDriveSyncManager.uploadBackup(backupFile)
+                if (uploadResult.isSuccess) {
+                    Timber.d("Auto-backup synced to Drive: ${backupFile.name}")
+                } else {
+                    Timber.e(uploadResult.exceptionOrNull(), "Failed to sync auto-backup to Drive")
+                }
+            }
+
             // Verify backup file was created successfully
             if (!backupFile.exists() || backupFile.length() == 0L) {
                 Timber.e("Backup file wasn't created or is empty")
@@ -606,10 +619,13 @@ class AutoBackupWorker @AssistedInject constructor(
             val timestamp = LocalDateTime.now().format(formatter)
             val backupFileName = "AniTail_AutoBackup_$timestamp.backup"
 
-            // Create a document URI for the new file
+            // Create a document URI for the new file using the correct Tree URI handling
+            val docId = DocumentsContract.getTreeDocumentId(customLocationUri)
+            val dirUri = DocumentsContract.buildDocumentUriUsingTree(customLocationUri, docId)
+
             val documentUri = DocumentsContract.createDocument(
                 context.contentResolver,
-                customLocationUri,
+                dirUri,
                 "application/octet-stream",
                 backupFileName
             )
@@ -621,7 +637,22 @@ class AutoBackupWorker @AssistedInject constructor(
             }
 
             // Create the backup file at the custom location
-            createBackup(documentUri)            // Show success notification
+            createBackup(documentUri)
+
+            // Upload to Drive if signed in
+            if (googleDriveSyncManager.isSignedIn()) {
+                val uploadResult = googleDriveSyncManager.uploadBackup(documentUri, backupFileName)
+                if (uploadResult.isSuccess) {
+                    Timber.d("Auto-backup synced to Drive from custom location: $backupFileName")
+                } else {
+                    Timber.e(
+                        uploadResult.exceptionOrNull(),
+                        "Failed to sync auto-backup to Drive from custom location"
+                    )
+                }
+            }
+
+            // Show success notification
             showNotification(
                 title = context.getString(R.string.backup_create_success),
                 message = context.getString(R.string.backup_custom_location)
@@ -639,7 +670,13 @@ class AutoBackupWorker @AssistedInject constructor(
         }
     }
     private fun createBackup(uri: Uri) {
-        val viewModel = BackupRestoreViewModel(database)
+        val viewModel = BackupRestoreViewModel(
+            database,
+            googleDriveSyncManager,
+            databaseMerger,
+            syncUtils,
+            context
+        )
         viewModel.backup(context, uri, showToast = false)
     }
 
