@@ -463,13 +463,27 @@ constructor(
                     Timber.d("syncCloud: Database closed before upload, aborting")
                     return@coroutineScope null
                 }
+
+                // Get database path before any operations (validate DB is still open)
+                val dbPath: String
+                try {
+                    database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)")
+                        .moveToFirst()
+                    dbPath = database.openHelper.writableDatabase.path
+                        ?: throw IllegalStateException("Database path is null")
+                } catch (e: IllegalStateException) {
+                    if (e.message?.contains("already-closed") == true) {
+                        Timber.w("syncCloud: Database was closed during upload preparation")
+                        return@coroutineScope null
+                    }
+                    throw e
+                }
+                
                 java.io.FileOutputStream(mergedBackupZip).use { fos ->
                     java.util.zip.ZipOutputStream(java.io.BufferedOutputStream(fos)).use { zos ->
                         // Add DB
                         zos.putNextEntry(java.util.zip.ZipEntry(com.anitail.music.db.InternalDatabase.DB_NAME))
-                        database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)")
-                            .moveToFirst()
-                        java.io.FileInputStream(database.openHelper.writableDatabase.path)
+                        java.io.FileInputStream(dbPath)
                             .use { fis -> fis.copyTo(zos) }
 
                         // Add Settings
@@ -524,12 +538,26 @@ constructor(
                     Timber.d("syncCloud: Database closed before initial upload, aborting")
                     return@coroutineScope null
                 }
+
+                // Get database path before any operations (validate DB is still open)
+                val dbPath: String
+                try {
+                    database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)")
+                        .moveToFirst()
+                    dbPath = database.openHelper.writableDatabase.path
+                        ?: throw IllegalStateException("Database path is null")
+                } catch (e: IllegalStateException) {
+                    if (e.message?.contains("already-closed") == true) {
+                        Timber.w("syncCloud: Database was closed during initial upload preparation")
+                        return@coroutineScope null
+                    }
+                    throw e
+                }
+                
                 java.io.FileOutputStream(localBackupZip).use { fos ->
                     java.util.zip.ZipOutputStream(java.io.BufferedOutputStream(fos)).use { zos ->
                         zos.putNextEntry(java.util.zip.ZipEntry(com.anitail.music.db.InternalDatabase.DB_NAME))
-                        database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)")
-                            .moveToFirst()
-                        java.io.FileInputStream(database.openHelper.writableDatabase.path)
+                        java.io.FileInputStream(dbPath)
                             .use { fis -> fis.copyTo(zos) }
 
                         val settingsFile =

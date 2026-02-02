@@ -1,7 +1,9 @@
 package com.anitail.music.services
 
+import android.annotation.SuppressLint
 import android.content.Context
 import androidx.hilt.work.HiltWorker
+import androidx.hilt.work.WorkerAssistedFactory
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -11,6 +13,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.anitail.music.utils.SyncUtils
 import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -29,6 +32,16 @@ class SyncWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val syncUtils: SyncUtils
 ) : CoroutineWorker(context, params) {
+
+    // Factory for creating SyncWorker instances with Hilt
+    @SuppressLint("RestrictedApi")
+    @AssistedFactory
+    interface Factory : WorkerAssistedFactory<SyncWorker> {
+        override fun create(
+            appContext: Context,
+            params: WorkerParameters
+        ): SyncWorker
+    }
 
     companion object {
         private const val SYNC_WORK_NAME = "periodic_cloud_sync"
@@ -80,8 +93,8 @@ class SyncWorker @AssistedInject constructor(
 
             when {
                 result == null -> {
-                    Timber.e("SyncWorker: Sync timed out")
-                    Result.retry()
+                    Timber.e("SyncWorker: Sync timed out or database unavailable")
+                    Result.success() // Don't retry if database was closed
                 }
 
                 result.contains("failed", ignoreCase = true) ||
@@ -94,6 +107,15 @@ class SyncWorker @AssistedInject constructor(
                     Timber.d("SyncWorker: Sync completed - $result")
                     Result.success()
                 }
+            }
+        } catch (e: IllegalStateException) {
+            // Handle database closed errors gracefully - don't retry
+            if (e.message?.contains("already-closed") == true) {
+                Timber.w("SyncWorker: Database was closed, aborting sync")
+                Result.success()
+            } else {
+                Timber.e(e, "SyncWorker: IllegalStateException during sync")
+                Result.retry()
             }
         } catch (e: Exception) {
             Timber.e(e, "SyncWorker: Unexpected error during sync")

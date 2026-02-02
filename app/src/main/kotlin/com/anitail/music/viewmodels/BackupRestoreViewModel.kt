@@ -20,6 +20,7 @@ import com.anitail.music.extensions.zipInputStream
 import com.anitail.music.extensions.zipOutputStream
 import com.anitail.music.playback.MusicService
 import com.anitail.music.playback.MusicService.Companion.PERSISTENT_QUEUE_FILE
+import com.anitail.music.services.SyncWorker
 import com.anitail.music.utils.GoogleDriveSyncManager
 import com.anitail.music.utils.reportException
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -159,6 +160,10 @@ class BackupRestoreViewModel @Inject constructor(
 
     private fun restoreFromFile(context: Context, file: File) {
         runCatching {
+            // Cancel any running sync before closing the database
+            SyncWorker.cancel(context)
+            MusicDatabase.isRestoring.set(true)
+            
             FileInputStream(file).use { fis ->
                 fis.zipInputStream().use { inputStream ->
                     var entry = tryOrNull { inputStream.nextEntry }
@@ -175,7 +180,6 @@ class BackupRestoreViewModel @Inject constructor(
                                 runBlocking(Dispatchers.IO) {
                                     database.checkpoint()
                                 }
-                                MusicDatabase.isRestoring.set(true)
                                 database.close()
                                 FileOutputStream(database.openHelper.writableDatabase.path).use { outputStream ->
                                     inputStream.copyTo(outputStream)
@@ -228,6 +232,10 @@ class BackupRestoreViewModel @Inject constructor(
 
     fun restore(context: Context, uri: Uri) {
         runCatching {
+            // Cancel any running sync before closing the database
+            SyncWorker.cancel(context)
+            MusicDatabase.isRestoring.set(true)
+            
             context.applicationContext.contentResolver.openInputStream(uri)?.use {
                 it.zipInputStream().use { inputStream ->
                     var entry = tryOrNull { inputStream.nextEntry } // prevent ZipException
@@ -244,7 +252,6 @@ class BackupRestoreViewModel @Inject constructor(
                                 runBlocking(Dispatchers.IO) {
                                     database.checkpoint()
                                 }
-                                MusicDatabase.isRestoring.set(true)
                                 database.close()
                                 FileOutputStream(database.openHelper.writableDatabase.path).use { outputStream ->
                                     inputStream.copyTo(outputStream)
