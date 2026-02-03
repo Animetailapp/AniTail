@@ -4,7 +4,6 @@ import android.content.Context
 import com.anitail.music.constants.EnableCastKey
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
-import kotlinx.coroutines.runBlocking
 
 /**
  * Utilidades para verificar la disponibilidad de Google Play Services
@@ -60,9 +59,7 @@ object GooglePlayServicesUtils {
     fun isCastAvailable(context: Context): Boolean {
         return try {
             val isGooglePlayAvailable = isGooglePlayServicesAvailable(context)
-            val isCastEnabled = runBlocking {
-                context.dataStore.get(EnableCastKey, true)
-            }
+            val isCastEnabled = context.dataStore.get(EnableCastKey, true)
             isGooglePlayAvailable && isCastEnabled
         } catch (e: Exception) {
             false

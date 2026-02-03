@@ -20,9 +20,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import java.time.LocalDateTime
@@ -220,20 +220,26 @@ constructor(
 
       if (remoteIds == localIds) return@onSuccess
 
-      database.transaction {
-        runBlocking {
-          database.clearPlaylist(playlistId)
-          songs.forEachIndexed { idx, song ->
-            if (database.song(song.id).firstOrNull() == null) {
-              database.insert(song)
+        val songsToInsert = mutableListOf<com.anitail.music.models.MediaMetadata>()
+        withContext(Dispatchers.IO) {
+            songs.forEach { song ->
+                if (database.getSongById(song.id) == null) {
+                    songsToInsert.add(song)
+                }
             }
-            database.insert(
-                PlaylistSongMap(
-                    songId = song.id,
-                    playlistId = playlistId,
-                    position = idx,
-                    setVideoId = song.setVideoId))
-          }
+        }
+      database.transaction {
+          database.clearPlaylist(playlistId)
+          songsToInsert.forEach { song -> database.insert(song) }
+          songs.forEachIndexed { idx, song ->
+              database.insert(
+                  PlaylistSongMap(
+                      songId = song.id,
+                      playlistId = playlistId,
+                      position = idx,
+                      setVideoId = song.setVideoId
+                  )
+              )
         }
       }
     }

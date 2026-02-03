@@ -28,7 +28,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
@@ -145,7 +144,9 @@ class BackupRestoreViewModel @Inject constructor(
             try {
                 val result = googleDriveSyncManager.downloadLatestBackup(tempFile)
                 result.onSuccess {
-                    restoreFromFile(context, tempFile)
+                    viewModelScope.launch {
+                        restoreFromFile(context, tempFile)
+                    }
                 }.onFailure {
                     Toast.makeText(context, "No backups found on Drive", Toast.LENGTH_SHORT).show()
                 }
@@ -158,7 +159,7 @@ class BackupRestoreViewModel @Inject constructor(
         }
     }
 
-    private fun restoreFromFile(context: Context, file: File) {
+    private suspend fun restoreFromFile(context: Context, file: File) {
         runCatching {
             // Cancel any running sync before closing the database
             SyncWorker.cancel(context)
@@ -177,7 +178,7 @@ class BackupRestoreViewModel @Inject constructor(
                             }
 
                             InternalDatabase.DB_NAME -> {
-                                runBlocking(Dispatchers.IO) {
+                                withContext(Dispatchers.IO) {
                                     database.checkpoint()
                                 }
                                 database.close()
@@ -200,75 +201,84 @@ class BackupRestoreViewModel @Inject constructor(
         }
     }
     fun backup(context: Context, uri: Uri, showToast: Boolean = true) {
-        runCatching {
-            context.applicationContext.contentResolver.openOutputStream(uri)?.use {
-                it.buffered().zipOutputStream().use { outputStream ->
-                    (context.filesDir / "datastore" / SETTINGS_FILENAME).inputStream().buffered()
-                        .use { inputStream ->
-                            outputStream.putNextEntry(ZipEntry(SETTINGS_FILENAME))
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                context.applicationContext.contentResolver.openOutputStream(uri)?.use {
+                    it.buffered().zipOutputStream().use { outputStream ->
+                        (context.filesDir / "datastore" / SETTINGS_FILENAME).inputStream()
+                            .buffered()
+                            .use { inputStream ->
+                                outputStream.putNextEntry(ZipEntry(SETTINGS_FILENAME))
+                                inputStream.copyTo(outputStream)
+                            }
+                        database.checkpoint()
+                        FileInputStream(database.openHelper.writableDatabase.path).use { inputStream ->
+                            outputStream.putNextEntry(ZipEntry(InternalDatabase.DB_NAME))
                             inputStream.copyTo(outputStream)
                         }
-                    runBlocking(Dispatchers.IO) {
-                        database.checkpoint()
-                    }
-                    FileInputStream(database.openHelper.writableDatabase.path).use { inputStream ->
-                        outputStream.putNextEntry(ZipEntry(InternalDatabase.DB_NAME))
-                        inputStream.copyTo(outputStream)
                     }
                 }
-            }
-        }.onSuccess {
-            if (showToast) {
-                // Only show the toast if requested (not from background worker)
-                Toast.makeText(context, R.string.backup_create_success, Toast.LENGTH_SHORT).show()
-            }
-        }.onFailure {
-            reportException(it)
-            if (showToast) {
-                Toast.makeText(context, R.string.backup_create_failed, Toast.LENGTH_SHORT).show()
+            }.onSuccess {
+                if (showToast) {
+                    withContext(Dispatchers.Main) {
+                        // Only show the toast if requested (not from background worker)
+                        Toast.makeText(context, R.string.backup_create_success, Toast.LENGTH_SHORT)
+                            .show()
+                    }
+                }
+            }.onFailure {
+                reportException(it)
+                if (showToast) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, R.string.backup_create_failed, Toast.LENGTH_SHORT)
+                            .show()
+                    }
+                }
             }
         }
     }
 
     fun restore(context: Context, uri: Uri) {
-        runCatching {
-            // Cancel any running sync before closing the database
-            SyncWorker.cancel(context)
-            MusicDatabase.isRestoring.set(true)
-            
-            context.applicationContext.contentResolver.openInputStream(uri)?.use {
-                it.zipInputStream().use { inputStream ->
-                    var entry = tryOrNull { inputStream.nextEntry } // prevent ZipException
-                    while (entry != null) {
-                        when (entry.name) {
-                            SETTINGS_FILENAME -> {
-                                (context.filesDir / "datastore" / SETTINGS_FILENAME).outputStream()
-                                    .use { outputStream ->
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                // Cancel any running sync before closing the database
+                SyncWorker.cancel(context)
+                MusicDatabase.isRestoring.set(true)
+
+                context.applicationContext.contentResolver.openInputStream(uri)?.use {
+                    it.zipInputStream().use { inputStream ->
+                        var entry = tryOrNull { inputStream.nextEntry } // prevent ZipException
+                        while (entry != null) {
+                            when (entry.name) {
+                                SETTINGS_FILENAME -> {
+                                    (context.filesDir / "datastore" / SETTINGS_FILENAME).outputStream()
+                                        .use { outputStream ->
+                                            inputStream.copyTo(outputStream)
+                                        }
+                                }
+
+                                InternalDatabase.DB_NAME -> {
+                                    database.checkpoint()
+                                    database.close()
+                                    FileOutputStream(database.openHelper.writableDatabase.path).use { outputStream ->
                                         inputStream.copyTo(outputStream)
                                     }
-                            }
-
-                            InternalDatabase.DB_NAME -> {
-                                runBlocking(Dispatchers.IO) {
-                                    database.checkpoint()
-                                }
-                                database.close()
-                                FileOutputStream(database.openHelper.writableDatabase.path).use { outputStream ->
-                                    inputStream.copyTo(outputStream)
                                 }
                             }
+                            entry = tryOrNull { inputStream.nextEntry } // prevent ZipException
                         }
-                        entry = tryOrNull { inputStream.nextEntry } // prevent ZipException
                     }
                 }
+                context.stopService(Intent(context, MusicService::class.java))
+                context.filesDir.resolve(PERSISTENT_QUEUE_FILE).delete()
+                context.startActivity(Intent(context, MainActivity::class.java))
+                exitProcess(0)
+            }.onFailure {
+                reportException(it)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, R.string.restore_failed, Toast.LENGTH_SHORT).show()
+                }
             }
-            context.stopService(Intent(context, MusicService::class.java))
-            context.filesDir.resolve(PERSISTENT_QUEUE_FILE).delete()
-            context.startActivity(Intent(context, MainActivity::class.java))
-            exitProcess(0)
-        }.onFailure {
-            reportException(it)
-            Toast.makeText(context, R.string.restore_failed, Toast.LENGTH_SHORT).show()
         }
     }
 

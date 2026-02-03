@@ -35,10 +35,12 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import java.time.LocalDateTime
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -57,7 +59,7 @@ constructor(
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val songUrlCache = HashMap<String, Pair<String, Long>>()
+    private val songUrlCache = ConcurrentHashMap<String, Pair<String, Long>>()
 
     // Legacy cache downloads (for compatibility)
     private val cacheDownloads = MutableStateFlow<Map<String, Download>>(emptyMap())
@@ -96,13 +98,8 @@ constructor(
                 return@Factory dataSpec.withUri(it.first.toUri())
             }
 
-            val playbackData = runBlocking(Dispatchers.IO) {
-                YTPlayerUtils.playerResponseForPlayback(
-                    mediaId,
-                    audioQuality = audioQuality,
-                    connectivityManager = connectivityManager,
-                )
-            }.getOrThrow()
+            val playbackData =
+                fetchPlaybackDataBlocking(mediaId) ?: error("Playback data unavailable")
             val format = playbackData.format
 
             database.query {
@@ -145,6 +142,24 @@ constructor(
             songUrlCache[mediaId] = streamUrl to playbackData.streamExpiresInSeconds * 1000L
             dataSpec.withUri(streamUrl.toUri())
         }
+
+    private fun fetchPlaybackDataBlocking(mediaId: String): YTPlayerUtils.PlaybackData? {
+        val future = CompletableFuture<YTPlayerUtils.PlaybackData?>()
+        scope.launch {
+            val data =
+                YTPlayerUtils.playerResponseForPlayback(
+                    mediaId,
+                    audioQuality = audioQuality,
+                    connectivityManager = connectivityManager,
+                ).getOrNull()
+            future.complete(data)
+        }
+        return try {
+            future.get(15, TimeUnit.SECONDS)
+        } catch (_: Exception) {
+            null
+        }
+    }
 
     val downloadNotificationHelper =
         DownloadNotificationHelper(context, ExoDownloadService.CHANNEL_ID)
