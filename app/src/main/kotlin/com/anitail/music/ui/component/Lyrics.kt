@@ -6,6 +6,7 @@ import android.content.res.Configuration
 import android.os.Build
 import android.widget.Toast
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseInOutCubic
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -14,6 +15,10 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -50,6 +55,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -107,10 +113,10 @@ import coil.request.ImageRequest
 import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.constants.DarkModeKey
-import com.anitail.music.constants.LyricsClickKey
-import com.anitail.music.constants.LyricsCustomFontPathKey
 import com.anitail.music.constants.LyricsAnimationStyle
 import com.anitail.music.constants.LyricsAnimationStyleKey
+import com.anitail.music.constants.LyricsClickKey
+import com.anitail.music.constants.LyricsCustomFontPathKey
 import com.anitail.music.constants.LyricsFontSizeKey
 import com.anitail.music.constants.LyricsGlowEffectKey
 import com.anitail.music.constants.LyricsRomanizeBelarusianKey
@@ -425,6 +431,9 @@ fun Lyrics(
 
     val lazyListState = rememberLazyListState()
 
+    // Auto scroll state like Metrolist
+    var isAutoScrollEnabled by rememberSaveable { mutableStateOf(true) }
+
     // Define max selection limit
     val maxSelectionLimit = 5
 
@@ -630,6 +639,9 @@ fun Lyrics(
                             available: Offset,
                             source: NestedScrollSource
                         ): Offset {
+                            if (source == NestedScrollSource.UserInput) {
+                                isAutoScrollEnabled = false
+                            }
                             if (!isSelectionModeActive) { // Only update preview time if not selecting
                                 lastPreviewTime = System.currentTimeMillis()
                             }
@@ -640,6 +652,7 @@ fun Lyrics(
                             consumed: Velocity,
                             available: Velocity
                         ): Velocity {
+                            isAutoScrollEnabled = false
                             if (!isSelectionModeActive) { // Only update preview time if not selecting
                                 lastPreviewTime = System.currentTimeMillis()
                             }
@@ -648,8 +661,30 @@ fun Lyrics(
                     }
                 })
         ) {
-            val displayedCurrentLineIndex =
+            val displayedCurrentLineIndex = if (!isAutoScrollEnabled) {
+                currentLineIndex
+            } else {
                 if (isSeeking || isSelectionModeActive) deferredCurrentLineIndex else currentLineIndex
+            }
+
+            // Show lyrics provider at the top, scrolling with content
+            if (!lyrics.isNullOrEmpty() && lyrics != LYRICS_NOT_FOUND) {
+                item {
+                    Text(
+                        text = stringResource(
+                            R.string.lyrics_from_betterlyrics,
+                            lyricsEntity?.provider ?: "Unknown"
+                        ),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+            }
 
             if (lyrics == null) {
                 item {
@@ -1070,6 +1105,52 @@ fun Lyrics(
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // Auto-scroll button at bottom center like Metrolist
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 16.dp)
+        ) {
+            AnimatedVisibility(
+                visible = !isAutoScrollEnabled && isSynced && !isSelectionModeActive,
+                enter = slideInVertically { it } + fadeIn(),
+                exit = slideOutVertically { it } + fadeOut()
+            ) {
+                FilledTonalButton(
+                    onClick = {
+                        scope.launch {
+                            val targetIndex = currentLineIndex
+                            if (targetIndex >= 0) {
+                                val currentLine = lines.getOrNull(targetIndex)
+                                val extraOffset = currentLine?.text?.count { it == '\n' } ?: 0
+                                val lineOffset = with(density) {
+                                    val dpValue = if (landscapeOffset) 16.dp else 20.dp
+                                    dpValue.toPx().toInt() * extraOffset
+                                }
+                                val scrollOffset =
+                                    with(density) { 36.dp.toPx().toInt() } + lineOffset
+
+                                if (useSmoothScroll) {
+                                    lazyListState.animateScrollToItem(targetIndex, scrollOffset)
+                                } else {
+                                    lazyListState.scrollToItem(targetIndex, scrollOffset)
+                                }
+                            }
+                            isAutoScrollEnabled = true
+                        }
+                    }
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.sync),
+                        contentDescription = stringResource(R.string.lyrics_resync),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = stringResource(R.string.lyrics_resync))
                 }
             }
         }

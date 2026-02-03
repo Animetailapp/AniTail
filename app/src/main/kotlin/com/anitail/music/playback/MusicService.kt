@@ -1635,10 +1635,12 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         CacheDataSource
             .Factory()
             .setCache(downloadCache)
+            .setFlags(FLAG_IGNORE_CACHE_ON_ERROR)
             .setUpstreamDataSourceFactory(
                 CacheDataSource
                     .Factory()
                     .setCache(playerCache)
+                    .setFlags(FLAG_IGNORE_CACHE_ON_ERROR)
                     .setUpstreamDataSourceFactory(
                         DefaultDataSource.Factory(
                             this,
@@ -1656,9 +1658,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                                     .build(),
                             ),
                         ),
-                    ),
-            ).setCacheWriteDataSinkFactory(null)
-            .setFlags(FLAG_IGNORE_CACHE_ON_ERROR)
+                    ).setCacheWriteDataSinkFactory(null),
+            )
 
   private fun createDataSourceFactory(): DataSource.Factory {
     val songUrlCache = HashMap<String, Pair<String, Long>>()
@@ -1675,20 +1676,38 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             return@Factory dataSpec.withUri(song.song.mediaStoreUri.toUri())
         }
 
-      if (downloadCache.isCached(
+        // Check if cached and validate cache content exists
+        val isCached = downloadCache.isCached(
           mediaId, dataSpec.position, if (dataSpec.length >= 0) dataSpec.length else 1) ||
-          playerCache.isCached(mediaId, dataSpec.position, CHUNK_LENGTH)) {
-        scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
-        return@Factory dataSpec
-      }
+                playerCache.isCached(mediaId, dataSpec.position, CHUNK_LENGTH)
 
-      songUrlCache[mediaId]
-          ?.takeIf { it.second > System.currentTimeMillis() }
-          ?.let {
-            scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
-            return@Factory dataSpec.withUri(it.first.toUri())
-          }
+        if (isCached) {
+            Timber.d("Cache hit for $mediaId")
+            // Try to get a valid streaming URL from cache first
+            val cachedUrl = songUrlCache[mediaId]
+                ?.takeIf { it.second > System.currentTimeMillis() }
+                ?.first
 
+            if (cachedUrl != null) {
+                scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
+                return@Factory dataSpec.withUri(cachedUrl.toUri())
+            }
+
+            // If no URL in memory cache, get it from YouTube
+            // CacheDataSource will still use cached data when available
+            // This ensures we always have a valid HTTP URL to fallback to
+            Timber.d("No cached URL for $mediaId, fetching from YouTube")
+        } else {
+            // Check URL cache before making API call
+            songUrlCache[mediaId]
+                ?.takeIf { it.second > System.currentTimeMillis() }
+                ?.let {
+                    scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
+                    return@Factory dataSpec.withUri(it.first.toUri())
+                }
+        }
+
+        // Fetch streaming URL from YouTube
       val playbackData =
           runBlocking(Dispatchers.IO) {
                 YTPlayerUtils.playerResponseForPlayback(
@@ -1702,21 +1721,24 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       if (playbackData == null) {
         throw PlaybackException(
             getString(R.string.error_unknown), null, PlaybackException.ERROR_CODE_REMOTE_ERROR)
-      } else {
+      }
+
         val format = playbackData.format
 
         database.query {
-          upsert(
-              FormatEntity(
-                  id = mediaId,
-                  itag = format.itag,
-                  mimeType = format.mimeType.split(";")[0],
-                  codecs = format.mimeType.split("codecs=")[1].removeSurrounding("\""),
-                  bitrate = format.bitrate,
-                  sampleRate = format.audioSampleRate,
-                  contentLength = format.contentLength!!,
-                  loudnessDb = playbackData.audioConfig?.loudnessDb,
-                  playbackUrl = playbackData.playbackTracking?.videostatsPlaybackUrl?.baseUrl))
+            upsert(
+                FormatEntity(
+                    id = mediaId,
+                    itag = format.itag,
+                    mimeType = format.mimeType.split(";")[0],
+                    codecs = format.mimeType.split("codecs=")[1].removeSurrounding("\""),
+                    bitrate = format.bitrate,
+                    sampleRate = format.audioSampleRate,
+                    contentLength = format.contentLength!!,
+                    loudnessDb = playbackData.audioConfig?.loudnessDb,
+                    playbackUrl = playbackData.playbackTracking?.videostatsPlaybackUrl?.baseUrl
+                )
+            )
         }
         scope.launch(Dispatchers.IO) { recoverSong(mediaId, playbackData) }
 
@@ -1724,10 +1746,10 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
         songUrlCache[mediaId] =
             streamUrl to System.currentTimeMillis() + (playbackData.streamExpiresInSeconds * 1000L)
+
         return@Factory dataSpec
             .withUri(streamUrl.toUri())
             .subrange(dataSpec.uriPositionOffset, CHUNK_LENGTH)
-      }
     }
   }
 

@@ -159,6 +159,8 @@
     <string name="font_loading_error">Error al cargar el archivo de fuente</string>
     <string name="font_loaded_successfully">Fuente cargada correctamente</string>
 
+    <string name="lyrics_from_betterlyrics">Letras desde %1$s</string>
+    <string name="lyrics_resync">Syncronizar</string>
     <string name="edit_song">Editar canción</string>
     <string name="song_title">Título de la canción</string>
     <string name="song_artists">Artistas de la canción</string>
@@ -340,6 +342,7 @@
     <string name="app_language">Idioma de la aplicación</string>
     <string name="enable_kugou">Activar proveedor de letras KuGou</string>
     <string name="enable_lrclib">Activar proveedor de letras LrcLib</string>
+    <string name="enable_simpmusic">Habilitar el proveedor de letras SimpMusic</string>
     <string name="set_first_lyrics_provider">Proveedor de letras preferido</string>
 
     <string name="player_and_audio">Reproductor y audio</string>
@@ -717,4 +720,16 @@
     <string name="clear_downloads_confirmation">¿Confirmar limpiar descargas?</string>
     <string name="share_selected">Compartir seleccionados</string>
     <string name="confirm">Confirmar</string>
+    <string name="lyrics_animation_style">Estilo de animación de letras</string>
+    <string name="enable_betterlyrics">Habilitar el proveedor de letras BetterLyrics</string>
+    <string name="discord_connection_state">Conexión</string>
+    <string name="discord_last_sync">Última sincronización</string>
+    <string name="discord_last_sync_never">Nunca</string>
+    <string name="discord_manual_refresh">Refrescar presencia</string>
+    <string name="discord_manual_refreshing">Actualizando...</string>
+    <string name="discord_status_disabled">Desactivado</string>
+    <string name="discord_status_idle">Inactivo</string>
+    <string name="discord_status_connecting">Conectando...</string>
+    <string name="discord_status_connected">Conectado</string>
+    <string name="discord_status_reconnecting">Reconectando...</string>
 </resources>

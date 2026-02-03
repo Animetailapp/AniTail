@@ -162,6 +162,8 @@
     <string name="lyrics">Lyrics</string>
     <string name="lyrics_auto_scroll">Auto scroll lyrics</string>
     <string name="lyrics_glow_effect">Enable glowing lyrics effect</string>
+    <string name="lyrics_from_betterlyrics">Lyrics from %1$s</string>
+    <string name="lyrics_resync">Syncronize</string>
 
 
     <string name="edit_song">Edit song</string>
