@@ -221,6 +221,8 @@ dependencies {
     implementation(projects.kugou)
     implementation(projects.lrclib)
     implementation(projects.kizzy)
+    implementation(projects.betterlyrics)
+    implementation(projects.simpmusic)
 
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.serialization.json)

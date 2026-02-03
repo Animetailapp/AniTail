@@ -64,6 +64,8 @@ import com.anitail.music.constants.GridItemsSizeKey
 import com.anitail.music.constants.LibraryFilter
 import com.anitail.music.constants.LyricsClickKey
 import com.anitail.music.constants.LyricsCustomFontPathKey
+import com.anitail.music.constants.LyricsAnimationStyle
+import com.anitail.music.constants.LyricsAnimationStyleKey
 import com.anitail.music.constants.LyricsFontSizeKey
 import com.anitail.music.constants.LyricsScrollKey
 import com.anitail.music.constants.LyricsSmoothScrollKey
@@ -182,6 +184,10 @@ fun AppearanceSettings(
     val (lyricsSmoothScroll, onLyricsSmoothScrollChange) = rememberPreference(
         LyricsSmoothScrollKey,
         defaultValue = true
+    )
+    val (lyricsAnimationStyle, onLyricsAnimationStyleChange) = rememberEnumPreference(
+        LyricsAnimationStyleKey,
+        defaultValue = LyricsAnimationStyle.APPLE
     )
     val (translateLyrics, onTranslateLyricsChange) = rememberPreference(
         TranslateLyricsKey,
@@ -665,6 +671,23 @@ fun AppearanceSettings(
             icon = { Icon(painterResource(R.drawable.lyrics), null) },
             checked = lyricsSmoothScroll,
             onCheckedChange = onLyricsSmoothScrollChange,
+        )
+
+        EnumListPreference(
+            title = { Text(stringResource(R.string.lyrics_animation_style)) },
+            icon = { Icon(painterResource(R.drawable.lyrics), null) },
+            selectedValue = lyricsAnimationStyle,
+            onValueSelected = onLyricsAnimationStyleChange,
+            valueText = {
+                when (it) {
+                    LyricsAnimationStyle.NONE -> stringResource(R.string.lyrics_animation_none)
+                    LyricsAnimationStyle.FADE -> stringResource(R.string.lyrics_animation_fade)
+                    LyricsAnimationStyle.GLOW -> stringResource(R.string.lyrics_animation_glow)
+                    LyricsAnimationStyle.SLIDE -> stringResource(R.string.lyrics_animation_slide)
+                    LyricsAnimationStyle.KARAOKE -> stringResource(R.string.lyrics_animation_karaoke)
+                    LyricsAnimationStyle.APPLE -> stringResource(R.string.lyrics_animation_apple)
+                }
+            },
         )
 
         SwitchPreference(

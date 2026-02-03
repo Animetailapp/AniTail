@@ -109,6 +109,8 @@ import com.anitail.music.R
 import com.anitail.music.constants.DarkModeKey
 import com.anitail.music.constants.LyricsClickKey
 import com.anitail.music.constants.LyricsCustomFontPathKey
+import com.anitail.music.constants.LyricsAnimationStyle
+import com.anitail.music.constants.LyricsAnimationStyleKey
 import com.anitail.music.constants.LyricsFontSizeKey
 import com.anitail.music.constants.LyricsGlowEffectKey
 import com.anitail.music.constants.LyricsRomanizeBelarusianKey
@@ -193,6 +195,10 @@ fun Lyrics(
     val lyricsCustomFontPath by rememberPreference(LyricsCustomFontPathKey, "")
     val lyricsGlowEffect by rememberPreference(LyricsGlowEffectKey, false)
     val smoothScroll by rememberPreference(LyricsSmoothScrollKey, true)
+    val lyricsAnimationStyle by rememberEnumPreference(
+        LyricsAnimationStyleKey,
+        defaultValue = LyricsAnimationStyle.APPLE
+    )
     val translateLyrics by rememberPreference(TranslateLyricsKey, false)
     val scope = rememberCoroutineScope()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
@@ -220,13 +226,22 @@ fun Lyrics(
         if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON
     }
 
+    val useSmoothScroll =
+        (smoothScroll && lyricsAnimationStyle != LyricsAnimationStyle.NONE) ||
+            lyricsAnimationStyle == LyricsAnimationStyle.APPLE
+    val enableAnimations = lyricsAnimationStyle != LyricsAnimationStyle.NONE
+    val effectiveGlow =
+        (lyricsGlowEffect && lyricsAnimationStyle != LyricsAnimationStyle.NONE) ||
+            lyricsAnimationStyle == LyricsAnimationStyle.GLOW ||
+            lyricsAnimationStyle == LyricsAnimationStyle.APPLE
+
     val lines = remember(lyrics, scope) {
         if (lyrics == null || lyrics == LYRICS_NOT_FOUND) {
             emptyList()
         } else if (lyrics.startsWith("[")) {
             val parsedLines = parseLyrics(lyrics)
             parsedLines.map { entry ->
-                val newEntry = LyricsEntry(entry.time, entry.text)
+                val newEntry = LyricsEntry(entry.time, entry.text, entry.wordTimestamps)
                 if (romanizeJapaneseLyrics) {
                     if (isJapanese(entry.text) && !isChinese(entry.text)) {
                         scope.launch {
@@ -525,7 +540,7 @@ fun Lyrics(
                         val scrollOffset =
                             with(density) { 36.dp.toPx().toInt() } + calculateOffset()
 
-                        if (smoothScroll) {
+                        if (useSmoothScroll) {
                             // Apple Music style smooth animation - refined and fluid
                             scope.launch {
                                 // Pre-animación: preparar el highlight de la línea siguiente
@@ -727,7 +742,7 @@ fun Lyrics(
                     var showPulse by remember(index) { mutableStateOf(false) }
 
                     LaunchedEffect(isCurrentLine) {
-                        if (isCurrentLine && smoothScroll && isSynced) {
+                        if (isCurrentLine && useSmoothScroll && isSynced && lyricsAnimationStyle == LyricsAnimationStyle.APPLE) {
                             showPulse = true
                             delay(300) // Duración del pulso
                             showPulse = false
@@ -736,19 +751,34 @@ fun Lyrics(
 
                     val pulseScale by animateFloatAsState(
                         targetValue = if (showPulse) 1.08f else 1f,
-                        animationSpec = tween(durationMillis = 300, easing = EaseInOutCubic),
+                        animationSpec = tween(
+                            durationMillis = if (enableAnimations) 300 else 0,
+                            easing = EaseInOutCubic
+                        ),
                         label = "pulse_animation_$index"
                     )
 
                     // Animación de opacidad más suave
-                    val targetAlpha = when {
-                        !isSynced || isCurrentLine || (isSelectionModeActive && isSelected) -> 1f
-                        isNearCurrentLine -> 0.7f
-                        else -> 0.4f
+                    val targetAlpha = when (lyricsAnimationStyle) {
+                        LyricsAnimationStyle.NONE -> 1f
+                        LyricsAnimationStyle.FADE,
+                        LyricsAnimationStyle.SLIDE -> when {
+                            !isSynced || isCurrentLine || (isSelectionModeActive && isSelected) -> 1f
+                            isNearCurrentLine -> 0.6f
+                            else -> 0.3f
+                        }
+
+                        else -> when {
+                            !isSynced || isCurrentLine || (isSelectionModeActive && isSelected) -> 1f
+                            isNearCurrentLine -> 0.7f
+                            else -> 0.4f
+                        }
                     }
                     val animatedAlpha by animateFloatAsState(
                         targetValue = targetAlpha,
-                        animationSpec = if (smoothScroll) {
+                        animationSpec = if (!enableAnimations) {
+                            tween(durationMillis = 0, easing = LinearEasing)
+                        } else if (useSmoothScroll) {
                             tween(durationMillis = 800, easing = EaseInOutCubic)
                         } else {
                             tween(durationMillis = 300, easing = FastOutSlowInEasing)
@@ -757,10 +787,20 @@ fun Lyrics(
                     )
 
                     // Animación de escala para destacar la línea actual
-                    val targetScale = if (isCurrentLine && isSynced) 1.05f else 1f
+                    val targetScale =
+                        if (isCurrentLine && isSynced &&
+                            (lyricsAnimationStyle == LyricsAnimationStyle.APPLE ||
+                                lyricsAnimationStyle == LyricsAnimationStyle.GLOW)
+                        ) {
+                            1.05f
+                        } else {
+                            1f
+                        }
                     val animatedScale by animateFloatAsState(
                         targetValue = targetScale,
-                        animationSpec = if (smoothScroll) {
+                        animationSpec = if (!enableAnimations) {
+                            tween(durationMillis = 0, easing = LinearEasing)
+                        } else if (useSmoothScroll) {
                             spring(
                                 dampingRatio = Spring.DampingRatioMediumBouncy,
                                 stiffness = Spring.StiffnessLow
@@ -771,6 +811,23 @@ fun Lyrics(
                         label = "scale_animation_$index"
                     )
 
+                    val slideOffsetPx = with(density) { 18.dp.toPx() }
+                    val targetTranslateX =
+                        if (lyricsAnimationStyle == LyricsAnimationStyle.SLIDE && isSynced) {
+                            if (isCurrentLine) 0f else -slideOffsetPx
+                        } else {
+                            0f
+                        }
+                    val animatedTranslateX by animateFloatAsState(
+                        targetValue = targetTranslateX,
+                        animationSpec = if (!enableAnimations) {
+                            tween(durationMillis = 0, easing = LinearEasing)
+                        } else {
+                            tween(durationMillis = 280, easing = FastOutSlowInEasing)
+                        },
+                        label = "translate_animation_$index"
+                    )
+
                     Column(
                         modifier = itemModifier
                             .graphicsLayer {
@@ -779,8 +836,7 @@ fun Lyrics(
                                 val finalScale = animatedScale * pulseScale
                                 scaleX = finalScale
                                 scaleY = finalScale
-
-
+                                translationX = animatedTranslateX
                             },
                         horizontalAlignment = when (lyricsTextPosition) {
                             LyricsPosition.LEFT -> Alignment.Start
@@ -791,13 +847,18 @@ fun Lyrics(
                         val isActiveLine = isCurrentLine && isSynced
                         val lineColor =
                             if (isActiveLine) expressiveAccent else expressiveAccent.copy(alpha = 0.7f)
+                        val playbackPositionMs =
+                            sliderPositionProvider() ?: playerConnection.player.currentPosition
+                        val playbackPositionSec = playbackPositionMs / 1000.0
+                        val inactiveWordColor = expressiveAccent.copy(alpha = 0.6f)
+                        val wordTimestamps = item.wordTimestamps
                         val alignment = when (lyricsTextPosition) {
                             LyricsPosition.LEFT -> TextAlign.Left
                             LyricsPosition.CENTER -> TextAlign.Center
                             LyricsPosition.RIGHT -> TextAlign.Right
                         }
 
-                        if (isActiveLine && lyricsGlowEffect) {
+                        if (isActiveLine && effectiveGlow) {
                             // Initial animation for glow fill from left to right
                             val fillProgress = remember { Animatable(0f) }
                             // Continuous pulsing animation for the glow
@@ -855,17 +916,43 @@ fun Lyrics(
                             )
 
                             val styledText = buildAnnotatedString {
-                                withStyle(
-                                    style = SpanStyle(
-                                        shadow = Shadow(
-                                            color = expressiveAccent.copy(alpha = 0.8f * glowIntensity),
-                                            offset = Offset(0f, 0f),
-                                            blurRadius = 28f * (1f + pulseEffect)
-                                        ),
-                                        brush = glowBrush
-                                    )
-                                ) {
-                                    append(item.text)
+                                if (!wordTimestamps.isNullOrEmpty()) {
+                                    wordTimestamps.forEachIndexed { wordIndex, word ->
+                                        val isWordActive =
+                                            playbackPositionSec >= word.startTime &&
+                                                playbackPositionSec < word.endTime
+                                        val style = if (isWordActive) {
+                                            SpanStyle(
+                                                shadow = Shadow(
+                                                    color = expressiveAccent.copy(alpha = 0.8f * glowIntensity),
+                                                    offset = Offset(0f, 0f),
+                                                    blurRadius = 28f * (1f + pulseEffect)
+                                                ),
+                                                brush = glowBrush
+                                            )
+                                        } else {
+                                            SpanStyle(color = inactiveWordColor)
+                                        }
+                                        withStyle(style) {
+                                            append(word.text)
+                                        }
+                                        if (wordIndex != wordTimestamps.lastIndex) {
+                                            append(" ")
+                                        }
+                                    }
+                                } else {
+                                    withStyle(
+                                        style = SpanStyle(
+                                            shadow = Shadow(
+                                                color = expressiveAccent.copy(alpha = 0.8f * glowIntensity),
+                                                offset = Offset(0f, 0f),
+                                                blurRadius = 28f * (1f + pulseEffect)
+                                            ),
+                                            brush = glowBrush
+                                        )
+                                    ) {
+                                        append(item.text)
+                                    }
                                 }
                             }
 
@@ -891,9 +978,31 @@ fun Lyrics(
                                     }
                             )
                         } else if (isActiveLine && !lyricsGlowEffect) {
-                            // Active line without glow effect - just bold text
+                            val styledText =
+                                if (!wordTimestamps.isNullOrEmpty()) {
+                                    buildAnnotatedString {
+                                        wordTimestamps.forEachIndexed { wordIndex, word ->
+                                            val isWordActive =
+                                                playbackPositionSec >= word.startTime &&
+                                                    playbackPositionSec < word.endTime
+                                            val style = if (isWordActive) {
+                                                SpanStyle(color = expressiveAccent)
+                                            } else {
+                                                SpanStyle(color = inactiveWordColor)
+                                            }
+                                            withStyle(style) {
+                                                append(word.text)
+                                            }
+                                            if (wordIndex != wordTimestamps.lastIndex) {
+                                                append(" ")
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    buildAnnotatedString { append(item.text) }
+                                }
                             Text(
-                                text = item.text,
+                                text = styledText,
                                 fontSize = lyricsFontSize.sp,
                                 color = expressiveAccent,
                                 textAlign = alignment,

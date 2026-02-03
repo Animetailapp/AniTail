@@ -389,13 +389,14 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
                 if (existingLyrics == null) {
                   Timber.d("Descargando letras para ${mediaMetadata.title}")
-                  val lyrics = lyricsHelper.getLyrics(mediaMetadata)
+                  val lyricsWithProvider = lyricsHelper.getLyrics(mediaMetadata)
 
                   database.query {
                     upsert(
                         LyricsEntity(
                             id = mediaMetadata.id,
-                            lyrics = lyrics,
+                            lyrics = lyricsWithProvider.lyrics,
+                            provider = lyricsWithProvider.provider,
                         ),
                     )
                   }
@@ -415,12 +416,13 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                   if (database.lyrics(nextId).firstOrNull() == null) {
                     Timber.d("Precargando letras para próxima canción: ${metadata.title}")
                     try {
-                      val lyrics = lyricsHelper.getLyrics(metadata)
+                      val lyricsWithProvider = lyricsHelper.getLyrics(metadata)
                       database.query {
                         upsert(
                             LyricsEntity(
                                 id = nextId,
-                                lyrics = lyrics,
+                                lyrics = lyricsWithProvider.lyrics,
+                                provider = lyricsWithProvider.provider,
                             ),
                         )
                       }
@@ -1281,12 +1283,13 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   suspend fun downloadLyricsForSong(songId: String) {
     val mediaMetadata = database.song(songId).firstOrNull()?.toMediaMetadata() ?: return
     if (database.lyrics(songId).firstOrNull() == null) {
-      val lyrics = lyricsHelper.getLyrics(mediaMetadata)
+      val lyricsWithProvider = lyricsHelper.getLyrics(mediaMetadata)
       database.query {
         upsert(
             LyricsEntity(
                 id = songId,
-                lyrics = lyrics,
+                lyrics = lyricsWithProvider.lyrics,
+                provider = lyricsWithProvider.provider,
             ),
         )
       }

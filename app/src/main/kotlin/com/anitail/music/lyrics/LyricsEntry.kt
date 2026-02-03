@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 data class LyricsEntry(
     val time: Long,
     val text: String,
+    val wordTimestamps: List<WordTimestamp>? = null,
     val romanizedTextFlow: MutableStateFlow<String?> = MutableStateFlow(null),
     val translatedTextFlow: MutableStateFlow<String?> = MutableStateFlow(null)
 ) : Comparable<LyricsEntry> {
@@ -14,3 +15,9 @@ data class LyricsEntry(
         val HEAD_LYRICS_ENTRY = LyricsEntry(0L, "")
     }
 }
+
+data class WordTimestamp(
+    val text: String,
+    val startTime: Double,
+    val endTime: Double,
+)

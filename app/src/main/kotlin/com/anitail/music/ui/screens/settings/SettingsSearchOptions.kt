@@ -96,6 +96,12 @@ object SettingsSearchOptions {
         ),
         option(
             context,
+            "lyrics_animation_style",
+            R.string.lyrics_animation_style,
+            sectionRes = R.string.lyrics
+        ),
+        option(
+            context,
             "translation_models",
             R.string.translation_models,
             sectionRes = R.string.lyrics
@@ -195,6 +201,8 @@ object SettingsSearchOptions {
         option(context, "app_language", R.string.app_language),
         option(context, "enable_proxy", R.string.enable_proxy),
         option(context, "config_proxy", R.string.config_proxy),
+        option(context, "enable_betterlyrics", R.string.enable_betterlyrics),
+        option(context, "enable_simpmusic", R.string.enable_simpmusic),
         option(context, "enable_lrclib", R.string.enable_lrclib),
         option(context, "enable_kugou", R.string.enable_kugou),
         option(context, "set_first_lyrics_provider", R.string.set_first_lyrics_provider),

@@ -89,6 +89,7 @@ fun LyricsMenu(
                         LyricsEntity(
                             id = mediaMetadataProvider().id,
                             lyrics = it,
+                            provider = lyricsProvider()?.provider,
                         ),
                     )
                 }
@@ -172,10 +173,11 @@ fun LyricsMenu(
                     onClick = {
                         if (isNetworkAvailable) {
                             viewModel.search(
-                                searchMediaMetadata.id,
+                                searchMediaMetadata.setVideoId ?: searchMediaMetadata.id,
                                 titleField.text,
                                 artistField.text,
-                                searchMediaMetadata.duration
+                                searchMediaMetadata.duration,
+                                searchMediaMetadata.album?.title
                             )
                             showSearchResultDialog = true
                         } else {
@@ -233,6 +235,7 @@ fun LyricsMenu(
                                     LyricsEntity(
                                         id = searchMediaMetadata.id,
                                         lyrics = result.lyrics,
+                                        provider = result.providerName,
                                     ),
                                 )
                             }

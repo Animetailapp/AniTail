@@ -43,8 +43,10 @@ import com.anitail.music.R
 import com.anitail.music.constants.ContentCountryKey
 import com.anitail.music.constants.ContentLanguageKey
 import com.anitail.music.constants.CountryCodeToName
+import com.anitail.music.constants.EnableBetterLyricsKey
 import com.anitail.music.constants.EnableKugouKey
 import com.anitail.music.constants.EnableLrcLibKey
+import com.anitail.music.constants.EnableSimpMusicKey
 import com.anitail.music.constants.HideExplicitKey
 import com.anitail.music.constants.LanguageCodeToName
 import com.anitail.music.constants.LyricsGlowEffectKey
@@ -113,12 +115,16 @@ fun ContentSettings(
         key = ProxyPasswordKey,
         defaultValue = "password"
     )
+    val (enableBetterLyrics, onEnableBetterLyricsChange) =
+        rememberPreference(key = EnableBetterLyricsKey, defaultValue = true)
+    val (enableSimpMusic, onEnableSimpMusicChange) =
+        rememberPreference(key = EnableSimpMusicKey, defaultValue = true)
     val (enableKugou, onEnableKugouChange) = rememberPreference(key = EnableKugouKey, defaultValue = true)
     val (enableLrclib, onEnableLrclibChange) = rememberPreference(key = EnableLrcLibKey, defaultValue = true)
     val (preferredProvider, onPreferredProviderChange) =
         rememberEnumPreference(
             key = PreferredLyricsProviderKey,
-            defaultValue = PreferredLyricsProvider.LRCLIB,
+            defaultValue = PreferredLyricsProvider.BETTER_LYRICS,
         )
     val (lyricsGlowEffect, onLyricsGlowEffectChange) = rememberPreference(
         key = LyricsGlowEffectKey,
@@ -344,6 +350,18 @@ fun ContentSettings(
 
         PreferenceGroupTitle(title = stringResource(R.string.lyrics))
         SwitchPreference(
+            title = { Text(stringResource(R.string.enable_betterlyrics)) },
+            icon = { Icon(painterResource(R.drawable.lyrics), null) },
+            checked = enableBetterLyrics,
+            onCheckedChange = onEnableBetterLyricsChange,
+        )
+        SwitchPreference(
+            title = { Text(stringResource(R.string.enable_simpmusic)) },
+            icon = { Icon(painterResource(R.drawable.lyrics), null) },
+            checked = enableSimpMusic,
+            onCheckedChange = onEnableSimpMusicChange,
+        )
+        SwitchPreference(
             title = { Text(stringResource(R.string.enable_lrclib)) },
             icon = { Icon(painterResource(R.drawable.lyrics), null) },
             checked = enableLrclib,
@@ -359,11 +377,18 @@ fun ContentSettings(
             title = { Text(stringResource(R.string.set_first_lyrics_provider)) },
             icon = { Icon(painterResource(R.drawable.lyrics), null) },
             selectedValue = preferredProvider,
-            values = listOf(PreferredLyricsProvider.LRCLIB, PreferredLyricsProvider.KUGOU),
+            values = listOf(
+                PreferredLyricsProvider.LRCLIB,
+                PreferredLyricsProvider.KUGOU,
+                PreferredLyricsProvider.BETTER_LYRICS,
+                PreferredLyricsProvider.SIMPMUSIC,
+            ),
             valueText = {
                 when (it) {
                     PreferredLyricsProvider.LRCLIB -> "LrcLib"
                     PreferredLyricsProvider.KUGOU -> "KuGou"
+                    PreferredLyricsProvider.BETTER_LYRICS -> stringResource(R.string.lyrics_provider_betterlyrics)
+                    PreferredLyricsProvider.SIMPMUSIC -> stringResource(R.string.lyrics_provider_simpmusic)
                 }
             },
             onValueSelected = onPreferredProviderChange,

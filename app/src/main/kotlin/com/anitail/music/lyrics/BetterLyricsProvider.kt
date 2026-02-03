@@ -1,15 +1,16 @@
 package com.anitail.music.lyrics
 
 import android.content.Context
-import com.anitail.lrclib.LrcLib
-import com.anitail.music.constants.EnableLrcLibKey
+import com.anitail.music.betterlyrics.BetterLyrics
+import com.anitail.music.constants.EnableBetterLyricsKey
 import com.anitail.music.utils.dataStore
 import com.anitail.music.utils.get
 
-object LrcLibLyricsProvider : LyricsProvider {
-    override val name = "LrcLib"
+object BetterLyricsProvider : LyricsProvider {
+    override val name = "BetterLyrics"
 
-    override fun isEnabled(context: Context): Boolean = context.dataStore[EnableLrcLibKey] ?: true
+    override fun isEnabled(context: Context): Boolean =
+        context.dataStore[EnableBetterLyricsKey] ?: true
 
     override suspend fun getLyrics(
         id: String,
@@ -17,7 +18,7 @@ object LrcLibLyricsProvider : LyricsProvider {
         artist: String,
         duration: Int,
         album: String?,
-    ): Result<String> = LrcLib.getLyrics(title, artist, duration)
+    ): Result<String> = BetterLyrics.getLyrics(title, artist, duration, album)
 
     override suspend fun getAllLyrics(
         id: String,
@@ -27,6 +28,6 @@ object LrcLibLyricsProvider : LyricsProvider {
         album: String?,
         callback: (String) -> Unit,
     ) {
-        LrcLib.getAllLyrics(title, artist, duration, album, callback)
+        BetterLyrics.getAllLyrics(title, artist, duration, album, callback)
     }
 }

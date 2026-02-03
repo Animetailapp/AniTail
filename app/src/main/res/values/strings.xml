@@ -311,6 +311,13 @@
     <string name="lyrics_custom_font">Lyrics font style</string>
     <string name="use_system_font">Use system font</string>
     <string name="smooth_lyrics_animation">Smooth lyrics animation</string>
+    <string name="lyrics_animation_style">Lyrics animation style</string>
+    <string name="lyrics_animation_none">None</string>
+    <string name="lyrics_animation_fade">Fade</string>
+    <string name="lyrics_animation_glow">Glow</string>
+    <string name="lyrics_animation_slide">Slide</string>
+    <string name="lyrics_animation_karaoke">Karaoke</string>
+    <string name="lyrics_animation_apple">Apple Music</string>
     <string name="font_size_preview">Sample lyrics text for preview</string>
     <string name="font_loading_error">Error loading font file</string>
     <string name="font_loaded_successfully">Font loaded successfully</string>
@@ -366,7 +373,11 @@
     <string name="app_language">App language</string>
     <string name="enable_kugou">Enable KuGou lyrics provider</string>
     <string name="enable_lrclib">Enable LrcLib lyrics provider</string>
+    <string name="enable_betterlyrics">Enable BetterLyrics lyrics provider</string>
+    <string name="enable_simpmusic">Enable SimpMusic lyrics provider</string>
     <string name="set_first_lyrics_provider">Preferred lyrics provider</string>
+    <string name="lyrics_provider_betterlyrics">BetterLyrics</string>
+    <string name="lyrics_provider_simpmusic">SimpMusic</string>
 
     <string name="player_and_audio">Player and audio</string>
     <string name="audio_quality">Audio quality</string>

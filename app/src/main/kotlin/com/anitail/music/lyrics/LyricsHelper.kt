@@ -28,6 +28,8 @@ constructor(
 ) {
     private var lyricsProviders =
         listOf(
+            BetterLyricsProvider,
+            SimpMusicLyricsProvider,
             LrcLibLyricsProvider,
             KuGouLyricsProvider,
             YouTubeSubtitleLyricsProvider,
@@ -37,61 +39,102 @@ constructor(
     val preferred =
         context.dataStore.data
             .map {
-                it[PreferredLyricsProviderKey].toEnum(PreferredLyricsProvider.LRCLIB)
+                it[PreferredLyricsProviderKey].toEnum(PreferredLyricsProvider.BETTER_LYRICS)
             }.distinctUntilChanged()
             .map {
                 lyricsProviders =
-                    if (it == PreferredLyricsProvider.LRCLIB) {
-                        listOf(
-                            LrcLibLyricsProvider,
-                            KuGouLyricsProvider,
-                            YouTubeSubtitleLyricsProvider,
-                            YouTubeLyricsProvider
-                        )
-                    } else {
-                        listOf(
-                            KuGouLyricsProvider,
-                            LrcLibLyricsProvider,
-                            YouTubeSubtitleLyricsProvider,
-                            YouTubeLyricsProvider
-                        )
+                    when (it) {
+                        PreferredLyricsProvider.LRCLIB ->
+                            listOf(
+                                BetterLyricsProvider,
+                                LrcLibLyricsProvider,
+                                SimpMusicLyricsProvider,
+                                KuGouLyricsProvider,
+                                YouTubeSubtitleLyricsProvider,
+                                YouTubeLyricsProvider
+                            )
+
+                        PreferredLyricsProvider.KUGOU ->
+                            listOf(
+                                BetterLyricsProvider,
+                                KuGouLyricsProvider,
+                                SimpMusicLyricsProvider,
+                                LrcLibLyricsProvider,
+                                YouTubeSubtitleLyricsProvider,
+                                YouTubeLyricsProvider
+                            )
+
+                        PreferredLyricsProvider.BETTER_LYRICS ->
+                            listOf(
+                                BetterLyricsProvider,
+                                SimpMusicLyricsProvider,
+                                LrcLibLyricsProvider,
+                                KuGouLyricsProvider,
+                                YouTubeSubtitleLyricsProvider,
+                                YouTubeLyricsProvider
+                            )
+
+                        PreferredLyricsProvider.SIMPMUSIC ->
+                            listOf(
+                                BetterLyricsProvider,
+                                SimpMusicLyricsProvider,
+                                LrcLibLyricsProvider,
+                                KuGouLyricsProvider,
+                                YouTubeSubtitleLyricsProvider,
+                                YouTubeLyricsProvider
+                            )
                     }
             }
 
     private val cache = LruCache<String, List<LyricsResult>>(MAX_CACHE_SIZE)
     private var currentLyricsJob: Job? = null
 
-    suspend fun getLyrics(mediaMetadata: MediaMetadata): String {
+    suspend fun getLyrics(mediaMetadata: MediaMetadata): LyricsWithProvider {
         currentLyricsJob?.cancel()
 
         val cached = cache.get(mediaMetadata.id)?.firstOrNull()
         if (cached != null) {
-            return cached.lyrics
+            return LyricsWithProvider(cached.lyrics, cached.providerName)
         }
 
         val scope = CoroutineScope(SupervisorJob())
         val deferred = scope.async {
+            // Prefer setVideoId for YouTube-based providers (SimpMusic, YouTubeSubtitle, YouTube)
+            val videoId = mediaMetadata.setVideoId ?: mediaMetadata.id
+            val artistsStr = mediaMetadata.artists.joinToString { it.name }
+            
             for (provider in lyricsProviders) {
                 if (provider.isEnabled(context)) {
-                    val result = provider.getLyrics(
-                        mediaMetadata.id,
-                        mediaMetadata.title,
-                        mediaMetadata.artists.joinToString { it.name },
-                        mediaMetadata.duration,
-                    )
-                    result.onSuccess { lyrics ->
-                        return@async lyrics
-                    }.onFailure {
-                        reportException(it)
+                    try {
+                        android.util.Log.d("LyricsHelper", "Trying ${provider.name}: id=$videoId, title=${mediaMetadata.title}, artist=$artistsStr, duration=${mediaMetadata.duration}")
+                        
+                        val result = provider.getLyrics(
+                            videoId,
+                            mediaMetadata.title,
+                            artistsStr,
+                            mediaMetadata.duration,
+                            mediaMetadata.album?.title,
+                        )
+                        result.onSuccess { lyrics ->
+                            android.util.Log.d("LyricsHelper", "${provider.name} succeeded with ${lyrics.length} chars")
+                            return@async LyricsWithProvider(lyrics, provider.name)
+                        }.onFailure {
+                            android.util.Log.w("LyricsHelper", "${provider.name} failed: ${it.message}")
+                            reportException(it)
+                        }
+                    } catch (e: Exception) {
+                        // Catch network-related exceptions like UnresolvedAddressException
+                        android.util.Log.e("LyricsHelper", "${provider.name} exception: ${e.message}", e)
+                        reportException(e)
                     }
                 }
             }
-            return@async LYRICS_NOT_FOUND
+            return@async LyricsWithProvider(LYRICS_NOT_FOUND, "Unknown")
         }
 
-        val lyrics = deferred.await()
+        val result = deferred.await()
         scope.cancel()
-        return lyrics
+        return result
     }
 
     suspend fun getAllLyrics(
@@ -99,6 +142,7 @@ constructor(
         songTitle: String,
         songArtists: String,
         duration: Int,
+        album: String? = null,
         callback: (LyricsResult) -> Unit,
     ) {
         currentLyricsJob?.cancel()
@@ -112,18 +156,19 @@ constructor(
         }
 
         val allResult = mutableListOf<LyricsResult>()
-        currentLyricsJob = CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        currentLyricsJob = CoroutineScope(SupervisorJob()).launch {
             lyricsProviders.forEach { provider ->
-                if (!provider.isEnabled(context)) return@forEach
-
-                runCatching {
-                    provider.getAllLyrics(mediaId, songTitle, songArtists, duration) { lyrics ->
-                        val result = LyricsResult(provider.name, lyrics)
-                        allResult += result
-                        callback(result)
+                if (provider.isEnabled(context)) {
+                    try {
+                        provider.getAllLyrics(mediaId, songTitle, songArtists, duration, album) { lyrics ->
+                            val result = LyricsResult(provider.name, lyrics)
+                            allResult += result
+                            callback(result)
+                        }
+                    } catch (e: Exception) {
+                        // Catch network-related exceptions like UnresolvedAddressException
+                        reportException(e)
                     }
-                }.onFailure {
-                    reportException(it)
                 }
             }
             cache.put(cacheKey, allResult)
@@ -145,4 +190,9 @@ constructor(
 data class LyricsResult(
     val providerName: String,
     val lyrics: String,
+)
+
+data class LyricsWithProvider(
+    val lyrics: String,
+    val provider: String,
 )

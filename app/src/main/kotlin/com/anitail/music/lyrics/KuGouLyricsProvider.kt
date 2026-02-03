@@ -15,7 +15,8 @@ object KuGouLyricsProvider : LyricsProvider {
         id: String,
         title: String,
         artist: String,
-        duration: Int
+        duration: Int,
+        album: String?,
     ): Result<String> =
         KuGou.getLyrics(title, artist, duration)
 
@@ -24,6 +25,7 @@ object KuGouLyricsProvider : LyricsProvider {
         title: String,
         artist: String,
         duration: Int,
+        album: String?,
         callback: (String) -> Unit
     ) {
         KuGou.getAllPossibleLyricsOptions(title, artist, duration, callback)
