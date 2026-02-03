@@ -60,6 +60,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
@@ -128,6 +129,8 @@ fun SettingsScreen(
     val discordUsername by homeViewModel.discordUsername.collectAsState()
     val (preferredAvatarSource) = rememberEnumPreference(PreferredAvatarSourceKey, defaultValue = AvatarSource.YOUTUBE)
 
+    val scheme = MaterialTheme.colorScheme
+
     val greetingText = remember(currentHour) {
         when (currentHour) {
             in 6..11 -> context.getString(R.string.good_morning)
@@ -136,20 +139,19 @@ fun SettingsScreen(
         }
     }
 
-    val timeBasedImage = remember(currentHour) {
+    val timeBasedTint = remember(currentHour, scheme) {
         when (currentHour) {
-            in 6..11 -> R.drawable.ic_user_device_day
-            in 12..18 -> R.drawable.ic_user_device_afternoon
-            else -> R.drawable.ic_user_device_night
+            in 6..11 -> scheme.primary
+            in 12..18 -> scheme.tertiary
+            else -> scheme.secondary
         }
     }
 
-    val colorScheme = colorScheme
-    val cardBackgroundColor = remember(currentHour, colorScheme) {
+    val cardBackgroundColor = remember(currentHour, scheme) {
         when (currentHour) {
-            in 6..11 -> colorScheme.primary.copy(alpha = 0.1f)
-            in 12..18 -> colorScheme.primary.copy(alpha = 0.1f)
-            else -> colorScheme.primary.copy(alpha = 0.1f)
+            in 6..11 -> scheme.primary.copy(alpha = 0.1f)
+            in 12..18 -> scheme.primary.copy(alpha = 0.1f)
+            else -> scheme.primary.copy(alpha = 0.1f)
         }
     }
 
@@ -380,18 +382,19 @@ fun SettingsScreen(
                             Text(
                                 text = displayName,
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = colorScheme.onSurfaceVariant
+                                color = scheme.onSurfaceVariant
                             )
                         }
 
                         Image(
-                            painter = painterResource(id = timeBasedImage),
+                            painter = painterResource(id = R.drawable.ic_user_device),
                             contentDescription = null,
                             modifier = Modifier
                                 .fillMaxHeight()
                                 .aspectRatio(1f)
                                 .padding(end = 8.dp),
-                            alignment = Alignment.CenterEnd
+                            alignment = Alignment.CenterEnd,
+                            colorFilter = ColorFilter.tint(timeBasedTint)
                         )
                     }
                 }
