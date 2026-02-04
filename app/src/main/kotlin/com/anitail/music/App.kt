@@ -38,6 +38,7 @@ import com.anitail.music.extensions.toInetSocketAddress
 import com.anitail.music.services.AutoBackupWorker
 import com.anitail.music.services.SyncWorker
 import com.anitail.music.services.UpdateCheckWorker
+import com.anitail.music.ui.utils.CrashHandler
 import com.anitail.music.utils.dataStore
 import com.anitail.music.utils.get
 import com.anitail.music.utils.reportException
@@ -77,7 +78,11 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
     @OptIn(DelicateCoroutinesApi::class)
     override fun onCreate() {
         super.onCreate()
+        // Install crash handler first
+        CrashHandler.install(this)
         instance = this
+
+
         Timber.plant(Timber.DebugTree())
         // OneSignal initialization
         // TODO: Replace with your real OneSignal App ID

@@ -79,7 +79,14 @@
             android:name="org.apache.http.legacy"
             android:required="false" />
 
-        <activity
+    <activity
+        android:name=".ui.screens.CrashActivity"
+        android:exported="false"
+        android:theme="@style/Theme.Anitail"
+        android:excludeFromRecents="true"
+        android:process=":crash" />
+
+    <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
