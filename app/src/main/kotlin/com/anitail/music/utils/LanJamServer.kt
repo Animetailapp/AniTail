@@ -317,7 +317,7 @@ class LanJamServer(
      * @param maxRetries Número máximo de reintentos por cliente
      * @return Número de clientes a los que se envió el mensaje exitosamente
      */
-    fun sendWithRetry(message: String, maxRetries: Int = 2): Int {
+    suspend fun sendWithRetry(message: String, maxRetries: Int = 2): Int {
         var successCount = 0
         val clientsCopy = ArrayList(connectedClients.values)
         
@@ -346,7 +346,7 @@ class LanJamServer(
                         }
                     } else {
                         // Pausa breve antes del siguiente intento
-                        Thread.sleep(100)
+                        kotlinx.coroutines.delay(100)
                     }
                 }
             }

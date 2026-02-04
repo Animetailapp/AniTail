@@ -52,7 +52,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import okhttp3.Credentials
 import timber.log.Timber
@@ -245,7 +244,7 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
             private set
 
         fun forgetAccount(context: Context) {
-            runBlocking {
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                 context.dataStore.edit { settings ->
                     settings.remove(InnerTubeCookieKey)
                     settings.remove(VisitorDataKey)

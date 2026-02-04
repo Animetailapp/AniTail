@@ -50,7 +50,6 @@ import com.anitail.music.ui.component.DefaultDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 
@@ -424,13 +423,8 @@ fun SelectionMediaMetadataMenu(
     AddToPlaylistDialog(
         isVisible = showChoosePlaylistDialog,
         onGetSong = {
-            songSelection.map {
-                runBlocking {
-                    withContext(Dispatchers.IO) {
-                        database.insert(it)
-                    }
-                }
-                it.id
+            withContext(Dispatchers.IO) {
+                songSelection.onEach { database.insert(it) }.map { it.id }
             }
         },
         onDismiss = { showChoosePlaylistDialog = false }

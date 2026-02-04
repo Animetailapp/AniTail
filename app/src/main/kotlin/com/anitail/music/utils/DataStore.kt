@@ -10,30 +10,43 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.anitail.music.extensions.toEnum
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.properties.ReadOnlyProperty
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
-operator fun <T> DataStore<Preferences>.get(key: Preferences.Key<T>): T? =
-    runBlocking(Dispatchers.IO) {
-        data.first()[key]
+private val dataStoreScope = kotlinx.coroutines.CoroutineScope(SupervisorJob() + Dispatchers.IO)
+private val dataStoreStateFlows =
+    ConcurrentHashMap<DataStore<Preferences>, StateFlow<Preferences>>()
+
+private fun DataStore<Preferences>.cachedPreferences(): StateFlow<Preferences> =
+    dataStoreStateFlows.getOrPut(this) {
+        data.stateIn(
+            dataStoreScope,
+            SharingStarted.Eagerly,
+            emptyPreferences(),
+        )
     }
 
- operator fun <T> DataStore<Preferences>.get(
+operator fun <T> DataStore<Preferences>.get(key: Preferences.Key<T>): T? =
+    cachedPreferences().value[key]
+
+operator fun <T> DataStore<Preferences>.get(
     key: Preferences.Key<T>,
     defaultValue: T,
 ): T =
-    runBlocking(Dispatchers.IO) {
-        data.first()[key] ?: defaultValue
-    }
+    cachedPreferences().value[key] ?: defaultValue
 
 fun <T> preference(
     context: Context,

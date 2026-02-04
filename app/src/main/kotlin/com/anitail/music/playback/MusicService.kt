@@ -2,6 +2,7 @@
 
 package com.anitail.music.playback
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
@@ -139,6 +140,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -156,12 +158,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import timber.log.Timber
 import java.time.LocalDateTime
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.math.min
 import kotlin.math.pow
@@ -192,6 +196,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   @Inject lateinit var mediaLibrarySessionCallback: MediaLibrarySessionCallback
 
   private var scope = CoroutineScope(Dispatchers.Main) + Job()
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val binder = MusicBinder()
 
   private lateinit var connectivityManager: ConnectivityManager
@@ -202,7 +207,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     // Cache simple: mediaId -> StreamInfo(url, mimeType, expiryMillis)
     private data class StreamInfo(val url: String, val mimeType: String, val expiry: Long)
 
-    private val streamUrlCache = HashMap<String, StreamInfo>()
+    private val streamUrlCache = ConcurrentHashMap<String, StreamInfo>()
 
     private lateinit var audioQuality: com.anitail.music.constants.AudioQuality
 
@@ -1199,7 +1204,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       ACTION_PLAY_RECOMMENDATION -> {
         val songId = intent.getStringExtra(EXTRA_WIDGET_RECOMMENDATION_ID)
         if (!songId.isNullOrBlank()) {
-          scope.launch(Dispatchers.IO + kotlinx.coroutines.SupervisorJob()) {
+          scope.launch(Dispatchers.IO + SupervisorJob()) {
             try {
               val song = database.song(songId).firstOrNull()
               if (song != null) {
@@ -1662,13 +1667,10 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             )
 
   private fun createDataSourceFactory(): DataSource.Factory {
-    val songUrlCache = HashMap<String, Pair<String, Long>>()
     return ResolvingDataSource.Factory(createCacheDataSource()) { dataSpec ->
       val mediaId = dataSpec.key ?: error("No media id")
         // Check for MediaStore URI first (local playback)
-        val song = runBlocking(Dispatchers.IO) {
-            database.song(mediaId).first()
-        }
+        val song = database.getSongByIdBlocking(mediaId)
 
         if (song?.song?.mediaStoreUri != null) {
             Timber.d("Playing from MediaStore: ${song.song.mediaStoreUri}")
@@ -1684,9 +1686,9 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         if (isCached) {
             Timber.d("Cache hit for $mediaId")
             // Try to get a valid streaming URL from cache first
-            val cachedUrl = songUrlCache[mediaId]
-                ?.takeIf { it.second > System.currentTimeMillis() }
-                ?.first
+            val cachedUrl = streamUrlCache[mediaId]
+                ?.takeIf { it.expiry > System.currentTimeMillis() }
+                ?.url
 
             if (cachedUrl != null) {
                 scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
@@ -1699,24 +1701,16 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             Timber.d("No cached URL for $mediaId, fetching from YouTube")
         } else {
             // Check URL cache before making API call
-            songUrlCache[mediaId]
-                ?.takeIf { it.second > System.currentTimeMillis() }
-                ?.let {
+            streamUrlCache[mediaId]
+                ?.takeIf { it.expiry > System.currentTimeMillis() }
+                ?.let { cached ->
                     scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
-                    return@Factory dataSpec.withUri(it.first.toUri())
+                    return@Factory dataSpec.withUri(cached.url.toUri())
                 }
         }
 
         // Fetch streaming URL from YouTube
-      val playbackData =
-          runBlocking(Dispatchers.IO) {
-                YTPlayerUtils.playerResponseForPlayback(
-                    mediaId,
-                    audioQuality = audioQuality,
-                    connectivityManager = connectivityManager,
-                )
-              }
-              .getOrNull()
+        val playbackData = fetchPlaybackDataBlocking(mediaId)
 
       if (playbackData == null) {
         throw PlaybackException(
@@ -1743,15 +1737,36 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         scope.launch(Dispatchers.IO) { recoverSong(mediaId, playbackData) }
 
         val streamUrl = playbackData.streamUrl
+        streamUrlCache[mediaId] =
+            StreamInfo(
+                url = streamUrl,
+                mimeType = format.mimeType.split(";").firstOrNull() ?: format.mimeType,
+                expiry = System.currentTimeMillis() + (playbackData.streamExpiresInSeconds * 1000L),
+            )
 
-        songUrlCache[mediaId] =
-            streamUrl to System.currentTimeMillis() + (playbackData.streamExpiresInSeconds * 1000L)
-
-        return@Factory dataSpec
-            .withUri(streamUrl.toUri())
+        return@Factory dataSpec.withUri(streamUrl.toUri())
             .subrange(dataSpec.uriPositionOffset, CHUNK_LENGTH)
     }
   }
+
+    @SuppressLint("NewApi")
+    private fun fetchPlaybackDataBlocking(mediaId: String): YTPlayerUtils.PlaybackData? {
+        val future = CompletableFuture<YTPlayerUtils.PlaybackData?>()
+        ioScope.launch {
+            val data =
+                YTPlayerUtils.playerResponseForPlayback(
+                    mediaId,
+                    audioQuality = audioQuality,
+                    connectivityManager = connectivityManager,
+                ).getOrNull()
+            future.complete(data)
+        }
+        return try {
+            future.get(15, TimeUnit.SECONDS)
+        } catch (_: Exception) {
+            null
+        }
+    }
 
   private fun createMediaSourceFactory() =
       DefaultMediaSourceFactory(

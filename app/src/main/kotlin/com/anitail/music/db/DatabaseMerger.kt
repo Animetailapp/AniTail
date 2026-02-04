@@ -3,6 +3,7 @@ package com.anitail.music.db
 import android.content.Context
 import androidx.sqlite.db.SupportSQLiteDatabase
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
@@ -16,7 +17,7 @@ class DatabaseMerger @Inject constructor(
      * Merges a remote backup database into the current local database.
      * Strategy: "Smart Merge" - Add missing items, ignore duplicates.
      */
-    fun mergeDatabase(remoteDbFile: File) {
+    suspend fun mergeDatabase(remoteDbFile: File) {
         val currentDb = musicDatabase.openHelper.writableDatabase
 
         try {
@@ -28,7 +29,7 @@ class DatabaseMerger @Inject constructor(
             }
 
             // Small delay to allow any pending transactions to complete
-            Thread.sleep(100)
+            delay(100)
             
             // Attach the remote database
             // Note: We need to use the raw SQLite path for ATTACH DATABASE
