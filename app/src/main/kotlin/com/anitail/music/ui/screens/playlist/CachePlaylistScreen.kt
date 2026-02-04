@@ -58,9 +58,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.anitail.innertube.YouTube
+import com.anitail.music.LocalDatabase
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
@@ -69,8 +70,10 @@ import com.anitail.music.constants.SongSortDescendingKey
 import com.anitail.music.constants.SongSortType
 import com.anitail.music.constants.SongSortTypeKey
 import com.anitail.music.constants.ThumbnailCornerRadius
+import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.extensions.togglePlayPause
+import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.DraggableScrollbar
 import com.anitail.music.ui.component.EmptyPlaceholder
@@ -84,7 +87,9 @@ import com.anitail.music.ui.utils.ItemWrapper
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.utils.rememberPreference
-import com.anitail.music.viewmodels.CachePlaylistViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -92,17 +97,73 @@ import java.time.LocalDateTime
 fun CachePlaylistScreen(
     navController: NavController,
     scrollBehavior: TopAppBarScrollBehavior,
-    viewModel: CachePlaylistViewModel = hiltViewModel(),
 ) {
     LocalContext.current
     val menuState = LocalMenuState.current
     val playerConnection = LocalPlayerConnection.current ?: return
+    val playerCache = playerConnection.service.playerCache
+    val database = LocalDatabase.current
     val haptic = LocalHapticFeedback.current
     val focusManager = LocalFocusManager.current
 
     val isPlaying by playerConnection.isPlaying.collectAsState()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
-    val cachedSongs by viewModel.cachedSongs.collectAsState()
+
+    // Obtener canciones cacheadas directamente
+    var cachedSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var isRecovering by remember { mutableStateOf(false) }
+
+    LaunchedEffect(playerCache) {
+        while (true) {
+            try {
+                val cachedIds = playerCache.keys.mapNotNull { it?.toString() }.toList()
+                if (cachedIds.isNotEmpty()) {
+                    // Usar getSongsByIds para obtener directamente las canciones por sus IDs
+                    val songs = database.getSongsByIds(cachedIds)
+                    cachedSongs = songs
+                    timber.log.Timber.d("CachePlaylist: ${cachedIds.size} IDs in cache, ${songs.size} found in database")
+
+                    // Recuperar metadatos de canciones que están en caché pero no en la DB
+                    val foundIds = songs.map { it.id }.toSet()
+                    val missingIds = cachedIds.filter { it !in foundIds }
+
+                    if (missingIds.isNotEmpty() && !isRecovering) {
+                        isRecovering = true
+                        timber.log.Timber.d("Recovering ${missingIds.size} missing songs from YouTube")
+
+                        withContext(Dispatchers.IO) {
+                            // YouTube.queue tiene un límite, procesamos en lotes
+                            missingIds.chunked(20).forEach { batch ->
+                                try {
+                                    val songItems = YouTube.queue(videoIds = batch).getOrNull()
+                                    songItems?.forEach { songItem ->
+                                        val metadata = songItem.toMediaMetadata()
+                                        database.query {
+                                            insert(metadata)
+                                        }
+                                        timber.log.Timber.d("Inserted missing song: ${metadata.title}")
+                                    }
+                                } catch (e: Exception) {
+                                    timber.log.Timber.e(e, "Failed to recover batch")
+                                }
+                            }
+                        }
+
+                        // Recargar después de insertar
+                        val updatedSongs = database.getSongsByIds(cachedIds)
+                        cachedSongs = updatedSongs
+                        isRecovering = false
+                    }
+                } else {
+                    cachedSongs = emptyList()
+                }
+            } catch (e: Exception) {
+                timber.log.Timber.e(e, "Error loading cached songs")
+                isRecovering = false
+            }
+            delay(2000)
+        }
+    }
 
     val (sortType, onSortTypeChange) = rememberEnumPreference(
         SongSortTypeKey,

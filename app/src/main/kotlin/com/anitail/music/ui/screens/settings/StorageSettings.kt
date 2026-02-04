@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,8 +33,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,6 +44,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,20 +59,28 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.media3.datasource.cache.SimpleCache
 import androidx.navigation.NavController
 import coil.annotation.ExperimentalCoilApi
+import coil.compose.AsyncImage
 import coil.imageLoader
+import com.anitail.innertube.YouTube
+import com.anitail.music.LocalDatabase
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
+import com.anitail.music.constants.MaxDownloadSizeKey
 import com.anitail.music.constants.MaxImageCacheSizeKey
 import com.anitail.music.constants.MaxSongCacheSizeKey
-import com.anitail.music.constants.MaxDownloadSizeKey
+import com.anitail.music.constants.ThumbnailCornerRadius
+import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.tryOrNull
+import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.ui.component.AnimatedIconButton
 import com.anitail.music.ui.component.EnhancedListPreference
 import com.anitail.music.ui.component.EnhancedPreferenceEntry
@@ -91,7 +104,61 @@ fun StorageSettings(
     val imageDiskCache = context.imageLoader.diskCache ?: return
     val playerCache = LocalPlayerConnection.current?.service?.playerCache ?: return
     val downloadCache = LocalPlayerConnection.current?.service?.downloadCache ?: return
+    val database = LocalDatabase.current
     val mediaStoreHelper = remember { MediaStoreHelper(context) }
+
+    // Obtener canciones cacheadas directamente del cache del servicio y la base de datos
+    var cachedSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var isRecovering by remember { mutableStateOf(false) }
+
+    LaunchedEffect(playerCache) {
+        while (true) {
+            try {
+                val cachedIds = playerCache.keys.mapNotNull { it?.toString() }.toList()
+                if (cachedIds.isNotEmpty()) {
+                    // Usar getSongsByIds para obtener directamente las canciones por sus IDs
+                    val songs = database.getSongsByIds(cachedIds)
+                    cachedSongs = songs
+                    timber.log.Timber.d("Cache songs: ${cachedIds.size} IDs in cache, ${songs.size} found in database")
+
+                    // Recuperar metadatos de canciones que están en caché pero no en la DB
+                    val foundIds = songs.map { it.id }.toSet()
+                    val missingIds = cachedIds.filter { it !in foundIds }
+
+                    if (missingIds.isNotEmpty() && !isRecovering) {
+                        isRecovering = true
+                        timber.log.Timber.d("Recovering ${missingIds.size} missing songs from YouTube")
+
+                        withContext(Dispatchers.IO) {
+                            missingIds.chunked(20).forEach { batch ->
+                                try {
+                                    val songItems = YouTube.queue(videoIds = batch).getOrNull()
+                                    songItems?.forEach { songItem ->
+                                        val metadata = songItem.toMediaMetadata()
+                                        database.query {
+                                            insert(metadata)
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    timber.log.Timber.e(e, "Failed to recover batch")
+                                }
+                            }
+                        }
+
+                        val updatedSongs = database.getSongsByIds(cachedIds)
+                        cachedSongs = updatedSongs
+                        isRecovering = false
+                    }
+                } else {
+                    cachedSongs = emptyList()
+                }
+            } catch (e: Exception) {
+                timber.log.Timber.e(e, "Error loading cached songs")
+                isRecovering = false
+            }
+            delay(2000)
+        }
+    }
 
     val coroutineScope = rememberCoroutineScope()
     val (maxImageCacheSize, onMaxImageCacheSizeChange) = rememberPreference(
@@ -117,6 +184,7 @@ fun StorageSettings(
     var showDownloadClearConfirm by remember { mutableStateOf(false) }
     var showSongCacheClearConfirm by remember { mutableStateOf(false) }
     var showImageCacheClearConfirm by remember { mutableStateOf(false) }
+    var showCachedSongsSheet by remember { mutableStateOf(false) }
 
     val imageCacheProgress by animateFloatAsState(
         targetValue = (imageCacheSize.toFloat() / imageDiskCache.maxSize).coerceIn(0f, 1f),
@@ -129,7 +197,7 @@ fun StorageSettings(
         ),
         label = "",
     )
-    val downloadCachePercentage = if (downloadCacheSize > 0) {
+    if (downloadCacheSize > 0) {
         (downloadCacheSize.toFloat() / (8192 * 1024 * 1024L)).coerceIn(0f, 1f) * 100
     } else 0f
     val downloadedSongsPercentage = if (maxDownloadSize != -1 && downloadedSongsSize > 0) {
@@ -358,6 +426,12 @@ fun StorageSettings(
                     iconTint = MaterialTheme.colorScheme.error,
                     onClick = { showSongCacheClearConfirm = true },
                 )
+
+                EnhancedPreferenceEntry(
+                    title = stringResource(R.string.manage_cached_songs),
+                    icon = R.drawable.music_note,
+                    onClick = { showCachedSongsSheet = true },
+                )
             }
 
             // Image Cache Section
@@ -460,6 +534,23 @@ fun StorageSettings(
                 showImageCacheClearConfirm = false
             },
             onDismiss = { showImageCacheClearConfirm = false }
+        )
+    }
+
+    if (showCachedSongsSheet) {
+        CachedSongsBottomSheet(
+            cachedSongs = cachedSongs,
+            playerCache = playerCache,
+            onRemoveSong = { songId ->
+                coroutineScope.launch(Dispatchers.IO) {
+                    try {
+                        playerCache.removeResource(songId)
+                    } catch (e: Exception) {
+                        // Ignore errors
+                    }
+                }
+            },
+            onDismiss = { showCachedSongsSheet = false }
         )
     }
 }
@@ -647,3 +738,163 @@ fun ConfirmationDialog(
         }
     )
 }
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalCoilApi::class)
+@Composable
+private fun CachedSongsBottomSheet(
+    cachedSongs: List<Song>,
+    playerCache: SimpleCache,
+    onRemoveSong: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val cachedSongsWithSize = remember(cachedSongs, playerCache) {
+        cachedSongs.map { song ->
+            val size = tryOrNull {
+                playerCache.getCachedBytes(song.id, 0, Long.MAX_VALUE)
+            } ?: 0L
+            CachedSongInfo(song = song, size = size)
+        }.sortedByDescending { it.size }
+    }
+
+    var displayedSongs by remember { mutableStateOf(cachedSongsWithSize) }
+    LaunchedEffect(cachedSongsWithSize) {
+        displayedSongs = cachedSongsWithSize
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 8.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = stringResource(R.string.cached_songs),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = pluralStringResource(
+                            id = R.plurals.n_song,
+                            count = displayedSongs.size,
+                            displayedSongs.size
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (displayedSongs.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.no_cached_songs),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 16.dp)
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(displayedSongs, key = { it.song.id }) { songInfo ->
+                        CachedSongItem(
+                            songInfo = songInfo,
+                            onDeleteClick = {
+                                onRemoveSong(songInfo.song.id)
+                                displayedSongs = displayedSongs.filterNot {
+                                    it.song.id == songInfo.song.id
+                                }
+                            }
+                        )
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CachedSongItem(
+    songInfo: CachedSongInfo,
+    onDeleteClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            AsyncImage(
+                model = songInfo.song.thumbnailUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(ThumbnailCornerRadius))
+            )
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = songInfo.song.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
+                )
+                Text(
+                    text = songInfo.song.artists.joinToString(", ") { it.name },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+                Text(
+                    text = formatFileSize(songInfo.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+
+            IconButton(onClick = onDeleteClick) {
+                Icon(
+                    painter = painterResource(R.drawable.delete),
+                    contentDescription = stringResource(R.string.remove_from_cache),
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+private data class CachedSongInfo(
+    val song: Song,
+    val size: Long
+)

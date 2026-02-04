@@ -867,8 +867,15 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       playbackData: YTPlayerUtils.PlaybackData? = null
   ) {
     val song = database.song(mediaId).first()
-    val mediaMetadata =
-        withContext(Dispatchers.Main) { player.findNextMediaItemById(mediaId)?.metadata } ?: return
+
+      // Try to get metadata from player first, then fallback to YouTube API
+      val mediaMetadata = withContext(Dispatchers.Main) {
+          player.findNextMediaItemById(mediaId)?.metadata
+      } ?: run {
+          // Fallback: get metadata from YouTube if player doesn't have it
+          YouTube.queue(videoIds = listOf(mediaId)).getOrNull()?.firstOrNull()?.toMediaMetadata()
+      } ?: return
+    
       val localMetadata = song?.song?.mediaStoreUri?.let { loadLocalAudioMetadata(it.toUri()) }
       if (localMetadata != null) {
           val localDurationSeconds =

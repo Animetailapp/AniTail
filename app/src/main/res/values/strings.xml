@@ -412,6 +412,9 @@
     <string name="clear_all_downloads">Clear all downloads</string>
     <string name="clear_image_cache">Clear image cache</string>
     <string name="clear_song_cache">Clear song cache</string>
+    <string name="manage_cached_songs">Manage cached songs</string>
+    <string name="cached_songs">Cached songs</string>
+    <string name="no_cached_songs">No cached songs</string>
     <string name="size_used">%s used</string>
 
 
