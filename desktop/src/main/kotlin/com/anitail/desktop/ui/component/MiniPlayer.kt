@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.player.RepeatMode
 import com.anitail.desktop.ui.IconAssets
-import com.anitail.desktop.ui.RemoteImage
+import com.anitail.desktop.ui.component.RemoteImage
 
 /**
  * MiniPlayer para Desktop - diseño inspirado en Android NewMiniPlayer.

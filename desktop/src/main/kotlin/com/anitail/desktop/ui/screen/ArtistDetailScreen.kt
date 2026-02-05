@@ -51,7 +51,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.anitail.desktop.player.PlayerState
-import com.anitail.desktop.ui.RemoteImage
+import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.ShimmerBox
 import com.anitail.desktop.ui.component.ShimmerListItem
 import com.anitail.innertube.YouTube
@@ -411,34 +412,6 @@ private fun ArtistShimmerPlaceholder() {
         // Lista de canciones
         repeat(6) {
             ShimmerListItem()
-        }
-    }
-}
-
-@Composable
-private fun NavigationTitle(
-    title: String,
-    onClick: (() -> Unit)? = null,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-        )
-        if (onClick != null) {
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

@@ -57,7 +57,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.player.PlayerState
-import com.anitail.desktop.ui.RemoteImage
+import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.shared.model.LibraryItem
 
 /**

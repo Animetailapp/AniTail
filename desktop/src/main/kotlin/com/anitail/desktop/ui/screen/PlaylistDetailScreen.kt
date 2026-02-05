@@ -50,7 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.anitail.desktop.player.PlayerState
-import com.anitail.desktop.ui.RemoteImage
+import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.component.ShimmerBox
 import com.anitail.desktop.ui.component.ShimmerListItem
 import com.anitail.innertube.YouTube

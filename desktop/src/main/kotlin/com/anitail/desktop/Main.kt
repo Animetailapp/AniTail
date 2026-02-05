@@ -32,13 +32,16 @@ import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.player.rememberPlayerState
 import com.anitail.desktop.storage.DesktopLibraryStore
 import com.anitail.desktop.ui.DesktopTheme
-import com.anitail.desktop.ui.DesktopTopBar
-import com.anitail.desktop.ui.ExploreScreen
-import com.anitail.desktop.ui.HomeScreen
-import com.anitail.desktop.ui.LibraryFilter
-import com.anitail.desktop.ui.LibraryScreen
-import com.anitail.desktop.ui.PlayerScreen
+import com.anitail.desktop.ui.component.DesktopTopBar
 import com.anitail.desktop.ui.component.MiniPlayer
+import com.anitail.desktop.ui.screen.ExploreScreen
+import com.anitail.desktop.ui.screen.HomeScreen
+import com.anitail.desktop.ui.screen.HistoryScreen
+import com.anitail.desktop.ui.screen.StatsScreen
+import com.anitail.desktop.ui.screen.SettingsScreen
+import com.anitail.desktop.ui.screen.LibraryFilter
+import com.anitail.desktop.ui.screen.LibraryScreen
+import com.anitail.desktop.ui.screen.PlayerScreen
 import com.anitail.desktop.ui.screen.ArtistDetailScreen
 import com.anitail.desktop.ui.screen.AlbumDetailScreen
 import com.anitail.desktop.ui.screen.PlaylistDetailScreen
@@ -472,11 +475,14 @@ private fun AniTailDesktopApp() {
                 }
 
                 DesktopScreen.Player -> {
-                    PlayerScreen(item = playerState.currentItem)
+                    PlayerScreen(
+                        item = playerState.currentItem,
+                        playerState = playerState,
+                    )
                 }
 
                 DesktopScreen.History -> {
-                    com.anitail.desktop.ui.HistoryScreen(
+                    HistoryScreen(
                         items = libraryItems,
                         onPlay = { item ->
                             playerState.play(item)
@@ -486,13 +492,13 @@ private fun AniTailDesktopApp() {
                 }
 
                 DesktopScreen.Stats -> {
-                    com.anitail.desktop.ui.StatsScreen(
+                    StatsScreen(
                         items = libraryItems,
                     )
                 }
 
                 DesktopScreen.Settings -> {
-                    com.anitail.desktop.ui.SettingsScreen()
+                    SettingsScreen()
                 }
 
                 DesktopScreen.ArtistDetail -> {
@@ -610,13 +616,7 @@ private fun AniTailDesktopApp() {
         }
     }
 
-    // Simular progreso de reproducción (cada 100ms avanza 100ms)
-    LaunchedEffect(playerState.isPlaying, playerState.currentItem) {
-        while (playerState.isPlaying && playerState.currentItem != null) {
-            delay(100)
-            playerState.updatePosition(playerState.position + 100)
-        }
-    }
+    // El reproductor nativo ahora actualiza la posición automáticamente
 }
 
 private suspend fun loadHomePage(

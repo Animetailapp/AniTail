@@ -1,14 +1,20 @@
 package com.anitail.desktop.player
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.anitail.shared.model.LibraryItem
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Estado global del reproductor para Desktop.
+ * Ahora usa NativeAudioPlayer para reproducción real de audio.
  */
 class PlayerState {
     var currentItem by mutableStateOf<LibraryItem?>(null)
@@ -28,11 +34,91 @@ class PlayerState {
     var repeatMode by mutableStateOf(RepeatMode.OFF)
         private set
 
+    var isBuffering by mutableStateOf(false)
+        private set
+
+    var errorMessage by mutableStateOf<String?>(null)
+        private set
+
+    var volume by mutableStateOf(1.0)
+        private set
+
     // Cola de reproducción
     private val _queue = mutableListOf<LibraryItem>()
     val queue: List<LibraryItem> get() = _queue.toList()
 
     private var currentQueueIndex by mutableStateOf(-1)
+
+    // Reproductor nativo de audio
+    private val nativePlayer = NativeAudioPlayer()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    init {
+        setupNativePlayerCallbacks()
+    }
+
+    private fun setupNativePlayerCallbacks() {
+        nativePlayer.onStatusChanged = { status ->
+            when (status) {
+                NativeAudioPlayer.PlaybackStatus.PLAYING -> {
+                    isPlaying = true
+                    isBuffering = false
+                    errorMessage = null
+                }
+                NativeAudioPlayer.PlaybackStatus.PAUSED -> {
+                    isPlaying = false
+                }
+                NativeAudioPlayer.PlaybackStatus.BUFFERING -> {
+                    isBuffering = true
+                }
+                NativeAudioPlayer.PlaybackStatus.ENDED -> {
+                    isPlaying = false
+                    handlePlaybackEnded()
+                }
+                NativeAudioPlayer.PlaybackStatus.ERROR -> {
+                    isPlaying = false
+                    isBuffering = false
+                }
+                NativeAudioPlayer.PlaybackStatus.STOPPED -> {
+                    isPlaying = false
+                }
+                else -> { /* Ignorar otros estados */ }
+            }
+        }
+
+        nativePlayer.onTimeChanged = { currentMs, totalMs ->
+            position = currentMs
+            if (totalMs > 0) {
+                duration = totalMs
+            }
+        }
+
+        nativePlayer.onError = { error ->
+            errorMessage = error
+            isPlaying = false
+            isBuffering = false
+        }
+
+        nativePlayer.onBuffering = { buffering ->
+            isBuffering = buffering
+        }
+    }
+
+    private fun handlePlaybackEnded() {
+        when (repeatMode) {
+            RepeatMode.ONE -> {
+                seekTo(0L)
+                nativePlayer.resume()
+            }
+            RepeatMode.ALL, RepeatMode.OFF -> {
+                if (canSkipNext) {
+                    skipToNext()
+                } else {
+                    position = 0L
+                }
+            }
+        }
+    }
 
     val canSkipPrevious: Boolean
         get() = currentQueueIndex > 0
@@ -45,15 +131,53 @@ class PlayerState {
 
     fun play(item: LibraryItem) {
         currentItem = item
-        isPlaying = true
         position = 0L
-        duration = item.durationMs ?: 180_000L // Default 3 minutes si no hay duración
+        duration = item.durationMs ?: 180_000L
+        isBuffering = true
+        errorMessage = null
 
         // Agregar a cola si no existe
         if (_queue.none { it.id == item.id }) {
             _queue.add(item)
         }
         currentQueueIndex = _queue.indexOfFirst { it.id == item.id }
+
+        // Extraer videoId e iniciar reproducción nativa
+        val videoId = extractVideoId(item.playbackUrl)
+        if (videoId != null) {
+            scope.launch {
+                nativePlayer.play(videoId).onFailure { error ->
+                    errorMessage = error.message ?: "Error al reproducir"
+                    isPlaying = false
+                    isBuffering = false
+                }
+            }
+        } else {
+            errorMessage = "URL de reproducción inválida"
+            isPlaying = false
+            isBuffering = false
+        }
+    }
+
+    private fun extractVideoId(url: String): String? {
+        // Patrones comunes de YouTube
+        val patterns = listOf(
+            Regex("watch\\?v=([^&]+)"),
+            Regex("youtu.be/([^?]+)"),
+            Regex("/watch/([^?]+)"),
+            Regex("v=([^&]+)"),
+        )
+        
+        for (pattern in patterns) {
+            pattern.find(url)?.groupValues?.getOrNull(1)?.let { return it }
+        }
+        
+        // Si la URL parece ser solo un ID de video
+        if (url.matches(Regex("^[a-zA-Z0-9_-]{11}$"))) {
+            return url
+        }
+        
+        return null
     }
 
     fun playQueue(items: List<LibraryItem>, startIndex: Int = 0) {
@@ -93,15 +217,18 @@ class PlayerState {
 
     fun togglePlayPause() {
         isPlaying = !isPlaying
+        nativePlayer.togglePlayPause()
     }
 
     fun pause() {
         isPlaying = false
+        nativePlayer.pause()
     }
 
     fun resume() {
         if (currentItem != null) {
             isPlaying = true
+            nativePlayer.resume()
         }
     }
 
@@ -109,14 +236,17 @@ class PlayerState {
         isPlaying = false
         position = 0L
         currentItem = null
+        nativePlayer.stop()
     }
 
     fun seekTo(positionMs: Long) {
         position = positionMs.coerceIn(0L, duration)
+        nativePlayer.seekTo(position)
     }
 
     fun seekToProgress(progress: Float) {
-        position = (duration * progress.coerceIn(0f, 1f)).toLong()
+        val newPosition = (duration * progress.coerceIn(0f, 1f)).toLong()
+        seekTo(newPosition)
     }
 
     fun skipToNext() {
@@ -135,7 +265,6 @@ class PlayerState {
 
     fun skipToPrevious() {
         if (position > 3000L) {
-            // Si pasaron más de 3 segundos, reiniciar la canción actual
             seekTo(0L)
         } else if (canSkipPrevious) {
             currentQueueIndex--
@@ -165,22 +294,23 @@ class PlayerState {
         }
     }
 
+    fun updateVolume(newVolume: Double) {
+        volume = newVolume.coerceIn(0.0, 1.0)
+        nativePlayer.setVolume(volume)
+    }
+
     fun updatePosition(positionMs: Long) {
+        // Este método ahora es principalmente para compatibilidad
+        // El reproductor nativo actualiza la posición automáticamente
         position = positionMs
 
-        // Auto-avanzar a la siguiente canción cuando termina
         if (position >= duration && duration > 0) {
-            when (repeatMode) {
-                RepeatMode.ONE -> seekTo(0L)
-                RepeatMode.ALL, RepeatMode.OFF -> {
-                    if (canSkipNext) {
-                        skipToNext()
-                    } else {
-                        pause()
-                    }
-                }
-            }
+            handlePlaybackEnded()
         }
+    }
+
+    fun release() {
+        nativePlayer.release()
     }
 }
 

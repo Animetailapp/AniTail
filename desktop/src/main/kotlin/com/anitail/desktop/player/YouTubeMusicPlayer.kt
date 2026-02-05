@@ -6,20 +6,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.SwingPanel
+import com.anitail.desktop.util.JavaFxManager
 import javafx.application.Platform
 import javafx.embed.swing.JFXPanel
 import javafx.scene.Scene
 import javafx.scene.web.WebView
-import java.util.concurrent.atomic.AtomicBoolean
-
-private val javaFxStarted = AtomicBoolean(false)
-
-private fun ensureJavaFx() {
-    if (javaFxStarted.compareAndSet(false, true)) {
-        Platform.startup {}
-        Platform.setImplicitExit(false)
-    }
-}
 
 @Composable
 fun YouTubeMusicPlayer(
@@ -28,7 +19,7 @@ fun YouTubeMusicPlayer(
 ) {
     val currentUrl = rememberUpdatedState(url)
     val panel = remember {
-        ensureJavaFx()
+        JavaFxManager.ensureInitialized()
         JFXPanel()
     }
 

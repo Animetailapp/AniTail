@@ -30,6 +30,12 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
     implementation(libs.json)
 
+    // Ktor for lyrics and API calls
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.json)
+
     implementation("org.openjfx:javafx-base:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-graphics:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-controls:$javafxVersion:$javafxPlatform")
