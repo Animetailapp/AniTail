@@ -42,6 +42,8 @@ import com.anitail.desktop.ui.component.MiniPlayer
 import com.anitail.desktop.ui.screen.ArtistDetailScreen
 import com.anitail.desktop.ui.screen.AlbumDetailScreen
 import com.anitail.desktop.ui.screen.PlaylistDetailScreen
+import com.anitail.desktop.ui.screen.SearchScreen
+import com.anitail.desktop.ui.screen.LibraryScreenEnhanced
 import com.anitail.desktop.model.SimilarRecommendation
 import com.anitail.desktop.navigation.Screen
 import com.anitail.desktop.navigation.rememberNavigationState
@@ -75,6 +77,7 @@ private enum class DesktopScreen {
     ArtistDetail,
     AlbumDetail,
     PlaylistDetail,
+    Search,
 }
 
 /**
@@ -228,6 +231,7 @@ private fun AniTailDesktopApp() {
                 DesktopScreen.ArtistDetail -> detailNavigation.artistName ?: "Artista"
                 DesktopScreen.AlbumDetail -> detailNavigation.albumName ?: "Álbum"
                 DesktopScreen.PlaylistDetail -> detailNavigation.playlistName ?: "Playlist"
+                DesktopScreen.Search -> "Buscar"
             }
             DesktopTopBar(
                 title = title,
@@ -275,6 +279,13 @@ private fun AniTailDesktopApp() {
                         onClick = { currentScreen = DesktopScreen.Library },
                         label = { Text("Biblioteca") },
                         icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
+                        colors = NavigationBarItemDefaults.colors(),
+                    )
+                    NavigationBarItem(
+                        selected = currentScreen == DesktopScreen.Search,
+                        onClick = { currentScreen = DesktopScreen.Search },
+                        label = { Text("Buscar") },
+                        icon = { Icon(Icons.Filled.Search, contentDescription = null) },
                         colors = NavigationBarItemDefaults.colors(),
                     )
                 }
@@ -427,12 +438,35 @@ private fun AniTailDesktopApp() {
                 }
 
                 DesktopScreen.Library -> {
-                    LibraryScreen(
+                    LibraryScreenEnhanced(
                         items = libraryItems,
-                        filterState = libraryFilter,
-                        onPlay = { item ->
+                        playerState = playerState,
+                        onPlayItem = { item ->
                             playerState.play(item)
-                            currentScreen = DesktopScreen.Player
+                        },
+                        onArtistClick = { artistId, artistName ->
+                            navigationHistory.add(DesktopScreen.Library)
+                            detailNavigation = detailNavigation.copy(
+                                artistId = artistId,
+                                artistName = artistName,
+                            )
+                            currentScreen = DesktopScreen.ArtistDetail
+                        },
+                        onAlbumClick = { albumId, albumName ->
+                            navigationHistory.add(DesktopScreen.Library)
+                            detailNavigation = detailNavigation.copy(
+                                albumId = albumId,
+                                albumName = albumName,
+                            )
+                            currentScreen = DesktopScreen.AlbumDetail
+                        },
+                        onPlaylistClick = { playlistId, playlistName ->
+                            navigationHistory.add(DesktopScreen.Library)
+                            detailNavigation = detailNavigation.copy(
+                                playlistId = playlistId,
+                                playlistName = playlistName,
+                            )
+                            currentScreen = DesktopScreen.PlaylistDetail
                         },
                     )
                 }
@@ -533,6 +567,42 @@ private fun AniTailDesktopApp() {
                                 artistName = artistName,
                             )
                             currentScreen = DesktopScreen.ArtistDetail
+                        },
+                    )
+                }
+
+                DesktopScreen.Search -> {
+                    SearchScreen(
+                        playerState = playerState,
+                        onBack = {
+                            currentScreen = navigationHistory.removeLastOrNull() ?: DesktopScreen.Home
+                        },
+                        onArtistClick = { artistId, artistName ->
+                            navigationHistory.add(DesktopScreen.Search)
+                            detailNavigation = detailNavigation.copy(
+                                artistId = artistId,
+                                artistName = artistName,
+                            )
+                            currentScreen = DesktopScreen.ArtistDetail
+                        },
+                        onAlbumClick = { albumId, albumName ->
+                            navigationHistory.add(DesktopScreen.Search)
+                            detailNavigation = detailNavigation.copy(
+                                albumId = albumId,
+                                albumName = albumName,
+                            )
+                            currentScreen = DesktopScreen.AlbumDetail
+                        },
+                        onPlaylistClick = { playlistId, playlistName ->
+                            navigationHistory.add(DesktopScreen.Search)
+                            detailNavigation = detailNavigation.copy(
+                                playlistId = playlistId,
+                                playlistName = playlistName,
+                            )
+                            currentScreen = DesktopScreen.PlaylistDetail
+                        },
+                        onSongClick = { item ->
+                            playerState.play(item)
                         },
                     )
                 }
