@@ -19,6 +19,18 @@ tasks.register<Delete>("Clean") {
     delete(rootProject.layout.buildDirectory)
 }
 
+tasks.register("runDesktop") {
+    group = "application"
+    description = "Run the AniTail Desktop app."
+    dependsOn(":desktop:run")
+}
+
+tasks.register("packageDistributionForCurrentOS") {
+    group = "distribution"
+    description = "Package AniTail Desktop for the current OS."
+    dependsOn(":desktop:packageDistributionForCurrentOS")
+}
+
 subprojects {
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         compilerOptions {
