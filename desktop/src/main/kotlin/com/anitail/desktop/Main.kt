@@ -1,20 +1,14 @@
 package com.anitail.desktop
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -34,6 +28,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.player.rememberPlayerState
 import com.anitail.desktop.storage.DesktopLibraryStore
 import com.anitail.desktop.ui.DesktopTheme
 import com.anitail.desktop.ui.DesktopTopBar
@@ -42,19 +38,29 @@ import com.anitail.desktop.ui.HomeScreen
 import com.anitail.desktop.ui.LibraryFilter
 import com.anitail.desktop.ui.LibraryScreen
 import com.anitail.desktop.ui.PlayerScreen
+import com.anitail.desktop.ui.component.MiniPlayer
+import com.anitail.desktop.ui.screen.ArtistDetailScreen
+import com.anitail.desktop.ui.screen.AlbumDetailScreen
+import com.anitail.desktop.ui.screen.PlaylistDetailScreen
+import com.anitail.desktop.model.SimilarRecommendation
+import com.anitail.desktop.navigation.Screen
+import com.anitail.desktop.navigation.rememberNavigationState
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
+import com.anitail.innertube.models.BrowseEndpoint
 import com.anitail.innertube.models.PlaylistItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.YTItem
 import com.anitail.innertube.pages.ChartsPage
 import com.anitail.innertube.pages.ExplorePage
 import com.anitail.innertube.pages.HomePage
+import com.anitail.innertube.pages.RelatedPage
 import com.anitail.shared.model.LibraryItem
 import com.anitail.shared.model.SearchState
 import com.anitail.shared.repository.InnertubeMusicRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -66,7 +72,22 @@ private enum class DesktopScreen {
     History,
     Stats,
     Settings,
+    ArtistDetail,
+    AlbumDetail,
+    PlaylistDetail,
 }
+
+/**
+ * Datos de navegación para pantallas de detalle.
+ */
+private data class DetailNavigation(
+    val artistId: String? = null,
+    val artistName: String? = null,
+    val albumId: String? = null,
+    val albumName: String? = null,
+    val playlistId: String? = null,
+    val playlistName: String? = null,
+)
 
 fun main() = application {
     Window(
@@ -86,9 +107,10 @@ private fun AniTailDesktopApp() {
     val libraryStore = remember { DesktopLibraryStore() }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val playerState = rememberPlayerState()
 
     var currentScreen by remember { mutableStateOf(DesktopScreen.Home) }
-    var selectedItem by remember { mutableStateOf<LibraryItem?>(null) }
+    // selectedItem ahora controlado por playerState.currentItem
     var searchQuery by remember { mutableStateOf("") }
     var searchState by remember { mutableStateOf(SearchState()) }
     var requestSearchFocus by remember { mutableStateOf(false) }
@@ -105,6 +127,9 @@ private fun AniTailDesktopApp() {
     var quickPicks by remember { mutableStateOf<List<LibraryItem>>(emptyList()) }
     var keepListening by remember { mutableStateOf<List<LibraryItem>>(emptyList()) }
     var forgottenFavorites by remember { mutableStateOf<List<LibraryItem>>(emptyList()) }
+    var similarRecommendations by remember { mutableStateOf<List<SimilarRecommendation>>(emptyList()) }
+    var detailNavigation by remember { mutableStateOf(DetailNavigation()) }
+    val navigationHistory = remember { mutableStateListOf<DesktopScreen>() }
 
     LaunchedEffect(Unit) {
         val storedItems = withContext(Dispatchers.IO) { libraryStore.load() }
@@ -131,6 +156,65 @@ private fun AniTailDesktopApp() {
         forgottenFavorites = items.drop(12).take(12)
     }
 
+    // Cargar recomendaciones similares basadas en biblioteca
+    LaunchedEffect(libraryItems.size) {
+        if (libraryItems.size >= 3) {
+            val sampledItems = libraryItems.shuffled().take(3)
+            val recommendations = mutableListOf<SimilarRecommendation>()
+            
+            sampledItems.forEach { item ->
+                // Intentar obtener contenido relacionado para cada item
+                val videoId = item.playbackUrl
+                    .substringAfter("watch?v=", "")
+                    .takeIf { it.isNotEmpty() }
+                
+                if (videoId != null) {
+                    val relatedPage = YouTube.related(
+                        BrowseEndpoint(browseId = "MPREb_${videoId.take(8)}")
+                    ).getOrNull()
+                    
+                    if (relatedPage != null && relatedPage.songs.isNotEmpty()) {
+                        recommendations.add(
+                            SimilarRecommendation(
+                                title = item.title,
+                                thumbnailUrl = item.artworkUrl,
+                                isArtist = false,
+                                items = relatedPage.songs.take(8),
+                            )
+                        )
+                    }
+                }
+            }
+            
+            // Si no hay recomendaciones de API, usar items de biblioteca como fallback
+            if (recommendations.isEmpty() && libraryItems.size >= 6) {
+                val artistGroups = libraryItems.groupBy { it.artist }
+                artistGroups.entries.take(2).forEach { (artist, songs) ->
+                    if (songs.size >= 2) {
+                        recommendations.add(
+                            SimilarRecommendation(
+                                title = artist,
+                                thumbnailUrl = songs.firstOrNull()?.artworkUrl,
+                                isArtist = true,
+                                items = songs.take(6).map { song ->
+                                    SongItem(
+                                        id = song.id,
+                                        title = song.title,
+                                        artists = emptyList(),
+                                        thumbnail = song.artworkUrl.orEmpty(),
+                                        explicit = false,
+                                    )
+                                },
+                            )
+                        )
+                    }
+                }
+            }
+            
+            similarRecommendations = recommendations.take(3)
+        }
+    }
+
     Scaffold(
         topBar = {
             val title = when (currentScreen) {
@@ -141,6 +225,9 @@ private fun AniTailDesktopApp() {
                 DesktopScreen.History -> "Historial"
                 DesktopScreen.Stats -> "Estadisticas"
                 DesktopScreen.Settings -> "Ajustes"
+                DesktopScreen.ArtistDetail -> detailNavigation.artistName ?: "Artista"
+                DesktopScreen.AlbumDetail -> detailNavigation.albumName ?: "Álbum"
+                DesktopScreen.PlaylistDetail -> detailNavigation.playlistName ?: "Playlist"
             }
             DesktopTopBar(
                 title = title,
@@ -162,11 +249,10 @@ private fun AniTailDesktopApp() {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             Column {
-                if (selectedItem != null) {
-                    MiniPlayerBar(
-                        title = selectedItem?.title.orEmpty(),
-                        artist = selectedItem?.artist.orEmpty(),
-                        onOpen = { currentScreen = DesktopScreen.Player },
+                if (playerState.currentItem != null) {
+                    MiniPlayer(
+                        playerState = playerState,
+                        onOpenFullPlayer = { currentScreen = DesktopScreen.Player },
                     )
                 }
                 NavigationBar {
@@ -211,6 +297,8 @@ private fun AniTailDesktopApp() {
                         quickPicks = quickPicks,
                         keepListening = keepListening,
                         forgottenFavorites = forgottenFavorites,
+                        similarRecommendations = similarRecommendations,
+                        playerState = playerState,
                         onChipSelected = { chip ->
                             scope.launch {
                                 handleChipSelection(
@@ -241,9 +329,37 @@ private fun AniTailDesktopApp() {
                             }
                         },
                         onItemSelected = { item ->
-                            itemToLibraryItem(item)?.let { libraryItem ->
-                                selectedItem = libraryItem
-                                currentScreen = DesktopScreen.Player
+                            when (item) {
+                                is ArtistItem -> {
+                                    navigationHistory.add(DesktopScreen.Home)
+                                    detailNavigation = detailNavigation.copy(
+                                        artistId = item.id,
+                                        artistName = item.title,
+                                    )
+                                    currentScreen = DesktopScreen.ArtistDetail
+                                }
+                                is AlbumItem -> {
+                                    navigationHistory.add(DesktopScreen.Home)
+                                    detailNavigation = detailNavigation.copy(
+                                        albumId = item.browseId,
+                                        albumName = item.title,
+                                    )
+                                    currentScreen = DesktopScreen.AlbumDetail
+                                }
+                                is PlaylistItem -> {
+                                    navigationHistory.add(DesktopScreen.Home)
+                                    detailNavigation = detailNavigation.copy(
+                                        playlistId = item.id,
+                                        playlistName = item.title,
+                                    )
+                                    currentScreen = DesktopScreen.PlaylistDetail
+                                }
+                                else -> {
+                                    itemToLibraryItem(item)?.let { libraryItem ->
+                                        playerState.play(libraryItem)
+                                        currentScreen = DesktopScreen.Player
+                                    }
+                                }
                             }
                         },
                         onAddToLibrary = { item ->
@@ -256,6 +372,16 @@ private fun AniTailDesktopApp() {
                                         }
                                     }
                                 }
+                            }
+                        },
+                        onShuffleAll = {
+                            // Shuffle all quick picks and start playing
+                            val shuffled = quickPicks.shuffled()
+                            if (shuffled.isNotEmpty()) {
+                                playerState.shuffleEnabled = true
+                                playerState.play(shuffled.first())
+                                shuffled.drop(1).forEach { playerState.addToQueue(it) }
+                                currentScreen = DesktopScreen.Player
                             }
                         },
                     )
@@ -282,7 +408,7 @@ private fun AniTailDesktopApp() {
                             }
                         },
                         onPlay = { item ->
-                            selectedItem = item
+                            playerState.play(item)
                             currentScreen = DesktopScreen.Player
                         },
                         onAddToLibrary = { item ->
@@ -305,21 +431,21 @@ private fun AniTailDesktopApp() {
                         items = libraryItems,
                         filterState = libraryFilter,
                         onPlay = { item ->
-                            selectedItem = item
+                            playerState.play(item)
                             currentScreen = DesktopScreen.Player
                         },
                     )
                 }
 
                 DesktopScreen.Player -> {
-                    PlayerScreen(item = selectedItem)
+                    PlayerScreen(item = playerState.currentItem)
                 }
 
                 DesktopScreen.History -> {
                     com.anitail.desktop.ui.HistoryScreen(
                         items = libraryItems,
                         onPlay = { item ->
-                            selectedItem = item
+                            playerState.play(item)
                             currentScreen = DesktopScreen.Player
                         },
                     )
@@ -334,42 +460,91 @@ private fun AniTailDesktopApp() {
                 DesktopScreen.Settings -> {
                     com.anitail.desktop.ui.SettingsScreen()
                 }
+
+                DesktopScreen.ArtistDetail -> {
+                    ArtistDetailScreen(
+                        artistId = detailNavigation.artistId.orEmpty(),
+                        artistName = detailNavigation.artistName.orEmpty(),
+                        playerState = playerState,
+                        onBack = {
+                            currentScreen = navigationHistory.removeLastOrNull() ?: DesktopScreen.Home
+                        },
+                        onAlbumClick = { albumId, albumName ->
+                            navigationHistory.add(DesktopScreen.ArtistDetail)
+                            detailNavigation = detailNavigation.copy(
+                                albumId = albumId,
+                                albumName = albumName,
+                            )
+                            currentScreen = DesktopScreen.AlbumDetail
+                        },
+                        onArtistClick = { artistId, artistName ->
+                            navigationHistory.add(DesktopScreen.ArtistDetail)
+                            detailNavigation = detailNavigation.copy(
+                                artistId = artistId,
+                                artistName = artistName,
+                            )
+                            currentScreen = DesktopScreen.ArtistDetail
+                        },
+                        onPlaylistClick = { playlistId, playlistName ->
+                            navigationHistory.add(DesktopScreen.ArtistDetail)
+                            detailNavigation = detailNavigation.copy(
+                                playlistId = playlistId,
+                                playlistName = playlistName,
+                            )
+                            currentScreen = DesktopScreen.PlaylistDetail
+                        },
+                        onSongClick = { item ->
+                            playerState.play(item)
+                        },
+                    )
+                }
+
+                DesktopScreen.AlbumDetail -> {
+                    AlbumDetailScreen(
+                        albumId = detailNavigation.albumId.orEmpty(),
+                        albumName = detailNavigation.albumName.orEmpty(),
+                        playerState = playerState,
+                        onBack = {
+                            currentScreen = navigationHistory.removeLastOrNull() ?: DesktopScreen.Home
+                        },
+                        onArtistClick = { artistId, artistName ->
+                            navigationHistory.add(DesktopScreen.AlbumDetail)
+                            detailNavigation = detailNavigation.copy(
+                                artistId = artistId,
+                                artistName = artistName,
+                            )
+                            currentScreen = DesktopScreen.ArtistDetail
+                        },
+                    )
+                }
+
+                DesktopScreen.PlaylistDetail -> {
+                    PlaylistDetailScreen(
+                        playlistId = detailNavigation.playlistId.orEmpty(),
+                        playlistName = detailNavigation.playlistName.orEmpty(),
+                        playerState = playerState,
+                        onBack = {
+                            currentScreen = navigationHistory.removeLastOrNull() ?: DesktopScreen.Home
+                        },
+                        onArtistClick = { artistId, artistName ->
+                            navigationHistory.add(DesktopScreen.PlaylistDetail)
+                            detailNavigation = detailNavigation.copy(
+                                artistId = artistId,
+                                artistName = artistName,
+                            )
+                            currentScreen = DesktopScreen.ArtistDetail
+                        },
+                    )
+                }
             }
         }
     }
-}
 
-@Composable
-private fun MiniPlayerBar(
-    title: String,
-    artist: String,
-    onOpen: () -> Unit,
-) {
-    androidx.compose.material3.Surface(tonalElevation = 2.dp) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        ) {
-            Row(
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = artist,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                Button(onClick = onOpen) {
-                    Text("Abrir")
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+    // Simular progreso de reproducción (cada 100ms avanza 100ms)
+    LaunchedEffect(playerState.isPlaying, playerState.currentItem) {
+        while (playerState.isPlaying && playerState.currentItem != null) {
+            delay(100)
+            playerState.updatePosition(playerState.position + 100)
         }
     }
 }

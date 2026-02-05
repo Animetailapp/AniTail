@@ -21,6 +21,8 @@ private val DesktopColorScheme = darkColorScheme(
     onSurface = Color(0xFFE6E0E9),
     surfaceVariant = Color(0xFF2A2630),
     onSurfaceVariant = Color(0xFFCAC4D0),
+    surfaceContainer = Color(0xFF252129),
+    surfaceContainerHigh = Color(0xFF302C35),
     outline = Color(0xFF3D3846),
 )
 

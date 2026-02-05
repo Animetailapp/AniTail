@@ -1,8 +1,11 @@
 package com.anitail.desktop.ui
 
+import androidx.compose.foundation.ContextMenuArea
+import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,18 +18,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,7 +64,14 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.player.YouTubeMusicPlayer
+import com.anitail.desktop.ui.component.HideOnScrollFAB
+import com.anitail.desktop.ui.component.PlayingIndicatorBox
+import com.anitail.desktop.ui.component.ShimmerChipsRow
+import com.anitail.desktop.ui.component.ShimmerQuickPicksGrid
+import com.anitail.desktop.ui.component.ShimmerSectionRow
+import com.anitail.desktop.model.SimilarRecommendation
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
 import com.anitail.innertube.models.PlaylistItem
@@ -113,10 +127,13 @@ fun HomeScreen(
     quickPicks: List<LibraryItem>,
     keepListening: List<LibraryItem>,
     forgottenFavorites: List<LibraryItem>,
+    similarRecommendations: List<SimilarRecommendation>,
+    playerState: PlayerState,
     onChipSelected: (HomePage.Chip?) -> Unit,
     onLoadMore: () -> Unit,
     onItemSelected: (YTItem) -> Unit,
     onAddToLibrary: (YTItem) -> Unit,
+    onShuffleAll: () -> Unit,
 ) {
     val listState = rememberLazyListState()
 
@@ -130,78 +147,120 @@ fun HomeScreen(
             }
     }
 
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        item {
-            SectionTitle(title = "Para ti")
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                SectionTitle(title = "Para ti")
+            }
+
+            homePage?.chips?.takeIf { it.isNotEmpty() }?.let { chips ->
+                item {
+                    HomeChipsRow(
+                        chips = chips,
+                        selectedChip = selectedChip,
+                        onSelected = onChipSelected,
+                    )
+                }
+            }
+
+            if (isLoading && homePage == null) {
+                // Shimmer placeholders mientras carga
+                item { ShimmerChipsRow() }
+                item { SectionHeader(title = "Quick picks", label = null, usePrimary = true) }
+                item { ShimmerQuickPicksGrid() }
+                item { SectionHeader(title = "Keep listening", label = null, usePrimary = true) }
+                item { ShimmerSectionRow() }
+            }
+
+            if (quickPicks.isNotEmpty()) {
+                item { SectionHeader(title = "Quick picks", label = null, usePrimary = true) }
+                item {
+                    QuickPicksGrid(
+                        items = quickPicks,
+                        playerState = playerState,
+                        onPrimary = onItemSelected,
+                        onSecondary = onAddToLibrary,
+                    )
+                }
+            }
+
+            if (keepListening.isNotEmpty()) {
+                item { SectionHeader(title = "Keep listening", label = null, usePrimary = true) }
+                item {
+                    KeepListeningRow(
+                        items = keepListening,
+                        playerState = playerState,
+                        onOpen = onItemSelected,
+                        onAddToLibrary = onAddToLibrary,
+                    )
+                }
+            }
+
+            if (forgottenFavorites.isNotEmpty()) {
+                item { SectionHeader(title = "Favoritos olvidados", label = null, usePrimary = true) }
+                item {
+                    QuickPicksGrid(
+                        items = forgottenFavorites,
+                        playerState = playerState,
+                        onPrimary = onItemSelected,
+                        onSecondary = onAddToLibrary,
+                    )
+                }
+            }
+
+            // Similar To sections
+            similarRecommendations.forEach { recommendation ->
+                item {
+                    SimilarToHeader(
+                        title = recommendation.title,
+                        thumbnailUrl = recommendation.thumbnailUrl,
+                        isArtist = recommendation.isArtist,
+                    )
+                }
+                item {
+                    HomeSectionRow(
+                        items = recommendation.items,
+                        playerState = playerState,
+                        onItemSelected = onItemSelected,
+                        onAddToLibrary = onAddToLibrary,
+                    )
+                }
+            }
+
+            homePage?.sections?.forEach { section ->
+                item {
+                    SectionHeader(title = section.title, label = section.label)
+                }
+                item {
+                    HomeSectionRow(
+                        items = section.items,
+                        playerState = playerState,
+                        onItemSelected = onItemSelected,
+                        onAddToLibrary = onAddToLibrary,
+                    )
+                }
+            }
+
+            if (isLoadingMore) {
+                item {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            }
         }
 
-        homePage?.chips?.takeIf { it.isNotEmpty() }?.let { chips ->
-            item {
-                HomeChipsRow(
-                    chips = chips,
-                    selectedChip = selectedChip,
-                    onSelected = onChipSelected,
-                )
-            }
-        }
-
-        if (isLoading && homePage == null) {
-            item {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-        }
-
-        if (quickPicks.isNotEmpty()) {
-            item { SectionHeader(title = "Quick picks", label = null, usePrimary = true) }
-            item {
-                QuickPicksGrid(
-                    items = quickPicks,
-                    onPrimary = onItemSelected,
-                    onSecondary = onAddToLibrary,
-                )
-            }
-        }
-
-        if (keepListening.isNotEmpty()) {
-            item { SectionHeader(title = "Keep listening", label = null, usePrimary = true) }
-            item {
-                KeepListeningRow(items = keepListening, onOpen = onItemSelected)
-            }
-        }
-
-        if (forgottenFavorites.isNotEmpty()) {
-            item { SectionHeader(title = "Favoritos olvidados", label = null, usePrimary = true) }
-            item {
-                QuickPicksGrid(
-                    items = forgottenFavorites,
-                    onPrimary = onItemSelected,
-                    onSecondary = onAddToLibrary,
-                )
-            }
-        }
-
-        homePage?.sections?.forEach { section ->
-            item {
-                SectionHeader(title = section.title, label = section.label)
-            }
-            item {
-                HomeSectionRow(
-                    items = section.items,
-                    onItemSelected = onItemSelected,
-                    onAddToLibrary = onAddToLibrary,
-                )
-            }
-        }
-
-        if (isLoadingMore) {
-            item {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-        }
+        // Shuffle FAB
+        HideOnScrollFAB(
+            visible = quickPicks.isNotEmpty(),
+            lazyListState = listState,
+            onClick = onShuffleAll,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+        )
     }
 }
 
@@ -272,7 +331,12 @@ fun ExploreScreen(
             )
         } else if (!searchState.isLoading) {
             if (isLoading) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                // Shimmer placeholders para charts y explore
+                SectionHeader(title = "Charts", label = null)
+                ShimmerSectionRow()
+                Spacer(modifier = Modifier.height(12.dp))
+                SectionHeader(title = "Nuevos lanzamientos", label = null)
+                ShimmerSectionRow()
             }
             chartsPage?.sections?.forEach { section ->
                 SectionHeader(title = section.title, label = null)
@@ -688,17 +752,77 @@ private fun SectionHeader(
     label: String?,
     usePrimary: Boolean = false,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            color = if (usePrimary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-        )
-        if (!label.isNullOrBlank()) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.weight(1f),
+        ) {
+            if (!label.isNullOrBlank()) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                overflow = TextOverflow.Ellipsis,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/**
+ * Header para secciones "Similar To" con thumbnail del artista/canción.
+ */
+@Composable
+private fun SimilarToHeader(
+    title: String,
+    thumbnailUrl: String?,
+    isArtist: Boolean,
+) {
+    val shape = if (isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
+    
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+    ) {
+        if (thumbnailUrl != null) {
+            RemoteImage(
+                url = thumbnailUrl,
+                modifier = Modifier.size(ListThumbnailSize),
+                shape = shape,
+            )
+        }
+        Column(
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.weight(1f),
+        ) {
+            Text(
+                text = "Similar a",
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                overflow = TextOverflow.Ellipsis,
+                maxLines = 1,
             )
         }
     }
@@ -707,6 +831,7 @@ private fun SectionHeader(
 @Composable
 private fun HomeSectionRow(
     items: List<YTItem>,
+    playerState: PlayerState,
     onItemSelected: (YTItem) -> Unit,
     onAddToLibrary: (YTItem) -> Unit,
 ) {
@@ -716,6 +841,7 @@ private fun HomeSectionRow(
         items(items) { item ->
             HomeItemCard(
                 item = item,
+                playerState = playerState,
                 onPrimary = { onItemSelected(item) },
                 onSecondary = { onAddToLibrary(item) },
             )
@@ -723,12 +849,16 @@ private fun HomeSectionRow(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HomeItemCard(
     item: YTItem,
+    playerState: PlayerState? = null,
     onPrimary: () -> Unit,
     onSecondary: () -> Unit,
 ) {
+    val isArtist = item is ArtistItem
+    val shape = if (isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
     val (title, subtitle) = when (item) {
         is SongItem -> item.title to item.artists?.joinToString { it.name }.orEmpty()
         is AlbumItem -> item.title to item.artists?.joinToString { it.name }.orEmpty()
@@ -737,36 +867,71 @@ private fun HomeItemCard(
         else -> "" to ""
     }
 
-    Column(
-        modifier = Modifier
-            .width(180.dp)
-            .clickable { onPrimary() },
-    ) {
-        RemoteImage(
-            url = itemThumbnail(item),
+    val libraryItem = itemToLibraryItem(item)
+    val contextMenuItems = remember(libraryItem, playerState) {
+        if (libraryItem != null && playerState != null) {
+            listOf(
+                ContextMenuItem("Reproducir") { onPrimary() },
+                ContextMenuItem("Reproducir siguiente") { playerState.addToQueue(libraryItem, playNext = true) },
+                ContextMenuItem("Agregar a la cola") { playerState.addToQueue(libraryItem) },
+                ContextMenuItem("Agregar a biblioteca") { onSecondary() },
+            )
+        } else if (libraryItem != null) {
+            listOf(
+                ContextMenuItem("Reproducir") { onPrimary() },
+                ContextMenuItem("Agregar a biblioteca") { onSecondary() },
+            )
+        } else {
+            emptyList()
+        }
+    }
+
+    ContextMenuArea(items = { contextMenuItems }) {
+        Column(
             modifier = Modifier
-                .height(180.dp)
-                .fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onPrimary) { Text("Reproducir") }
-            OutlinedButton(onClick = onSecondary) { Text("Agregar") }
+                .width(GridThumbnailHeight)
+                .padding(12.dp)
+                .clickable { onPrimary() },
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(GridThumbnailHeight),
+            ) {
+                RemoteImage(
+                    url = itemThumbnail(item),
+                    modifier = Modifier.fillMaxSize(),
+                    shape = shape,
+                )
+                // Overlay play button for songs
+                if (item is SongItem) {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                shape = CircleShape,
+                            )
+                            .padding(6.dp),
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -774,6 +939,7 @@ private fun HomeItemCard(
 @Composable
 private fun QuickPicksGrid(
     items: List<LibraryItem>,
+    playerState: PlayerState,
     onPrimary: (YTItem) -> Unit,
     onSecondary: (YTItem) -> Unit,
 ) {
@@ -789,9 +955,8 @@ private fun QuickPicksGrid(
     ) {
         items(items) { item ->
             QuickPickRowItem(
-                title = item.title,
-                subtitle = item.artist,
-                thumbnail = item.artworkUrl,
+                item = item,
+                playerState = playerState,
                 onPrimary = { onPrimary(ytItemFromLibrary(item)) },
                 onSecondary = { onSecondary(ytItemFromLibrary(item)) },
             )
@@ -799,92 +964,64 @@ private fun QuickPicksGrid(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun QuickPickRowItem(
-    title: String,
-    subtitle: String,
-    thumbnail: String?,
+    item: LibraryItem,
+    playerState: PlayerState,
     onPrimary: () -> Unit,
     onSecondary: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .width(320.dp)
-            .height(ListItemHeight)
-            .clip(RoundedCornerShape(ThumbnailCornerRadius))
-            .background(MaterialTheme.colorScheme.surface)
-            .clickable { onPrimary() }
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RemoteImage(
-            url = thumbnail,
-            modifier = Modifier.size(ListThumbnailSize),
-            shape = RoundedCornerShape(ThumbnailCornerRadius),
+    val isCurrentlyPlaying = playerState.currentItem?.id == item.id
+    val contextMenuItems = remember(item) {
+        listOf(
+            ContextMenuItem("Reproducir") { onPrimary() },
+            ContextMenuItem("Reproducir siguiente") { playerState.addToQueue(item, playNext = true) },
+            ContextMenuItem("Agregar a la cola") { playerState.addToQueue(item) },
+            ContextMenuItem("Agregar a biblioteca") { onSecondary() },
         )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
-            )
-        }
-        IconButton(onClick = onSecondary) {
-            Icon(IconsMore, contentDescription = "Menu")
-        }
     }
-}
 
-@Composable
-private fun KeepListeningRow(
-    items: List<LibraryItem>,
-    onOpen: (YTItem) -> Unit,
-) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        items(items) { item ->
-            val isArtist = item.playbackUrl.contains("/channel/")
-            val shape = if (isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
-            Column(
-                modifier = Modifier
-                    .width(160.dp)
-                    .clickable { onOpen(ytItemFromLibrary(item)) },
-            ) {
-                Box {
-                    RemoteImage(
-                        url = item.artworkUrl,
-                        modifier = Modifier
-                            .size(GridThumbnailHeight)
-                            .clip(shape),
-                        shape = shape,
-                    )
-                    if (!isArtist) {
-                        Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Filled.PlayArrow,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .size(28.dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                    shape = CircleShape,
-                                )
-                                .padding(4.dp),
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
+    ContextMenuArea(items = { contextMenuItems }) {
+        Row(
+            modifier = Modifier
+                .width(320.dp)
+                .height(ListItemHeight)
+                .clip(RoundedCornerShape(ThumbnailCornerRadius))
+                .background(
+                    if (isCurrentlyPlaying) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    else MaterialTheme.colorScheme.surface
+                )
+                .clickable { onPrimary() }
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box {
+                RemoteImage(
+                    url = item.artworkUrl,
+                    modifier = Modifier.size(ListThumbnailSize),
+                    shape = RoundedCornerShape(ThumbnailCornerRadius),
+                )
+                PlayingIndicatorBox(
+                    isActive = isCurrentlyPlaying,
+                    isPlaying = playerState.isPlaying,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(ListThumbnailSize)
+                        .background(
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(ThumbnailCornerRadius),
+                        ),
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     item.title,
                     style = MaterialTheme.typography.titleSmall,
+                    color = if (isCurrentlyPlaying) MaterialTheme.colorScheme.primary 
+                            else MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -894,6 +1031,90 @@ private fun KeepListeningRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
                 )
+            }
+            IconButton(onClick = onSecondary) {
+                Icon(IconsMore, contentDescription = "Menu")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun KeepListeningRow(
+    items: List<LibraryItem>,
+    playerState: PlayerState,
+    onOpen: (YTItem) -> Unit,
+    onAddToLibrary: (YTItem) -> Unit,
+) {
+    val rows = if (items.size > 6) 2 else 1
+    // Calculate item height: GridThumbnailHeight + spacing + text lines
+    val itemHeight = GridThumbnailHeight + 8.dp + 40.dp // thumbnail + spacing + title/subtitle
+
+    LazyHorizontalGrid(
+        rows = GridCells.Fixed(rows),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(itemHeight * rows),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        items(items) { item ->
+            val isArtist = item.playbackUrl.contains("/channel/")
+            val shape = if (isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
+            val contextMenuItems = remember(item) {
+                listOf(
+                    ContextMenuItem("Reproducir") { onOpen(ytItemFromLibrary(item)) },
+                    ContextMenuItem("Reproducir siguiente") { playerState.addToQueue(item, playNext = true) },
+                    ContextMenuItem("Agregar a la cola") { playerState.addToQueue(item) },
+                    ContextMenuItem("Agregar a biblioteca") { onAddToLibrary(ytItemFromLibrary(item)) },
+                )
+            }
+
+            ContextMenuArea(items = { contextMenuItems }) {
+                Column(
+                    modifier = Modifier
+                        .width(GridThumbnailHeight)
+                        .clickable { onOpen(ytItemFromLibrary(item)) },
+                ) {
+                    Box {
+                        RemoteImage(
+                            url = item.artworkUrl,
+                            modifier = Modifier
+                                .size(GridThumbnailHeight)
+                                .clip(shape),
+                            shape = shape,
+                        )
+                        if (!isArtist) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Filled.PlayArrow,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .size(28.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                        shape = CircleShape,
+                                    )
+                                    .padding(4.dp),
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        item.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        item.artist,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }
@@ -910,27 +1131,48 @@ private fun ChartsRow(
             val libraryItem = item.toLibraryItem() ?: return@items
             Column(
                 modifier = Modifier
-                    .width(180.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(12.dp),
+                    .width(GridThumbnailHeight)
+                    .padding(12.dp)
+                    .clickable { onPlay(libraryItem) },
             ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(GridThumbnailHeight),
+                ) {
+                    RemoteImage(
+                        url = libraryItem.artworkUrl,
+                        modifier = Modifier.fillMaxSize(),
+                        shape = RoundedCornerShape(ThumbnailCornerRadius),
+                    )
+                    if (item is SongItem) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Filled.PlayArrow,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                    shape = CircleShape,
+                                )
+                                .padding(6.dp),
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     libraryItem.title,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     libraryItem.artist,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { onPlay(libraryItem) }) { Text("Reproducir") }
-                    OutlinedButton(onClick = { onAddToLibrary(libraryItem) }) { Text("Agregar") }
-                }
             }
         }
     }
@@ -981,6 +1223,10 @@ private fun ytItemFromLibrary(item: LibraryItem): YTItem {
     )
 }
 
+private fun itemToLibraryItem(item: YTItem): LibraryItem? {
+    return item.toLibraryItem()
+}
+
 private fun YTItem.toLibraryItem(): LibraryItem? {
     return when (this) {
         is SongItem -> LibraryItem(
@@ -1020,10 +1266,11 @@ private fun YTItem.toLibraryItem(): LibraryItem? {
 }
 
 @Composable
-private fun RemoteImage(
+fun RemoteImage(
     url: String?,
     modifier: Modifier,
-    shape: Shape,
+    shape: Shape = RoundedCornerShape(0.dp),
+    contentScale: ContentScale = ContentScale.Crop,
 ) {
     val cached = remember(url) { ImageCache.get(url) }
     var image by remember(url) { mutableStateOf<ImageBitmap?>(cached) }
@@ -1050,7 +1297,7 @@ private fun RemoteImage(
         androidx.compose.foundation.Image(
             bitmap = image!!,
             contentDescription = null,
-            contentScale = ContentScale.Crop,
+            contentScale = contentScale,
             modifier = modifier.clip(shape),
         )
     }
@@ -1084,69 +1331,66 @@ private object ImageCache {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeChipsRow(
     chips: List<HomePage.Chip>,
     selectedChip: HomePage.Chip?,
     onSelected: (HomePage.Chip?) -> Unit,
 ) {
-    LazyRow(
+    Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp),
     ) {
-        items(chips) { chip ->
+        chips.forEach { chip ->
             val selected = chip == selectedChip
-            val background =
-                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-            val content =
-                if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-            Box(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(background)
-                    .clickable { onSelected(chip) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            ) {
-                Text(
-                    text = chip.title,
-                    color = content,
-                    style = MaterialTheme.typography.labelLarge,
-                )
-            }
+            FilterChip(
+                selected = selected,
+                onClick = { onSelected(chip) },
+                label = { Text(chip.title) },
+                shape = RoundedCornerShape(16.dp),
+                border = null,
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+            )
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun ChipsRow(
     chips: List<String>,
     selectedIndex: Int = 0,
     onSelected: (Int) -> Unit = {},
 ) {
-    LazyRow(
+    Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp),
     ) {
-        items(chips.size) { index ->
+        chips.forEachIndexed { index, label ->
             val selected = index == selectedIndex
-            val background =
-                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-            val content =
-                if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-            Box(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(background)
-                    .clickable { onSelected(index) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            ) {
-                Text(
-                    text = chips[index],
-                    color = content,
-                    style = MaterialTheme.typography.labelLarge,
-                )
-            }
+            FilterChip(
+                selected = selected,
+                onClick = { onSelected(index) },
+                label = { Text(label) },
+                shape = RoundedCornerShape(16.dp),
+                border = null,
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+            )
         }
     }
 }

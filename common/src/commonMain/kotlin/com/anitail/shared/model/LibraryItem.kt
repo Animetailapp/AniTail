@@ -6,4 +6,5 @@ data class LibraryItem(
     val artist: String,
     val artworkUrl: String?,
     val playbackUrl: String,
+    val durationMs: Long? = null,
 )
