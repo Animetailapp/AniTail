@@ -70,6 +70,9 @@ fun ExploreScreen(
     onAddToLibrary: (LibraryItem) -> Unit,
     requestFocus: Boolean,
     onRequestFocusHandled: () -> Unit,
+    onChartsClick: () -> Unit = {},
+    onMoodGreClick: () -> Unit = {},
+    onNewReleaseClick: () -> Unit = {},
 ) {
     val focusRequester = remember { FocusRequester() }
 

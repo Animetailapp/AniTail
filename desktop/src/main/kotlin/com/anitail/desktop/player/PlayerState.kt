@@ -1,7 +1,6 @@
 package com.anitail.desktop.player
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,8 +34,6 @@ class PlayerState {
         private set
 
     var isBuffering by mutableStateOf(false)
-        private set
-
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
@@ -47,7 +44,8 @@ class PlayerState {
     private val _queue = mutableListOf<LibraryItem>()
     val queue: List<LibraryItem> get() = _queue.toList()
 
-    private var currentQueueIndex by mutableStateOf(-1)
+    var currentQueueIndex by mutableStateOf(-1)
+        private set
 
     // Reproductor nativo de audio
     private val nativePlayer = NativeAudioPlayer()
@@ -142,21 +140,25 @@ class PlayerState {
         }
         currentQueueIndex = _queue.indexOfFirst { it.id == item.id }
 
-        // Extraer videoId e iniciar reproducción nativa
+        // Extraer videoId para intentar reproducción nativa vía extracción de NativeAudioPlayer
         val videoId = extractVideoId(item.playbackUrl)
-        if (videoId != null) {
-            scope.launch {
-                nativePlayer.play(videoId).onFailure { error ->
-                    errorMessage = error.message ?: "Error al reproducir"
-                    isPlaying = false
-                    isBuffering = false
-                }
+        println("Anitail DEBUG: Play called for item: ${item.title}, videoId: $videoId")
+
+        scope.launch {
+            if (videoId != null) {
+                isBuffering = true
+                nativePlayer.play(videoId).onFailure { handlePlaybackError(it) }
+            } else {
+                nativePlayer.playStream(item.playbackUrl).onFailure { handlePlaybackError(it) }
             }
-        } else {
-            errorMessage = "URL de reproducción inválida"
-            isPlaying = false
-            isBuffering = false
         }
+    }
+
+    private fun handlePlaybackError(error: Throwable) {
+        errorMessage = error.message ?: "Error al reproducir"
+        isPlaying = false
+        isBuffering = false
+        println("Anitail ERROR: Playback failed: ${error.message}")
     }
 
     private fun extractVideoId(url: String): String? {
@@ -206,6 +208,28 @@ class PlayerState {
             _queue.removeAt(index)
             if (index < currentQueueIndex) {
                 currentQueueIndex--
+            } else if (index == currentQueueIndex && _queue.isNotEmpty()) {
+                // Si borramos el actual, reproducimos el siguiente o paramos si es el último
+                if (currentQueueIndex < _queue.size) {
+                    play(_queue[currentQueueIndex])
+                } else {
+                    stop()
+                }
+            }
+        }
+    }
+
+    fun removeFromQueue(index: Int) {
+        if (index in _queue.indices) {
+            _queue.removeAt(index)
+            if (index < currentQueueIndex) {
+                currentQueueIndex--
+            } else if (index == currentQueueIndex && _queue.isNotEmpty()) {
+                if (currentQueueIndex < _queue.size) {
+                    play(_queue[currentQueueIndex])
+                } else {
+                    stop()
+                }
             }
         }
     }

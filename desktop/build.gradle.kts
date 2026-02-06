@@ -29,6 +29,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
     implementation(libs.json)
+    implementation(libs.okhttp)
 
     // Ktor for lyrics and API calls
     implementation(libs.ktor.client.core)
@@ -42,6 +43,22 @@ dependencies {
     implementation("org.openjfx:javafx-swing:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-media:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-web:$javafxVersion:$javafxPlatform")
+
+    // New multiplatform player (VLC/Media3/AVPlayer)
+    implementation(libs.compose.multiplatform.media.player)
+}
+
+configurations.all {
+    resolutionStrategy {
+        // Force CM version to match plugin to avoid Skiko UnsatisfiedLinkError
+        force("org.jetbrains.compose.runtime:runtime:1.7.3")
+        force("org.jetbrains.compose.ui:ui:1.7.3")
+        force("org.jetbrains.compose.foundation:foundation:1.7.3")
+        force("org.jetbrains.compose.material3:material3:1.7.3")
+        // Skiko version alignment (matching CM 1.7.3)
+        force("org.jetbrains.skiko:skiko:0.8.18")
+        force("org.jetbrains.skiko:skiko-jvm:0.8.18")
+    }
 }
 
 compose.desktop {

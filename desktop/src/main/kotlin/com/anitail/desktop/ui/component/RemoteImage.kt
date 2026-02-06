@@ -29,6 +29,7 @@ import java.net.URL
 @Composable
 fun RemoteImage(
     url: String?,
+    contentDescription: String? = null,
     modifier: Modifier,
     shape: Shape = RoundedCornerShape(0.dp),
     contentScale: ContentScale = ContentScale.Crop,
@@ -57,7 +58,7 @@ fun RemoteImage(
     } else {
         Image(
             bitmap = image!!,
-            contentDescription = null,
+            contentDescription = contentDescription,
             contentScale = contentScale,
             modifier = modifier.clip(shape),
         )

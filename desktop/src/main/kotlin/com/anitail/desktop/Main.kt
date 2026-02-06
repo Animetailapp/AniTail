@@ -18,38 +18,42 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.db.DesktopDatabase
+import com.anitail.desktop.db.mapper.extractVideoId
+import com.anitail.desktop.db.mapper.toLibraryItem
+import com.anitail.desktop.db.mapper.toSongEntity
+import com.anitail.desktop.model.SimilarRecommendation
 import com.anitail.desktop.player.rememberPlayerState
-import com.anitail.desktop.storage.DesktopLibraryStore
+import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.DesktopTheme
 import com.anitail.desktop.ui.component.DesktopTopBar
 import com.anitail.desktop.ui.component.MiniPlayer
-import com.anitail.desktop.ui.screen.ExploreScreen
-import com.anitail.desktop.ui.screen.HomeScreen
-import com.anitail.desktop.ui.screen.HistoryScreen
-import com.anitail.desktop.ui.screen.StatsScreen
-import com.anitail.desktop.ui.screen.SettingsScreen
-import com.anitail.desktop.ui.screen.LibraryFilter
-import com.anitail.desktop.ui.screen.LibraryScreen
-import com.anitail.desktop.ui.screen.PlayerScreen
-import com.anitail.desktop.ui.screen.ArtistDetailScreen
 import com.anitail.desktop.ui.screen.AlbumDetailScreen
+import com.anitail.desktop.ui.screen.ArtistDetailScreen
+import com.anitail.desktop.ui.screen.ChartsScreen
+import com.anitail.desktop.ui.screen.ExploreScreen
+import com.anitail.desktop.ui.screen.HistoryScreen
+import com.anitail.desktop.ui.screen.HomeScreen
+import com.anitail.desktop.ui.screen.LibraryScreenEnhanced
+import com.anitail.desktop.ui.screen.MoodAndGenresScreen
+import com.anitail.desktop.ui.screen.NewReleaseScreen
+import com.anitail.desktop.ui.screen.PlayerScreen
 import com.anitail.desktop.ui.screen.PlaylistDetailScreen
 import com.anitail.desktop.ui.screen.SearchScreen
-import com.anitail.desktop.ui.screen.LibraryScreenEnhanced
-import com.anitail.desktop.model.SimilarRecommendation
-import com.anitail.desktop.navigation.Screen
-import com.anitail.desktop.navigation.rememberNavigationState
+import com.anitail.desktop.ui.screen.SettingsScreen
+import com.anitail.desktop.ui.screen.StatsScreen
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
@@ -60,12 +64,10 @@ import com.anitail.innertube.models.YTItem
 import com.anitail.innertube.pages.ChartsPage
 import com.anitail.innertube.pages.ExplorePage
 import com.anitail.innertube.pages.HomePage
-import com.anitail.innertube.pages.RelatedPage
 import com.anitail.shared.model.LibraryItem
 import com.anitail.shared.model.SearchState
 import com.anitail.shared.repository.InnertubeMusicRepository
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -81,6 +83,9 @@ private enum class DesktopScreen {
     AlbumDetail,
     PlaylistDetail,
     Search,
+    Charts,
+    MoodAndGenres,
+    NewRelease,
 }
 
 /**
@@ -110,18 +115,25 @@ fun main() = application {
 @Composable
 private fun AniTailDesktopApp() {
     val repository = remember { InnertubeMusicRepository() }
-    val libraryStore = remember { DesktopLibraryStore() }
+    // Replace legacy store with Database and Preferences
+    val database = remember { DesktopDatabase.getInstance() }
+    val preferences = remember { DesktopPreferences.getInstance() }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val playerState = rememberPlayerState()
 
     var currentScreen by remember { mutableStateOf(DesktopScreen.Home) }
-    // selectedItem ahora controlado por playerState.currentItem
     var searchQuery by remember { mutableStateOf("") }
     var searchState by remember { mutableStateOf(SearchState()) }
     var requestSearchFocus by remember { mutableStateOf(false) }
-    val libraryItems = remember { mutableStateListOf<LibraryItem>() }
-    val libraryFilter = remember { mutableStateOf(LibraryFilter.TODOS) }
+
+    // Library state from Database
+    val songs by database.songsInLibrary().collectAsState(initial = emptyList())
+    // For backward compatibility with existing code that expects LibraryItem
+    val libraryItems = remember(songs) {
+        songs.map { it.toLibraryItem() }.toMutableStateList()
+    }
+
     var homePage by remember { mutableStateOf<HomePage?>(null) }
     var selectedChip by remember { mutableStateOf<HomePage.Chip?>(null) }
     var previousHomePage by remember { mutableStateOf<HomePage?>(null) }
@@ -137,13 +149,28 @@ private fun AniTailDesktopApp() {
     var detailNavigation by remember { mutableStateOf(DetailNavigation()) }
     val navigationHistory = remember { mutableStateListOf<DesktopScreen>() }
 
+    // Initialize Database and sync preferences with Innertube
     LaunchedEffect(Unit) {
-        val storedItems = withContext(Dispatchers.IO) { libraryStore.load() }
-        if (storedItems.isEmpty()) {
-            libraryItems.addAll(repository.initialLibrary())
-        } else {
-            libraryItems.addAll(storedItems)
+        withContext(Dispatchers.IO) {
+            database.initialize()
         }
+    }
+
+    // Sync Preferences with InnerTube API
+    val youtubeCookie by preferences.youtubeCookie.collectAsState()
+    val contentLanguage by preferences.contentLanguage.collectAsState()
+    val contentCountry by preferences.contentCountry.collectAsState()
+
+    LaunchedEffect(youtubeCookie, contentLanguage, contentCountry) {
+        YouTube.cookie = youtubeCookie
+        YouTube.locale = com.anitail.innertube.models.YouTubeLocale(
+            hl = contentLanguage,
+            gl = contentCountry
+        )
+        println("Anitail: YouTube API initialized with Cookie: ${youtubeCookie?.take(20)}..., Locale: $contentLanguage-$contentCountry")
+    }
+
+    LaunchedEffect(Unit) {
         loadHomePage(
             onLoading = { isHomeLoading = it },
             onPage = { page -> homePage = page },
@@ -162,17 +189,15 @@ private fun AniTailDesktopApp() {
         forgottenFavorites = items.drop(12).take(12)
     }
 
-    // Cargar recomendaciones similares basadas en biblioteca
+    // Recommendation logic remains similar...
+    // [Truncated for brevity, keeping recommendation logic same as before but using updated libraryItems]
     LaunchedEffect(libraryItems.size) {
         if (libraryItems.size >= 3) {
             val sampledItems = libraryItems.shuffled().take(3)
             val recommendations = mutableListOf<SimilarRecommendation>()
             
             sampledItems.forEach { item ->
-                // Intentar obtener contenido relacionado para cada item
-                val videoId = item.playbackUrl
-                    .substringAfter("watch?v=", "")
-                    .takeIf { it.isNotEmpty() }
+                val videoId = extractVideoId(item.playbackUrl)
                 
                 if (videoId != null) {
                     val relatedPage = YouTube.related(
@@ -192,7 +217,6 @@ private fun AniTailDesktopApp() {
                 }
             }
             
-            // Si no hay recomendaciones de API, usar items de biblioteca como fallback
             if (recommendations.isEmpty() && libraryItems.size >= 6) {
                 val artistGroups = libraryItems.groupBy { it.artist }
                 artistGroups.entries.take(2).forEach { (artist, songs) ->
@@ -229,12 +253,15 @@ private fun AniTailDesktopApp() {
                 DesktopScreen.Library -> "Biblioteca"
                 DesktopScreen.Player -> "Reproductor"
                 DesktopScreen.History -> "Historial"
-                DesktopScreen.Stats -> "Estadisticas"
+                DesktopScreen.Stats -> "Estadísticas"
                 DesktopScreen.Settings -> "Ajustes"
                 DesktopScreen.ArtistDetail -> detailNavigation.artistName ?: "Artista"
                 DesktopScreen.AlbumDetail -> detailNavigation.albumName ?: "Álbum"
                 DesktopScreen.PlaylistDetail -> detailNavigation.playlistName ?: "Playlist"
                 DesktopScreen.Search -> "Buscar"
+                DesktopScreen.Charts -> "Éxitos"
+                DesktopScreen.MoodAndGenres -> "Estados de ánimo y géneros"
+                DesktopScreen.NewRelease -> "Nuevos lanzamientos"
             }
             DesktopTopBar(
                 title = title,
@@ -377,19 +404,14 @@ private fun AniTailDesktopApp() {
                             }
                         },
                         onAddToLibrary = { item ->
-                            itemToLibraryItem(item)?.let { libraryItem ->
-                                if (libraryItems.none { it.id == libraryItem.id }) {
-                                    libraryItems.add(libraryItem)
-                                    scope.launch {
-                                        withContext(Dispatchers.IO) {
-                                            libraryStore.save(libraryItems)
-                                        }
-                                    }
+                            val songEntity = itemToLibraryItem(item)?.toSongEntity()
+                            if (songEntity != null) {
+                                scope.launch {
+                                    database.insertSong(songEntity)
                                 }
                             }
                         },
                         onShuffleAll = {
-                            // Shuffle all quick picks and start playing
                             val shuffled = quickPicks.shuffled()
                             if (shuffled.isNotEmpty()) {
                                 playerState.shuffleEnabled = true
@@ -426,17 +448,16 @@ private fun AniTailDesktopApp() {
                             currentScreen = DesktopScreen.Player
                         },
                         onAddToLibrary = { item ->
-                            if (libraryItems.none { it.id == item.id }) {
-                                libraryItems.add(item)
-                                scope.launch {
-                                    withContext(Dispatchers.IO) {
-                                        libraryStore.save(libraryItems)
-                                    }
-                                }
+                            val songEntity = item.toSongEntity()
+                            scope.launch {
+                                database.insertSong(songEntity)
                             }
                         },
                         requestFocus = requestSearchFocus,
                         onRequestFocusHandled = { requestSearchFocus = false },
+                        onChartsClick = { currentScreen = DesktopScreen.Charts },
+                        onMoodGreClick = { currentScreen = DesktopScreen.MoodAndGenres },
+                        onNewReleaseClick = { currentScreen = DesktopScreen.NewRelease },
                     )
                 }
 
@@ -471,6 +492,16 @@ private fun AniTailDesktopApp() {
                             )
                             currentScreen = DesktopScreen.PlaylistDetail
                         },
+                        onCreatePlaylist = { name ->
+                            scope.launch {
+                                database.insertPlaylist(
+                                    com.anitail.desktop.db.entities.PlaylistEntity(
+                                        name = name,
+                                        createdAt = java.time.LocalDateTime.now()
+                                    )
+                                )
+                            }
+                        }
                     )
                 }
 
@@ -498,7 +529,53 @@ private fun AniTailDesktopApp() {
                 }
 
                 DesktopScreen.Settings -> {
-                    SettingsScreen()
+                    SettingsScreen(preferences = preferences)
+                }
+
+                DesktopScreen.Charts -> {
+                    ChartsScreen(
+                        playerState = playerState,
+                        onBack = { currentScreen = DesktopScreen.Explore },
+                        onPlayTrack = { item ->
+                            playerState.play(item)
+                        },
+                        onArtistClick = { artistId, _ ->
+                            navigationHistory.add(DesktopScreen.Charts)
+                            detailNavigation = detailNavigation.copy(artistId = artistId)
+                            currentScreen = DesktopScreen.ArtistDetail
+                        },
+                        onPlaylistClick = { playlistId, _ ->
+                            navigationHistory.add(DesktopScreen.Charts)
+                            detailNavigation = detailNavigation.copy(playlistId = playlistId)
+                            currentScreen = DesktopScreen.PlaylistDetail
+                        }
+                    )
+                }
+
+                DesktopScreen.MoodAndGenres -> {
+                    MoodAndGenresScreen(
+                        onBack = { currentScreen = DesktopScreen.Explore },
+                        onCategoryClick = { browseId, params, title ->
+                            // TODO: Implement Category/Mood Playlist viewing
+                        }
+                    )
+                }
+
+                DesktopScreen.NewRelease -> {
+                    NewReleaseScreen(
+                        playerState = playerState,
+                        onBack = { currentScreen = DesktopScreen.Explore },
+                        onAlbumClick = { albumId, _ ->
+                            navigationHistory.add(DesktopScreen.NewRelease)
+                            detailNavigation = detailNavigation.copy(albumId = albumId)
+                            currentScreen = DesktopScreen.AlbumDetail
+                        },
+                        onArtistClick = { artistId, _ ->
+                            navigationHistory.add(DesktopScreen.NewRelease)
+                            detailNavigation = detailNavigation.copy(artistId = artistId)
+                            currentScreen = DesktopScreen.ArtistDetail
+                        }
+                    )
                 }
 
                 DesktopScreen.ArtistDetail -> {
