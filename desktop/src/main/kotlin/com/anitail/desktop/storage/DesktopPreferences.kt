@@ -18,7 +18,7 @@ class DesktopPreferences private constructor(
     private val filePath: Path = defaultPreferencesPath(),
 ) {
     // === Appearance Settings ===
-    private val _darkMode = MutableStateFlow(DarkModePreference.SYSTEM)
+    private val _darkMode = MutableStateFlow(DarkModePreference.AUTO)
     val darkMode: StateFlow<DarkModePreference> = _darkMode.asStateFlow()
 
     private val _pureBlack = MutableStateFlow(false)
@@ -178,7 +178,7 @@ class DesktopPreferences private constructor(
             if (raw.isBlank()) return
             val json = JSONObject(raw)
 
-            _darkMode.value = DarkModePreference.fromString(json.optString("darkMode", "system"))
+            _darkMode.value = DarkModePreference.fromString(json.optString("darkMode", "auto"))
             _pureBlack.value = json.optBoolean("pureBlack", false)
             _dynamicColor.value = json.optBoolean("dynamicColor", true)
 
@@ -265,15 +265,18 @@ class DesktopPreferences private constructor(
 }
 
 enum class DarkModePreference {
-    LIGHT,
-    DARK,
-    SYSTEM;
+    ON,
+    OFF,
+    AUTO,
+    TIME_BASED;
 
     companion object {
         fun fromString(value: String): DarkModePreference = when (value.lowercase()) {
-            "light" -> LIGHT
-            "dark" -> DARK
-            else -> SYSTEM
+            "on", "dark" -> ON
+            "off", "light" -> OFF
+            "time_based", "timebased", "time" -> TIME_BASED
+            "auto", "system" -> AUTO
+            else -> AUTO
         }
     }
 }

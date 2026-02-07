@@ -1,10 +1,6 @@
 package com.anitail.desktop.ui.screen
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import com.anitail.desktop.auth.AccountInfo
 import com.anitail.desktop.auth.AuthCredentials
 import com.anitail.desktop.auth.DesktopAuthService
+import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.util.JavaFxManager
 import com.anitail.innertube.YouTube
 import javafx.application.Platform
@@ -68,7 +65,7 @@ fun LoginScreen(
                 title = { Text("Iniciar sesión") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                        Icon(IconAssets.arrowBack(), contentDescription = "Volver")
                     }
                 },
             )
@@ -172,7 +169,7 @@ fun AccountScreen(
                 title = { Text("Cuenta") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                        Icon(IconAssets.arrowBack(), contentDescription = "Volver")
                     }
                 },
             )
@@ -188,7 +185,7 @@ fun AccountScreen(
             if (authService.isLoggedIn) {
                 // Mostrar información de la cuenta
                 Icon(
-                    imageVector = Icons.Filled.AccountCircle,
+                    imageVector = IconAssets.account(),
                     contentDescription = null,
                     modifier = Modifier.size(100.dp),
                     tint = MaterialTheme.colorScheme.primary,
@@ -240,14 +237,14 @@ fun AccountScreen(
                         contentColor = MaterialTheme.colorScheme.error,
                     ),
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
+                    Icon(IconAssets.logout(), contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Cerrar sesión")
                 }
             } else {
                 // No hay sesión iniciada
                 Icon(
-                    imageVector = Icons.Filled.AccountCircle,
+                    imageVector = IconAssets.account(),
                     contentDescription = null,
                     modifier = Modifier.size(100.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),

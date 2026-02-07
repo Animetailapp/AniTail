@@ -21,14 +21,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.NorthWest
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -63,6 +55,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.component.ShimmerListItem
 import com.anitail.innertube.YouTube
@@ -374,7 +367,7 @@ private fun SearchBar(
             .padding(8.dp)
     ) {
         IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+            Icon(IconAssets.arrowBack(), contentDescription = "Volver")
         }
 
         OutlinedTextField(
@@ -383,7 +376,7 @@ private fun SearchBar(
             placeholder = { Text("Buscar canciones, artistas, álbumes...") },
             leadingIcon = {
                 Icon(
-                    Icons.Default.Search,
+                    IconAssets.search(),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -391,7 +384,7 @@ private fun SearchBar(
             trailingIcon = {
                 if (query.isNotEmpty()) {
                     IconButton(onClick = { onQueryChange("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = "Limpiar")
+                        Icon(IconAssets.close(), contentDescription = "Limpiar")
                     }
                 }
             },
@@ -479,7 +472,7 @@ private fun SuggestionItem(
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Icon(
-            imageVector = if (isHistory) Icons.Default.History else Icons.Default.Search,
+            imageVector = if (isHistory) IconAssets.history() else IconAssets.search(),
             contentDescription = null,
             modifier = Modifier.alpha(0.5f)
         )
@@ -499,7 +492,7 @@ private fun SuggestionItem(
                 onClick = onDelete,
                 modifier = Modifier.alpha(0.5f)
             ) {
-                Icon(Icons.Default.Close, contentDescription = "Eliminar")
+                Icon(IconAssets.close(), contentDescription = "Eliminar")
             }
         }
 
@@ -507,7 +500,7 @@ private fun SuggestionItem(
             onClick = onFillTextField,
             modifier = Modifier.alpha(0.5f)
         ) {
-            Icon(Icons.Default.NorthWest, contentDescription = "Usar sugerencia")
+            Icon(IconAssets.arrowTopLeft(), contentDescription = "Usar sugerencia")
         }
     }
 }
@@ -597,7 +590,7 @@ private fun SearchResultItem(
 
         IconButton(onClick = { /* TODO: Context menu */ }) {
             Icon(
-                Icons.Default.MoreVert,
+                IconAssets.moreVert(),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -614,7 +607,7 @@ private fun EmptySearchResults() {
             .padding(48.dp)
     ) {
         Icon(
-            Icons.Default.Search,
+            IconAssets.search(),
             contentDescription = null,
             modifier = Modifier
                 .size(64.dp)

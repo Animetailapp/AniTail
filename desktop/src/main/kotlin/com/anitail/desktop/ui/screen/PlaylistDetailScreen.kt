@@ -17,14 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Radio
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -48,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.ui.IconAssets
 import androidx.compose.ui.unit.sp
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.component.RemoteImage
@@ -189,8 +182,8 @@ fun PlaylistDetailScreen(
                                                 onClick = { isLiked = !isLiked }
                                             ) {
                                                 Icon(
-                                                    imageVector = if (isLiked) Icons.Default.Favorite
-                                                    else Icons.Default.FavoriteBorder,
+                                                    imageVector = if (isLiked) IconAssets.favorite()
+                                                    else IconAssets.favoriteBorder(),
                                                     contentDescription = null,
                                                     tint = if (isLiked)
                                                         MaterialTheme.colorScheme.error
@@ -204,7 +197,7 @@ fun PlaylistDetailScreen(
                                             onClick = { /* TODO: More menu */ }
                                         ) {
                                             Icon(
-                                                Icons.Default.MoreVert,
+                                                IconAssets.moreVert(),
                                                 contentDescription = null,
                                             )
                                         }
@@ -231,7 +224,7 @@ fun PlaylistDetailScreen(
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Icon(
-                                            Icons.Default.Shuffle,
+                                            IconAssets.shuffle(),
                                             contentDescription = null,
                                             modifier = Modifier.size(ButtonDefaults.IconSize)
                                         )
@@ -250,7 +243,7 @@ fun PlaylistDetailScreen(
                                         modifier = Modifier.weight(1f),
                                     ) {
                                         Icon(
-                                            Icons.Default.Radio,
+                                            IconAssets.radio(),
                                             contentDescription = null,
                                             modifier = Modifier.size(ButtonDefaults.IconSize),
                                         )
@@ -317,7 +310,7 @@ fun PlaylistDetailScreen(
                     }
                 }
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                Icon(IconAssets.arrowBack(), contentDescription = "Volver")
             }
 
             if (isSearching) {
@@ -343,7 +336,7 @@ fun PlaylistDetailScreen(
             // Botón buscar
             if (!isSearching) {
                 IconButton(onClick = { isSearching = true }) {
-                    Icon(Icons.Default.Search, contentDescription = "Buscar")
+                    Icon(IconAssets.search(), contentDescription = "Buscar")
                 }
             }
         }
@@ -445,7 +438,7 @@ private fun YouTubeListItem(
 
         IconButton(onClick = onMoreClick) {
             Icon(
-                Icons.Default.MoreVert,
+                IconAssets.moreVert(),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )

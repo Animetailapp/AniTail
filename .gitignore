@@ -91,3 +91,9 @@ output-metadata.json
 
 # VS Code
 .vscode/
+.agents/
+*.keystore
+*.jks
+.maestro/
+docs/
+.tmp/

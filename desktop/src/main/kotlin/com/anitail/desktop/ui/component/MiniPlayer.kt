@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.anitail.desktop.constants.MiniPlayerHeight
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.player.RepeatMode
 import com.anitail.desktop.ui.IconAssets
@@ -58,7 +59,7 @@ fun MiniPlayer(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
+                .height(MiniPlayerHeight)
                 .padding(horizontal = 12.dp, vertical = 4.dp)
                 .clip(RoundedCornerShape(32.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainer)

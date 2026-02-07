@@ -16,20 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
@@ -58,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.anitail.desktop.storage.AudioQuality
 import com.anitail.desktop.storage.DarkModePreference
 import com.anitail.desktop.storage.DesktopPreferences
+import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.NavigationTitle
 
 /**
@@ -129,37 +116,37 @@ private fun SettingsMainScreen(
         SettingsCategory(
             title = "Apariencia",
             subtitle = "Tema, colores, fuente",
-            icon = Icons.Filled.Palette,
+            icon = IconAssets.palette(),
             destination = SettingsDestination.APPEARANCE,
         ),
         SettingsCategory(
             title = "Reproducción",
             subtitle = "Calidad, crossfade, cola",
-            icon = Icons.Filled.PlayCircle,
+            icon = IconAssets.play(),
             destination = SettingsDestination.PLAYER,
         ),
         SettingsCategory(
             title = "Contenido",
             subtitle = "Idioma, país, filtros",
-            icon = Icons.Filled.Language,
+            icon = IconAssets.language(),
             destination = SettingsDestination.CONTENT,
         ),
         SettingsCategory(
             title = "Privacidad",
             subtitle = "Historial, datos",
-            icon = Icons.Filled.Security,
+            icon = IconAssets.security(),
             destination = SettingsDestination.PRIVACY,
         ),
         SettingsCategory(
             title = "Almacenamiento",
             subtitle = "Caché, espacio",
-            icon = Icons.Filled.Storage,
+            icon = IconAssets.storage(),
             destination = SettingsDestination.STORAGE,
         ),
         SettingsCategory(
             title = "Acerca de",
             subtitle = "Versión, licencias",
-            icon = Icons.Filled.Info,
+            icon = IconAssets.info(),
             destination = SettingsDestination.ABOUT,
         ),
     )
@@ -217,7 +204,7 @@ private fun SettingsCategoryItem(
                 )
             }
             Icon(
-                imageVector = Icons.Filled.ChevronRight,
+                imageVector = IconAssets.chevronRight(),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -244,15 +231,17 @@ private fun AppearanceSettingsScreen(
         SettingsDropdown(
             title = "Modo oscuro",
             subtitle = when (darkMode) {
-                DarkModePreference.LIGHT -> "Claro"
-                DarkModePreference.DARK -> "Oscuro"
-                DarkModePreference.SYSTEM -> "Sistema"
+                DarkModePreference.ON -> "Oscuro"
+                DarkModePreference.OFF -> "Claro"
+                DarkModePreference.AUTO -> "Sistema"
+                DarkModePreference.TIME_BASED -> "Horario"
             },
             options = DarkModePreference.entries.map {
                 when (it) {
-                    DarkModePreference.LIGHT -> "Claro"
-                    DarkModePreference.DARK -> "Oscuro"
-                    DarkModePreference.SYSTEM -> "Sistema"
+                    DarkModePreference.ON -> "Oscuro"
+                    DarkModePreference.OFF -> "Claro"
+                    DarkModePreference.AUTO -> "Sistema"
+                    DarkModePreference.TIME_BASED -> "Horario"
                 }
             },
             selectedIndex = DarkModePreference.entries.indexOf(darkMode),
@@ -272,7 +261,7 @@ private fun AppearanceSettingsScreen(
         // Dynamic Color
         SettingsSwitch(
             title = "Color dinámico",
-            subtitle = "Usa colores del tema del sistema",
+            subtitle = "Usa colores de la carátula actual",
             checked = dynamicColor,
             onCheckedChange = { preferences.setDynamicColor(it) },
         )
@@ -617,7 +606,7 @@ private fun AboutScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Icon(
-                    imageVector = Icons.Filled.MusicNote,
+                    imageVector = IconAssets.musicNote(),
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
                     tint = MaterialTheme.colorScheme.primary,
@@ -689,7 +678,7 @@ private fun SettingsSubScreen(
         ) {
             IconButton(onClick = onBack) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    imageVector = IconAssets.arrowBack(),
                     contentDescription = "Volver",
                 )
             }
@@ -791,7 +780,7 @@ private fun SettingsDropdown(
                     )
                 }
                 Icon(
-                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    imageVector = if (expanded) IconAssets.expandLess() else IconAssets.expandMore(),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -809,7 +798,7 @@ private fun SettingsDropdown(
                             expanded = false
                         },
                         leadingIcon = if (index == selectedIndex) {
-                            { Icon(Icons.Filled.Check, contentDescription = null) }
+                            { Icon(IconAssets.check(), contentDescription = null) }
                         } else null,
                     )
                 }
@@ -889,7 +878,7 @@ private fun SettingsButton(
                 )
             }
             Icon(
-                imageVector = Icons.Filled.OpenInNew,
+                imageVector = IconAssets.link(),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
             )

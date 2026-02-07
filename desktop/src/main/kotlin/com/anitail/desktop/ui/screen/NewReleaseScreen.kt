@@ -17,8 +17,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.component.shimmer.GridItemPlaceholder
 import com.anitail.desktop.ui.component.shimmer.ShimmerHost
@@ -87,7 +86,7 @@ fun NewReleaseScreen(
         ) {
             IconButton(onClick = onBack) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    imageVector = IconAssets.arrowBack(),
                     contentDescription = "Volver",
                 )
             }

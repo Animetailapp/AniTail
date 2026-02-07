@@ -6,9 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +17,7 @@ import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadState
 import com.anitail.desktop.download.DownloadStatus
 import com.anitail.desktop.download.DownloadedSong
+import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
 
 /**
@@ -48,13 +46,13 @@ fun DownloadsScreen(
                 title = { Text("Descargas") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                        Icon(IconAssets.arrowBack(), contentDescription = "Volver")
                     }
                 },
                 actions = {
                     if (downloadedSongs.isNotEmpty()) {
                         IconButton(onClick = { showDeleteAllDialog = true }) {
-                            Icon(Icons.Filled.DeleteSweep, contentDescription = "Eliminar todo")
+                            Icon(IconAssets.deleteHistory(), contentDescription = "Eliminar todo")
                         }
                     }
                 },
@@ -142,7 +140,7 @@ private fun ActiveDownloadsTab(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
-                    imageVector = Icons.Filled.Download,
+                    imageVector = IconAssets.download(),
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
@@ -224,7 +222,7 @@ private fun DownloadProgressItem(
                     )
                 } else {
                     Icon(
-                        Icons.Filled.MusicNote,
+                        IconAssets.musicNote(),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -284,16 +282,16 @@ private fun DownloadProgressItem(
             // Actions
             if (download.status == DownloadStatus.PAUSED) {
                 IconButton(onClick = onResume) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = "Reanudar")
+                    Icon(IconAssets.play(), contentDescription = "Reanudar")
                 }
             } else if (download.status == DownloadStatus.DOWNLOADING) {
                 IconButton(onClick = onPause) {
-                    Icon(Icons.Filled.Pause, contentDescription = "Pausar")
+                    Icon(IconAssets.pause(), contentDescription = "Pausar")
                 }
             }
             
             IconButton(onClick = onCancel) {
-                Icon(Icons.Filled.Close, contentDescription = "Cancelar")
+                Icon(IconAssets.close(), contentDescription = "Cancelar")
             }
         }
     }
@@ -318,7 +316,7 @@ private fun FailedDownloadItem(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                Icons.Filled.Error,
+                IconAssets.error(),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
             )
@@ -344,11 +342,11 @@ private fun FailedDownloadItem(
             }
             
             IconButton(onClick = onRetry) {
-                Icon(Icons.Filled.Refresh, contentDescription = "Reintentar")
+                Icon(IconAssets.refresh(), contentDescription = "Reintentar")
             }
             
             IconButton(onClick = onCancel) {
-                Icon(Icons.Filled.Close, contentDescription = "Eliminar")
+                Icon(IconAssets.close(), contentDescription = "Eliminar")
             }
         }
     }
@@ -367,7 +365,7 @@ private fun CompletedDownloadsTab(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(
-                    imageVector = Icons.Filled.DownloadDone,
+                    imageVector = IconAssets.download(),
                     contentDescription = null,
                     modifier = Modifier.size(64.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
@@ -449,7 +447,7 @@ private fun DownloadedSongItem(
                     )
                 } else {
                     Icon(
-                        Icons.Filled.MusicNote,
+                        IconAssets.musicNote(),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -487,7 +485,7 @@ private fun DownloadedSongItem(
             
             // Offline indicator
             Icon(
-                Icons.Filled.OfflinePin,
+                IconAssets.offline(),
                 contentDescription = "Disponible sin conexión",
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp),
@@ -498,7 +496,7 @@ private fun DownloadedSongItem(
             // Delete button
             IconButton(onClick = { showDeleteDialog = true }) {
                 Icon(
-                    Icons.Filled.Delete,
+                    IconAssets.delete(),
                     contentDescription = "Eliminar",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

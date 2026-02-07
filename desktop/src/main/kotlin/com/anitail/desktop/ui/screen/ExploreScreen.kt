@@ -19,16 +19,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -37,9 +36,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.NavigationTitle
+import com.anitail.desktop.ui.component.TopSearch
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.component.ShimmerSectionRow
 import com.anitail.innertube.models.AlbumItem
@@ -59,70 +62,112 @@ private val ThumbnailCornerRadius = 6.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExploreScreen(
-    query: String,
+    query: TextFieldValue,
     searchState: SearchState,
     explorePage: ExplorePage?,
     chartsPage: ChartsPage?,
     isLoading: Boolean,
-    onQueryChange: (String) -> Unit,
+    onQueryChange: (TextFieldValue) -> Unit,
     onSearch: () -> Unit,
     onPlay: (LibraryItem) -> Unit,
     onAddToLibrary: (LibraryItem) -> Unit,
-    requestFocus: Boolean,
-    onRequestFocusHandled: () -> Unit,
+    searchActive: Boolean,
+    onSearchActiveChange: (Boolean) -> Unit,
+    pureBlack: Boolean,
     onChartsClick: () -> Unit = {},
     onMoodGreClick: () -> Unit = {},
     onNewReleaseClick: () -> Unit = {},
 ) {
     val focusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(requestFocus) {
-        if (requestFocus) {
+    LaunchedEffect(searchActive) {
+        if (searchActive) {
             focusRequester.requestFocus()
-            onRequestFocusHandled()
         }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        NavigationTitle(title = "Buscar")
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        TopSearch(
+            query = query,
+            onQueryChange = onQueryChange,
+            onSearch = { onSearch() },
+            active = searchActive,
+            onActiveChange = onSearchActiveChange,
+            placeholder = { Text("Busca canciones o artistas") },
+            leadingIcon = {
+                IconButton(
+                    onClick = {
+                        if (searchActive) {
+                            onSearchActiveChange(false)
+                        } else {
+                            onSearchActiveChange(true)
+                        }
+                    },
+                ) {
+                    Icon(
+                        imageVector = if (searchActive) IconAssets.arrowBack() else IconAssets.search(),
+                        contentDescription = null,
+                    )
+                }
+            },
+            trailingIcon = {
+                if (searchActive && query.text.isNotEmpty()) {
+                    IconButton(
+                        onClick = { onQueryChange(TextFieldValue("")) },
+                    ) {
+                        Icon(
+                            imageVector = IconAssets.close(),
+                            contentDescription = null,
+                        )
+                    }
+                }
+            },
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp),
+                .focusRequester(focusRequester)
+                .align(Alignment.CenterHorizontally),
+            focusRequester = focusRequester,
+            colors = if (pureBlack && searchActive) {
+                SearchBarDefaults.colors(
+                    containerColor = Color.Black,
+                    dividerColor = Color.DarkGray,
+                    inputFieldColors = TextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.Gray,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        cursorColor = Color.White,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                    )
+                )
+            } else {
+                SearchBarDefaults.colors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                )
+            }
         ) {
-            TextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier
-                    .weight(1f)
-                    .focusRequester(focusRequester),
-                placeholder = { Text("Busca canciones o artistas") },
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = onSearch) {
-                Text("Buscar")
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                if (searchState.isLoading) {
+                    Text("Buscando...")
+                }
+                searchState.errorMessage?.let { error ->
+                    Text(error)
+                }
+                if (!searchState.isLoading && searchState.results.isNotEmpty()) {
+                    NavigationTitle(title = "Resultados")
+                    ItemList(
+                        items = searchState.results,
+                        primaryAction = "Reproducir",
+                        onPrimaryAction = onPlay,
+                        secondaryAction = "Agregar",
+                        onSecondaryAction = onAddToLibrary,
+                    )
+                }
             }
         }
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (searchState.isLoading) {
-            Text("Buscando...")
-        }
-        searchState.errorMessage?.let { error ->
-            Text(error)
-        }
-
-        if (!searchState.isLoading && searchState.results.isNotEmpty()) {
-            NavigationTitle(title = "Resultados")
-            ItemList(
-                items = searchState.results,
-                primaryAction = "Reproducir",
-                onPrimaryAction = onPlay,
-                secondaryAction = "Agregar",
-                onSecondaryAction = onAddToLibrary,
-            )
-        } else if (!searchState.isLoading) {
+        if (!searchActive) {
             if (isLoading) {
                 // Shimmer placeholders para charts y explore
                 NavigationTitle(title = "Charts")
@@ -150,18 +195,20 @@ fun ExploreScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-        NavigationTitle(title = "Mood y generos")
-        SimpleChipsRow(
-            chips = listOf(
-                "Pop",
-                "Rock",
-                "Hip-Hop",
-                "Electro",
-                "Focus",
-                "Relax",
-            ),
-        )
+        if (!searchActive) {
+            Spacer(modifier = Modifier.height(16.dp))
+            NavigationTitle(title = "Mood y generos")
+            SimpleChipsRow(
+                chips = listOf(
+                    "Pop",
+                    "Rock",
+                    "Hip-Hop",
+                    "Electro",
+                    "Focus",
+                    "Relax",
+                ),
+            )
+        }
     }
 }
 
@@ -191,7 +238,7 @@ private fun ChartsRow(
                     )
                     if (item is SongItem) {
                         Icon(
-                            imageVector = Icons.Filled.PlayArrow,
+                            imageVector = IconAssets.play(),
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier
@@ -258,7 +305,7 @@ private fun YtItemRow(
                     )
                     if (item is SongItem) {
                         Icon(
-                            imageVector = Icons.Filled.PlayArrow,
+                            imageVector = IconAssets.play(),
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier

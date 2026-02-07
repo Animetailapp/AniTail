@@ -1,6 +1,8 @@
 plugins {
     kotlin("multiplatform")
     id("com.android.library")
+    id("org.jetbrains.compose")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 kotlin {
@@ -12,6 +14,10 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.ui)
             }
         }
         val commonTest by getting
@@ -35,5 +41,8 @@ android {
     compileSdk = 36
     defaultConfig {
         minSdk = 23
+    }
+    buildFeatures {
+        compose = true
     }
 }

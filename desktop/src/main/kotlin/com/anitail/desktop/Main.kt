@@ -1,14 +1,16 @@
 package com.anitail.desktop
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -26,7 +28,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -34,12 +38,22 @@ import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.db.mapper.extractVideoId
 import com.anitail.desktop.db.mapper.toLibraryItem
 import com.anitail.desktop.db.mapper.toSongEntity
+import com.anitail.desktop.constants.MiniPlayerBottomSpacing
+import com.anitail.desktop.constants.MiniPlayerHeight
+import com.anitail.desktop.constants.NavigationBarHeight
 import com.anitail.desktop.model.SimilarRecommendation
 import com.anitail.desktop.player.rememberPlayerState
 import com.anitail.desktop.storage.DesktopPreferences
-import com.anitail.desktop.ui.DesktopTheme
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import com.anitail.desktop.ui.AnitailTheme
+import com.anitail.desktop.ui.DefaultThemeColor
+import com.anitail.desktop.ui.IconAssets
+import com.anitail.desktop.ui.extractThemeColor
+import com.anitail.desktop.ui.component.BottomSheet
 import com.anitail.desktop.ui.component.DesktopTopBar
 import com.anitail.desktop.ui.component.MiniPlayer
+import com.anitail.desktop.ui.component.rememberBottomSheetState
 import com.anitail.desktop.ui.screen.AlbumDetailScreen
 import com.anitail.desktop.ui.screen.ArtistDetailScreen
 import com.anitail.desktop.ui.screen.ChartsScreen
@@ -70,12 +84,13 @@ import com.anitail.shared.repository.InnertubeMusicRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.jetbrains.skia.Image
+import java.net.URL
 
 private enum class DesktopScreen {
     Home,
     Explore,
     Library,
-    Player,
     History,
     Stats,
     Settings,
@@ -105,9 +120,7 @@ fun main() = application {
         onCloseRequest = ::exitApplication,
         title = "AniTail Desktop",
     ) {
-        DesktopTheme {
-            AniTailDesktopApp()
-        }
+        AniTailDesktopApp()
     }
 }
 
@@ -121,11 +134,16 @@ private fun AniTailDesktopApp() {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val playerState = rememberPlayerState()
+    val darkMode by preferences.darkMode.collectAsState()
+    val pureBlackEnabled by preferences.pureBlack.collectAsState()
+    val dynamicColorEnabled by preferences.dynamicColor.collectAsState()
+    var themeColor by remember { mutableStateOf(DefaultThemeColor) }
+    var lastArtworkUrl by remember { mutableStateOf<String?>(null) }
 
     var currentScreen by remember { mutableStateOf(DesktopScreen.Home) }
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
     var searchState by remember { mutableStateOf(SearchState()) }
-    var requestSearchFocus by remember { mutableStateOf(false) }
+    var searchActive by remember { mutableStateOf(false) }
 
     // Library state from Database
     val songs by database.songsInLibrary().collectAsState(initial = emptyList())
@@ -148,6 +166,23 @@ private fun AniTailDesktopApp() {
     var similarRecommendations by remember { mutableStateOf<List<SimilarRecommendation>>(emptyList()) }
     var detailNavigation by remember { mutableStateOf(DetailNavigation()) }
     val navigationHistory = remember { mutableStateListOf<DesktopScreen>() }
+
+    LaunchedEffect(dynamicColorEnabled, playerState.currentItem?.artworkUrl) {
+        if (!dynamicColorEnabled) {
+            themeColor = DefaultThemeColor
+            lastArtworkUrl = null
+            return@LaunchedEffect
+        }
+        val artworkUrl = playerState.currentItem?.artworkUrl
+        if (artworkUrl.isNullOrBlank()) {
+            themeColor = DefaultThemeColor
+            lastArtworkUrl = null
+            return@LaunchedEffect
+        }
+        if (artworkUrl == lastArtworkUrl) return@LaunchedEffect
+        lastArtworkUrl = artworkUrl
+        themeColor = fetchThemeColorFromUrl(artworkUrl) ?: DefaultThemeColor
+    }
 
     // Initialize Database and sync preferences with Innertube
     LaunchedEffect(Unit) {
@@ -245,221 +280,197 @@ private fun AniTailDesktopApp() {
         }
     }
 
-    Scaffold(
-        topBar = {
-            val title = when (currentScreen) {
-                DesktopScreen.Home -> "Inicio"
-                DesktopScreen.Explore -> "Explorar"
-                DesktopScreen.Library -> "Biblioteca"
-                DesktopScreen.Player -> "Reproductor"
-                DesktopScreen.History -> "Historial"
-                DesktopScreen.Stats -> "Estadísticas"
-                DesktopScreen.Settings -> "Ajustes"
-                DesktopScreen.ArtistDetail -> detailNavigation.artistName ?: "Artista"
-                DesktopScreen.AlbumDetail -> detailNavigation.albumName ?: "Álbum"
-                DesktopScreen.PlaylistDetail -> detailNavigation.playlistName ?: "Playlist"
-                DesktopScreen.Search -> "Buscar"
-                DesktopScreen.Charts -> "Éxitos"
-                DesktopScreen.MoodAndGenres -> "Estados de ánimo y géneros"
-                DesktopScreen.NewRelease -> "Nuevos lanzamientos"
+    AnitailTheme(
+        darkMode = darkMode,
+        pureBlack = pureBlackEnabled,
+        themeColor = themeColor,
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val playerBottomSheetState =
+                rememberBottomSheetState(
+                    dismissedBound = 0.dp,
+                    collapsedBound = NavigationBarHeight + MiniPlayerBottomSpacing + MiniPlayerHeight,
+                    expandedBound = maxHeight,
+                )
+            val playerBottomPadding = if (!playerBottomSheetState.isDismissed) {
+                MiniPlayerHeight + MiniPlayerBottomSpacing
+            } else {
+                0.dp
             }
-            DesktopTopBar(
-                title = title,
-                onSearch = {
-                    currentScreen = DesktopScreen.Explore
-                    requestSearchFocus = true
-                },
-                onHistory = {
-                    currentScreen = DesktopScreen.History
-                },
-                onStats = {
-                    currentScreen = DesktopScreen.Stats
-                },
-                onSettings = {
-                    currentScreen = DesktopScreen.Settings
-                },
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        bottomBar = {
-            Column {
-                if (playerState.currentItem != null) {
-                    MiniPlayer(
-                        playerState = playerState,
-                        onOpenFullPlayer = { currentScreen = DesktopScreen.Player },
-                    )
-                }
-                NavigationBar {
-                    NavigationBarItem(
-                        selected = currentScreen == DesktopScreen.Home,
-                        onClick = { currentScreen = DesktopScreen.Home },
-                        label = { Text("Inicio") },
-                        icon = { Icon(Icons.Filled.Home, contentDescription = null) },
-                        colors = NavigationBarItemDefaults.colors(),
-                    )
-                    NavigationBarItem(
-                        selected = currentScreen == DesktopScreen.Explore,
-                        onClick = { currentScreen = DesktopScreen.Explore },
-                        label = { Text("Explorar") },
-                        icon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                        colors = NavigationBarItemDefaults.colors(),
-                    )
-                    NavigationBarItem(
-                        selected = currentScreen == DesktopScreen.Library,
-                        onClick = { currentScreen = DesktopScreen.Library },
-                        label = { Text("Biblioteca") },
-                        icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
-                        colors = NavigationBarItemDefaults.colors(),
-                    )
-                    NavigationBarItem(
-                        selected = currentScreen == DesktopScreen.Search,
-                        onClick = { currentScreen = DesktopScreen.Search },
-                        label = { Text("Buscar") },
-                        icon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                        colors = NavigationBarItemDefaults.colors(),
-                    )
+            val contentBottomPadding = NavigationBarHeight + playerBottomPadding
+            val bottomSheetBackgroundColor =
+                if (pureBlackEnabled) Color.Black else MaterialTheme.colorScheme.surfaceContainer
+
+            LaunchedEffect(playerState.currentItem) {
+                if (playerState.currentItem == null) {
+                    playerBottomSheetState.dismiss()
+                } else if (playerBottomSheetState.isDismissed) {
+                    playerBottomSheetState.collapseSoft()
                 }
             }
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .padding(16.dp),
-        ) {
-            when (currentScreen) {
-                DesktopScreen.Home -> {
-                    HomeScreen(
-                        homePage = homePage,
-                        selectedChip = selectedChip,
-                        isLoading = isHomeLoading,
-                        isLoadingMore = isLoadingMore,
-                        quickPicks = quickPicks,
-                        keepListening = keepListening,
-                        forgottenFavorites = forgottenFavorites,
-                        similarRecommendations = similarRecommendations,
-                        playerState = playerState,
-                        onChipSelected = { chip ->
-                            scope.launch {
-                                handleChipSelection(
-                                    chip = chip,
-                                    selectedChip = selectedChip,
-                                    previousHomePage = previousHomePage,
-                                    currentHomePage = homePage,
-                                    onSelectedChip = { selectedChip = it },
-                                    onPreviousPage = { previousHomePage = it },
-                                    onPage = { page -> homePage = page },
-                                    onLoading = { isHomeLoading = it },
-                                )
-                            }
-                        },
-                        onLoadMore = {
-                            if (isLoadingMore) return@HomeScreen
-                            val continuation = homePage?.continuation ?: return@HomeScreen
-                            scope.launch {
-                                isLoadingMore = true
-                                val nextPage = YouTube.home(continuation).getOrNull()
-                                if (nextPage != null) {
-                                    homePage = homePage?.copy(
-                                        sections = homePage?.sections.orEmpty() + nextPage.sections,
-                                        continuation = nextPage.continuation,
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                Scaffold(
+                    topBar = {
+                        DesktopTopBar(
+                            onSearch = {
+                                currentScreen = DesktopScreen.Explore
+                                searchActive = true
+                            },
+                            onHistory = {
+                                currentScreen = DesktopScreen.History
+                            },
+                            onStats = {
+                                currentScreen = DesktopScreen.Stats
+                            },
+                            onSettings = {
+                                currentScreen = DesktopScreen.Settings
+                            },
+                            pureBlack = pureBlackEnabled,
+                        )
+                    },
+                    snackbarHost = { SnackbarHost(snackbarHostState) },
+                ) { padding ->
+                    Column(
+                        modifier = Modifier
+                            .padding(padding)
+                            .padding(bottom = contentBottomPadding)
+                            .fillMaxSize()
+                            .padding(16.dp),
+                    ) {
+                        when (currentScreen) {
+                        DesktopScreen.Home -> {
+                        HomeScreen(
+                            homePage = homePage,
+                            selectedChip = selectedChip,
+                            isLoading = isHomeLoading,
+                            isLoadingMore = isLoadingMore,
+                            quickPicks = quickPicks,
+                            keepListening = keepListening,
+                            forgottenFavorites = forgottenFavorites,
+                            similarRecommendations = similarRecommendations,
+                            playerState = playerState,
+                            onChipSelected = { chip ->
+                                scope.launch {
+                                    handleChipSelection(
+                                        chip = chip,
+                                        selectedChip = selectedChip,
+                                        previousHomePage = previousHomePage,
+                                        currentHomePage = homePage,
+                                        onSelectedChip = { selectedChip = it },
+                                        onPreviousPage = { previousHomePage = it },
+                                        onPage = { page -> homePage = page },
+                                        onLoading = { isHomeLoading = it },
                                     )
                                 }
-                                isLoadingMore = false
-                            }
-                        },
-                        onItemSelected = { item ->
-                            when (item) {
-                                is ArtistItem -> {
-                                    navigationHistory.add(DesktopScreen.Home)
-                                    detailNavigation = detailNavigation.copy(
-                                        artistId = item.id,
-                                        artistName = item.title,
-                                    )
-                                    currentScreen = DesktopScreen.ArtistDetail
+                            },
+                            onLoadMore = {
+                                if (isLoadingMore) return@HomeScreen
+                                val continuation = homePage?.continuation ?: return@HomeScreen
+                                scope.launch {
+                                    isLoadingMore = true
+                                    val nextPage = YouTube.home(continuation).getOrNull()
+                                    if (nextPage != null) {
+                                        homePage = homePage?.copy(
+                                            sections = homePage?.sections.orEmpty() + nextPage.sections,
+                                            continuation = nextPage.continuation,
+                                        )
+                                    }
+                                    isLoadingMore = false
                                 }
-                                is AlbumItem -> {
-                                    navigationHistory.add(DesktopScreen.Home)
-                                    detailNavigation = detailNavigation.copy(
-                                        albumId = item.browseId,
-                                        albumName = item.title,
-                                    )
-                                    currentScreen = DesktopScreen.AlbumDetail
-                                }
-                                is PlaylistItem -> {
-                                    navigationHistory.add(DesktopScreen.Home)
-                                    detailNavigation = detailNavigation.copy(
-                                        playlistId = item.id,
-                                        playlistName = item.title,
-                                    )
-                                    currentScreen = DesktopScreen.PlaylistDetail
-                                }
-                                else -> {
-                                    itemToLibraryItem(item)?.let { libraryItem ->
-                                        playerState.play(libraryItem)
-                                        currentScreen = DesktopScreen.Player
+                            },
+                            onItemSelected = { item ->
+                                when (item) {
+                                    is ArtistItem -> {
+                                        navigationHistory.add(DesktopScreen.Home)
+                                        detailNavigation = detailNavigation.copy(
+                                            artistId = item.id,
+                                            artistName = item.title,
+                                        )
+                                        currentScreen = DesktopScreen.ArtistDetail
+                                    }
+                                    is AlbumItem -> {
+                                        navigationHistory.add(DesktopScreen.Home)
+                                        detailNavigation = detailNavigation.copy(
+                                            albumId = item.browseId,
+                                            albumName = item.title,
+                                        )
+                                        currentScreen = DesktopScreen.AlbumDetail
+                                    }
+                                    is PlaylistItem -> {
+                                        navigationHistory.add(DesktopScreen.Home)
+                                        detailNavigation = detailNavigation.copy(
+                                            playlistId = item.id,
+                                            playlistName = item.title,
+                                        )
+                                        currentScreen = DesktopScreen.PlaylistDetail
+                                    }
+                                    else -> {
+                                        itemToLibraryItem(item)?.let { libraryItem ->
+                                            playerState.play(libraryItem)
+                                            playerBottomSheetState.collapseSoft()
+                                        }
                                     }
                                 }
-                            }
-                        },
-                        onAddToLibrary = { item ->
-                            val songEntity = itemToLibraryItem(item)?.toSongEntity()
-                            if (songEntity != null) {
+                            },
+                            onAddToLibrary = { item ->
+                                val songEntity = itemToLibraryItem(item)?.toSongEntity()
+                                if (songEntity != null) {
+                                    scope.launch {
+                                        database.insertSong(songEntity)
+                                    }
+                                }
+                            },
+                            onShuffleAll = {
+                                val shuffled = quickPicks.shuffled()
+                                if (shuffled.isNotEmpty()) {
+                                    playerState.shuffleEnabled = true
+                                    playerState.play(shuffled.first())
+                                    shuffled.drop(1).forEach { playerState.addToQueue(it) }
+                                    playerBottomSheetState.collapseSoft()
+                                }
+                            },
+                        )
+                    }
+
+                    DesktopScreen.Explore -> {
+                        ExploreScreen(
+                            query = searchQuery,
+                            searchState = searchState,
+                            explorePage = explorePage,
+                            chartsPage = chartsPage,
+                            isLoading = isExploreLoading,
+                            onQueryChange = { searchQuery = it },
+                            onSearch = {
+                                scope.launch {
+                                    searchState =
+                                        searchState.copy(isLoading = true, errorMessage = null)
+                                    val results = repository.search(searchQuery.text)
+                                    searchState = searchState.copy(
+                                        isLoading = false,
+                                        results = results,
+                                        errorMessage = if (results.isEmpty()) "Sin resultados" else null,
+                                    )
+                                }
+                            },
+                            onPlay = { item ->
+                                playerState.play(item)
+                                playerBottomSheetState.collapseSoft()
+                            },
+                            onAddToLibrary = { item ->
+                                val songEntity = item.toSongEntity()
                                 scope.launch {
                                     database.insertSong(songEntity)
                                 }
-                            }
-                        },
-                        onShuffleAll = {
-                            val shuffled = quickPicks.shuffled()
-                            if (shuffled.isNotEmpty()) {
-                                playerState.shuffleEnabled = true
-                                playerState.play(shuffled.first())
-                                shuffled.drop(1).forEach { playerState.addToQueue(it) }
-                                currentScreen = DesktopScreen.Player
-                            }
-                        },
-                    )
-                }
-
-                DesktopScreen.Explore -> {
-                    ExploreScreen(
-                        query = searchQuery,
-                        searchState = searchState,
-                        explorePage = explorePage,
-                        chartsPage = chartsPage,
-                        isLoading = isExploreLoading,
-                        onQueryChange = { searchQuery = it },
-                        onSearch = {
-                            scope.launch {
-                                searchState =
-                                    searchState.copy(isLoading = true, errorMessage = null)
-                                val results = repository.search(searchQuery)
-                                searchState = searchState.copy(
-                                    isLoading = false,
-                                    results = results,
-                                    errorMessage = if (results.isEmpty()) "Sin resultados" else null,
-                                )
-                            }
-                        },
-                        onPlay = { item ->
-                            playerState.play(item)
-                            currentScreen = DesktopScreen.Player
-                        },
-                        onAddToLibrary = { item ->
-                            val songEntity = item.toSongEntity()
-                            scope.launch {
-                                database.insertSong(songEntity)
-                            }
-                        },
-                        requestFocus = requestSearchFocus,
-                        onRequestFocusHandled = { requestSearchFocus = false },
-                        onChartsClick = { currentScreen = DesktopScreen.Charts },
-                        onMoodGreClick = { currentScreen = DesktopScreen.MoodAndGenres },
-                        onNewReleaseClick = { currentScreen = DesktopScreen.NewRelease },
-                    )
-                }
+                            },
+                            searchActive = searchActive,
+                            onSearchActiveChange = { searchActive = it },
+                            pureBlack = pureBlackEnabled,
+                            onChartsClick = { currentScreen = DesktopScreen.Charts },
+                            onMoodGreClick = { currentScreen = DesktopScreen.MoodAndGenres },
+                            onNewReleaseClick = { currentScreen = DesktopScreen.NewRelease },
+                        )
+                    }
 
                 DesktopScreen.Library -> {
                     LibraryScreenEnhanced(
@@ -467,6 +478,7 @@ private fun AniTailDesktopApp() {
                         playerState = playerState,
                         onPlayItem = { item ->
                             playerState.play(item)
+                            playerBottomSheetState.collapseSoft()
                         },
                         onArtistClick = { artistId, artistName ->
                             navigationHistory.add(DesktopScreen.Library)
@@ -505,19 +517,12 @@ private fun AniTailDesktopApp() {
                     )
                 }
 
-                DesktopScreen.Player -> {
-                    PlayerScreen(
-                        item = playerState.currentItem,
-                        playerState = playerState,
-                    )
-                }
-
                 DesktopScreen.History -> {
                     HistoryScreen(
                         items = libraryItems,
                         onPlay = { item ->
                             playerState.play(item)
-                            currentScreen = DesktopScreen.Player
+                            playerBottomSheetState.collapseSoft()
                         },
                     )
                 }
@@ -538,6 +543,7 @@ private fun AniTailDesktopApp() {
                         onBack = { currentScreen = DesktopScreen.Explore },
                         onPlayTrack = { item ->
                             playerState.play(item)
+                            playerBottomSheetState.collapseSoft()
                         },
                         onArtistClick = { artistId, _ ->
                             navigationHistory.add(DesktopScreen.Charts)
@@ -552,14 +558,12 @@ private fun AniTailDesktopApp() {
                     )
                 }
 
-                DesktopScreen.MoodAndGenres -> {
-                    MoodAndGenresScreen(
-                        onBack = { currentScreen = DesktopScreen.Explore },
-                        onCategoryClick = { browseId, params, title ->
-                            // TODO: Implement Category/Mood Playlist viewing
-                        }
-                    )
-                }
+                            DesktopScreen.MoodAndGenres -> {
+                                MoodAndGenresScreen(
+                                    onBack = { currentScreen = DesktopScreen.Explore },
+                                    onCategoryClick = { _, _, _ -> }
+                                )
+                            }
 
                 DesktopScreen.NewRelease -> {
                     NewReleaseScreen(
@@ -612,6 +616,7 @@ private fun AniTailDesktopApp() {
                         },
                         onSongClick = { item ->
                             playerState.play(item)
+                            playerBottomSheetState.collapseSoft()
                         },
                     )
                 }
@@ -686,7 +691,86 @@ private fun AniTailDesktopApp() {
                         },
                         onSongClick = { item ->
                             playerState.play(item)
+                            playerBottomSheetState.collapseSoft()
                         },
+                    )
+                }
+                        }
+                    }
+                }
+
+                BottomSheet(
+                    state = playerBottomSheetState,
+                    background = {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(bottomSheetBackgroundColor)
+                        )
+                    },
+                    onDismiss = { playerState.stop() },
+                    collapsedContent = {
+                        if (playerState.currentItem != null) {
+                            MiniPlayer(
+                                playerState = playerState,
+                                onOpenFullPlayer = { playerBottomSheetState.expandSoft() },
+                            )
+                        }
+                    },
+                ) {
+                    PlayerScreen(
+                        item = playerState.currentItem,
+                        playerState = playerState,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+
+                NavigationBar(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .height(NavigationBarHeight)
+                        .offset(y = NavigationBarHeight * playerBottomSheetState.progress.coerceIn(0f, 1f)),
+                    containerColor = if (pureBlackEnabled) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
+                    contentColor = if (pureBlackEnabled) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                ) {
+                    NavigationBarItem(
+                        selected = currentScreen == DesktopScreen.Home,
+                        onClick = { currentScreen = DesktopScreen.Home },
+                        label = { Text("Inicio") },
+                        icon = {
+                            val selected = currentScreen == DesktopScreen.Home
+                            Icon(
+                                if (selected) IconAssets.homeFilled() else IconAssets.homeOutlined(),
+                                contentDescription = null,
+                            )
+                        },
+                        colors = NavigationBarItemDefaults.colors(),
+                    )
+                    NavigationBarItem(
+                        selected = currentScreen == DesktopScreen.Explore,
+                        onClick = { currentScreen = DesktopScreen.Explore },
+                        label = { Text("Explorar") },
+                        icon = {
+                            val selected = currentScreen == DesktopScreen.Explore
+                            Icon(
+                                if (selected) IconAssets.exploreFilled() else IconAssets.exploreOutlined(),
+                                contentDescription = null,
+                            )
+                        },
+                        colors = NavigationBarItemDefaults.colors(),
+                    )
+                    NavigationBarItem(
+                        selected = currentScreen == DesktopScreen.Library,
+                        onClick = { currentScreen = DesktopScreen.Library },
+                        label = { Text("Biblioteca") },
+                        icon = {
+                            val selected = currentScreen == DesktopScreen.Library
+                            Icon(
+                                if (selected) IconAssets.libraryFilled() else IconAssets.libraryOutlined(),
+                                contentDescription = null,
+                            )
+                        },
+                        colors = NavigationBarItemDefaults.colors(),
                     )
                 }
             }
@@ -694,6 +778,13 @@ private fun AniTailDesktopApp() {
     }
 
     // El reproductor nativo ahora actualiza la posición automáticamente
+}
+
+private suspend fun fetchThemeColorFromUrl(url: String): Color? = withContext(Dispatchers.IO) {
+    val bytes = runCatching { URL(url).readBytes() }.getOrNull() ?: return@withContext null
+    val bitmap = runCatching { Image.makeFromEncoded(bytes).asImageBitmap() }.getOrNull()
+        ?: return@withContext null
+    runCatching { bitmap.extractThemeColor() }.getOrNull()
 }
 
 private suspend fun loadHomePage(

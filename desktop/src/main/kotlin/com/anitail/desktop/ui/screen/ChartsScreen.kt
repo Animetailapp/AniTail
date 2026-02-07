@@ -19,8 +19,6 @@ import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.shimmer.GridItemPlaceholder
 import com.anitail.desktop.ui.component.shimmer.ShimmerHost
@@ -92,7 +91,7 @@ fun ChartsScreen(
         ) {
             IconButton(onClick = onBack) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    imageVector = IconAssets.arrowBack(),
                     contentDescription = "Volver",
                 )
             }

@@ -20,12 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Radio
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,6 +43,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.ui.IconAssets
 import androidx.compose.ui.unit.sp
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.component.RemoteImage
@@ -191,7 +186,7 @@ fun ArtistDetailScreen(
                                                 modifier = Modifier.height(40.dp)
                                             ) {
                                                 Icon(
-                                                    Icons.Default.Radio,
+                                                    IconAssets.radio(),
                                                     contentDescription = null,
                                                     modifier = Modifier.size(20.dp)
                                                 )
@@ -227,7 +222,7 @@ fun ArtistDetailScreen(
                                                     )
                                             ) {
                                                 Icon(
-                                                    Icons.Default.Shuffle,
+                                                    IconAssets.shuffle(),
                                                     contentDescription = "Shuffle",
                                                     tint = MaterialTheme.colorScheme.onPrimary,
                                                     modifier = Modifier.size(20.dp)
@@ -329,7 +324,7 @@ fun ArtistDetailScreen(
                 .padding(8.dp)
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                Icon(IconAssets.arrowBack(), contentDescription = "Volver")
             }
             if (!transparentAppBar) {
                 Text(
@@ -489,7 +484,7 @@ private fun YouTubeListItem(
 
         IconButton(onClick = onMoreClick) {
             Icon(
-                Icons.Default.MoreVert,
+                IconAssets.moreVert(),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )

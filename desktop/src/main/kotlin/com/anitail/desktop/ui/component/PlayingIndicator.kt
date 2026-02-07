@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,6 +24,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.ui.IconAssets
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
@@ -107,7 +106,7 @@ fun PlayingIndicatorBox(
                 )
             } else {
                 Icon(
-                    imageVector = Icons.Filled.PlayArrow,
+                    imageVector = IconAssets.play(),
                     contentDescription = null,
                     tint = color,
                     modifier = Modifier.size(24.dp),

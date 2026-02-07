@@ -27,9 +27,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -47,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.component.HideOnScrollFAB
 import com.anitail.desktop.ui.component.NavigationTitle
@@ -333,7 +331,7 @@ private fun HomeItemCard(
                 // Overlay play button for songs
                 if (item is SongItem) {
                     Icon(
-                        imageVector = Icons.Filled.PlayArrow,
+                        imageVector = IconAssets.play(),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier
@@ -461,7 +459,7 @@ private fun QuickPickRowItem(
                 )
             }
             IconButton(onClick = onSecondary) {
-                Icon(Icons.Filled.MoreVert, contentDescription = "Menu")
+                Icon(IconAssets.moreVert(), contentDescription = "Menu")
             }
         }
     }
@@ -514,7 +512,7 @@ private fun KeepListeningRow(
                         )
                         if (!isArtist) {
                             Icon(
-                                imageVector = Icons.Filled.PlayArrow,
+                                imageVector = IconAssets.play(),
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier

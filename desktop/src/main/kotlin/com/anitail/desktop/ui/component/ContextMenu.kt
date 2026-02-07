@@ -10,14 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.QueueMusic
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -30,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.ui.IconAssets
 import com.anitail.shared.model.LibraryItem
 
 /**
@@ -75,7 +68,7 @@ fun ItemContextMenu(
         // Opciones
         ContextMenuItem(
             label = "Reproducir",
-            icon = Icons.Filled.PlayArrow,
+            icon = IconAssets.play(),
             onClick = {
                 onPlay()
                 onDismiss()
@@ -84,7 +77,7 @@ fun ItemContextMenu(
 
         ContextMenuItem(
             label = "Reproducir siguiente",
-            icon = Icons.Filled.QueueMusic,
+            icon = IconAssets.queueMusic(),
             onClick = {
                 onPlayNext()
                 onDismiss()
@@ -93,7 +86,7 @@ fun ItemContextMenu(
 
         ContextMenuItem(
             label = "Agregar a la cola",
-            icon = Icons.Filled.PlaylistAdd,
+            icon = IconAssets.playlistAdd(),
             onClick = {
                 onAddToQueue()
                 onDismiss()
@@ -104,7 +97,7 @@ fun ItemContextMenu(
 
         ContextMenuItem(
             label = "Agregar a biblioteca",
-            icon = Icons.Filled.Add,
+            icon = IconAssets.add(),
             onClick = {
                 onAddToLibrary()
                 onDismiss()
@@ -114,7 +107,7 @@ fun ItemContextMenu(
         if (onToggleFavorite != null) {
             ContextMenuItem(
                 label = if (isFavorite) "Quitar de favoritos" else "Agregar a favoritos",
-                icon = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                icon = if (isFavorite) IconAssets.favorite() else IconAssets.favoriteBorder(),
                 onClick = {
                     onToggleFavorite()
                     onDismiss()
@@ -126,7 +119,7 @@ fun ItemContextMenu(
 
         ContextMenuItem(
             label = "Compartir",
-            icon = Icons.Filled.Share,
+            icon = IconAssets.share(),
             onClick = {
                 // Copy URL to clipboard
                 val url = item.playbackUrl

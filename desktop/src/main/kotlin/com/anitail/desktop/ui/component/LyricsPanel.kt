@@ -18,10 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lyrics
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.anitail.desktop.lyrics.DesktopLyricsService
 import com.anitail.desktop.lyrics.LyricLine
 import com.anitail.desktop.lyrics.LyricsResult
+import com.anitail.desktop.ui.IconAssets
 import kotlinx.coroutines.launch
 
 /**
@@ -113,7 +110,7 @@ fun LyricsPanel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Lyrics,
+                    imageVector = IconAssets.lyrics(),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                 )
@@ -157,7 +154,7 @@ fun LyricsPanel(
                             }
                         }
                     ) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Reintentar")
+                        Icon(IconAssets.refresh(), contentDescription = "Reintentar")
                     }
                 }
             }
@@ -183,7 +180,7 @@ fun LyricsPanel(
                             verticalArrangement = Arrangement.Center,
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.MusicNote,
+                                imageVector = IconAssets.musicNote(),
                                 contentDescription = null,
                                 modifier = Modifier.size(48.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
@@ -238,7 +235,7 @@ fun LyricsPanel(
                             verticalArrangement = Arrangement.Center,
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.Lyrics,
+                                imageVector = IconAssets.lyrics(),
                                 contentDescription = null,
                                 modifier = Modifier.size(48.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),

@@ -17,14 +17,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -50,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.ui.IconAssets
 import androidx.compose.ui.unit.sp
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.component.RemoteImage
@@ -98,7 +91,7 @@ fun AlbumDetailScreen(
                 modifier = Modifier.fillMaxWidth().padding(8.dp),
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                    Icon(IconAssets.arrowBack(), contentDescription = "Volver")
                 }
                 Text(
                     text = albumPage?.album?.title ?: albumName,
@@ -179,8 +172,8 @@ fun AlbumDetailScreen(
                                     onClick = { isLiked = !isLiked }
                                 ) {
                                     Icon(
-                                        imageVector = if (isLiked) Icons.Default.Favorite
-                                        else Icons.Default.FavoriteBorder,
+                                        imageVector = if (isLiked) IconAssets.favorite()
+                                        else IconAssets.favoriteBorder(),
                                         contentDescription = null,
                                         tint = if (isLiked) MaterialTheme.colorScheme.error
                                         else LocalContentColor.current,
@@ -191,7 +184,7 @@ fun AlbumDetailScreen(
                                     onClick = { /* TODO: Download */ }
                                 ) {
                                     Icon(
-                                        Icons.Default.Download,
+                                        IconAssets.download(),
                                         contentDescription = null,
                                     )
                                 }
@@ -200,7 +193,7 @@ fun AlbumDetailScreen(
                                     onClick = { /* TODO: More menu */ }
                                 ) {
                                     Icon(
-                                        Icons.Default.MoreVert,
+                                        IconAssets.moreVert(),
                                         contentDescription = null,
                                     )
                                 }
@@ -223,7 +216,7 @@ fun AlbumDetailScreen(
                             modifier = Modifier.weight(1f),
                         ) {
                             Icon(
-                                Icons.Default.PlayArrow,
+                                IconAssets.play(),
                                 contentDescription = null,
                                 modifier = Modifier.size(ButtonDefaults.IconSize),
                             )
@@ -243,7 +236,7 @@ fun AlbumDetailScreen(
                             modifier = Modifier.weight(1f),
                         ) {
                             Icon(
-                                Icons.Default.Shuffle,
+                                IconAssets.shuffle(),
                                 contentDescription = null,
                                 modifier = Modifier.size(ButtonDefaults.IconSize),
                             )
@@ -391,7 +384,7 @@ private fun SongListItem(
         // Botón más opciones
         IconButton(onClick = onMoreClick) {
             Icon(
-                Icons.Default.MoreVert,
+                IconAssets.moreVert(),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )

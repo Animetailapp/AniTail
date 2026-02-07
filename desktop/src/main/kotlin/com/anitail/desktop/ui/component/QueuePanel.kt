@@ -16,14 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.RepeatOne
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.ui.IconAssets
 import com.anitail.shared.model.LibraryItem
 
 /**
@@ -68,7 +61,7 @@ fun QueuePanel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    imageVector = Icons.Filled.QueueMusic,
+                    imageVector = IconAssets.queueMusic(),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                 )
@@ -107,7 +100,7 @@ fun QueuePanel(
                     label = { Text("Aleatorio") },
                     leadingIcon = {
                         Icon(
-                            Icons.Filled.Shuffle,
+                            IconAssets.shuffle(),
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )
@@ -130,9 +123,9 @@ fun QueuePanel(
                     leadingIcon = {
                         Icon(
                             if (playerState.repeatMode == com.anitail.desktop.player.RepeatMode.ONE) {
-                                Icons.Filled.RepeatOne
+                                IconAssets.repeatOne()
                             } else {
-                                Icons.Filled.Repeat
+                                IconAssets.repeat()
                             },
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
@@ -153,7 +146,7 @@ fun QueuePanel(
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.QueueMusic,
+                            imageVector = IconAssets.queueMusic(),
                             contentDescription = null,
                             modifier = Modifier.size(48.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
@@ -287,7 +280,7 @@ private fun QueueItem(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.MusicNote,
+                        imageVector = IconAssets.musicNote(),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -303,7 +296,7 @@ private fun QueueItem(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.PlayArrow,
+                        imageVector = IconAssets.play(),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(24.dp),
@@ -346,7 +339,7 @@ private fun QueueItem(
                 modifier = Modifier.size(32.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Close,
+                    imageVector = IconAssets.close(),
                     contentDescription = "Eliminar de la cola",
                     modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),

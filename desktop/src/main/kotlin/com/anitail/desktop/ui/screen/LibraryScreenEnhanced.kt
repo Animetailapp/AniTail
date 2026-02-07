@@ -20,17 +20,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -56,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.shared.model.LibraryItem
@@ -107,21 +97,21 @@ fun LibraryScreenEnhanced(
             SpecialPlaylist(
                 id = "liked",
                 name = "Me gusta",
-                icon = Icons.Filled.Favorite,
+                icon = IconAssets.favorite(),
                 iconTint = Color(0xFFE91E63),
                 songCount = 0,
             ),
             SpecialPlaylist(
                 id = "offline",
                 name = "Sin conexión",
-                icon = Icons.Filled.CloudDownload,
+                icon = IconAssets.download(),
                 iconTint = Color(0xFF4CAF50),
                 songCount = 0,
             ),
             SpecialPlaylist(
                 id = "top50",
                 name = "Mi Top 50",
-                icon = Icons.Filled.TrendingUp,
+                icon = IconAssets.trendingUp(),
                 iconTint = Color(0xFFFF9800),
                 songCount = 0,
             ),
@@ -287,7 +277,7 @@ private fun LibraryMixContent(
                         fontWeight = FontWeight.Bold,
                     )
                     IconButton(onClick = onCreatePlaylist) {
-                        Icon(Icons.Filled.Add, contentDescription = "Crear playlist")
+                        Icon(IconAssets.add(), contentDescription = "Crear playlist")
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -474,7 +464,7 @@ private fun LibrarySongsContent(
 ) {
     if (songs.isEmpty()) {
         EmptyStateMessage(
-            icon = Icons.Filled.MusicNote,
+            icon = IconAssets.musicNote(),
             title = "No hay canciones",
             subtitle = "Las canciones que guardes aparecerán aquí",
         )
@@ -500,7 +490,7 @@ private fun LibraryAlbumsContent(
 ) {
     if (albums.isEmpty()) {
         EmptyStateMessage(
-            icon = Icons.Filled.Album,
+            icon = IconAssets.album(),
             title = "No hay álbumes",
             subtitle = "Los álbumes que guardes aparecerán aquí",
         )
@@ -534,7 +524,7 @@ private fun LibraryArtistsContent(
 ) {
     if (artists.isEmpty()) {
         EmptyStateMessage(
-            icon = Icons.Filled.Person,
+            icon = IconAssets.person(),
             title = "No hay artistas",
             subtitle = "Los artistas que sigas aparecerán aquí",
         )
@@ -564,7 +554,7 @@ private fun LibraryArtistsContent(
 @Composable
 private fun LibraryDownloadsContent() {
     EmptyStateMessage(
-        icon = Icons.Filled.CloudDownload,
+        icon = IconAssets.download(),
         title = "No hay descargas",
         subtitle = "Las descargas estarán disponibles próximamente en Desktop",
     )
@@ -649,7 +639,7 @@ private fun CreatePlaylistCard(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Add,
+                    imageVector = IconAssets.add(),
                     contentDescription = null,
                     modifier = Modifier.size(40.dp),
                     tint = MaterialTheme.colorScheme.primary,
@@ -691,7 +681,7 @@ private fun LibraryGridItem(
                     )
                 } else {
                     Icon(
-                        imageVector = Icons.Filled.QueueMusic,
+                        imageVector = IconAssets.queueMusic(),
                         contentDescription = null,
                         modifier = Modifier
                             .size(48.dp)
@@ -749,7 +739,7 @@ private fun ArtistGridItem(
                 )
             } else {
                 Icon(
-                    imageVector = Icons.Filled.Person,
+                    imageVector = IconAssets.person(),
                     contentDescription = null,
                     modifier = Modifier
                         .size(48.dp)
@@ -799,7 +789,7 @@ private fun SongListItem(
                     )
                 } else {
                     Icon(
-                        imageVector = Icons.Filled.MusicNote,
+                        imageVector = IconAssets.musicNote(),
                         contentDescription = null,
                         modifier = Modifier
                             .size(24.dp)
@@ -828,7 +818,7 @@ private fun SongListItem(
             }
             IconButton(onClick = { onPlay(item) }) {
                 Icon(
-                    imageVector = Icons.Filled.PlayArrow,
+                    imageVector = IconAssets.play(),
                     contentDescription = "Reproducir",
                 )
             }
@@ -847,7 +837,7 @@ private fun EmptyLibraryState() {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Icon(
-                imageVector = Icons.Filled.LibraryMusic,
+                imageVector = IconAssets.libraryMusic(),
                 contentDescription = null,
                 modifier = Modifier.size(80.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
