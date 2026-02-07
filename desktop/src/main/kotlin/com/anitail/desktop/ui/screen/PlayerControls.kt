@@ -17,9 +17,8 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.constants.PlayerHorizontalPadding
 import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.storage.SliderStyle
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.shared.model.LibraryItem
 
@@ -46,6 +46,9 @@ fun PlayerControls(
     playerState: PlayerState,
     textColor: Color,
     mutedTextColor: Color,
+    sliderStyle: SliderStyle,
+    textButtonColor: Color,
+    iconButtonColor: Color,
     modifier: Modifier = Modifier,
 ) {
     var sliderPosition by remember { mutableStateOf<Float?>(null) }
@@ -104,19 +107,17 @@ fun PlayerControls(
 
         Spacer(Modifier.height(12.dp))
 
-        Slider(
+        PlayerProgressSlider(
             value = sliderValue,
-            valueRange = 0f..1f,
             onValueChange = { sliderPosition = it },
             onValueChangeFinished = {
                 sliderPosition?.let { playerState.seekToProgress(it) }
                 sliderPosition = null
             },
-            colors = SliderDefaults.colors(
-                activeTrackColor = textColor,
-                inactiveTrackColor = textColor.copy(alpha = 0.3f),
-                thumbColor = textColor,
-            ),
+            style = sliderStyle,
+            activeColor = textButtonColor,
+            inactiveColor = textButtonColor.copy(alpha = 0.3f),
+            isPlaying = playerState.isPlaying,
             modifier = Modifier.padding(horizontal = PlayerHorizontalPadding),
         )
 
@@ -146,11 +147,7 @@ fun PlayerControls(
         Spacer(Modifier.height(12.dp))
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val maxW = maxWidth
-            val playButtonHeight = maxW / 6f
-            val playButtonWidth = playButtonHeight * 1.1f
-            val sideButtonHeight = playButtonHeight * 0.7f
-            val sideButtonWidth = sideButtonHeight * 1.3f
+            val sizes = calculatePlayerControlSizes(maxWidth)
 
             Row(
                 horizontalArrangement = Arrangement.Center,
@@ -184,14 +181,18 @@ fun PlayerControls(
                 FilledTonalIconButton(
                     onClick = { playerState.skipToPrevious() },
                     enabled = playerState.canSkipPrevious,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = textButtonColor,
+                        contentColor = iconButtonColor,
+                    ),
                     modifier = Modifier
-                        .size(width = sideButtonWidth, height = sideButtonHeight)
+                        .size(width = sizes.sideButtonWidth, height = sizes.sideButtonHeight)
                         .clip(RoundedCornerShape(32.dp)),
                 ) {
                     Icon(
                         imageVector = IconAssets.previous(),
                         contentDescription = null,
-                        modifier = Modifier.size(32.dp),
+                        modifier = Modifier.size(sizes.sideIconSize),
                     )
                 }
 
@@ -199,21 +200,25 @@ fun PlayerControls(
 
                 FilledIconButton(
                     onClick = { playerState.togglePlayPause() },
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = textButtonColor,
+                        contentColor = iconButtonColor,
+                    ),
                     modifier = Modifier
-                        .size(width = playButtonWidth, height = playButtonHeight)
+                        .size(width = sizes.playButtonWidth, height = sizes.playButtonHeight)
                         .clip(RoundedCornerShape(32.dp)),
                 ) {
                     if (playerState.isBuffering) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(32.dp),
-                            color = textColor,
+                            modifier = Modifier.size(sizes.playIconSize * 0.67f),
+                            color = iconButtonColor,
                             strokeWidth = 3.dp,
                         )
                     } else {
                         Icon(
                             imageVector = if (playerState.isPlaying) IconAssets.pause() else IconAssets.play(),
                             contentDescription = null,
-                            modifier = Modifier.size(42.dp),
+                            modifier = Modifier.size(sizes.playIconSize),
                         )
                     }
                 }
@@ -223,14 +228,18 @@ fun PlayerControls(
                 FilledTonalIconButton(
                     onClick = { playerState.skipToNext() },
                     enabled = playerState.canSkipNext,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = textButtonColor,
+                        contentColor = iconButtonColor,
+                    ),
                     modifier = Modifier
-                        .size(width = sideButtonWidth, height = sideButtonHeight)
+                        .size(width = sizes.sideButtonWidth, height = sizes.sideButtonHeight)
                         .clip(RoundedCornerShape(32.dp)),
                 ) {
                     Icon(
                         imageVector = IconAssets.next(),
                         contentDescription = null,
-                        modifier = Modifier.size(32.dp),
+                        modifier = Modifier.size(sizes.sideIconSize),
                     )
                 }
 

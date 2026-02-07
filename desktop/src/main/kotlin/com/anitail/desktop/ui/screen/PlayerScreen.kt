@@ -35,6 +35,9 @@ import com.anitail.desktop.constants.PlayerHorizontalPadding
 import com.anitail.desktop.constants.PlayerQueueCollapsedHeight
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.storage.DesktopPreferences
+import com.anitail.desktop.storage.PlayerBackgroundStyle
+import com.anitail.desktop.storage.PlayerButtonsStyle
+import com.anitail.desktop.storage.SliderStyle
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.LyricsPanel
 import com.anitail.desktop.ui.component.RemoteImage
@@ -56,16 +59,45 @@ fun PlayerScreen(
     val preferences = remember { DesktopPreferences.getInstance() }
     val showLyrics by preferences.showLyrics.collectAsState()
     val pureBlack by preferences.pureBlack.collectAsState()
+    val playerBackgroundStyle by preferences.playerBackgroundStyle.collectAsState()
+    val playerButtonsStyle by preferences.playerButtonsStyle.collectAsState()
+    val sliderStyle by preferences.sliderStyle.collectAsState()
 
     val backgroundColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface
-    val textColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurface
-    val textMutedColor = if (pureBlack) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+    val textBackgroundColor = when (playerBackgroundStyle) {
+        PlayerBackgroundStyle.DEFAULT -> if (pureBlack) Color.White else MaterialTheme.colorScheme.onBackground
+        PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.BLUR -> Color.White
+    }
+    val mutedTextColor = when (playerBackgroundStyle) {
+        PlayerBackgroundStyle.DEFAULT -> if (pureBlack) {
+            Color.White.copy(alpha = 0.7f)
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
+        PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.BLUR -> Color.White.copy(alpha = 0.7f)
+    }
+    val iconBackgroundColor = when (playerBackgroundStyle) {
+        PlayerBackgroundStyle.DEFAULT -> MaterialTheme.colorScheme.surface
+        PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.BLUR -> Color.Black
+    }
+    val (textButtonColor, iconButtonColor) = when (playerButtonsStyle) {
+        PlayerButtonsStyle.DEFAULT -> textBackgroundColor to iconBackgroundColor
+        PlayerButtonsStyle.SECONDARY -> MaterialTheme.colorScheme.secondary to MaterialTheme.colorScheme.onSecondary
+    }
 
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(backgroundColor)
     ) {
+        PlayerBackgroundLayer(
+            artworkUrl = item.artworkUrl,
+            style = playerBackgroundStyle,
+            pureBlack = pureBlack,
+            showLyrics = showLyrics,
+            modifier = Modifier.fillMaxSize(),
+        )
+
         val queueSheetState = rememberBottomSheetState(
             dismissedBound = PlayerQueueCollapsedHeight,
             collapsedBound = PlayerQueueCollapsedHeight,
@@ -82,8 +114,8 @@ fun PlayerScreen(
             PlayerNowPlayingHeader(
                 title = "Reproduciendo",
                 subtitle = item.artist.ifBlank { "Cola actual" },
-                textColor = textColor,
-                subtitleColor = textMutedColor,
+                textColor = textBackgroundColor,
+                subtitleColor = mutedTextColor,
             )
 
             Box(
@@ -117,8 +149,11 @@ fun PlayerScreen(
             PlayerControls(
                 item = item,
                 playerState = playerState,
-                textColor = textColor,
-                mutedTextColor = textMutedColor,
+                textColor = textBackgroundColor,
+                mutedTextColor = mutedTextColor,
+                sliderStyle = sliderStyle,
+                textButtonColor = textButtonColor,
+                iconButtonColor = iconButtonColor,
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -132,6 +167,8 @@ fun PlayerScreen(
             showLyrics = showLyrics,
             onToggleLyrics = { preferences.setShowLyrics(it) },
             pureBlack = pureBlack,
+            textColor = textBackgroundColor,
+            mutedTextColor = mutedTextColor,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
@@ -23,16 +25,19 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -42,11 +47,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.constants.PlayerQueueCollapsedHeight
 import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.BottomSheet
 import com.anitail.desktop.ui.component.BottomSheetState
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.shared.model.LibraryItem
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.awt.Desktop
 import java.net.URI
 
@@ -58,24 +66,31 @@ fun PlayerQueueSheet(
     showLyrics: Boolean,
     onToggleLyrics: (Boolean) -> Unit,
     pureBlack: Boolean,
+    textColor: Color,
+    mutedTextColor: Color,
     modifier: Modifier = Modifier,
 ) {
-    val textColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurface
-    val mutedTextColor = if (pureBlack) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
     val borderColor = textColor.copy(alpha = 0.35f)
-    val sheetBackground = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh
+    val listBackground = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
+    val chromeBackground = if (pureBlack) {
+        Color.Black
+    } else {
+        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.9f)
+    }
     val clipboard = LocalClipboardManager.current
+    val preferences = remember { DesktopPreferences.getInstance() }
+    val queueEditLocked by preferences.queueEditLocked.collectAsState()
 
     var showMenu by remember { mutableStateOf(false) }
 
-    fun copyLink() {
-        clipboard.setText(AnnotatedString(currentItem.playbackUrl))
+    fun copyLink(url: String) {
+        clipboard.setText(AnnotatedString(url))
     }
 
-    fun openInBrowser() {
+    fun openInBrowser(url: String) {
         runCatching {
             if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().browse(URI(currentItem.playbackUrl))
+                Desktop.getDesktop().browse(URI(url))
             }
         }.onFailure { error ->
             println("Anitail WARN: no se pudo abrir el navegador: ${error.message}")
@@ -99,7 +114,7 @@ fun PlayerQueueSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(PlayerQueueCollapsedHeight)
-                    .background(sheetBackground)
+                    .background(chromeBackground)
                     .padding(horizontal = 30.dp),
             ) {
                 QueueActionButton(
@@ -113,7 +128,7 @@ fun PlayerQueueSheet(
                     ),
                     borderColor = borderColor,
                     iconTint = textColor,
-                    onClick = { copyLink() },
+                    onClick = { copyLink(currentItem.playbackUrl) },
                 )
 
                 QueueActionButton(
@@ -163,14 +178,14 @@ fun PlayerQueueSheet(
                         DropdownMenuItem(
                             text = { Text("Copiar enlace") },
                             onClick = {
-                                copyLink()
+                                copyLink(currentItem.playbackUrl)
                                 showMenu = false
                             },
                         )
                         DropdownMenuItem(
                             text = { Text("Abrir en navegador") },
                             onClick = {
-                                openInBrowser()
+                                openInBrowser(currentItem.playbackUrl)
                                 showMenu = false
                             },
                         )
@@ -179,77 +194,132 @@ fun PlayerQueueSheet(
             }
         },
     ) {
+        val queue = playerState.queue
+        val currentIndex = playerState.currentQueueIndex
+        val lazyListState = rememberLazyListState()
+        val reorderableState = rememberReorderableLazyListState(lazyListState = lazyListState) { from, to ->
+            if (!queueEditLocked && from.index in queue.indices && to.index in queue.indices) {
+                playerState.moveQueueItem(from.index, to.index)
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(sheetBackground),
+                .background(listBackground),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = PlayerQueueCollapsedHeight),
-            ) {
-                QueueHeader(
-                    title = "Cola actual",
-                    count = playerState.queue.size,
-                    totalDurationMs = playerState.queue.sumOf { it.durationMs ?: 0L },
-                    textColor = textColor,
-                    mutedTextColor = mutedTextColor,
-                )
-
-                if (playerState.queue.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize(),
-                        contentAlignment = Alignment.Center,
+            if (queue.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = PlayerQueueCollapsedHeight, bottom = PlayerQueueCollapsedHeight),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            Icon(
-                                imageVector = IconAssets.queueMusic(),
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = mutedTextColor.copy(alpha = 0.5f),
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "La cola esta vacia",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = mutedTextColor,
-                            )
-                        }
+                        Icon(
+                            imageVector = IconAssets.queueMusic(),
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = mutedTextColor.copy(alpha = 0.5f),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "La cola esta vacia",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = mutedTextColor,
+                        )
                     }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        itemsIndexed(playerState.queue) { index, item ->
-                            QueueItemRow(
-                                item = item,
-                                isPlaying = index == playerState.currentQueueIndex,
-                                onClick = {
-                                    if (index == playerState.currentQueueIndex) {
-                                        playerState.togglePlayPause()
-                                    } else {
-                                        playerState.play(item)
+                }
+            } else {
+                LazyColumn(
+                    state = lazyListState,
+                    contentPadding = PaddingValues(
+                        top = PlayerQueueCollapsedHeight + 8.dp,
+                        bottom = PlayerQueueCollapsedHeight + 8.dp,
+                    ),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    itemsIndexed(
+                        items = queue,
+                        key = { _, item -> item.id },
+                    ) { index, item ->
+                        ReorderableItem(
+                            state = reorderableState,
+                            key = item.id,
+                        ) {
+                            val dismissState = rememberSwipeToDismissBoxState(
+                                confirmValueChange = { dismissValue ->
+                                    if (dismissValue == SwipeToDismissBoxValue.StartToEnd ||
+                                        dismissValue == SwipeToDismissBoxValue.EndToStart
+                                    ) {
+                                        playerState.removeFromQueue(index)
                                     }
+                                    true
                                 },
-                                onRemove = { playerState.removeFromQueue(index) },
-                                textColor = textColor,
-                                mutedTextColor = mutedTextColor,
-                                backgroundColor = sheetBackground,
                             )
+
+                            val content: @Composable () -> Unit = {
+                                QueueItemRow(
+                                    item = item,
+                                    isActive = index == currentIndex,
+                                    isPlaying = playerState.isPlaying && index == currentIndex,
+                                    locked = queueEditLocked,
+                                    dragHandleModifier = if (!queueEditLocked) Modifier.draggableHandle() else Modifier,
+                                    onClick = {
+                                        if (index == currentIndex) {
+                                            playerState.togglePlayPause()
+                                        } else {
+                                            playerState.play(item)
+                                        }
+                                    },
+                                    onPlayNext = {
+                                        if (currentIndex in queue.indices && index != currentIndex) {
+                                            playerState.moveQueueItem(index, (currentIndex + 1).coerceAtMost(queue.lastIndex))
+                                        }
+                                    },
+                                    onRemove = { playerState.removeFromQueue(index) },
+                                    onCopyLink = { copyLink(item.playbackUrl) },
+                                    onOpenInBrowser = { openInBrowser(item.playbackUrl) },
+                                    textColor = textColor,
+                                    mutedTextColor = mutedTextColor,
+                                    backgroundColor = listBackground,
+                                )
+                            }
+
+                            if (queueEditLocked) {
+                                content()
+                            } else {
+                                SwipeToDismissBox(
+                                    state = dismissState,
+                                    backgroundContent = {},
+                                ) {
+                                    content()
+                                }
+                            }
                         }
                     }
                 }
             }
 
+            QueueHeader(
+                title = "Cola actual",
+                count = queue.size,
+                totalDurationMs = queue.sumOf { it.durationMs ?: 0L },
+                locked = queueEditLocked,
+                onToggleLock = { preferences.setQueueEditLocked(!queueEditLocked) },
+                textColor = textColor,
+                mutedTextColor = mutedTextColor,
+                backgroundColor = chromeBackground,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+
             QueueBottomBar(
                 playerState = playerState,
                 textColor = textColor,
                 mutedTextColor = mutedTextColor,
-                backgroundColor = sheetBackground,
+                backgroundColor = chromeBackground,
                 onCollapse = { state.collapseSoft() },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
@@ -288,67 +358,93 @@ private fun QueueHeader(
     title: String,
     count: Int,
     totalDurationMs: Long,
+    locked: Boolean,
+    onToggleLock: () -> Unit,
     textColor: Color,
     mutedTextColor: Color,
+    backgroundColor: Color,
+    modifier: Modifier = Modifier,
 ) {
-    Row(
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(PlayerQueueCollapsedHeight)
-            .padding(horizontal = 12.dp),
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = textColor,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-
-        Column(
-            horizontalAlignment = Alignment.End,
-        ) {
-            Text(
-                text = "$count canciones",
-                style = MaterialTheme.typography.bodyMedium,
-                color = mutedTextColor,
-            )
-            Text(
-                text = formatDurationMs(totalDurationMs),
-                style = MaterialTheme.typography.bodyMedium,
-                color = mutedTextColor,
-            )
-        }
-    }
-
-    if (count > 0) {
-        Surface(
-            color = mutedTextColor.copy(alpha = 0.15f),
+    Column(modifier = modifier.background(backgroundColor)) {
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(1.dp),
-        ) { }
+                .height(PlayerQueueCollapsedHeight)
+                .padding(horizontal = 12.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = textColor,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+
+            IconButton(
+                onClick = onToggleLock,
+                modifier = Modifier.size(36.dp),
+            ) {
+                Icon(
+                    imageVector = if (locked) IconAssets.lock() else IconAssets.lockOpen(),
+                    contentDescription = null,
+                    tint = mutedTextColor,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.End,
+            ) {
+                Text(
+                    text = "$count canciones",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = mutedTextColor,
+                )
+                Text(
+                    text = formatDurationMs(totalDurationMs),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = mutedTextColor,
+                )
+            }
+        }
+
+        if (count > 0) {
+            Surface(
+                color = mutedTextColor.copy(alpha = 0.15f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp),
+            ) { }
+        }
     }
 }
 
 @Composable
 private fun QueueItemRow(
     item: LibraryItem,
+    isActive: Boolean,
     isPlaying: Boolean,
+    locked: Boolean,
+    dragHandleModifier: Modifier,
     onClick: () -> Unit,
+    onPlayNext: () -> Unit,
     onRemove: () -> Unit,
+    onCopyLink: () -> Unit,
+    onOpenInBrowser: () -> Unit,
     textColor: Color,
     mutedTextColor: Color,
     backgroundColor: Color,
 ) {
-    val rowBackground = if (isPlaying) {
+    var showItemMenu by remember { mutableStateOf(false) }
+    val rowBackground = if (isActive) {
         textColor.copy(alpha = 0.08f)
     } else {
         backgroundColor
     }
+    val contentAlpha = if (isActive) 1f else 0.9f
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -376,7 +472,23 @@ private fun QueueItemRow(
                     Icon(
                         imageVector = IconAssets.musicNote(),
                         contentDescription = null,
-                        tint = mutedTextColor,
+                        tint = mutedTextColor.copy(alpha = contentAlpha),
+                    )
+                }
+            }
+
+            if (isActive) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = if (isPlaying) 0.45f else 0.25f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) IconAssets.pause() else IconAssets.play(),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
             }
@@ -390,41 +502,81 @@ private fun QueueItemRow(
             Text(
                 text = item.title,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
-                color = if (isPlaying) textColor else textColor.copy(alpha = 0.9f),
+                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                color = if (isActive) textColor else textColor.copy(alpha = contentAlpha),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = item.artist,
                 style = MaterialTheme.typography.bodySmall,
-                color = mutedTextColor,
+                color = mutedTextColor.copy(alpha = contentAlpha),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
 
-        if (!isPlaying) {
+        Box {
             IconButton(
-                onClick = onRemove,
+                onClick = { showItemMenu = true },
                 modifier = Modifier.size(32.dp),
             ) {
                 Icon(
-                    imageVector = IconAssets.close(),
-                    contentDescription = "Eliminar",
+                    imageVector = IconAssets.moreVert(),
+                    contentDescription = "Menu",
                     tint = mutedTextColor,
                     modifier = Modifier.size(18.dp),
                 )
             }
-        } else {
-            Icon(
-                imageVector = IconAssets.play(),
-                contentDescription = null,
-                tint = textColor,
-                modifier = Modifier
-                    .size(18.dp)
-                    .alpha(0.7f),
-            )
+
+            DropdownMenu(
+                expanded = showItemMenu,
+                onDismissRequest = { showItemMenu = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Reproducir siguiente") },
+                    onClick = {
+                        onPlayNext()
+                        showItemMenu = false
+                    },
+                    enabled = !isActive,
+                )
+                DropdownMenuItem(
+                    text = { Text("Eliminar de la cola") },
+                    onClick = {
+                        onRemove()
+                        showItemMenu = false
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Copiar enlace") },
+                    onClick = {
+                        onCopyLink()
+                        showItemMenu = false
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Abrir en navegador") },
+                    onClick = {
+                        onOpenInBrowser()
+                        showItemMenu = false
+                    },
+                )
+            }
+        }
+
+        if (!locked) {
+            IconButton(
+                onClick = { },
+                modifier = dragHandleModifier.size(32.dp),
+            ) {
+                Icon(
+                    imageVector = IconAssets.dragHandle(),
+                    contentDescription = null,
+                    tint = mutedTextColor,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }

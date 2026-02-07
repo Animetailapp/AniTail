@@ -27,6 +27,15 @@ class DesktopPreferences private constructor(
     private val _dynamicColor = MutableStateFlow(true)
     val dynamicColor: StateFlow<Boolean> = _dynamicColor.asStateFlow()
 
+    private val _playerBackgroundStyle = MutableStateFlow(PlayerBackgroundStyle.DEFAULT)
+    val playerBackgroundStyle: StateFlow<PlayerBackgroundStyle> = _playerBackgroundStyle.asStateFlow()
+
+    private val _playerButtonsStyle = MutableStateFlow(PlayerButtonsStyle.DEFAULT)
+    val playerButtonsStyle: StateFlow<PlayerButtonsStyle> = _playerButtonsStyle.asStateFlow()
+
+    private val _sliderStyle = MutableStateFlow(SliderStyle.DEFAULT)
+    val sliderStyle: StateFlow<SliderStyle> = _sliderStyle.asStateFlow()
+
     // === Player Settings ===
     private val _audioQuality = MutableStateFlow(AudioQuality.AUTO)
     val audioQuality: StateFlow<AudioQuality> = _audioQuality.asStateFlow()
@@ -42,6 +51,9 @@ class DesktopPreferences private constructor(
 
     private val _autoStartRadio = MutableStateFlow(true)
     val autoStartRadio: StateFlow<Boolean> = _autoStartRadio.asStateFlow()
+
+    private val _queueEditLocked = MutableStateFlow(true)
+    val queueEditLocked: StateFlow<Boolean> = _queueEditLocked.asStateFlow()
 
     // === Content Settings ===
     private val _contentLanguage = MutableStateFlow("es")
@@ -94,6 +106,21 @@ class DesktopPreferences private constructor(
         save()
     }
 
+    fun setPlayerBackgroundStyle(value: PlayerBackgroundStyle) {
+        _playerBackgroundStyle.value = value
+        save()
+    }
+
+    fun setPlayerButtonsStyle(value: PlayerButtonsStyle) {
+        _playerButtonsStyle.value = value
+        save()
+    }
+
+    fun setSliderStyle(value: SliderStyle) {
+        _sliderStyle.value = value
+        save()
+    }
+
     fun setAudioQuality(value: AudioQuality) {
         _audioQuality.value = value
         save()
@@ -116,6 +143,11 @@ class DesktopPreferences private constructor(
 
     fun setAutoStartRadio(value: Boolean) {
         _autoStartRadio.value = value
+        save()
+    }
+
+    fun setQueueEditLocked(value: Boolean) {
+        _queueEditLocked.value = value
         save()
     }
 
@@ -181,12 +213,20 @@ class DesktopPreferences private constructor(
             _darkMode.value = DarkModePreference.fromString(json.optString("darkMode", "auto"))
             _pureBlack.value = json.optBoolean("pureBlack", false)
             _dynamicColor.value = json.optBoolean("dynamicColor", true)
+            _playerBackgroundStyle.value = PlayerBackgroundStyle.fromString(
+                json.optString("playerBackgroundStyle", "default")
+            )
+            _playerButtonsStyle.value = PlayerButtonsStyle.fromString(
+                json.optString("playerButtonsStyle", "default")
+            )
+            _sliderStyle.value = SliderStyle.fromString(json.optString("sliderStyle", "default"))
 
             _audioQuality.value = AudioQuality.fromString(json.optString("audioQuality", "auto"))
             _skipSilence.value = json.optBoolean("skipSilence", false)
             _crossfadeDuration.value = json.optInt("crossfadeDuration", 0)
             _persistentQueue.value = json.optBoolean("persistentQueue", true)
             _autoStartRadio.value = json.optBoolean("autoStartRadio", true)
+            _queueEditLocked.value = json.optBoolean("queueEditLocked", true)
 
             _contentLanguage.value = json.optString("contentLanguage", "es")
             _contentCountry.value = json.optString("contentCountry", "ES")
@@ -211,12 +251,16 @@ class DesktopPreferences private constructor(
                 put("darkMode", _darkMode.value.name.lowercase())
                 put("pureBlack", _pureBlack.value)
                 put("dynamicColor", _dynamicColor.value)
+                put("playerBackgroundStyle", _playerBackgroundStyle.value.name.lowercase())
+                put("playerButtonsStyle", _playerButtonsStyle.value.name.lowercase())
+                put("sliderStyle", _sliderStyle.value.name.lowercase())
 
                 put("audioQuality", _audioQuality.value.name.lowercase())
                 put("skipSilence", _skipSilence.value)
                 put("crossfadeDuration", _crossfadeDuration.value)
                 put("persistentQueue", _persistentQueue.value)
                 put("autoStartRadio", _autoStartRadio.value)
+                put("queueEditLocked", _queueEditLocked.value)
 
                 put("contentLanguage", _contentLanguage.value)
                 put("contentCountry", _contentCountry.value)
@@ -302,5 +346,65 @@ enum class AudioQuality {
             MEDIUM -> "Media (192 kbps)"
             HIGH -> "Alta (320 kbps)"
             AUTO -> "Automática"
+        }
+}
+
+enum class PlayerBackgroundStyle {
+    DEFAULT,
+    GRADIENT,
+    BLUR;
+
+    companion object {
+        fun fromString(value: String): PlayerBackgroundStyle = when (value.lowercase()) {
+            "gradient" -> GRADIENT
+            "blur" -> BLUR
+            else -> DEFAULT
+        }
+    }
+
+    val displayName: String
+        get() = when (this) {
+            DEFAULT -> "Seguir tema"
+            GRADIENT -> "Gradiente"
+            BLUR -> "Desenfoque"
+        }
+}
+
+enum class PlayerButtonsStyle {
+    DEFAULT,
+    SECONDARY;
+
+    companion object {
+        fun fromString(value: String): PlayerButtonsStyle = when (value.lowercase()) {
+            "secondary" -> SECONDARY
+            else -> DEFAULT
+        }
+    }
+
+    val displayName: String
+        get() = when (this) {
+            DEFAULT -> "Predeterminado"
+            SECONDARY -> "Color secundario"
+        }
+}
+
+enum class SliderStyle {
+    DEFAULT,
+    SQUIGGLY,
+    SLIM;
+
+    companion object {
+        fun fromString(value: String): SliderStyle = when (value.lowercase()) {
+            "squiggly" -> SQUIGGLY
+            "slim" -> SLIM
+            else -> DEFAULT
+        }
+    }
+
+    val displayName: String
+        get() = when (this) {
+            DEFAULT -> "Predeterminado"
+            SQUIGGLY -> "Ondulado"
+            SLIM -> "Fino"
         }
 }

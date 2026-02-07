@@ -112,4 +112,10 @@ object IconAssets {
     fun deleteHistory(): ImageVector = VectorResource.load("delete_history.xml")
 
     fun libraryMusic(): ImageVector = VectorResource.load("library_music.xml")
+
+    fun lock(): ImageVector = VectorResource.load("lock.xml")
+
+    fun lockOpen(): ImageVector = VectorResource.load("lock_open.xml")
+
+    fun dragHandle(): ImageVector = VectorResource.load("drag_handle.xml")
 }

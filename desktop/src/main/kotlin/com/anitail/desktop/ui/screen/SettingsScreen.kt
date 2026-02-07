@@ -44,6 +44,9 @@ import androidx.compose.ui.unit.dp
 import com.anitail.desktop.storage.AudioQuality
 import com.anitail.desktop.storage.DarkModePreference
 import com.anitail.desktop.storage.DesktopPreferences
+import com.anitail.desktop.storage.PlayerBackgroundStyle
+import com.anitail.desktop.storage.PlayerButtonsStyle
+import com.anitail.desktop.storage.SliderStyle
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.NavigationTitle
 
@@ -222,6 +225,9 @@ private fun AppearanceSettingsScreen(
     val darkMode by preferences.darkMode.collectAsState()
     val pureBlack by preferences.pureBlack.collectAsState()
     val dynamicColor by preferences.dynamicColor.collectAsState()
+    val playerBackgroundStyle by preferences.playerBackgroundStyle.collectAsState()
+    val playerButtonsStyle by preferences.playerButtonsStyle.collectAsState()
+    val sliderStyle by preferences.sliderStyle.collectAsState()
 
     SettingsSubScreen(
         title = "Apariencia",
@@ -264,6 +270,38 @@ private fun AppearanceSettingsScreen(
             subtitle = "Usa colores de la carátula actual",
             checked = dynamicColor,
             onCheckedChange = { preferences.setDynamicColor(it) },
+        )
+
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+        SettingsDropdown(
+            title = "Fondo del reproductor",
+            subtitle = playerBackgroundStyle.displayName,
+            options = PlayerBackgroundStyle.entries.map { it.displayName },
+            selectedIndex = PlayerBackgroundStyle.entries.indexOf(playerBackgroundStyle),
+            onSelect = { index ->
+                preferences.setPlayerBackgroundStyle(PlayerBackgroundStyle.entries[index])
+            },
+        )
+
+        SettingsDropdown(
+            title = "Estilo de botones",
+            subtitle = playerButtonsStyle.displayName,
+            options = PlayerButtonsStyle.entries.map { it.displayName },
+            selectedIndex = PlayerButtonsStyle.entries.indexOf(playerButtonsStyle),
+            onSelect = { index ->
+                preferences.setPlayerButtonsStyle(PlayerButtonsStyle.entries[index])
+            },
+        )
+
+        SettingsDropdown(
+            title = "Estilo del deslizador",
+            subtitle = sliderStyle.displayName,
+            options = SliderStyle.entries.map { it.displayName },
+            selectedIndex = SliderStyle.entries.indexOf(sliderStyle),
+            onSelect = { index ->
+                preferences.setSliderStyle(SliderStyle.entries[index])
+            },
         )
     }
 }

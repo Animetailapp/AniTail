@@ -2,6 +2,7 @@ package com.anitail.desktop.player
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,8 +42,8 @@ class PlayerState {
         private set
 
     // Cola de reproducción
-    private val _queue = mutableListOf<LibraryItem>()
-    val queue: List<LibraryItem> get() = _queue.toList()
+    private val _queue = mutableStateListOf<LibraryItem>()
+    val queue: List<LibraryItem> get() = _queue
 
     var currentQueueIndex by mutableStateOf(-1)
         private set
@@ -237,6 +238,22 @@ class PlayerState {
     fun clearQueue() {
         _queue.clear()
         currentQueueIndex = -1
+    }
+
+    fun moveQueueItem(fromIndex: Int, toIndex: Int) {
+        if (fromIndex !in _queue.indices || toIndex !in _queue.indices || fromIndex == toIndex) {
+            return
+        }
+
+        val item = _queue.removeAt(fromIndex)
+        _queue.add(toIndex, item)
+
+        currentQueueIndex = when {
+            currentQueueIndex == fromIndex -> toIndex
+            fromIndex < currentQueueIndex && toIndex >= currentQueueIndex -> currentQueueIndex - 1
+            fromIndex > currentQueueIndex && toIndex <= currentQueueIndex -> currentQueueIndex + 1
+            else -> currentQueueIndex
+        }
     }
 
     fun togglePlayPause() {

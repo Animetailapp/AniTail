@@ -26,6 +26,7 @@ dependencies {
     implementation(compose.material3)
     implementation(compose.materialIconsExtended)
     implementation(libs.materialKolor)
+    implementation(libs.compose.reorderable)
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
@@ -47,6 +48,9 @@ dependencies {
 
     // New multiplatform player (VLC/Media3/AVPlayer)
     implementation(libs.compose.multiplatform.media.player)
+
+    testImplementation(kotlin("test"))
+    testImplementation("junit:junit:4.13.2")
 }
 
 configurations.all {
