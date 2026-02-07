@@ -1,7 +1,6 @@
 package com.anitail.music.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -37,6 +36,8 @@ import com.anitail.music.ui.menu.YouTubePlaylistMenu
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.viewmodels.AccountViewModel
 
+import com.anitail.music.ui.utils.tvCombinedClickable
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AccountScreen(
@@ -68,7 +69,7 @@ fun AccountScreen(
                 fillMaxWidth = true,
                 modifier =
                 Modifier
-                    .combinedClickable(
+                    .tvCombinedClickable(
                         onClick = {
                             navController.navigate("online_playlist/${item.id}")
                         },
@@ -94,7 +95,7 @@ fun AccountScreen(
                 item = item,
                 fillMaxWidth = true,
                 modifier = Modifier
-                    .combinedClickable(
+                    .tvCombinedClickable(
                         onClick = {
                             navController.navigate("album/${item.id}")
                         },
@@ -120,7 +121,7 @@ fun AccountScreen(
                 item = item,
                 fillMaxWidth = true,
                 modifier = Modifier
-                    .combinedClickable(
+                    .tvCombinedClickable(
                         onClick = {
                             navController.navigate("artist/${item.id}")
                         },

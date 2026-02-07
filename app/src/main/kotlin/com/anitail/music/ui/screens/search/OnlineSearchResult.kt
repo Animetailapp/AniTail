@@ -2,7 +2,6 @@ package com.anitail.music.ui.screens.search
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
@@ -65,6 +64,7 @@ import com.anitail.music.ui.menu.YouTubeAlbumMenu
 import com.anitail.music.ui.menu.YouTubeArtistMenu
 import com.anitail.music.ui.menu.YouTubePlaylistMenu
 import com.anitail.music.ui.menu.YouTubeSongMenu
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.viewmodels.OnlineSearchViewModel
 import kotlinx.coroutines.launch
 
@@ -157,7 +157,7 @@ fun OnlineSearchResult(
             },
             modifier =
             Modifier
-                .combinedClickable(
+                .tvCombinedClickable(
                     onClick = {
                         when (item) {
                             is SongItem -> {

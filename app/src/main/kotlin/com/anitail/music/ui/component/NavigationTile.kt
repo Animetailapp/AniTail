@@ -2,7 +2,6 @@ package com.anitail.music.ui.component
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.music.ui.utils.tvClickable
 
 @Composable
 fun NavigationTile(
@@ -39,7 +39,7 @@ fun NavigationTile(
                 .size(56.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainer)
-                .clickable(onClick = onClick),
+                .tvClickable(shape = CircleShape, onClick = onClick),
         ) {
             Icon(
                 painter = painterResource(icon),

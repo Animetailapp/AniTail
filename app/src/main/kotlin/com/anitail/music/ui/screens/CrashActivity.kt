@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
@@ -40,6 +41,8 @@ import androidx.core.content.FileProvider
 import com.anitail.music.R
 import com.anitail.music.ui.theme.AnitailTheme
 import com.anitail.music.ui.utils.CrashHandler
+import com.anitail.music.ui.utils.LocalIsTelevision
+import com.anitail.music.ui.utils.rememberIsTelevision
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -56,14 +59,17 @@ class CrashActivity : ComponentActivity() {
 
         setContent {
             val darkTheme = isSystemInDarkTheme()
-            AnitailTheme(
-                darkMode = if (darkTheme) com.anitail.music.ui.screens.settings.DarkMode.ON else com.anitail.music.ui.screens.settings.DarkMode.OFF
-            ) {
-                CrashScreen(
-                    crashLog = crashLog,
-                    onClose = { finishAffinity() },
-                    onShare = { shareCrashLog(crashLog) }
-                )
+            val isTelevision = rememberIsTelevision()
+            CompositionLocalProvider(LocalIsTelevision provides isTelevision) {
+                AnitailTheme(
+                    darkMode = if (darkTheme) com.anitail.music.ui.screens.settings.DarkMode.ON else com.anitail.music.ui.screens.settings.DarkMode.OFF
+                ) {
+                    CrashScreen(
+                        crashLog = crashLog,
+                        onClose = { finishAffinity() },
+                        onShare = { shareCrashLog(crashLog) }
+                    )
+                }
             }
         }
     }

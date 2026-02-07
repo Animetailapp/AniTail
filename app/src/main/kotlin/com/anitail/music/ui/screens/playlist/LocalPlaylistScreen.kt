@@ -4,8 +4,6 @@ import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -140,6 +138,8 @@ import com.anitail.music.ui.menu.SelectionSongMenu
 import com.anitail.music.ui.menu.SongMenu
 import com.anitail.music.ui.utils.ItemWrapper
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.utils.makeTimeString
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.utils.rememberPreference
@@ -676,7 +676,7 @@ fun LocalPlaylistScreen(
                                 modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .combinedClickable(
+                                    .tvCombinedClickable(
                                         onClick = {
                                             if (song.song.id == mediaMetadata?.id) {
                                                 playerConnection.player.togglePlayPause()
@@ -814,7 +814,7 @@ fun LocalPlaylistScreen(
                                 modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .combinedClickable(
+                                    .tvCombinedClickable(
                                         onClick = {
                                             if (!selection) {
                                                 if (songWrapper.item.song.id == mediaMetadata?.id) {
@@ -1407,7 +1407,7 @@ fun PlaylistEditDialog(
                             .height(120.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .clickable { showImageUrlDialog = true },
+                            .tvClickable { showImageUrlDialog = true },
                         contentAlignment = Alignment.Center
                     ) {
                         if (backgroundImageUrl != null) {
@@ -1425,7 +1425,7 @@ fun PlaylistEditDialog(
                                     .size(28.dp)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
-                                    .clickable { backgroundImageUrl = null },
+                                    .tvClickable { backgroundImageUrl = null },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(

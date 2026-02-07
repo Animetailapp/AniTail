@@ -2,7 +2,6 @@ package com.anitail.music.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,6 +74,7 @@ import com.anitail.music.ui.component.shimmer.TextPlaceholder
 import com.anitail.music.ui.menu.YouTubeSongMenu
 import com.anitail.music.ui.utils.SnapLayoutInfoProvider
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.viewmodels.ChartsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -270,7 +270,7 @@ fun ChartsScreen(
                                             },
                                             modifier = Modifier
                                                 .width(horizontalLazyGridItemWidth)
-                                                .combinedClickable(
+                                                .tvCombinedClickable(
                                                     onClick = {
                                                         if (song.id == mediaMetadata?.id) {
                                                             playerConnection.player.togglePlayPause()
@@ -284,7 +284,9 @@ fun ChartsScreen(
                                                         }
                                                     },
                                                     onLongClick = {
-                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        haptic.performHapticFeedback(
+                                                            HapticFeedbackType.LongPress
+                                                        )
                                                         menuState.show {
                                                             YouTubeSongMenu(
                                                                 song = song,
@@ -325,7 +327,7 @@ fun ChartsScreen(
                                         isPlaying = isPlaying,
                                         coroutineScope = coroutineScope,
                                         modifier = Modifier
-                                            .combinedClickable(
+                                            .tvCombinedClickable(
                                                 onClick = {
                                                     if (video.id == mediaMetadata?.id) {
                                                         playerConnection.player.togglePlayPause()

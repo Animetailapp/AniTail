@@ -1,6 +1,5 @@
 package com.anitail.music.ui.component
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +37,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.music.R
+import com.anitail.music.ui.utils.tvClickable
 import kotlin.math.roundToInt
 
 @Composable
@@ -56,7 +56,7 @@ fun PreferenceEntry(
         modifier =
         modifier
             .fillMaxWidth()
-            .clickable(
+            .tvClickable(
                 enabled = isEnabled && onClick != null,
                 onClick = onClick ?: {},
             )
@@ -124,7 +124,7 @@ fun <T> ListPreference(
                     modifier =
                     Modifier
                         .fillMaxWidth()
-                        .clickable {
+                        .tvClickable {
                             showDialog = false
                             onValueSelected(value)
                         }

@@ -3,7 +3,6 @@ package com.anitail.music.ui.screens.playlist
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -109,6 +108,7 @@ import com.anitail.music.ui.menu.YouTubePlaylistMenu
 import com.anitail.music.ui.menu.YouTubeSongMenu
 import com.anitail.music.ui.utils.ItemWrapper
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.utils.rememberPreference
 import com.anitail.music.viewmodels.OnlinePlaylistViewModel
 
@@ -431,7 +431,7 @@ fun OnlinePlaylistScreen(
                             },
                             modifier =
                             Modifier
-                                .combinedClickable(
+                                .tvCombinedClickable(
                                     enabled = !hideExplicit || !song.item.second.explicit,
                                     onClick = {
                                         if (!selection) {

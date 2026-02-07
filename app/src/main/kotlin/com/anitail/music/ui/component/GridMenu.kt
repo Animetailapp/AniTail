@@ -2,7 +2,6 @@ package com.anitail.music.ui.component
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -33,6 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.offline.Download
 import com.anitail.music.R
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.makeTimeString
 
 val GridMenuItemHeight = 108.dp
@@ -84,9 +84,10 @@ fun LazyGridScope.GridMenuItem(
             modifier = modifier
                 .clip(ShapeDefaults.Large)
                 .height(GridMenuItemHeight)
-                .clickable(
+                .tvClickable(
                     enabled = enabled,
-                    onClick = onClick
+                    shape = ShapeDefaults.Large,
+                    onClick = onClick,
                 )
                 .alpha(if (enabled) 1f else 0.5f)
                 .padding(12.dp)
@@ -162,8 +163,10 @@ fun LazyGridScope.SleepTimerGridMenu(
             modifier = modifier
                 .clip(ShapeDefaults.Large)
                 .height(GridMenuItemHeight)
-                .clickable(
-                    onClick = onClick
+                .tvClickable(
+                    enabled = enabled,
+                    shape = ShapeDefaults.Large,
+                    onClick = onClick,
                 )
                 .padding(12.dp)
         ) {

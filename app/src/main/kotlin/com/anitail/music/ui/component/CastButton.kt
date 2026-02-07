@@ -3,7 +3,6 @@ package com.anitail.music.ui.component
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -32,17 +31,18 @@ import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.cast.CastDevicePickerDialog
 import com.anitail.music.cast.CastManager
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.GooglePlayServicesUtils
 import com.google.android.gms.cast.framework.CastButtonFactory
-import com.google.android.gms.cast.framework.CastContext
 
 @Composable
 fun CastMiniPlayerButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current
 
+    val hasCastContext = GooglePlayServicesUtils.getCastContextOrNull(context) != null
     // Verificar si Cast está disponible antes de renderizar
-    if (!GooglePlayServicesUtils.isCastAvailable(context)) {
+    if (!hasCastContext) {
         return
     }
     
@@ -60,7 +60,6 @@ fun CastMiniPlayerButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
     // Inicializar solo una vez y manegar ciclo de vida
     LaunchedEffect(castManager) {
         runCatching {
-            CastContext.getSharedInstance(context)
             castManager.start()
         }
     }
@@ -102,7 +101,7 @@ fun CastMiniPlayerButton(pureBlack: Boolean, modifier: Modifier = Modifier) {
             .clip(CircleShape)
             .border(1.dp, if (isCasting) primary.copy(alpha = 0.6f) else outline, CircleShape)
             .background(bgColor, CircleShape)
-            .clickable(enabled = !isPreparing) {
+            .tvClickable(enabled = !isPreparing, shape = CircleShape) {
                 if (isCasting) {
                     // Nueva actividad Compose personalizada
                     runCatching {

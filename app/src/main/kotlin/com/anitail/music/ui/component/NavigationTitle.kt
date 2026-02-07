@@ -1,6 +1,5 @@
 package com.anitail.music.ui.component
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.music.R
+import com.anitail.music.ui.utils.tvClickable
 
 @Composable
 fun NavigationTitle(
@@ -37,9 +37,7 @@ fun NavigationTitle(
         modifier = modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal))
-            .clickable(enabled = onClick != null) {
-                onClick?.invoke()
-            }
+            .tvClickable(enabled = onClick != null, onClick = { onClick?.invoke() })
             .padding(horizontal = 12.dp, vertical = 12.dp)
     ) {
         thumbnail?.invoke()

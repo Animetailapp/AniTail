@@ -1,7 +1,5 @@
 package com.anitail.music.ui.component
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.anitail.music.R
 import com.anitail.music.constants.PlaylistSongSortType
+import com.anitail.music.ui.utils.tvClickable
 
 @Composable
 inline fun <reified T : Enum<T>> SortHeader(
@@ -49,12 +48,11 @@ inline fun <reified T : Enum<T>> SortHeader(
             style = MaterialTheme.typography.labelLarge,
             modifier =
             Modifier
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
+                .tvClickable(
                     indication = ripple(bounded = false),
-                ) {
-                    menuExpanded = !menuExpanded
-                }.padding(horizontal = 4.dp, vertical = 8.dp),
+                    onClick = { menuExpanded = !menuExpanded },
+                )
+                .padding(horizontal = 4.dp, vertical = 8.dp),
         )
 
         DropdownMenu(

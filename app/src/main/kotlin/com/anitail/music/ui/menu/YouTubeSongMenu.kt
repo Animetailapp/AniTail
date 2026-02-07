@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -69,6 +68,7 @@ import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.component.LocalBottomSheetPageState
 import com.anitail.music.ui.utils.ShowMediaInfo
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.joinByBullet
 import com.anitail.music.utils.makeTimeString
 import kotlinx.coroutines.Dispatchers
@@ -133,7 +133,7 @@ fun YouTubeSongMenu(
                     modifier =
                     Modifier
                         .height(ListItemHeight)
-                        .clickable {
+                        .tvClickable {
                             navController.navigate("artist/${artist.id}")
                             showSelectArtistDialog = false
                             onDismiss()
@@ -146,7 +146,7 @@ fun YouTubeSongMenu(
                         Modifier
                             .fillParentMaxWidth()
                             .height(ListItemHeight)
-                            .clickable {
+                            .tvClickable {
                                 navController.navigate("artist/${artist.id}")
                                 showSelectArtistDialog = false
                                 onDismiss()
@@ -248,7 +248,7 @@ fun YouTubeSongMenu(
                     shape = RoundedCornerShape(8.dp)
                 )
                 .clip(RoundedCornerShape(8.dp))
-                .clickable {
+                .tvClickable {
                     playerConnection.playNext(song.toMediaItem())
                     onDismiss()
                 }
@@ -279,7 +279,7 @@ fun YouTubeSongMenu(
                     shape = RoundedCornerShape(8.dp)
                 )
                 .clip(RoundedCornerShape(8.dp))
-                .clickable {
+                .tvClickable {
                     showChoosePlaylistDialog = true
                 }
                 .padding(12.dp),
@@ -309,7 +309,7 @@ fun YouTubeSongMenu(
                     shape = RoundedCornerShape(8.dp)
                 )
                 .clip(RoundedCornerShape(8.dp))
-                .clickable {
+                .tvClickable {
                     val intent = Intent().apply {
                         action = Intent.ACTION_SEND
                         type = "text/plain"
@@ -354,7 +354,7 @@ fun YouTubeSongMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     playerConnection.playQueue(YouTubeQueue.radio(song.toMediaMetadata()))
                     onDismiss()
                 }
@@ -369,7 +369,7 @@ fun YouTubeSongMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     playerConnection.addToQueue(song.toMediaItem())
                     onDismiss()
                 }
@@ -386,7 +386,7 @@ fun YouTubeSongMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     if (librarySong?.song?.inLibrary != null) {
                         database.query {
                             inLibrary(song.id, null)
@@ -416,7 +416,7 @@ fun YouTubeSongMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             DownloadService.sendRemoveDownload(
                                 context,
                                 ExoDownloadService::class.java,
@@ -435,7 +435,7 @@ fun YouTubeSongMenu(
                                 strokeWidth = 2.dp
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             DownloadService.sendRemoveDownload(
                                 context,
                                 ExoDownloadService::class.java,
@@ -454,7 +454,7 @@ fun YouTubeSongMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             coroutineScope.launch(Dispatchers.IO) {
                                 database.transaction {
                                     insert(song.toMediaMetadata())
@@ -479,7 +479,7 @@ fun YouTubeSongMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         if (artists.size == 1) {
                             navController.navigate("artist/${artists[0].id}")
                             onDismiss()
@@ -500,7 +500,7 @@ fun YouTubeSongMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         navController.navigate("album/${album.id}")
                         onDismiss()
                     }
@@ -516,7 +516,7 @@ fun YouTubeSongMenu(
                          contentDescription = null,
                      )
                  },
-                 modifier = Modifier.clickable {
+                 modifier = Modifier.tvClickable {
                       onDismiss()
                       bottomSheetPageState.show {
                           ShowMediaInfo(song.id)

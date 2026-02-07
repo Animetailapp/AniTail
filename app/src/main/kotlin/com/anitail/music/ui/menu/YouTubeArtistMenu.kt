@@ -3,7 +3,6 @@ package com.anitail.music.ui.menu
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -42,6 +41,7 @@ import com.anitail.music.R
 import com.anitail.music.db.entities.ArtistEntity
 import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.YouTubeListItem
+import com.anitail.music.ui.utils.tvClickable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,7 +80,7 @@ fun YouTubeArtistMenu(
                         shape = RoundedCornerShape(8.dp)
                     )
                     .clip(RoundedCornerShape(8.dp))
-                    .clickable {
+                    .tvClickable {
                         playerConnection.playQueue(YouTubeQueue(watchEndpoint))
                         onDismiss()
                     }
@@ -113,7 +113,7 @@ fun YouTubeArtistMenu(
                         shape = RoundedCornerShape(8.dp)
                     )
                     .clip(RoundedCornerShape(8.dp))
-                    .clickable {
+                    .tvClickable {
                         playerConnection.playQueue(YouTubeQueue(watchEndpoint))
                         onDismiss()
                     }
@@ -145,7 +145,7 @@ fun YouTubeArtistMenu(
                     shape = RoundedCornerShape(8.dp)
                 )
                 .clip(RoundedCornerShape(8.dp))
-                .clickable {
+                .tvClickable {
                     val intent = Intent().apply {
                         action = Intent.ACTION_SEND
                         type = "text/plain"
@@ -203,7 +203,7 @@ fun YouTubeArtistMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     database.query {
                         val libraryArtist = libraryArtist
                         if (libraryArtist != null) {

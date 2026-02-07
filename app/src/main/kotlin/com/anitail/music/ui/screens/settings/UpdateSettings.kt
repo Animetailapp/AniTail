@@ -8,7 +8,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -73,6 +72,7 @@ import com.anitail.music.constants.UpdateCheckFrequency
 import com.anitail.music.ui.component.IconButton
 import com.anitail.music.ui.component.ReleaseNotesCard
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.Updater
 import com.anitail.music.utils.dataStore
 import com.anitail.music.utils.rememberPreference
@@ -229,7 +229,7 @@ fun UpdateSettings(
                             }
                         )
                     },
-                    modifier = Modifier.clickable { /* Toggle switch action */ }
+                    modifier = Modifier.tvClickable { /* Toggle switch action */ }
                 )
 
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -251,7 +251,7 @@ fun UpdateSettings(
                         Icon(Icons.Default.KeyboardArrowRight, contentDescription = null)
                     },
                     modifier = Modifier
-                        .clickable(enabled = autoUpdateEnabled) { showFrequencyDialog = true },
+                        .tvClickable(enabled = autoUpdateEnabled) { showFrequencyDialog = true },
                     colors = ListItemDefaults.colors(
                         containerColor = Color.Transparent,
                         headlineColor = if (autoUpdateEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(
@@ -355,7 +355,7 @@ fun UpdateSettings(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
+                                .tvClickable {
                                     coroutineScope.launch {
                                         context.dataStore.edit { preferences ->
                                             preferences[AutoUpdateCheckFrequencyKey] = option.name

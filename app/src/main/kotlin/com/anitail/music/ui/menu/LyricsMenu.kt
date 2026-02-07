@@ -4,7 +4,6 @@ import android.app.SearchManager
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -58,6 +57,7 @@ import com.anitail.music.models.MediaMetadata
 import com.anitail.music.ui.component.DefaultDialog
 import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.component.TextFieldDialog
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.viewmodels.LyricsMenuViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -227,7 +227,7 @@ fun LyricsMenu(
                     modifier =
                     Modifier
                         .fillMaxWidth()
-                        .clickable {
+                        .tvClickable {
                             onDismiss()
                             viewModel.cancelSearch()
                             database.query {
@@ -353,7 +353,7 @@ fun LyricsMenu(
                         }
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     isChecked = !isChecked
                     songProvider()?.let { song ->
                         database.query {
@@ -378,7 +378,7 @@ fun LyricsMenu(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable {
+                .tvClickable {
                     // Toggle isChecked when the row is clicked
                     isChecked = !isChecked
                     songProvider()?.let { song ->
@@ -417,7 +417,7 @@ fun LyricsMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     showEditDialog = true
                 }
             )
@@ -431,7 +431,7 @@ fun LyricsMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     onDismiss()
                     viewModel.refetchLyrics(mediaMetadataProvider(), lyricsProvider())
                 }
@@ -446,7 +446,7 @@ fun LyricsMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     showSearchDialog = true
                 }
             )

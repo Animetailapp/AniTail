@@ -10,7 +10,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -95,6 +94,7 @@ import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.models.MediaMetadata
 import com.anitail.music.playback.queues.LocalAlbumRadio
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.joinByBullet
 import com.anitail.music.utils.makeTimeString
 import com.anitail.music.utils.rememberPreference
@@ -122,10 +122,16 @@ inline fun ListItem(
         modifier = modifier
             .height(ListItemHeight)
             .padding(horizontal = 8.dp)
-            .then(if (isActive) Modifier.clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.secondaryContainer) else Modifier)
+            .then(
+                if (isActive) Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.secondaryContainer) else Modifier
+            )
     ) {
         Box(Modifier.padding(6.dp), contentAlignment = Alignment.Center) { thumbnailContent() }
-        Column(Modifier.weight(1f).padding(horizontal = 6.dp)) {
+        Column(Modifier
+            .weight(1f)
+            .padding(horizontal = 6.dp)) {
             Text(
                 text = title, fontSize = 14.sp, fontWeight = FontWeight.Bold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis
@@ -803,7 +809,9 @@ fun YouTubeGridItem(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = if (item is ArtistItem) TextAlign.Center else TextAlign.Start,
-            modifier = Modifier.basicMarquee().fillMaxWidth()
+            modifier = Modifier
+                .basicMarquee()
+                .fillMaxWidth()
         )
     },
     subtitle = {
@@ -827,7 +835,7 @@ fun YouTubeGridItem(
     thumbnailContent = {
         val database = LocalDatabase.current
         val playerConnection = LocalPlayerConnection.current ?: return@GridItem
-        val shape = if (item is ArtistItem) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
+        if (item is ArtistItem) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
 
         ItemThumbnail(
             thumbnailUrl = item.thumbnail,
@@ -1225,7 +1233,7 @@ fun BoxScope.AlbumPlayButton(
                 .size(36.dp)
                 .clip(CircleShape)
                 .background(Color.Black.copy(alpha = ActiveBoxAlpha))
-                .clickable(onClick = onClick)
+                .tvClickable(onClick = onClick)
         ) {
             Icon(
                 painter = painterResource(R.drawable.play),

@@ -1,7 +1,6 @@
 package com.anitail.music.ui.screens.settings.designs
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,6 +28,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.anitail.music.ui.utils.tvClickable
 
 sealed class IconResource {
     data class Drawable(val painter: Painter) : IconResource()
@@ -65,7 +65,13 @@ fun SettingsBox(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .then(if (onClick != null || actionType == ActionType.SWITCH) Modifier.clickable(onClick = finalOnClick) else Modifier),
+            .then(
+                if (onClick != null || actionType == ActionType.SWITCH) {
+                    Modifier.tvClickable(shape = shape, onClick = finalOnClick)
+                } else {
+                    Modifier
+                }
+            ),
         color = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = 1.dp
     ) {

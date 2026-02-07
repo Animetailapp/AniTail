@@ -16,8 +16,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -103,6 +101,8 @@ import com.anitail.music.ui.component.MediaMetadataListItem
 import com.anitail.music.ui.menu.PlayerMenu
 import com.anitail.music.ui.menu.SelectionMediaMetadataMenu
 import com.anitail.music.ui.utils.ShowMediaInfo
+import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.utils.makeTimeString
 import com.anitail.music.utils.rememberPreference
 import kotlinx.coroutines.Job
@@ -233,7 +233,7 @@ fun Queue(
                                         bottomEnd = 5.dp
                                     )
                                 )
-                                .clickable {
+                                .tvClickable {
                                     val intent = Intent().apply {
                                         action = Intent.ACTION_SEND
                                         type = "text/plain"
@@ -261,7 +261,7 @@ fun Queue(
                                 .border(
                                     1.dp, borderColor, RoundedCornerShape(5.dp)
                                 )
-                                .clickable { state.expandSoft() },
+                                .tvClickable { state.expandSoft() },
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -293,7 +293,7 @@ fun Queue(
                                         bottomEnd = 50.dp
                                     )
                                 )
-                                .clickable {
+                                .tvClickable {
                                     showLyrics = !showLyrics
                                 },
                             contentAlignment = Alignment.Center
@@ -315,7 +315,7 @@ fun Queue(
                             .size(buttonSize)
                             .clip(CircleShape)
                             .background(textButtonColor)
-                            .clickable {
+                            .tvClickable {
                                 menuState.show {
                                     PlayerMenu(
                                         mediaMetadata = mediaMetadata,
@@ -645,7 +645,7 @@ fun Queue(
                                         Modifier
                                             .fillMaxWidth()
                                             .background(backgroundColor)
-                                            .combinedClickable(
+                                            .tvCombinedClickable(
                                                 onClick = {
                                                     if (selection) {
                                                         if (window.mediaItem.metadata!! in selectedSongs) {
@@ -745,7 +745,7 @@ fun Queue(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .combinedClickable(
+                                        .tvCombinedClickable(
                                             onClick = {},
                                             onLongClick = {
                                                 menuState.show {
@@ -944,7 +944,7 @@ fun Queue(
                                     .calculateBottomPadding(),
                     )
                     .align(Alignment.BottomCenter)
-                    .clickable {
+                    .tvClickable {
                         state.collapseSoft()
                     }
                     .windowInsetsPadding(

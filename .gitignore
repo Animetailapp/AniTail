@@ -91,3 +91,8 @@ output-metadata.json
 
 # VS Code
 .vscode/
+.agents/
+
+#KEY
+*.jks
+*.keystore

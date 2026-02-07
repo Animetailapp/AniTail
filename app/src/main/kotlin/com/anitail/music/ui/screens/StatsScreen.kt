@@ -1,7 +1,6 @@
 package com.anitail.music.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
@@ -52,6 +51,7 @@ import com.anitail.music.ui.menu.AlbumMenu
 import com.anitail.music.ui.menu.ArtistMenu
 import com.anitail.music.ui.menu.SongMenu
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.utils.joinByBullet
 import com.anitail.music.utils.makeTimeString
 import com.anitail.music.viewmodels.StatsViewModel
@@ -254,7 +254,7 @@ fun StatsScreen(
                             modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .combinedClickable(
+                                .tvCombinedClickable(
                                     onClick = {
                                         if (song.id == mediaMetadata?.id) {
                                             playerConnection.player.togglePlayPause()
@@ -311,7 +311,7 @@ fun StatsScreen(
                             thumbnailUrl = artist.artist.thumbnailUrl,
                             modifier =
                             Modifier
-                                .combinedClickable(
+                                .tvCombinedClickable(
                                     onClick = {
                                         navController.navigate("artist/${artist.id}")
                                     },
@@ -363,7 +363,7 @@ fun StatsScreen(
                                 modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .combinedClickable(
+                                    .tvCombinedClickable(
                                         onClick = {
                                             navController.navigate("album/${album.id}")
                                         },

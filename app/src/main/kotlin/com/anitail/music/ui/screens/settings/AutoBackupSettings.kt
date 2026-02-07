@@ -15,12 +15,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.core.net.toUri
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.runtime.getValue
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Sync
 import androidx.compose.foundation.layout.Arrangement.Center
 import androidx.compose.foundation.layout.Arrangement.SpaceBetween
 import androidx.compose.foundation.layout.Box
@@ -40,6 +35,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CardDefaults.cardColors
@@ -58,13 +55,12 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -74,6 +70,7 @@ import androidx.compose.ui.text.font.FontWeight.Companion.SemiBold
 import androidx.compose.ui.text.style.TextOverflow.Companion.Ellipsis
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.edit
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.anitail.music.BuildConfig
 import com.anitail.music.LocalPlayerAwareWindowInsets
@@ -92,6 +89,7 @@ import com.anitail.music.ui.component.PreferenceEntry
 import com.anitail.music.ui.component.PreferenceGroupTitle
 import com.anitail.music.ui.component.SwitchPreference
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.dataStore
 import com.anitail.music.utils.get
 import com.anitail.music.utils.rememberPreference
@@ -565,7 +563,7 @@ fun AutoBackupSettings(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .clickable {
+                                .tvClickable {
                                     val newFrequency =
                                         when (index) {
                                             0 -> BackupFrequency.ONE_HOUR
@@ -623,7 +621,7 @@ private fun DiagnosticCard(title: String, content: String) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(
+                    .tvClickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = ripple(
                             bounded = true,

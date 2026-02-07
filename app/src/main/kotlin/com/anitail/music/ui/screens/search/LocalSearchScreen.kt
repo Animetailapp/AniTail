@@ -2,8 +2,6 @@ package com.anitail.music.ui.screens.search
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,6 +50,8 @@ import com.anitail.music.ui.component.LocalMenuState
 import com.anitail.music.ui.component.PlaylistListItem
 import com.anitail.music.ui.component.SongListItem
 import com.anitail.music.ui.menu.SongMenu
+import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.viewmodels.LocalFilter
 import com.anitail.music.viewmodels.LocalSearchViewModel
 import kotlinx.coroutines.flow.drop
@@ -121,7 +121,7 @@ fun LocalSearchScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(ListItemHeight)
-                                .clickable { viewModel.filter.value = filter }
+                                .tvClickable { viewModel.filter.value = filter }
                                 .padding(start = 12.dp, end = 18.dp),
                         ) {
                             Text(
@@ -180,7 +180,7 @@ fun LocalSearchScreen(
                                 }
                             },
                             modifier = Modifier
-                                .combinedClickable(
+                                .tvCombinedClickable(
                                     onClick = {
                                         if (item.id == mediaMetadata?.id) {
                                             playerConnection.player.togglePlayPause()
@@ -220,7 +220,7 @@ fun LocalSearchScreen(
                             isActive = item.id == mediaMetadata?.album?.id,
                             isPlaying = isPlaying,
                             modifier = Modifier
-                                .clickable {
+                                .tvClickable {
                                     onDismiss()
                                     navController.navigate("album/${item.id}")
                                 }
@@ -230,7 +230,7 @@ fun LocalSearchScreen(
                         is Artist -> ArtistListItem(
                             artist = item,
                             modifier = Modifier
-                                .clickable {
+                                .tvClickable {
                                     onDismiss()
                                     navController.navigate("artist/${item.id}")
                                 }
@@ -240,7 +240,7 @@ fun LocalSearchScreen(
                         is Playlist -> PlaylistListItem(
                             playlist = item,
                             modifier = Modifier
-                                .clickable {
+                                .tvClickable {
                                     onDismiss()
                                     navController.navigate("local_playlist/${item.id}")
                                 }

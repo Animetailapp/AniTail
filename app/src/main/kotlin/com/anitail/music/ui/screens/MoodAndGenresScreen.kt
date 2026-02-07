@@ -2,7 +2,6 @@ package com.anitail.music.ui.screens
 
 import android.content.res.Configuration.ORIENTATION_LANDSCAPE
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,6 +37,7 @@ import com.anitail.music.ui.component.NavigationTitle
 import com.anitail.music.ui.component.shimmer.ListItemPlaceHolder
 import com.anitail.music.ui.component.shimmer.ShimmerHost
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.viewmodels.MoodAndGenresViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -128,7 +128,7 @@ fun MoodAndGenresButton(
             .height(MoodAndGenresButtonHeight)
             .clip(RoundedCornerShape(6.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .clickable(onClick = onClick)
+            .tvClickable(shape = RoundedCornerShape(6.dp), onClick = onClick)
             .padding(horizontal = 12.dp),
     ) {
         Text(

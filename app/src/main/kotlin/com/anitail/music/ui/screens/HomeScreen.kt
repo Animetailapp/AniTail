@@ -3,7 +3,6 @@ package com.anitail.music.ui.screens
 import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -110,6 +109,7 @@ import com.anitail.music.ui.menu.YouTubeArtistMenu
 import com.anitail.music.ui.menu.YouTubePlaylistMenu
 import com.anitail.music.ui.menu.YouTubeSongMenu
 import com.anitail.music.ui.utils.SnapLayoutInfoProvider
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.utils.rememberPreference
 import com.anitail.music.viewmodels.HomeViewModel
 import kotlinx.coroutines.Dispatchers
@@ -202,7 +202,7 @@ fun HomeScreen(
                 song = it,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .combinedClickable(
+                    .tvCombinedClickable(
                         onClick = {
                             if (it.id == mediaMetadata?.id) {
                                 playerConnection.player.togglePlayPause()
@@ -236,7 +236,7 @@ fun HomeScreen(
                 coroutineScope = scope,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .combinedClickable(
+                    .tvCombinedClickable(
                         onClick = {
                             navController.navigate("album/${it.id}")
                         },
@@ -257,7 +257,7 @@ fun HomeScreen(
                 artist = it,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .combinedClickable(
+                    .tvCombinedClickable(
                         onClick = {
                             navController.navigate("artist/${it.id}")
                         },
@@ -288,7 +288,7 @@ fun HomeScreen(
             coroutineScope = scope,
             thumbnailRatio = 1f,
             modifier = Modifier
-                .combinedClickable(
+                .tvCombinedClickable(
                     onClick = {
                         when (item) {
                             is SongItem -> playerConnection.playQueue(
@@ -442,7 +442,7 @@ fun HomeScreen(
                                 },
                                 modifier = Modifier
                                     .width(horizontalLazyGridItemWidth)
-                                    .combinedClickable(
+                                    .tvCombinedClickable(
                                         onClick = {
                                             if (song!!.id == mediaMetadata?.id) {
                                                 playerConnection.player.togglePlayPause()
@@ -608,7 +608,7 @@ fun HomeScreen(
                                 },
                                 modifier = Modifier
                                     .width(horizontalLazyGridItemWidth)
-                                    .combinedClickable(
+                                    .tvCombinedClickable(
                                         onClick = {
                                             if (song!!.id == mediaMetadata?.id) {
                                                 playerConnection.player.togglePlayPause()

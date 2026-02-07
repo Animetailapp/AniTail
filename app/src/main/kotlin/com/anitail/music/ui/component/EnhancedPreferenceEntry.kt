@@ -3,8 +3,7 @@ package com.anitail.music.ui.component
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +35,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.anitail.music.R
+import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.ui.utils.tvCombinedClickable
+import com.anitail.music.ui.utils.tvFocusable
 
 /**
  * Enhanced version of PreferenceEntry with icon and improved design
@@ -51,7 +53,9 @@ fun EnhancedPreferenceEntry(
     onClick: () -> Unit,
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .tvFocusable(shape = RoundedCornerShape(12.dp), enabled = enabled),
         color = Color.Transparent,
         enabled = enabled,
         onClick = onClick
@@ -156,7 +160,7 @@ fun <T> EnhancedListPreference(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable {
+                                .tvClickable(shape = RoundedCornerShape(8.dp)) {
                                     onValueSelected(value)
                                     showDialog = false
                                 }
@@ -207,6 +211,7 @@ fun AnimatedIconButton(
     onLongClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     Surface(
         shape = CircleShape,
         color = Color.Transparent,
@@ -214,15 +219,19 @@ fun AnimatedIconButton(
             .size(48.dp)
             .then(
                 if (onLongClick != null) {
-                    Modifier.combinedClickable(
+                    Modifier.tvCombinedClickable(
                         onClick = onClick,
                         onLongClick = onLongClick,
-                        enabled = enabled
+                        enabled = enabled,
+                        shape = CircleShape,
+                        interactionSource = interactionSource,
                     )
                 } else {
-                    Modifier.clickable(
+                    Modifier.tvClickable(
+                        enabled = enabled,
+                        shape = CircleShape,
                         onClick = onClick,
-                        enabled = enabled
+                        interactionSource = interactionSource,
                     )
                 }
             )

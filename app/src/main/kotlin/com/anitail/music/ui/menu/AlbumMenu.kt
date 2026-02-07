@@ -5,7 +5,6 @@ import android.content.Intent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -69,6 +68,7 @@ import com.anitail.music.ui.component.AlbumListItem
 import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.component.ListItem
 import com.anitail.music.ui.component.SongListItem
+import com.anitail.music.ui.utils.tvClickable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -211,7 +211,7 @@ fun AlbumMenu(
                     },
                     modifier =
                     Modifier
-                        .clickable { showErrorPlaylistAddDialog = false },
+                        .tvClickable { showErrorPlaylistAddDialog = false },
                 )
             }
 
@@ -234,7 +234,7 @@ fun AlbumMenu(
                     modifier =
                     Modifier
                         .height(ListItemHeight)
-                        .clickable {
+                        .tvClickable {
                             navController.navigate("artist/${artist.id}")
                             showSelectArtistDialog = false
                             onDismiss()
@@ -310,7 +310,7 @@ fun AlbumMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     onDismiss()
                     playerConnection.playNext(songs.map { it.toMediaItem() })
                 }
@@ -325,7 +325,7 @@ fun AlbumMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     onDismiss()
                     playerConnection.addToQueue(songs.map { it.toMediaItem() })
                 }
@@ -340,7 +340,7 @@ fun AlbumMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     showChoosePlaylistDialog = true
                 }
             )
@@ -361,7 +361,7 @@ fun AlbumMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             // TODO: Option to remove from MediaStore
                             onDismiss()
                         }
@@ -385,7 +385,7 @@ fun AlbumMenu(
                                 strokeWidth = 2.dp
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             songs.forEach { song ->
                                 downloadUtil.cancelMediaStoreDownload(song.id)
                             }
@@ -411,7 +411,7 @@ fun AlbumMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             songs.forEach { song ->
                                 downloadUtil.retryMediaStoreDownload(song.id)
                             }
@@ -429,7 +429,7 @@ fun AlbumMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             songs.forEach { song ->
                                 downloadUtil.downloadToMediaStore(song)
                             }
@@ -448,7 +448,7 @@ fun AlbumMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     if (album.artists.size == 1) {
                         navController.navigate("artist/${album.artists[0].id}")
                         onDismiss()
@@ -468,7 +468,7 @@ fun AlbumMenu(
                         modifier = Modifier.graphicsLayer(rotationZ = rotationAnimation),
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     refetchIconDegree -= 360
                     scope.launch(Dispatchers.IO) {
                         YouTube.album(album.id).onSuccess {
@@ -489,7 +489,7 @@ fun AlbumMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     onDismiss()
                     val intent =
                         Intent().apply {

@@ -2059,12 +2059,9 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     fun castCurrentToDevice() {
         try {
             // Verificar si Cast está disponible antes de proceder
-            if (!com.anitail.music.utils.GooglePlayServicesUtils.isCastAvailable(this)) {
-                return
-            }
-            
             val castContext =
-                com.google.android.gms.cast.framework.CastContext.getSharedInstance(this)
+                com.anitail.music.utils.GooglePlayServicesUtils.getCastContextOrNull(this)
+                    ?: return
             castContext.sessionManager.currentCastSession ?: return
             if (castPlayer == null) {
                 castPlayer = CastPlayer(castContext)

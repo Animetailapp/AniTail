@@ -1,7 +1,7 @@
 package com.anitail.music.ui.menu
 
+import com.anitail.music.ui.utils.tvClickable
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
@@ -108,7 +108,7 @@ fun AddToPlaylistDialogOnline(
                             modifier = Modifier.size(ListThumbnailSize)
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         showCreatePlaylistDialog = true
                     }
                 )
@@ -117,7 +117,7 @@ fun AddToPlaylistDialogOnline(
             items(playlists) { playlist ->
                 PlaylistListItem(
                     playlist = playlist,
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         selectedPlaylist = playlist
                         coroutineScope.launch(Dispatchers.IO) {
                             onDismiss()
@@ -180,7 +180,7 @@ fun AddToPlaylistDialogOnline(
 
             item {
                 ListItem(
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         coroutineScope.launch(Dispatchers.IO) {
                             onDismiss()
                             val songsTot = songs.count().toDouble()
