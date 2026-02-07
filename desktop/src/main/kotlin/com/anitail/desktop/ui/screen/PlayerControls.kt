@@ -116,10 +116,12 @@ fun PlayerControls(
             },
             style = sliderStyle,
             activeColor = textButtonColor,
-            inactiveColor = textButtonColor.copy(alpha = 0.3f),
+            inactiveColor = Color.White.copy(alpha = 0.15f),
             isPlaying = playerState.isPlaying,
             modifier = Modifier.padding(horizontal = PlayerHorizontalPadding),
         )
+
+        Spacer(Modifier.height(4.dp))
 
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -131,14 +133,14 @@ fun PlayerControls(
             Text(
                 text = formatTime(displayPosition),
                 style = MaterialTheme.typography.labelMedium,
-                color = mutedTextColor,
+                color = textColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = formatTime(durationMs),
                 style = MaterialTheme.typography.labelMedium,
-                color = mutedTextColor,
+                color = textColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

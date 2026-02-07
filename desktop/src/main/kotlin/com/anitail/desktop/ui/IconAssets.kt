@@ -118,4 +118,8 @@ object IconAssets {
     fun lockOpen(): ImageVector = VectorResource.load("lock_open.xml")
 
     fun dragHandle(): ImageVector = VectorResource.load("drag_handle.xml")
+
+    fun selectAll(): ImageVector = VectorResource.load("select_all.xml")
+
+    fun deselect(): ImageVector = VectorResource.load("deselect.xml")
 }

@@ -16,7 +16,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -79,7 +78,7 @@ fun PlayerBackgroundLayer(
                 RemoteImage(
                     url = artworkUrl,
                     modifier = Modifier.fillMaxSize().blur(150.dp),
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.FillBounds,
                 )
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
             }
@@ -135,14 +134,19 @@ private fun extractGradientColors(bitmap: ImageBitmap): List<Color> {
     }
 
     if (count == 0) return emptyList()
-    val avg = Color(red / count, green / count, blue / count, 1f)
-    val isDark = avg.luminance() < 0.35f
-    val primary = adjustColor(avg, if (isDark) 0.18f else -0.18f)
-    val secondary = adjustColor(avg, if (isDark) 0.32f else -0.32f)
-    return listOf(primary, secondary)
+    val dominant = Color(red / count, green / count, blue / count, 1f)
+    val isDark = isColorDark(dominant)
+    val secondary = shiftColor(dominant, if (isDark) 0.2f else -0.2f)
+    return listOf(dominant, secondary)
 }
 
-private fun adjustColor(color: Color, delta: Float): Color {
+private fun isColorDark(color: Color): Boolean {
+    val yiq =
+        ((color.red * 255f) * 299f + (color.green * 255f) * 587f + (color.blue * 255f) * 114f) / 1000f
+    return yiq < 128f
+}
+
+private fun shiftColor(color: Color, delta: Float): Color {
     return Color(
         red = (color.red + delta).coerceIn(0f, 1f),
         green = (color.green + delta).coerceIn(0f, 1f),

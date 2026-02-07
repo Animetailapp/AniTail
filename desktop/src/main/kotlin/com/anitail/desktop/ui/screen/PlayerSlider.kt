@@ -68,7 +68,7 @@ fun PlayerProgressSlider(
         Canvas(modifier = Modifier.fillMaxWidth().height(if (style == SliderStyle.SLIM) 16.dp else 24.dp)) {
             val centerY = size.height / 2f
             val trackHeight = when (style) {
-                SliderStyle.SLIM -> 2.dp.toPx()
+                SliderStyle.SLIM -> 10.dp.toPx()
                 SliderStyle.SQUIGGLY -> 3.dp.toPx()
                 SliderStyle.DEFAULT -> 4.dp.toPx()
             }
@@ -83,7 +83,7 @@ fun PlayerProgressSlider(
             )
 
             if (style == SliderStyle.SQUIGGLY) {
-                val amplitude = if (isPlaying) 6.dp.toPx() else 2.dp.toPx()
+                val amplitude = if (isPlaying) 2.dp.toPx() else 0.dp.toPx()
                 val wavelength = 28.dp.toPx()
                 val step = 6.dp.toPx()
                 val path = Path()

@@ -240,6 +240,17 @@ class PlayerState {
         currentQueueIndex = -1
     }
 
+    fun insertIntoQueue(index: Int, item: LibraryItem) {
+        val safeIndex = index.coerceIn(0, _queue.size)
+        if (_queue.any { it.id == item.id }) {
+            return
+        }
+        _queue.add(safeIndex, item)
+        if (currentQueueIndex >= safeIndex && currentQueueIndex != -1) {
+            currentQueueIndex++
+        }
+    }
+
     fun moveQueueItem(fromIndex: Int, toIndex: Int) {
         if (fromIndex !in _queue.indices || toIndex !in _queue.indices || fromIndex == toIndex) {
             return
