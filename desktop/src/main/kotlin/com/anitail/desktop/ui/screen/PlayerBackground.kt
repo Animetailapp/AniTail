@@ -15,7 +15,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -103,7 +103,7 @@ private suspend fun loadArtworkBitmap(url: String): ImageBitmap? {
     val bytes = withContext(Dispatchers.IO) {
         runCatching { URL(url).readBytes() }.getOrNull()
     } ?: return null
-    val bitmap = runCatching { Image.makeFromEncoded(bytes).asImageBitmap() }.getOrNull()
+    val bitmap = runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
     if (bitmap != null) {
         ImageCache.put(url, bitmap)
     }

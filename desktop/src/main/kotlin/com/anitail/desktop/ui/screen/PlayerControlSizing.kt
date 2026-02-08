@@ -13,12 +13,13 @@ internal data class PlayerControlSizes(
 )
 
 internal fun calculatePlayerControlSizes(@Suppress("UNUSED_PARAMETER") maxWidth: Dp): PlayerControlSizes {
-    val playButtonHeight = (maxWidth / 6f).coerceAtMost(60.dp)
+    val referenceWidth = maxWidth.coerceAtMost(360.dp)
+    val playButtonHeight = referenceWidth / 6f
     val playButtonWidth = playButtonHeight * 1.1f
     val sideButtonHeight = playButtonHeight * 0.7f
-    val sideButtonWidth = (sideButtonHeight * 1.3f).coerceAtMost(54.dp)
-    val playIconSize = playButtonHeight * 0.7f
-    val sideIconSize = sideButtonHeight * 0.762f
+    val sideButtonWidth = sideButtonHeight * 1.3f
+    val playIconSize = 42.dp
+    val sideIconSize = 32.dp
 
     return PlayerControlSizes(
         playButtonWidth = playButtonWidth,

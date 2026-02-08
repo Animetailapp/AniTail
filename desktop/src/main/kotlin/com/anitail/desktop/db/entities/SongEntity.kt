@@ -13,6 +13,7 @@ data class SongEntity(
     val thumbnailUrl: String? = null,
     val albumId: String? = null,
     val albumName: String? = null,
+    val artistId: String? = null,
     val artistName: String? = null,
     val explicit: Boolean = false,
     val year: Int? = null,

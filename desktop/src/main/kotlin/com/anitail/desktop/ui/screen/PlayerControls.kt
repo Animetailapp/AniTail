@@ -1,6 +1,8 @@
 package com.anitail.desktop.ui.screen
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -44,11 +46,14 @@ import com.anitail.shared.model.LibraryItem
 fun PlayerControls(
     item: LibraryItem,
     playerState: PlayerState,
+    isLiked: Boolean,
     textColor: Color,
     mutedTextColor: Color,
     sliderStyle: SliderStyle,
     textButtonColor: Color,
     iconButtonColor: Color,
+    onToggleLike: () -> Unit,
+    onAddToPlaylist: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var sliderPosition by remember { mutableStateOf<Float?>(null) }
@@ -80,29 +85,84 @@ fun PlayerControls(
             }
         }
 
-        Column(
+        val addToPlaylistShape = RoundedCornerShape(
+            topStart = 5.dp,
+            bottomStart = 5.dp,
+            topEnd = 50.dp,
+            bottomEnd = 50.dp,
+        )
+        val favShape = RoundedCornerShape(
+            topStart = 50.dp,
+            bottomStart = 50.dp,
+            topEnd = 5.dp,
+            bottomEnd = 5.dp,
+        )
+
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = PlayerHorizontalPadding),
         ) {
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = textColor,
-                modifier = Modifier.basicMarquee(),
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = item.artist,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = mutedTextColor,
-                modifier = Modifier.basicMarquee(),
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = textColor,
+                    modifier = Modifier.basicMarquee(),
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = item.artist,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = mutedTextColor,
+                    modifier = Modifier.basicMarquee(),
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(favShape)
+                        .background(textButtonColor)
+                        .clickable(onClick = onToggleLike),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (isLiked) IconAssets.favorite() else IconAssets.favoriteBorder(),
+                        contentDescription = null,
+                        tint = iconButtonColor,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(addToPlaylistShape)
+                        .background(textButtonColor)
+                        .clickable(onClick = onAddToPlaylist),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = IconAssets.playlistAdd(),
+                        contentDescription = null,
+                        tint = iconButtonColor,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(12.dp))

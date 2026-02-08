@@ -25,6 +25,7 @@ fun SongItem.toSongEntity(inLibrary: Boolean = false): SongEntity = SongEntity(
     thumbnailUrl = thumbnail,
     albumId = album?.id,
     albumName = album?.name,
+    artistId = artists.firstOrNull()?.id,
     artistName = artists.joinToString(", ") { it.name },
     explicit = explicit,
     year = null,
@@ -123,13 +124,14 @@ fun PlaylistEntity.toLibraryItem(): LibraryItem = LibraryItem(
  * Creates a basic SongEntity from a LibraryItem.
  * Used when adding items from innertube directly.
  */
-fun LibraryItem.toSongEntity(): SongEntity = SongEntity(
+fun LibraryItem.toSongEntity(inLibrary: Boolean): SongEntity = SongEntity(
     id = id,
     title = title,
     duration = (durationMs?.div(1000))?.toInt() ?: -1,
     thumbnailUrl = artworkUrl,
     albumId = null,
     albumName = null,
+    artistId = null,
     artistName = artist,
     explicit = false,
     year = null,
@@ -138,10 +140,12 @@ fun LibraryItem.toSongEntity(): SongEntity = SongEntity(
     liked = false,
     likedDate = null,
     totalPlayTime = 0,
-    inLibrary = LocalDateTime.now(),
+    inLibrary = if (inLibrary) LocalDateTime.now() else null,
     dateDownload = null,
     isLocal = false,
 )
+
+fun LibraryItem.toSongEntity(): SongEntity = toSongEntity(inLibrary = true)
 
 /**
  * Helper to extract video ID from YouTube URL

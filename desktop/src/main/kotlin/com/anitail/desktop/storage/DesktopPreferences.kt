@@ -46,6 +46,9 @@ class DesktopPreferences private constructor(
     private val _crossfadeDuration = MutableStateFlow(0) // in seconds, 0 = disabled
     val crossfadeDuration: StateFlow<Int> = _crossfadeDuration.asStateFlow()
 
+    private val _historyDuration = MutableStateFlow(30f) // seconds
+    val historyDuration: StateFlow<Float> = _historyDuration.asStateFlow()
+
     private val _persistentQueue = MutableStateFlow(true)
     val persistentQueue: StateFlow<Boolean> = _persistentQueue.asStateFlow()
 
@@ -64,6 +67,9 @@ class DesktopPreferences private constructor(
 
     private val _hideExplicit = MutableStateFlow(false)
     val hideExplicit: StateFlow<Boolean> = _hideExplicit.asStateFlow()
+
+    private val _quickPicks = MutableStateFlow(QuickPicks.QUICK_PICKS)
+    val quickPicks: StateFlow<QuickPicks> = _quickPicks.asStateFlow()
 
     // === Privacy Settings ===
     private val _pauseListenHistory = MutableStateFlow(false)
@@ -136,6 +142,11 @@ class DesktopPreferences private constructor(
         save()
     }
 
+    fun setHistoryDuration(value: Float) {
+        _historyDuration.value = value.coerceIn(0f, 120f)
+        save()
+    }
+
     fun setPersistentQueue(value: Boolean) {
         _persistentQueue.value = value
         save()
@@ -163,6 +174,11 @@ class DesktopPreferences private constructor(
 
     fun setHideExplicit(value: Boolean) {
         _hideExplicit.value = value
+        save()
+    }
+
+    fun setQuickPicks(value: QuickPicks) {
+        _quickPicks.value = value
         save()
     }
 
@@ -224,6 +240,7 @@ class DesktopPreferences private constructor(
             _audioQuality.value = AudioQuality.fromString(json.optString("audioQuality", "auto"))
             _skipSilence.value = json.optBoolean("skipSilence", false)
             _crossfadeDuration.value = json.optInt("crossfadeDuration", 0)
+            _historyDuration.value = json.optDouble("historyDuration", 30.0).toFloat()
             _persistentQueue.value = json.optBoolean("persistentQueue", true)
             _autoStartRadio.value = json.optBoolean("autoStartRadio", true)
             _queueEditLocked.value = json.optBoolean("queueEditLocked", true)
@@ -231,6 +248,7 @@ class DesktopPreferences private constructor(
             _contentLanguage.value = json.optString("contentLanguage", "es")
             _contentCountry.value = json.optString("contentCountry", "ES")
             _hideExplicit.value = json.optBoolean("hideExplicit", false)
+            _quickPicks.value = QuickPicks.fromString(json.optString("quickPicks", "quick_picks"))
 
             _pauseListenHistory.value = json.optBoolean("pauseListenHistory", false)
             _pauseSearchHistory.value = json.optBoolean("pauseSearchHistory", false)
@@ -258,6 +276,7 @@ class DesktopPreferences private constructor(
                 put("audioQuality", _audioQuality.value.name.lowercase())
                 put("skipSilence", _skipSilence.value)
                 put("crossfadeDuration", _crossfadeDuration.value)
+                put("historyDuration", _historyDuration.value)
                 put("persistentQueue", _persistentQueue.value)
                 put("autoStartRadio", _autoStartRadio.value)
                 put("queueEditLocked", _queueEditLocked.value)
@@ -265,6 +284,7 @@ class DesktopPreferences private constructor(
                 put("contentLanguage", _contentLanguage.value)
                 put("contentCountry", _contentCountry.value)
                 put("hideExplicit", _hideExplicit.value)
+                put("quickPicks", _quickPicks.value.name.lowercase())
 
                 put("pauseListenHistory", _pauseListenHistory.value)
                 put("pauseSearchHistory", _pauseSearchHistory.value)
@@ -321,6 +341,18 @@ enum class DarkModePreference {
             "time_based", "timebased", "time" -> TIME_BASED
             "auto", "system" -> AUTO
             else -> AUTO
+        }
+    }
+}
+
+enum class QuickPicks {
+    QUICK_PICKS,
+    LAST_LISTEN;
+
+    companion object {
+        fun fromString(value: String): QuickPicks = when (value.lowercase()) {
+            "last_listen", "last_listened", "last" -> LAST_LISTEN
+            else -> QUICK_PICKS
         }
     }
 }

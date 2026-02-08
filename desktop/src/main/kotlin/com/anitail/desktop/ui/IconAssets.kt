@@ -75,6 +75,8 @@ object IconAssets {
 
     fun album(): ImageVector = VectorResource.load("album.xml")
 
+    fun artist(): ImageVector = VectorResource.load("artist.xml")
+
     fun person(): ImageVector = VectorResource.load("person.xml")
 
     fun trendingUp(): ImageVector = VectorResource.load("trending_up.xml")
@@ -88,6 +90,12 @@ object IconAssets {
     fun storage(): ImageVector = VectorResource.load("storage.xml")
 
     fun info(): ImageVector = VectorResource.load("info.xml")
+
+    fun bedtime(): ImageVector = VectorResource.load("bedtime.xml")
+
+    fun equalizer(): ImageVector = VectorResource.load("equalizer.xml")
+
+    fun tune(): ImageVector = VectorResource.load("tune.xml")
 
     fun chevronRight(): ImageVector = VectorResource.load("chevron_right.xml")
 

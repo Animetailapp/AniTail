@@ -9,7 +9,10 @@ import androidx.compose.runtime.setValue
 import com.anitail.shared.model.LibraryItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -41,6 +44,21 @@ class PlayerState {
     var volume by mutableStateOf(1.0)
         private set
 
+    var tempo by mutableStateOf(1f)
+        private set
+
+    var pitchSemitone by mutableStateOf(0)
+        private set
+
+    var onPlaybackEvent: ((LibraryItem, Long) -> Unit)? = null
+
+    private var lastReportedItemId: String? = null
+    private var lastReportedPosition: Long = 0L
+
+    private var sleepTimerState by mutableStateOf(inactiveSleepTimerState())
+    private var sleepTimerJob: Job? = null
+    private var sleepTimerTick by mutableStateOf(0L)
+
     // Cola de reproducción
     private val _queue = mutableStateListOf<LibraryItem>()
     val queue: List<LibraryItem> get() = _queue
@@ -54,6 +72,7 @@ class PlayerState {
 
     init {
         setupNativePlayerCallbacks()
+        applyPlaybackRate()
     }
 
     private fun setupNativePlayerCallbacks() {
@@ -104,6 +123,10 @@ class PlayerState {
     }
 
     private fun handlePlaybackEnded() {
+        val shouldRecord = repeatMode == RepeatMode.ONE || !canSkipNext
+        if (shouldRecord) {
+            reportPlaybackIfNeeded(force = true)
+        }
         when (repeatMode) {
             RepeatMode.ONE -> {
                 seekTo(0L)
@@ -128,7 +151,16 @@ class PlayerState {
     val progress: Float
         get() = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
 
+    val isSleepTimerActive: Boolean
+        get() = sleepTimerState.isActive
+
+    val sleepTimerTimeLeftMs: Long
+        get() = computeSleepTimerTimeLeftMs(sleepTimerState, sleepTimerTick)
+
     fun play(item: LibraryItem) {
+        if (currentItem?.id != item.id) {
+            reportPlaybackIfNeeded()
+        }
         currentItem = item
         position = 0L
         duration = item.durationMs ?: 180_000L
@@ -285,7 +317,9 @@ class PlayerState {
     }
 
     fun stop() {
+        reportPlaybackIfNeeded()
         isPlaying = false
+        cancelSleepTimer()
         position = 0L
         currentItem = null
         nativePlayer.stop()
@@ -351,6 +385,67 @@ class PlayerState {
         nativePlayer.setVolume(volume)
     }
 
+    fun updateTempo(newTempo: Float) {
+        tempo = newTempo.coerceIn(0.5f, 2.0f)
+        applyPlaybackRate()
+    }
+
+    fun updatePitchSemitone(newPitchSemitone: Int) {
+        pitchSemitone = newPitchSemitone.coerceIn(-12, 12)
+        applyPlaybackRate()
+    }
+
+    fun resetTempoPitch() {
+        tempo = 1f
+        pitchSemitone = 0
+        applyPlaybackRate()
+    }
+
+    private fun applyPlaybackRate() {
+        val rate = PlaybackRateCalculator.toRate(tempo, pitchSemitone)
+        nativePlayer.setPlaybackRate(rate)
+    }
+
+    private fun reportPlaybackIfNeeded(force: Boolean = false) {
+        val item = currentItem ?: return
+        val playTimeMs = position.coerceAtLeast(0L)
+        if (playTimeMs <= 0L) return
+        if (!force && lastReportedItemId == item.id && lastReportedPosition == playTimeMs) return
+        lastReportedItemId = item.id
+        lastReportedPosition = playTimeMs
+        onPlaybackEvent?.invoke(item, playTimeMs)
+    }
+
+    fun startSleepTimer(durationMs: Long) {
+        cancelSleepTimer()
+        val nowMs = System.currentTimeMillis()
+        val newState = startSleepTimerState(nowMs, durationMs)
+        sleepTimerState = newState
+        sleepTimerTick = nowMs
+
+        if (!newState.isActive) return
+
+        sleepTimerJob = scope.launch {
+            while (isActive && sleepTimerState.isActive) {
+                delay(1_000L)
+                val tick = System.currentTimeMillis()
+                sleepTimerTick = tick
+                if (isSleepTimerExpired(sleepTimerState, tick)) {
+                    pause()
+                    sleepTimerState = cancelSleepTimerState()
+                    break
+                }
+            }
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        sleepTimerState = cancelSleepTimerState()
+        sleepTimerTick = 0L
+    }
+
     fun updatePosition(positionMs: Long) {
         // Este método ahora es principalmente para compatibilidad
         // El reproductor nativo actualiza la posición automáticamente
@@ -362,6 +457,7 @@ class PlayerState {
     }
 
     fun release() {
+        cancelSleepTimer()
         nativePlayer.release()
     }
 }

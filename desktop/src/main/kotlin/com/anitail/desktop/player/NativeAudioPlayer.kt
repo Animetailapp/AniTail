@@ -26,6 +26,7 @@ class NativeAudioPlayer {
 
     private var mediaPlayer: MediaPlayer? = null
     private var volume: Double = 1.0
+    private var playbackRate: Double = 1.0
 
     // Callbacks de estado
     var onStatusChanged: ((PlaybackStatus) -> Unit)? = null
@@ -204,6 +205,7 @@ class NativeAudioPlayer {
                 player.setOnReady {
                     mediaPlayer = player
                     onStatusChanged?.invoke(PlaybackStatus.READY)
+                    player.rate = playbackRate
                     player.play()
                     if (continuation.isActive) continuation.resume(true)
                 }
@@ -311,6 +313,13 @@ class NativeAudioPlayer {
                 MediaPlayer.Status.PAUSED -> player.play()
                 else -> { /* Ignorar otros estados */ }
             }
+        }
+    }
+
+    fun setPlaybackRate(rate: Double) {
+        playbackRate = rate
+        Platform.runLater {
+            mediaPlayer?.rate = rate
         }
     }
     

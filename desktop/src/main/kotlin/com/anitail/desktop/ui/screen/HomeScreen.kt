@@ -60,6 +60,8 @@ import com.anitail.innertube.models.PlaylistItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.YTItem
 import com.anitail.innertube.pages.HomePage
+import com.anitail.desktop.db.mapper.extractChannelId
+import com.anitail.desktop.db.mapper.extractPlaylistId
 import com.anitail.shared.model.LibraryItem
 
 // Constantes de dimensiones
@@ -487,20 +489,27 @@ private fun KeepListeningRow(
         items(items) { item ->
             val isArtist = item.playbackUrl.contains("/channel/")
             val shape = if (isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
+            val ytItem = remember(item) { ytItemFromLibrary(item) }
             val contextMenuItems = remember(item) {
-                listOf(
-                    ContextMenuItem("Reproducir") { onOpen(ytItemFromLibrary(item)) },
-                    ContextMenuItem("Reproducir siguiente") { playerState.addToQueue(item, playNext = true) },
-                    ContextMenuItem("Agregar a la cola") { playerState.addToQueue(item) },
-                    ContextMenuItem("Agregar a biblioteca") { onAddToLibrary(ytItemFromLibrary(item)) },
-                )
+                if (ytItem is SongItem) {
+                    listOf(
+                        ContextMenuItem("Reproducir") { onOpen(ytItem) },
+                        ContextMenuItem("Reproducir siguiente") { playerState.addToQueue(item, playNext = true) },
+                        ContextMenuItem("Agregar a la cola") { playerState.addToQueue(item) },
+                        ContextMenuItem("Agregar a biblioteca") { onAddToLibrary(ytItem) },
+                    )
+                } else {
+                    listOf(
+                        ContextMenuItem("Abrir") { onOpen(ytItem) },
+                    )
+                }
             }
 
             ContextMenuArea(items = { contextMenuItems }) {
                 Column(
                     modifier = Modifier
                         .width(GridThumbnailHeight)
-                        .clickable { onOpen(ytItemFromLibrary(item)) },
+                        .clickable { onOpen(ytItem) },
                 ) {
                     Box {
                         RemoteImage(
@@ -547,6 +556,49 @@ private fun KeepListeningRow(
 
 // Funciones auxiliares
 private fun ytItemFromLibrary(item: LibraryItem): YTItem {
+    val playbackUrl = item.playbackUrl
+    val playlistId = extractPlaylistId(playbackUrl)
+    val channelId = extractChannelId(playbackUrl)
+
+    if (!channelId.isNullOrBlank() || playbackUrl.contains("/channel/")) {
+        return ArtistItem(
+            id = channelId ?: item.id,
+            title = item.title,
+            thumbnail = item.artworkUrl,
+            channelId = channelId,
+            shuffleEndpoint = null,
+            radioEndpoint = null,
+        )
+    }
+
+    if (!playlistId.isNullOrBlank() && (item.id.startsWith("MPREb_") ||
+                item.id.startsWith("FEmusic_library_privately_owned_release_detail"))
+    ) {
+        return AlbumItem(
+            browseId = item.id,
+            playlistId = playlistId,
+            title = item.title,
+            artists = null,
+            year = null,
+            thumbnail = item.artworkUrl.orEmpty(),
+            explicit = false,
+        )
+    }
+
+    if (!playlistId.isNullOrBlank()) {
+        return PlaylistItem(
+            id = item.id,
+            title = item.title,
+            author = null,
+            songCountText = null,
+            thumbnail = item.artworkUrl,
+            playEndpoint = null,
+            shuffleEndpoint = null,
+            radioEndpoint = null,
+            isEditable = false,
+        )
+    }
+
     return SongItem(
         id = item.id,
         title = item.title,

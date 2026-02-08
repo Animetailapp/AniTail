@@ -22,11 +22,13 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -52,14 +54,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.constants.PlayerQueueCollapsedHeight
+import com.anitail.desktop.db.DesktopDatabase
+import com.anitail.desktop.db.entities.PlaylistEntity
+import com.anitail.desktop.db.mapper.toSongEntity
+import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.BottomSheet
 import com.anitail.desktop.ui.component.BottomSheetState
+import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.shared.model.LibraryItem
 import kotlinx.coroutines.launch
@@ -75,9 +83,21 @@ fun PlayerQueueSheet(
     currentItem: LibraryItem,
     showLyrics: Boolean,
     onToggleLyrics: (Boolean) -> Unit,
+    onStartRadio: () -> Unit,
+    artistsWithId: List<Pair<String, String>>,
+    albumInfo: Pair<String, String>?,
+    onOpenArtist: (String, String) -> Unit,
+    onShowArtistPicker: () -> Unit,
+    onOpenAlbum: (String, String) -> Unit,
+    onShowDetailsDialog: () -> Unit,
+    onShowSleepTimerDialog: () -> Unit,
+    onShowAudioSettingsDialog: () -> Unit,
+    onShowAdvancedDialog: () -> Unit,
     pureBlack: Boolean,
     textColor: Color,
     mutedTextColor: Color,
+    database: DesktopDatabase,
+    downloadService: DesktopDownloadService,
     modifier: Modifier = Modifier,
 ) {
     val borderColor = textColor.copy(alpha = 0.35f)
@@ -96,6 +116,29 @@ fun PlayerQueueSheet(
     var selectionMode by remember { mutableStateOf(false) }
 
     var showMenu by remember { mutableStateOf(false) }
+    var showPlaylistDialog by remember { mutableStateOf(false) }
+    var showRemoveDownloadDialog by remember { mutableStateOf(false) }
+    var playlistTargetItems by remember { mutableStateOf<List<LibraryItem>>(emptyList()) }
+    var downloadTargetItems by remember { mutableStateOf<List<LibraryItem>>(emptyList()) }
+
+    val queue = playerState.queue
+
+    val songs by database.songs.collectAsState(initial = emptyList())
+    val playlists by database.allPlaylists().collectAsState(initial = emptyList())
+    val editablePlaylists = remember(playlists) { playlists.filter { it.isEditable } }
+    val songsById = remember(songs) { songs.associateBy { it.id } }
+    val downloadStates by downloadService.downloadStates.collectAsState()
+    val downloadedSongs by downloadService.downloadedSongs.collectAsState()
+    val shareUrl = if (currentItem.id.isNotBlank()) {
+        "https://music.youtube.com/watch?v=${currentItem.id}"
+    } else {
+        currentItem.playbackUrl
+    }
+    val currentDownloadState = computeSelectionDownloadState(
+        selectedIds = listOf(currentItem.id),
+        downloadStates = downloadStates,
+        downloadedSongs = downloadedSongs,
+    )
 
     fun copyLink(url: String) {
         clipboard.setText(AnnotatedString(url))
@@ -114,6 +157,69 @@ fun PlayerQueueSheet(
     fun clearSelection() {
         selectionMode = false
         selectedIds.clear()
+    }
+
+    fun selectedItemsInQueue(queue: List<LibraryItem>): List<LibraryItem> {
+        return if (selectionMode) {
+            queue.filter { selectedIds.contains(it.id) }
+        } else {
+            emptyList()
+        }
+    }
+
+    suspend fun ensureSongsInDatabase(items: List<LibraryItem>) {
+        val existingIds = songsById.keys
+        items.filter { it.id !in existingIds }.forEach { item ->
+            database.insertSong(item.toSongEntity())
+        }
+    }
+
+    fun addItemsToPlaylist(playlistId: String, items: List<LibraryItem>) {
+        if (items.isEmpty()) return
+        coroutineScope.launch {
+            ensureSongsInDatabase(items)
+            items.forEach { item ->
+                database.addSongToPlaylist(playlistId, item.id)
+            }
+        }
+    }
+
+    fun toggleLikesForItems(items: List<LibraryItem>, like: Boolean) {
+        if (items.isEmpty()) return
+        val snapshot = songsById
+        coroutineScope.launch {
+            ensureSongsInDatabase(items)
+            items.forEach { item ->
+                val liked = snapshot[item.id]?.liked == true
+                if (like && !liked) {
+                    database.toggleSongLike(item.id)
+                } else if (!like && liked) {
+                    database.toggleSongLike(item.id)
+                }
+            }
+        }
+    }
+
+    fun downloadItems(items: List<LibraryItem>) {
+        if (items.isEmpty()) return
+        items.forEach { item ->
+            val durationSec = ((item.durationMs ?: 0L) / 1000L).toInt()
+            downloadService.downloadSong(
+                songId = item.id,
+                title = item.title,
+                artist = item.artist,
+                album = null,
+                thumbnailUrl = item.artworkUrl,
+                duration = durationSec,
+            )
+        }
+    }
+
+    fun removeDownloads(items: List<LibraryItem>) {
+        if (items.isEmpty()) return
+        items.forEach { item ->
+            downloadService.deleteDownload(item.id)
+        }
     }
 
     BottomSheet(
@@ -194,18 +300,201 @@ fun PlayerQueueSheet(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false },
                     ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                .fillMaxWidth(),
+                        ) {
+                            PlayerMenuQuickAction(
+                                icon = IconAssets.radio(),
+                                label = "Iniciar radio",
+                                onClick = {
+                                    onStartRadio()
+                                    showMenu = false
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
+                            PlayerMenuQuickAction(
+                                icon = IconAssets.playlistAdd(),
+                                label = "Agregar a playlist",
+                                onClick = {
+                                    playlistTargetItems = listOf(currentItem)
+                                    showPlaylistDialog = true
+                                    showMenu = false
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
+                            PlayerMenuQuickAction(
+                                icon = IconAssets.link(),
+                                label = "Copiar enlace",
+                                onClick = {
+                                    copyLink(shareUrl)
+                                    showMenu = false
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+
+                        Surface(
+                            color = mutedTextColor.copy(alpha = 0.2f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp),
+                        ) { }
+
+                        if (artistsWithId.isNotEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("Ver artista") },
+                                onClick = {
+                                    if (artistsWithId.size == 1) {
+                                        val artist = artistsWithId.first()
+                                        onOpenArtist(artist.first, artist.second)
+                                    } else {
+                                        onShowArtistPicker()
+                                    }
+                                    showMenu = false
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = IconAssets.artist(),
+                                        contentDescription = null,
+                                    )
+                                },
+                            )
+                        }
+                        albumInfo?.let { album ->
+                            DropdownMenuItem(
+                                text = { Text("Ver album") },
+                                onClick = {
+                                    onOpenAlbum(album.first, album.second)
+                                    showMenu = false
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = IconAssets.album(),
+                                        contentDescription = null,
+                                    )
+                                },
+                            )
+                        }
+                        when (currentDownloadState) {
+                            SelectionDownloadState.NONE -> Unit
+                            SelectionDownloadState.COMPLETED -> {
+                                DropdownMenuItem(
+                                    text = { Text("Eliminar descarga") },
+                                    onClick = {
+                                        removeDownloads(listOf(currentItem))
+                                        showMenu = false
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = IconAssets.offline(),
+                                            contentDescription = null,
+                                        )
+                                    },
+                                )
+                            }
+                            SelectionDownloadState.DOWNLOADING -> {
+                                DropdownMenuItem(
+                                    text = { Text("Descargando") },
+                                    onClick = {
+                                        removeDownloads(listOf(currentItem))
+                                        showMenu = false
+                                    },
+                                    leadingIcon = {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            strokeWidth = 2.dp,
+                                        )
+                                    },
+                                )
+                            }
+                            SelectionDownloadState.NOT_DOWNLOADED -> {
+                                DropdownMenuItem(
+                                    text = { Text("Descargar") },
+                                    onClick = {
+                                        downloadItems(listOf(currentItem))
+                                        showMenu = false
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = IconAssets.download(),
+                                            contentDescription = null,
+                                        )
+                                    },
+                                )
+                            }
+                        }
                         DropdownMenuItem(
-                            text = { Text("Copiar enlace") },
+                            text = { Text("Compartir") },
                             onClick = {
-                                copyLink(currentItem.playbackUrl)
+                                copyLink(shareUrl)
                                 showMenu = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = IconAssets.share(),
+                                    contentDescription = null,
+                                )
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Abrir en navegador") },
+                            text = { Text("Detalles") },
                             onClick = {
-                                openInBrowser(currentItem.playbackUrl)
+                                onShowDetailsDialog()
                                 showMenu = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = IconAssets.info(),
+                                    contentDescription = null,
+                                )
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                if (playerState.isSleepTimerActive) {
+                                    Text("Temporizador (${formatTime(playerState.sleepTimerTimeLeftMs)})")
+                                } else {
+                                    Text("Temporizador")
+                                }
+                            },
+                            onClick = {
+                                onShowSleepTimerDialog()
+                                showMenu = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = IconAssets.bedtime(),
+                                    contentDescription = null,
+                                )
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Ecualizador") },
+                            onClick = {
+                                onShowAudioSettingsDialog()
+                                showMenu = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = IconAssets.equalizer(),
+                                    contentDescription = null,
+                                )
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Avanzado") },
+                            onClick = {
+                                onShowAdvancedDialog()
+                                showMenu = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = IconAssets.tune(),
+                                    contentDescription = null,
+                                )
                             },
                         )
                     }
@@ -213,7 +502,6 @@ fun PlayerQueueSheet(
             }
         },
     ) {
-        val queue = playerState.queue
         val currentIndex = playerState.currentQueueIndex
         val allSelected = selectionMode && selectedIds.size == queue.size && queue.isNotEmpty()
 
@@ -311,7 +599,13 @@ fun PlayerQueueSheet(
                         ReorderableItem(
                             state = reorderableState,
                             key = item.id,
-                        ) {
+                        ) { _ ->
+                            val dragHandleModifier =
+                                if (!queueEditLocked && !selectionMode) {
+                                    Modifier.draggableHandle()
+                                } else {
+                                    Modifier
+                                }
                             val dismissState = rememberSwipeToDismissBoxState(
                                 confirmValueChange = { dismissValue ->
                                     if (dismissValue == SwipeToDismissBoxValue.StartToEnd ||
@@ -325,6 +619,12 @@ fun PlayerQueueSheet(
 
                             val content: @Composable () -> Unit = {
                                 val isSelected = selectionMode && selectedIds.contains(item.id)
+                                val isLiked = songsById[item.id]?.liked == true
+                                val itemDownloadState = computeSelectionDownloadState(
+                                    selectedIds = listOf(item.id),
+                                    downloadStates = downloadStates,
+                                    downloadedSongs = downloadedSongs,
+                                )
                                 QueueItemRow(
                                     item = item,
                                     isActive = index == currentIndex,
@@ -332,7 +632,9 @@ fun PlayerQueueSheet(
                                     isSelected = isSelected,
                                     showDragHandle = !queueEditLocked && !selectionMode,
                                     showItemMenu = !selectionMode,
-                                    dragHandleModifier = if (!queueEditLocked && !selectionMode) Modifier.draggableHandle() else Modifier,
+                                    isLiked = isLiked,
+                                    downloadState = itemDownloadState,
+                                    dragHandleModifier = dragHandleModifier,
                                     onClick = {
                                         if (selectionMode) {
                                             if (isSelected) {
@@ -363,6 +665,20 @@ fun PlayerQueueSheet(
                                             playerState.moveQueueItem(index, (currentIndex + 1).coerceAtMost(queue.lastIndex))
                                         }
                                     },
+                                    onAddToPlaylist = {
+                                        playlistTargetItems = listOf(item)
+                                        showPlaylistDialog = true
+                                    },
+                                    onToggleLike = {
+                                        toggleLikesForItems(listOf(item), like = !isLiked)
+                                    },
+                                    onDownload = {
+                                        downloadItems(listOf(item))
+                                    },
+                                    onRemoveDownload = {
+                                        downloadTargetItems = listOf(item)
+                                        showRemoveDownloadDialog = true
+                                    },
                                     onRemove = { removeItemsWithUndo(listOf(index)) },
                                     onCopyLink = { copyLink(item.playbackUrl) },
                                     onOpenInBrowser = { openInBrowser(item.playbackUrl) },
@@ -389,6 +705,15 @@ fun PlayerQueueSheet(
                 }
             }
 
+            val selectedItems = selectedItemsInQueue(queue)
+            val allLiked = selectedItems.isNotEmpty() &&
+                selectedItems.all { songsById[it.id]?.liked == true }
+            val downloadState = computeSelectionDownloadState(
+                selectedIds = selectedItems.map { it.id },
+                downloadStates = downloadStates,
+                downloadedSongs = downloadedSongs,
+            )
+
             QueueHeader(
                 title = "Cola actual",
                 count = queue.size,
@@ -403,8 +728,6 @@ fun PlayerQueueSheet(
             )
 
             if (selectionMode) {
-                val selectedItems = queue.filter { selectedIds.contains(it.id) }
-                val selectedLinks = selectedItems.map { it.playbackUrl }.filter { it.isNotBlank() }
                 QueueSelectionBar(
                     selectedCount = selectedIds.size,
                     allSelected = allSelected,
@@ -427,19 +750,41 @@ fun PlayerQueueSheet(
                             clearSelection()
                         }
                     },
-                    onRemove = {
+                    onShuffle = {
+                        if (selectedItems.isNotEmpty()) {
+                            playerState.playQueue(selectedItems.shuffled(), startIndex = 0)
+                            clearSelection()
+                        }
+                    },
+                    onAddToQueue = {
+                        selectedItems.forEach { playerState.addToQueue(it) }
+                        clearSelection()
+                    },
+                    onAddToPlaylist = {
+                        if (selectedItems.isNotEmpty()) {
+                            playlistTargetItems = selectedItems
+                            showPlaylistDialog = true
+                        }
+                    },
+                    allLiked = allLiked,
+                    downloadState = downloadState,
+                    onDownload = {
+                        downloadItems(selectedItems)
+                        clearSelection()
+                    },
+                    onRemoveDownload = {
+                        downloadTargetItems = selectedItems
+                        showRemoveDownloadDialog = true
+                    },
+                    onToggleLike = {
+                        toggleLikesForItems(selectedItems, like = !allLiked)
+                        clearSelection()
+                    },
+                    onRemoveFromQueue = {
                         val indices = selectedIds.mapNotNull { id ->
                             queue.indexOfFirst { it.id == id }.takeIf { it != -1 }
                         }
                         removeItemsWithUndo(indices)
-                    },
-                    onCopyLinks = {
-                        if (selectedLinks.isNotEmpty()) {
-                            copyLink(selectedLinks.joinToString("\n"))
-                        }
-                    },
-                    onOpenInBrowser = {
-                        selectedLinks.firstOrNull()?.let { openInBrowser(it) }
                     },
                     modifier = Modifier.align(Alignment.TopCenter).padding(top = PlayerQueueCollapsedHeight),
                 )
@@ -461,6 +806,56 @@ fun PlayerQueueSheet(
                     .padding(bottom = PlayerQueueCollapsedHeight + 12.dp),
             )
         }
+    }
+
+    if (showPlaylistDialog) {
+        val playlistItems =
+            if (playlistTargetItems.isNotEmpty()) playlistTargetItems else selectedItemsInQueue(queue)
+        PlaylistPickerDialog(
+            visible = true,
+            playlists = editablePlaylists,
+            onCreatePlaylist = { name ->
+                val playlist = PlaylistEntity(name = name)
+                coroutineScope.launch {
+                    database.insertPlaylist(playlist)
+                    addItemsToPlaylist(playlist.id, playlistItems)
+                    if (selectionMode) clearSelection()
+                }
+                showPlaylistDialog = false
+            },
+            onSelectPlaylist = { playlist ->
+                addItemsToPlaylist(playlist.id, playlistItems)
+                if (selectionMode) clearSelection()
+                showPlaylistDialog = false
+            },
+            onDismiss = { showPlaylistDialog = false },
+        )
+    }
+
+    if (showRemoveDownloadDialog) {
+        val removalItems =
+            if (downloadTargetItems.isNotEmpty()) downloadTargetItems else selectedItemsInQueue(queue)
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showRemoveDownloadDialog = false },
+            title = { Text("Eliminar descargas") },
+            text = { Text("Se eliminaran las descargas seleccionadas.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        removeDownloads(removalItems)
+                        if (selectionMode) clearSelection()
+                        showRemoveDownloadDialog = false
+                    },
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemoveDownloadDialog = false }) {
+                    Text("Cancelar")
+                }
+            },
+        )
     }
 }
 
@@ -486,6 +881,41 @@ private fun QueueActionButton(
             contentDescription = contentDescription,
             modifier = Modifier.size(24.dp),
             tint = iconTint,
+        )
+    }
+}
+
+@Composable
+private fun PlayerMenuQuickAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(8.dp)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(22.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }
@@ -572,12 +1002,20 @@ private fun QueueSelectionBar(
     onClose: () -> Unit,
     onToggleSelectAll: () -> Unit,
     onPlay: () -> Unit,
-    onRemove: () -> Unit,
-    onCopyLinks: () -> Unit,
-    onOpenInBrowser: () -> Unit,
+    onShuffle: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    allLiked: Boolean,
+    downloadState: SelectionDownloadState,
+    onDownload: () -> Unit,
+    onRemoveDownload: () -> Unit,
+    onToggleLike: () -> Unit,
+    onRemoveFromQueue: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val likeLabel = if (allLiked) "Quitar me gusta" else "Me gusta"
+    val likeIcon = if (allLiked) IconAssets.favorite() else IconAssets.favoriteBorder()
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -628,37 +1066,140 @@ private fun QueueSelectionBar(
                 onDismissRequest = { showMenu = false },
             ) {
                 DropdownMenuItem(
-                    text = { Text("Reproducir seleccion") },
+                    text = { Text("Quitar de la cola") },
+                    onClick = {
+                        onRemoveFromQueue()
+                        showMenu = false
+                    },
+                    enabled = selectedCount > 0,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = IconAssets.delete(),
+                            contentDescription = null,
+                        )
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Reproducir") },
                     onClick = {
                         onPlay()
                         showMenu = false
                     },
                     enabled = selectedCount > 0,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = IconAssets.play(),
+                            contentDescription = null,
+                        )
+                    },
                 )
                 DropdownMenuItem(
-                    text = { Text("Eliminar") },
+                    text = { Text("Aleatorio") },
                     onClick = {
-                        onRemove()
+                        onShuffle()
                         showMenu = false
                     },
                     enabled = selectedCount > 0,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = IconAssets.shuffle(),
+                            contentDescription = null,
+                        )
+                    },
                 )
                 DropdownMenuItem(
-                    text = { Text("Copiar enlace") },
+                    text = { Text("Agregar a la cola") },
                     onClick = {
-                        onCopyLinks()
+                        onAddToQueue()
                         showMenu = false
                     },
                     enabled = selectedCount > 0,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = IconAssets.queueMusic(),
+                            contentDescription = null,
+                        )
+                    },
                 )
                 DropdownMenuItem(
-                    text = { Text("Abrir en navegador") },
+                    text = { Text("Agregar a playlist") },
                     onClick = {
-                        onOpenInBrowser()
+                        onAddToPlaylist()
                         showMenu = false
                     },
                     enabled = selectedCount > 0,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = IconAssets.playlistAdd(),
+                            contentDescription = null,
+                        )
+                    },
                 )
+                DropdownMenuItem(
+                    text = { Text(likeLabel) },
+                    onClick = {
+                        onToggleLike()
+                        showMenu = false
+                    },
+                    enabled = selectedCount > 0,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = likeIcon,
+                            contentDescription = null,
+                        )
+                    },
+                )
+                when (downloadState) {
+                    SelectionDownloadState.NONE -> Unit
+                    SelectionDownloadState.COMPLETED -> {
+                        DropdownMenuItem(
+                            text = { Text("Eliminar descarga") },
+                            onClick = {
+                                onRemoveDownload()
+                                showMenu = false
+                            },
+                            enabled = selectedCount > 0,
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = IconAssets.offline(),
+                                    contentDescription = null,
+                                )
+                            },
+                        )
+                    }
+                    SelectionDownloadState.DOWNLOADING -> {
+                        DropdownMenuItem(
+                            text = { Text("Descargando") },
+                            onClick = {
+                                onRemoveDownload()
+                                showMenu = false
+                            },
+                            enabled = selectedCount > 0,
+                            leadingIcon = {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            },
+                        )
+                    }
+                    SelectionDownloadState.NOT_DOWNLOADED -> {
+                        DropdownMenuItem(
+                            text = { Text("Descargar") },
+                            onClick = {
+                                onDownload()
+                                showMenu = false
+                            },
+                            enabled = selectedCount > 0,
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = IconAssets.download(),
+                                    contentDescription = null,
+                                )
+                            },
+                        )
+                    }
+                }
             }
         }
     }
@@ -673,10 +1214,16 @@ private fun QueueItemRow(
     isSelected: Boolean,
     showDragHandle: Boolean,
     showItemMenu: Boolean,
+    isLiked: Boolean,
+    downloadState: SelectionDownloadState,
     dragHandleModifier: Modifier,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onPlayNext: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onToggleLike: () -> Unit,
+    onDownload: () -> Unit,
+    onRemoveDownload: () -> Unit,
     onRemove: () -> Unit,
     onCopyLink: () -> Unit,
     onOpenInBrowser: () -> Unit,
@@ -806,19 +1353,98 @@ private fun QueueItemRow(
                             itemMenuExpanded = false
                         },
                         enabled = !isActive,
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Eliminar de la cola") },
-                        onClick = {
-                            onRemove()
-                            itemMenuExpanded = false
+                        leadingIcon = {
+                            Icon(
+                                imageVector = IconAssets.play(),
+                                contentDescription = null,
+                            )
                         },
                     )
+                    DropdownMenuItem(
+                        text = { Text("Agregar a playlist") },
+                        onClick = {
+                            onAddToPlaylist()
+                            itemMenuExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = IconAssets.playlistAdd(),
+                                contentDescription = null,
+                            )
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (isLiked) "Quitar me gusta" else "Me gusta") },
+                        onClick = {
+                            onToggleLike()
+                            itemMenuExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = if (isLiked) IconAssets.favorite() else IconAssets.favoriteBorder(),
+                                contentDescription = null,
+                            )
+                        },
+                    )
+                    when (downloadState) {
+                        SelectionDownloadState.NONE -> Unit
+                        SelectionDownloadState.COMPLETED -> {
+                            DropdownMenuItem(
+                                text = { Text("Eliminar descarga") },
+                                onClick = {
+                                    onRemoveDownload()
+                                    itemMenuExpanded = false
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = IconAssets.offline(),
+                                        contentDescription = null,
+                                    )
+                                },
+                            )
+                        }
+                        SelectionDownloadState.DOWNLOADING -> {
+                            DropdownMenuItem(
+                                text = { Text("Descargando") },
+                                onClick = {
+                                    onRemoveDownload()
+                                    itemMenuExpanded = false
+                                },
+                                leadingIcon = {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                },
+                            )
+                        }
+                        SelectionDownloadState.NOT_DOWNLOADED -> {
+                            DropdownMenuItem(
+                                text = { Text("Descargar") },
+                                onClick = {
+                                    onDownload()
+                                    itemMenuExpanded = false
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = IconAssets.download(),
+                                        contentDescription = null,
+                                    )
+                                },
+                            )
+                        }
+                    }
                     DropdownMenuItem(
                         text = { Text("Copiar enlace") },
                         onClick = {
                             onCopyLink()
                             itemMenuExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = IconAssets.link(),
+                                contentDescription = null,
+                            )
                         },
                     )
                     DropdownMenuItem(
@@ -826,6 +1452,25 @@ private fun QueueItemRow(
                         onClick = {
                             onOpenInBrowser()
                             itemMenuExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = IconAssets.arrowTopLeft(),
+                                contentDescription = null,
+                            )
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Eliminar de la cola") },
+                        onClick = {
+                            onRemove()
+                            itemMenuExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = IconAssets.delete(),
+                                contentDescription = null,
+                            )
                         },
                     )
                 }

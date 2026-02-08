@@ -46,6 +46,7 @@ import com.anitail.desktop.storage.DarkModePreference
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.storage.PlayerBackgroundStyle
 import com.anitail.desktop.storage.PlayerButtonsStyle
+import com.anitail.desktop.storage.QuickPicks
 import com.anitail.desktop.storage.SliderStyle
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.NavigationTitle
@@ -314,6 +315,7 @@ private fun PlayerSettingsScreen(
     val audioQuality by preferences.audioQuality.collectAsState()
     val skipSilence by preferences.skipSilence.collectAsState()
     val crossfadeDuration by preferences.crossfadeDuration.collectAsState()
+    val historyDuration by preferences.historyDuration.collectAsState()
     val persistentQueue by preferences.persistentQueue.collectAsState()
     val autoStartRadio by preferences.autoStartRadio.collectAsState()
     val showLyrics by preferences.showLyrics.collectAsState()
@@ -332,6 +334,16 @@ private fun PlayerSettingsScreen(
             onSelect = { index ->
                 preferences.setAudioQuality(AudioQuality.entries[index])
             },
+        )
+
+        // Historial de reproducción
+        SettingsSlider(
+            title = "Duración del historial",
+            subtitle = if (historyDuration <= 0f) "Ilimitado" else "${historyDuration.toInt()} segundos",
+            value = historyDuration.coerceIn(0f, 60f),
+            valueRange = 0f..60f,
+            steps = 59,
+            onValueChange = { preferences.setHistoryDuration(it) },
         )
 
         // Skip Silence
@@ -397,6 +409,7 @@ private fun ContentSettingsScreen(
     val contentLanguage by preferences.contentLanguage.collectAsState()
     val contentCountry by preferences.contentCountry.collectAsState()
     val hideExplicit by preferences.hideExplicit.collectAsState()
+    val quickPicks by preferences.quickPicks.collectAsState()
 
     val languages = listOf(
         "es" to "Español",
@@ -452,6 +465,20 @@ private fun ContentSettingsScreen(
             subtitle = "Filtra canciones con contenido explícito",
             checked = hideExplicit,
             onCheckedChange = { preferences.setHideExplicit(it) },
+        )
+
+        // Quick Picks mode
+        SettingsDropdown(
+            title = "Quick picks",
+            subtitle = when (quickPicks) {
+                QuickPicks.QUICK_PICKS -> "Quick picks"
+                QuickPicks.LAST_LISTEN -> "Última canción escuchada"
+            },
+            options = listOf("Quick picks", "Última canción escuchada"),
+            selectedIndex = if (quickPicks == QuickPicks.QUICK_PICKS) 0 else 1,
+            onSelect = { index ->
+                preferences.setQuickPicks(if (index == 0) QuickPicks.QUICK_PICKS else QuickPicks.LAST_LISTEN)
+            },
         )
     }
 }

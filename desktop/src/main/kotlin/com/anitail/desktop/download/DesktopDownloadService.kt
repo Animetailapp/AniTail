@@ -70,7 +70,12 @@ data class DownloadedSong(
  */
 class DesktopDownloadService {
     companion object {
-        private val downloadDir = File(System.getProperty("user.home"), ".anitail/downloads")
+        internal fun resolveMusicDownloadDir(homeDir: String = System.getProperty("user.home") ?: "."): File {
+            val musicDir = File(homeDir, "Music")
+            return File(musicDir, "Anitail")
+        }
+
+        private val downloadDir = resolveMusicDownloadDir()
         private val metadataFile = File(System.getProperty("user.home"), ".anitail/downloads.json")
         
         private val json = Json { 

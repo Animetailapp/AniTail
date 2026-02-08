@@ -3,6 +3,7 @@ package com.anitail.desktop.db
 import com.anitail.desktop.db.entities.AlbumEntity
 import com.anitail.desktop.db.entities.ArtistEntity
 import com.anitail.desktop.db.entities.EventEntity
+import com.anitail.desktop.db.entities.RelatedSongMap
 import com.anitail.desktop.db.entities.PlaylistEntity
 import com.anitail.desktop.db.entities.PlaylistSongMap
 import com.anitail.desktop.db.entities.SearchHistory
@@ -39,6 +40,7 @@ class DesktopDatabase private constructor(
     private val _albums = MutableStateFlow<Map<String, AlbumEntity>>(emptyMap())
     private val _playlists = MutableStateFlow<Map<String, PlaylistEntity>>(emptyMap())
     private val _playlistSongMaps = MutableStateFlow<List<PlaylistSongMap>>(emptyList())
+    private val _relatedSongMaps = MutableStateFlow<List<RelatedSongMap>>(emptyList())
     private val _events = MutableStateFlow<List<EventEntity>>(emptyList())
     private val _searchHistory = MutableStateFlow<List<SearchHistory>>(emptyList())
 
@@ -46,6 +48,7 @@ class DesktopDatabase private constructor(
     val artists: Flow<List<ArtistEntity>> = _artists.map { it.values.toList() }
     val albums: Flow<List<AlbumEntity>> = _albums.map { it.values.toList() }
     val playlists: Flow<List<PlaylistEntity>> = _playlists.map { it.values.toList() }
+    val relatedSongMaps: Flow<List<RelatedSongMap>> = _relatedSongMaps
     val events: Flow<List<EventEntity>> = _events
     val searchHistory: Flow<List<SearchHistory>> = _searchHistory
 
@@ -217,6 +220,41 @@ class DesktopDatabase private constructor(
             savePlaylistSongMaps()
         }
 
+    // === Related Song Map Operations ===
+
+    fun hasRelatedSongs(songId: String): Boolean =
+        _relatedSongMaps.value.any { it.songId == songId }
+
+    fun relatedSongs(songId: String): List<SongEntity> {
+        val relatedIds = _relatedSongMaps.value
+            .filter { it.songId == songId }
+            .map { it.relatedSongId }
+            .distinct()
+        return relatedIds.mapNotNull { _songs.value[it] }
+    }
+
+    suspend fun insertRelatedSongs(songId: String, relatedSongIds: List<String>) =
+        withContext(Dispatchers.IO) {
+            if (relatedSongIds.isEmpty()) return@withContext
+            val existing = _relatedSongMaps.value
+                .filter { it.songId == songId }
+                .map { it.relatedSongId }
+                .toSet()
+            val uniqueIds = relatedSongIds.filterNot { it in existing }.distinct()
+            if (uniqueIds.isEmpty()) return@withContext
+
+            val startId = (_relatedSongMaps.value.maxOfOrNull { it.id } ?: 0L) + 1L
+            val newMaps = uniqueIds.mapIndexed { index, relatedId ->
+                RelatedSongMap(
+                    id = startId + index,
+                    songId = songId,
+                    relatedSongId = relatedId,
+                )
+            }
+            _relatedSongMaps.value = _relatedSongMaps.value + newMaps
+            saveRelatedSongMaps()
+        }
+
     // === Event Operations (History) ===
 
     fun recentEvents(limit: Int = 100): Flow<List<EventEntity>> = _events.map { events ->
@@ -283,6 +321,7 @@ class DesktopDatabase private constructor(
         loadAlbums()
         loadPlaylists()
         loadPlaylistSongMaps()
+        loadRelatedSongMaps()
         loadEvents()
         loadSearchHistory()
     }
@@ -319,6 +358,7 @@ class DesktopDatabase private constructor(
                     thumbnailUrl = obj.optString("thumbnailUrl").takeIf { it.isNotBlank() },
                     albumId = obj.optString("albumId").takeIf { it.isNotBlank() },
                     albumName = obj.optString("albumName").takeIf { it.isNotBlank() },
+                    artistId = obj.optString("artistId").takeIf { it.isNotBlank() },
                     artistName = obj.optString("artistName").takeIf { it.isNotBlank() },
                     explicit = obj.optBoolean("explicit", false),
                     year = obj.optInt("year", 0).takeIf { it > 0 },
@@ -348,6 +388,7 @@ class DesktopDatabase private constructor(
                 put("thumbnailUrl", song.thumbnailUrl ?: "")
                 put("albumId", song.albumId ?: "")
                 put("albumName", song.albumName ?: "")
+                put("artistId", song.artistId ?: "")
                 put("artistName", song.artistName ?: "")
                 put("explicit", song.explicit)
                 put("year", song.year ?: 0)
@@ -554,6 +595,43 @@ class DesktopDatabase private constructor(
                 put("playlistId", map.playlistId)
                 put("songId", map.songId)
                 put("position", map.position)
+            })
+        }
+        Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)
+    }
+
+    // === Related Song Map Persistence ===
+
+    private fun loadRelatedSongMaps() {
+        val file = basePath.resolve("related_song_map.json")
+        if (!Files.exists(file)) return
+        runCatching {
+            val raw = Files.readString(file, StandardCharsets.UTF_8)
+            if (raw.isBlank()) return
+            val array = JSONArray(raw)
+            val maps = mutableListOf<RelatedSongMap>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                maps.add(
+                    RelatedSongMap(
+                        id = obj.getLong("id"),
+                        songId = obj.getString("songId"),
+                        relatedSongId = obj.getString("relatedSongId"),
+                    )
+                )
+            }
+            _relatedSongMaps.value = maps
+        }
+    }
+
+    private fun saveRelatedSongMaps() {
+        val file = basePath.resolve("related_song_map.json")
+        val array = JSONArray()
+        _relatedSongMaps.value.forEach { map ->
+            array.put(JSONObject().apply {
+                put("id", map.id)
+                put("songId", map.songId)
+                put("relatedSongId", map.relatedSongId)
             })
         }
         Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)

@@ -19,6 +19,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -35,15 +36,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.anitail.desktop.db.DesktopDatabase
+import com.anitail.desktop.db.entities.EventEntity
+import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.db.mapper.extractVideoId
 import com.anitail.desktop.db.mapper.toLibraryItem
+import com.anitail.desktop.db.mapper.toAlbumEntity
+import com.anitail.desktop.db.mapper.toArtistEntity
 import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.constants.MiniPlayerBottomSpacing
 import com.anitail.desktop.constants.MiniPlayerHeight
 import com.anitail.desktop.constants.NavigationBarHeight
+import com.anitail.desktop.home.HomeListenAlbum
+import com.anitail.desktop.home.HomeListenArtist
+import com.anitail.desktop.home.HomeListenSong
+import com.anitail.desktop.home.buildHomeRecommendations
 import com.anitail.desktop.model.SimilarRecommendation
 import com.anitail.desktop.player.rememberPlayerState
 import com.anitail.desktop.storage.DesktopPreferences
+import com.anitail.desktop.storage.QuickPicks
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import com.anitail.desktop.ui.AnitailTheme
@@ -78,10 +88,13 @@ import com.anitail.innertube.models.YTItem
 import com.anitail.innertube.pages.ChartsPage
 import com.anitail.innertube.pages.ExplorePage
 import com.anitail.innertube.pages.HomePage
+import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.shared.model.LibraryItem
 import com.anitail.shared.model.SearchState
 import com.anitail.shared.repository.InnertubeMusicRepository
+import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
@@ -130,6 +143,7 @@ private fun AniTailDesktopApp() {
     val repository = remember { InnertubeMusicRepository() }
     // Replace legacy store with Database and Preferences
     val database = remember { DesktopDatabase.getInstance() }
+    val downloadService = remember { DesktopDownloadService() }
     val preferences = remember { DesktopPreferences.getInstance() }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -137,6 +151,10 @@ private fun AniTailDesktopApp() {
     val darkMode by preferences.darkMode.collectAsState()
     val pureBlackEnabled by preferences.pureBlack.collectAsState()
     val dynamicColorEnabled by preferences.dynamicColor.collectAsState()
+    val hideExplicit by preferences.hideExplicit.collectAsState()
+    val quickPicksMode by preferences.quickPicks.collectAsState()
+    val pauseListenHistory by preferences.pauseListenHistory.collectAsState()
+    val historyDuration by preferences.historyDuration.collectAsState()
     var themeColor by remember { mutableStateOf(DefaultThemeColor) }
     var lastArtworkUrl by remember { mutableStateOf<String?>(null) }
 
@@ -147,6 +165,11 @@ private fun AniTailDesktopApp() {
 
     // Library state from Database
     val songs by database.songsInLibrary().collectAsState(initial = emptyList())
+    val allSongs by database.songs.collectAsState(initial = emptyList())
+    val albums by database.albums.collectAsState(initial = emptyList())
+    val artists by database.artists.collectAsState(initial = emptyList())
+    val relatedSongMaps by database.relatedSongMaps.collectAsState(initial = emptyList())
+    val events by database.events.collectAsState(initial = emptyList())
     // For backward compatibility with existing code that expects LibraryItem
     val libraryItems = remember(songs) {
         songs.map { it.toLibraryItem() }.toMutableStateList()
@@ -166,6 +189,99 @@ private fun AniTailDesktopApp() {
     var similarRecommendations by remember { mutableStateOf<List<SimilarRecommendation>>(emptyList()) }
     var detailNavigation by remember { mutableStateOf(DetailNavigation()) }
     val navigationHistory = remember { mutableStateListOf<DesktopScreen>() }
+
+    DisposableEffect(playerState, database) {
+        playerState.onPlaybackEvent = { item, playTimeMs ->
+            val thresholdMs = if (historyDuration <= 0f) 0L else (historyDuration * 1000f).toLong()
+            if (!pauseListenHistory && playTimeMs >= thresholdMs) {
+                scope.launch {
+                    val existing = database.song(item.id).first()
+                    val base = existing ?: item.toSongEntity(inLibrary = false)
+                    database.updateSong(
+                        base.copy(
+                            totalPlayTime = base.totalPlayTime + playTimeMs,
+                            dateModified = LocalDateTime.now(),
+                        ),
+                    )
+                    database.insertEvent(
+                        EventEntity(
+                            songId = item.id,
+                            timestamp = LocalDateTime.now(),
+                            playTime = playTimeMs,
+                        ),
+                    )
+                }
+            }
+        }
+        onDispose {
+            playerState.onPlaybackEvent = null
+        }
+    }
+
+    LaunchedEffect(playerState.currentItem?.id) {
+        val item = playerState.currentItem ?: return@LaunchedEffect
+        val existing = database.song(item.id).first()
+        val base = existing ?: item.toSongEntity(inLibrary = false)
+        if (existing == null) {
+            database.updateSong(base)
+        }
+
+        suspend fun ensureArtist(artistId: String) {
+            if (artistId.isBlank()) return
+            if (database.artist(artistId).first() != null) return
+            YouTube.artist(artistId).onSuccess { page ->
+                database.insertArtist(page.artist.toArtistEntity())
+            }
+        }
+
+        suspend fun ensureAlbum(albumId: String) {
+            if (albumId.isBlank()) return
+            if (database.album(albumId).first() != null) return
+            YouTube.album(albumId).onSuccess { page ->
+                database.insertAlbum(page.album.toAlbumEntity())
+            }
+        }
+
+        val nextResult = YouTube.next(WatchEndpoint(videoId = item.id)).getOrNull()
+        val songDetails = nextResult?.let { result ->
+            result.currentIndex?.let { index -> result.items.getOrNull(index) }
+                ?: result.items.firstOrNull { it.id == item.id }
+                ?: result.items.firstOrNull()
+        }
+
+        if (songDetails != null) {
+            val updated = base.copy(
+                title = songDetails.title.ifBlank { base.title },
+                duration = if (base.duration > 0) base.duration else (songDetails.duration ?: base.duration),
+                thumbnailUrl = songDetails.thumbnail.ifBlank { base.thumbnailUrl.orEmpty() }
+                    .takeIf { it.isNotBlank() } ?: base.thumbnailUrl,
+                albumId = songDetails.album?.id ?: base.albumId,
+                albumName = songDetails.album?.name ?: base.albumName,
+                artistId = songDetails.artists.firstOrNull()?.id ?: base.artistId,
+                artistName = if (songDetails.artists.isNotEmpty()) {
+                    songDetails.artists.joinToString(", ") { it.name }
+                } else {
+                    base.artistName
+                },
+                explicit = base.explicit || songDetails.explicit,
+                dateModified = LocalDateTime.now(),
+            )
+            database.updateSong(updated)
+
+            songDetails.artists.mapNotNull { it.id }.forEach { ensureArtist(it) }
+            songDetails.album?.id?.let { ensureAlbum(it) }
+        }
+
+        if (!database.hasRelatedSongs(item.id)) {
+            val relatedEndpoint = nextResult?.relatedEndpoint ?: return@LaunchedEffect
+            val relatedPage = YouTube.related(relatedEndpoint).getOrNull() ?: return@LaunchedEffect
+            val relatedSongs = relatedPage.songs
+            relatedSongs.forEach { song ->
+                database.insertSong(song.toSongEntity())
+            }
+            database.insertRelatedSongs(item.id, relatedSongs.map { it.id })
+        }
+    }
 
     LaunchedEffect(dynamicColorEnabled, playerState.currentItem?.artworkUrl) {
         if (!dynamicColorEnabled) {
@@ -217,11 +333,60 @@ private fun AniTailDesktopApp() {
         )
     }
 
-    LaunchedEffect(libraryItems.size) {
-        val items = libraryItems.toList()
-        quickPicks = items.take(12)
-        keepListening = items.shuffled().take(12)
-        forgottenFavorites = items.drop(12).take(12)
+    LaunchedEffect(
+        allSongs,
+        albums,
+        artists,
+        relatedSongMaps,
+        events,
+        hideExplicit,
+        quickPicksMode,
+    ) {
+        val recommendations = buildHomeRecommendations(
+            songs = allSongs,
+            albums = albums,
+            artists = artists,
+            relatedSongMaps = relatedSongMaps,
+            events = events,
+            hideExplicit = hideExplicit,
+        )
+
+        val lastListenQuickPicks = if (quickPicksMode == QuickPicks.LAST_LISTEN) {
+            val lastSongId = events.maxByOrNull { it.timestamp }?.songId
+            val related = lastSongId?.let { database.relatedSongs(it) }.orEmpty()
+            if (hideExplicit) related.filterNot { it.explicit } else related
+        } else {
+            emptyList()
+        }
+
+        val quickPicksSource = if (
+            quickPicksMode == QuickPicks.LAST_LISTEN && lastListenQuickPicks.isNotEmpty()
+        ) {
+            lastListenQuickPicks
+        } else {
+            recommendations.quickPicks
+        }
+
+        quickPicks = quickPicksSource
+            .shuffled()
+            .take(20)
+            .map { it.toLibraryItem() }
+
+        keepListening = recommendations.keepListening
+            .shuffled()
+            .mapNotNull { item ->
+                when (item) {
+                    is HomeListenSong -> item.song.toLibraryItem()
+                    is HomeListenAlbum -> item.album.toLibraryItem()
+                    is HomeListenArtist -> item.artist.toLibraryItem()
+                }
+            }
+            .take(20)
+
+        forgottenFavorites = recommendations.forgottenFavorites
+            .shuffled()
+            .take(20)
+            .map { it.toLibraryItem() }
     }
 
     // Recommendation logic remains similar...
@@ -721,6 +886,25 @@ private fun AniTailDesktopApp() {
                     PlayerScreen(
                         item = playerState.currentItem,
                         playerState = playerState,
+                        database = database,
+                        downloadService = downloadService,
+                        onOpenArtist = { artistId, artistName ->
+                            navigationHistory.add(currentScreen)
+                            detailNavigation = detailNavigation.copy(
+                                artistId = artistId,
+                                artistName = artistName,
+                            )
+                            currentScreen = DesktopScreen.ArtistDetail
+                        },
+                        onOpenAlbum = { albumId, albumName ->
+                            navigationHistory.add(currentScreen)
+                            detailNavigation = detailNavigation.copy(
+                                albumId = albumId,
+                                albumName = albumName,
+                            )
+                            currentScreen = DesktopScreen.AlbumDetail
+                        },
+                        onCollapsePlayer = { playerBottomSheetState.collapseSoft() },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
