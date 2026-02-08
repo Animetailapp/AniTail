@@ -1,9 +1,11 @@
 package com.anitail.desktop.player
 
+import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.YouTubeClient
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.OutputStream
+import java.net.URI
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.*
@@ -113,10 +115,24 @@ object PlaybackProxy {
                 }
             } ?: if (params.containsKey("ref")) "" else "https://www.youtube.com/"
 
-            println("PlaybackProxy: PROXYING -> $targetUrl")
-            println("PlaybackProxy: HEADERS -> UA: $userAgent, Ref: $referer, Range: $rangeHeader")
+            val cookie = decodeBase64Param(params["ck"])?.takeIf { it.isNotBlank() }
 
-            proxyRequest(targetUrl, rangeHeader, userAgent, referer, output)
+            println("PlaybackProxy: PROXYING -> $targetUrl")
+            val resolvedRange = resolveRangeHeader(rangeHeader, targetUrl)
+            val sendReferer = shouldSendReferer(referer)
+            val sendCookie = shouldSendCookie(cookie, targetUrl, referer)
+            println(
+                "PlaybackProxy: HEADERS -> UA: $userAgent, Ref: ${if (sendReferer) referer else "<none>"}, Range: $resolvedRange, Cookie: $sendCookie"
+            )
+
+            proxyRequest(
+                targetUrl = targetUrl,
+                range = resolvedRange,
+                userAgent = userAgent,
+                referer = if (sendReferer) referer else null,
+                cookie = if (sendCookie) cookie else null,
+                output = output
+            )
 
         } catch (e: Exception) {
             println("PlaybackProxy: Error en handleSocket: ${e.message}")
@@ -132,14 +148,38 @@ object PlaybackProxy {
         targetUrl: String,
         range: String?,
         userAgent: String,
-        referer: String,
+        referer: String?,
+        cookie: String?,
         output: OutputStream
     ) {
         try {
             val requestBuilder = Request.Builder()
                 .url(targetUrl)
-                .addHeader("User-Agent", userAgent)
-                .addHeader("Referer", referer)
+            if (!userAgent.isNullOrEmpty()) {
+                requestBuilder.header("User-Agent", userAgent)
+                
+                // Inject Client Hints if simulating Chrome (Music/Web client)
+                if (userAgent.contains("Chrome")) {
+                    requestBuilder.header("sec-ch-ua", "\"Not(A:Brand\";v=\"8\", \"Chromium\";v=\"144\", \"Google Chrome\";v=\"144\"")
+                    requestBuilder.header("sec-ch-ua-mobile", "?1")
+                    requestBuilder.header("sec-ch-ua-platform", "\"Android\"")
+                    requestBuilder.header("sec-ch-ua-model", "\"Nexus 5\"")
+                    requestBuilder.header("sec-ch-ua-arch", "\"\"")
+                    requestBuilder.header("sec-ch-ua-bitness", "\"64\"")
+                    requestBuilder.header("sec-ch-ua-full-version", "\"144.0.7559.133\"")
+                    requestBuilder.header("sec-fetch-dest", "empty")
+                    requestBuilder.header("sec-fetch-mode", "cors")
+                    requestBuilder.header("sec-fetch-site", "same-origin")
+                }
+            }
+
+            if (!referer.isNullOrBlank()) {
+                requestBuilder.addHeader("Referer", referer)
+            }
+
+            if (!cookie.isNullOrBlank()) {
+                requestBuilder.addHeader("Cookie", cookie)
+            }
 
             if (range != null) {
                 requestBuilder.addHeader("Range", range)
@@ -210,6 +250,44 @@ object PlaybackProxy {
             sb.append("&ref=$encodedRef")
         }
 
+        val cookie = YouTube.cookie?.takeIf { it.isNotBlank() }
+        if (cookie != null && shouldAttachCookie(url)) {
+            val encodedCookie = Base64.getUrlEncoder().encodeToString(cookie.toByteArray())
+            sb.append("&ck=$encodedCookie")
+        }
+
         return sb.toString()
+    }
+
+    private fun decodeBase64Param(value: String?): String? {
+        if (value.isNullOrBlank()) return null
+        return runCatching { String(Base64.getUrlDecoder().decode(value)) }.getOrNull()
+    }
+
+    internal fun resolveRangeHeader(rangeHeader: String?, targetUrl: String): String? {
+        if (!rangeHeader.isNullOrBlank()) return rangeHeader
+        val rqh = extractQueryParam(targetUrl, "rqh")
+        return if (rqh == "1") "bytes=0-" else null
+    }
+
+    internal fun shouldSendReferer(referer: String): Boolean = referer.isNotBlank()
+
+    internal fun shouldSendCookie(cookie: String?, targetUrl: String, referer: String): Boolean {
+        if (cookie.isNullOrBlank()) return false
+        // Allow cookies for googlevideo.com even without referer (mobile clients like IOS)
+        return shouldAttachCookie(targetUrl)
+    }
+
+    private fun extractQueryParam(url: String, key: String): String? {
+        val query = runCatching { URI(url).rawQuery }.getOrNull() ?: return null
+        return query.split("&")
+            .map { entry -> entry.split("=", limit = 2) }
+            .firstOrNull { it.firstOrNull() == key }
+            ?.getOrNull(1)
+    }
+
+    private fun shouldAttachCookie(url: String): Boolean {
+        val host = runCatching { URI(url).host?.lowercase() }.getOrNull() ?: return false
+        return host.endsWith("googlevideo.com") || host.endsWith("youtube.com")
     }
 }

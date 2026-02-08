@@ -74,10 +74,6 @@ import kotlin.random.Random
 object YouTube {
     private val innerTube = InnerTube()
 
-    init {
-        com.anitail.innertube.pages.NewPipeUtils.init(innerTube)
-    }
-
     var locale: YouTubeLocale
         get() = innerTube.locale
         set(value) {

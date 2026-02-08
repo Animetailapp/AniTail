@@ -75,8 +75,6 @@ class InnerTube {
 
     var useLoginForBrowse: Boolean = false
 
-    fun getHttpClient() = httpClient
-
     @OptIn(ExperimentalSerializationApi::class)
     private fun createClient() = HttpClient(OkHttp) {
         expectSuccess = true
@@ -116,26 +114,19 @@ class InnerTube {
 
     private fun HttpRequestBuilder.ytClient(client: YouTubeClient, setLogin: Boolean = false) {
         contentType(ContentType.Application.Json)
-        val origin =
-            if (client.clientName.contains("REMIX")) YouTubeClient.ORIGIN_YOUTUBE_MUSIC else YouTubeClient.ORIGIN_YOUTUBE
-        val referer =
-            if (client.clientName.contains("REMIX")) YouTubeClient.REFERER_YOUTUBE_MUSIC else YouTubeClient.REFERER_YOUTUBE
-
         headers {
             append("X-Goog-Api-Format-Version", "1")
             append("X-YouTube-Client-Name", client.clientId /* Not a typo. The Client-Name header does contain the client id. */)
             append("X-YouTube-Client-Version", client.clientVersion)
-            append("X-Origin", origin)
-            append("Referer", referer)
+            append("X-Origin", YouTubeClient.ORIGIN_YOUTUBE_MUSIC)
+            append("Referer", YouTubeClient.REFERER_YOUTUBE_MUSIC)
             if (setLogin && client.loginSupported) {
                 cookie?.let { cookie ->
                     append("cookie", cookie)
-                    val sapisid = cookieMap["SAPISID"] ?: cookieMap["__Secure-3PAPISID"]
-                    if (sapisid != null) {
-                        val currentTime = System.currentTimeMillis() / 1000
-                        val sapisidHash = sha1("$currentTime $sapisid $origin")
-                        append("Authorization", "SAPISIDHASH ${currentTime}_${sapisidHash}")
-                    }
+                    if ("SAPISID" !in cookieMap) return@let
+                    val currentTime = System.currentTimeMillis() / 1000
+                    val sapisidHash = sha1("$currentTime ${cookieMap["SAPISID"]} ${YouTubeClient.ORIGIN_YOUTUBE_MUSIC}")
+                    append("Authorization", "SAPISIDHASH ${currentTime}_${sapisidHash}")
                 }
             }
         }
@@ -170,44 +161,30 @@ class InnerTube {
         videoId: String,
         playlistId: String?,
         signatureTimestamp: Int?,
-    ) = try {
-        val isMusic = client.clientName.contains("REMIX")
-        val baseUrl =
-            if (isMusic) YouTubeClient.API_URL_YOUTUBE_MUSIC else YouTubeClient.API_URL_YOUTUBE
-        val fullUrl = "${baseUrl}player"
-        println("InnerTube DEBUG: POST $fullUrl (Client: ${client.clientName}, videoId: $videoId)")
-        val response = httpClient.post(fullUrl) {
-            if (!isMusic) {
-                parameter("key", "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX3")
-            }
-            ytClient(client, setLogin = true)
-            setBody(
-                PlayerBody(
-                    context = client.toContext(locale, visitorData, dataSyncId).let {
-                        if (client.isEmbedded) {
-                            it.copy(
-                                thirdParty = Context.ThirdParty(
-                                    embedUrl = "https://www.youtube.com/watch?v=${videoId}"
-                                )
-                            )
-                        } else it
-                    },
-                    videoId = videoId,
-                    playlistId = playlistId,
-                    playbackContext = if (client.useSignatureTimestamp && signatureTimestamp != null) {
-                        PlayerBody.PlaybackContext(
-                            PlayerBody.PlaybackContext.ContentPlaybackContext(
-                                signatureTimestamp
+    ) = httpClient.post("player") {
+        ytClient(client, setLogin = true)
+        setBody(
+            PlayerBody(
+                context = client.toContext(locale, visitorData, dataSyncId).let {
+                    if (client.isEmbedded) {
+                        it.copy(
+                            thirdParty = Context.ThirdParty(
+                                embedUrl = "https://www.youtube.com/watch?v=${videoId}"
                             )
                         )
-                    } else null,
-                )
+                    } else it
+                },
+                videoId = videoId,
+                playlistId = playlistId,
+                playbackContext = if (client.useSignatureTimestamp && signatureTimestamp != null) {
+                    PlayerBody.PlaybackContext(
+                        PlayerBody.PlaybackContext.ContentPlaybackContext(
+                            signatureTimestamp
+                        )
+                    )
+                } else null,
             )
-        }
-        response
-    } catch (e: Exception) {
-        println("InnerTube: Error en petición player: ${e.message}")
-        throw e
+        )
     }
 
     suspend fun registerPlayback(

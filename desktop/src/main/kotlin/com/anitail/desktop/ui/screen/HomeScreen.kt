@@ -79,6 +79,7 @@ fun HomeScreen(
     quickPicks: List<LibraryItem>,
     keepListening: List<LibraryItem>,
     forgottenFavorites: List<LibraryItem>,
+    accountPlaylists: List<PlaylistItem>,
     similarRecommendations: List<SimilarRecommendation>,
     playerState: PlayerState,
     onChipSelected: (HomePage.Chip?) -> Unit,
@@ -86,6 +87,7 @@ fun HomeScreen(
     onItemSelected: (YTItem) -> Unit,
     onAddToLibrary: (YTItem) -> Unit,
     onShuffleAll: () -> Unit,
+    onNavigate: (String) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
 
@@ -103,6 +105,7 @@ fun HomeScreen(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             homePage?.chips?.takeIf { it.isNotEmpty() }?.let { chips ->
@@ -115,15 +118,7 @@ fun HomeScreen(
                 }
             }
 
-            if (isLoading && homePage == null) {
-                // Shimmer placeholders mientras carga
-                item { ShimmerChipsRow() }
-                item { NavigationTitle(title = "Quick picks") }
-                item { ShimmerQuickPicksGrid() }
-                item { NavigationTitle(title = "Keep listening") }
-                item { ShimmerSectionRow() }
-            }
-
+            // 1. Quick Picks (Grid of List Items)
             if (quickPicks.isNotEmpty()) {
                 item { NavigationTitle(title = "Quick picks") }
                 item {
@@ -132,10 +127,15 @@ fun HomeScreen(
                         playerState = playerState,
                         onPrimary = onItemSelected,
                         onSecondary = onAddToLibrary,
+                        rows = 4
                     )
                 }
+            } else if (isLoading && homePage == null) {
+                 item { NavigationTitle(title = "Quick picks") }
+                 item { ShimmerQuickPicksGrid() }
             }
 
+            // 2. Keep Listening (Grid of Cards)
             if (keepListening.isNotEmpty()) {
                 item { NavigationTitle(title = "Keep listening") }
                 item {
@@ -146,27 +146,52 @@ fun HomeScreen(
                         onAddToLibrary = onAddToLibrary,
                     )
                 }
+            } else if (isLoading && homePage == null) {
+                item { NavigationTitle(title = "Keep listening") }
+                item { ShimmerSectionRow() }
             }
 
-            if (forgottenFavorites.isNotEmpty()) {
-                item { NavigationTitle(title = "Favoritos olvidados") }
+            // 3. Account Playlists (Row of Cards)
+            if (accountPlaylists.isNotEmpty()) {
                 item {
+                    NavigationTitle(
+                        title = "Your playlists", // Should be user name but we don't have it easily here yet
+                        label = "YouTube",
+                        onClick = { onNavigate("account") }
+                    )
+                }
+                item {
+                    HomeSectionRow(
+                        items = accountPlaylists,
+                        playerState = playerState,
+                        onItemSelected = onItemSelected,
+                        onAddToLibrary = onAddToLibrary,
+                    )
+                }
+            }
+
+            // 4. Forgotten Favorites (Grid of List Items)
+            if (forgottenFavorites.isNotEmpty()) {
+                item { NavigationTitle(title = "Forgotten favorites") }
+                item {
+                    val rows = minOf(4, forgottenFavorites.size)
                     QuickPicksGrid(
                         items = forgottenFavorites,
                         playerState = playerState,
                         onPrimary = onItemSelected,
                         onSecondary = onAddToLibrary,
+                        rows = rows
                     )
                 }
             }
 
-            // Similar To sections
+            // 5. Similar Recommendations (Row of Cards)
             similarRecommendations.forEach { recommendation ->
                 item {
                     val shape = if (recommendation.isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
                     NavigationTitle(
                         title = recommendation.title,
-                        label = "Similar a",
+                        label = "Similar to",
                         thumbnail = if (recommendation.thumbnailUrl != null) {
                             {
                                 RemoteImage(
@@ -176,6 +201,9 @@ fun HomeScreen(
                                 )
                             }
                         } else null,
+                        onClick = {
+                             // Handle click similarly to Android if possible
+                        }
                     )
                 }
                 item {
@@ -188,26 +216,60 @@ fun HomeScreen(
                 }
             }
 
+            // 6. Remote Sections (Rows/Grids)
             homePage?.sections?.forEach { section ->
                 item {
+                    val shape = if (section.items.all { it is ArtistItem }) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
                     NavigationTitle(
-                        title = section.title,
+                        title = section.title.orEmpty(),
                         label = section.label,
+                        thumbnail = if (section.thumbnail != null) {
+                            {
+                                RemoteImage(
+                                    url = section.thumbnail,
+                                    modifier = Modifier.size(ListThumbnailSize),
+                                    shape = shape,
+                                )
+                            }
+                        } else null,
+                        onClick = section.endpoint?.let { endpoint -> 
+                            { 
+                                endpoint.browseId?.let { id ->
+                                    if (id == "FEmusic_moods_and_genres") onNavigate("moods_and_genres")
+                                    else if (id == "FEmusic_charts") onNavigate("charts")
+                                    else onNavigate("browse/$id")
+                                }
+                            } 
+                        }
                     )
                 }
                 item {
-                    HomeSectionRow(
-                        items = section.items,
-                        playerState = playerState,
-                        onItemSelected = onItemSelected,
-                        onAddToLibrary = onAddToLibrary,
-                    )
+                    val isGrid = section.title?.equals("Quick picks", ignoreCase = true) == true
+                    if (isGrid) {
+                        val libraryItems = section.items.mapNotNull { it.toLibraryItem() }
+                        QuickPicksGrid(
+                            items = libraryItems,
+                            playerState = playerState,
+                            onPrimary = onItemSelected,
+                            onSecondary = onAddToLibrary,
+                            rows = 4
+                        )
+                    } else {
+                        HomeSectionRow(
+                            items = section.items,
+                            playerState = playerState,
+                            onItemSelected = onItemSelected,
+                            onAddToLibrary = onAddToLibrary,
+                        )
+                    }
                 }
             }
-
-            if (isLoadingMore) {
+            
+            if (isLoadingMore || (isLoading && homePage != null)) {
                 item {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                         LinearProgressIndicator()
+                    }
                 }
             }
         }
@@ -370,8 +432,8 @@ private fun QuickPicksGrid(
     playerState: PlayerState,
     onPrimary: (YTItem) -> Unit,
     onSecondary: (YTItem) -> Unit,
+    rows: Int = 4,
 ) {
-    val rows = 4
     val itemHeight = ListItemHeight
     LazyHorizontalGrid(
         rows = GridCells.Fixed(rows),

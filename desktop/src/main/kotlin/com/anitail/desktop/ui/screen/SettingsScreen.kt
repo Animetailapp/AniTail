@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -36,11 +38,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.auth.AuthCredentials
+import com.anitail.desktop.auth.DesktopAccountTokenParser
+import com.anitail.desktop.auth.DesktopAuthService
 import com.anitail.desktop.storage.AudioQuality
 import com.anitail.desktop.storage.DarkModePreference
 import com.anitail.desktop.storage.DesktopPreferences
@@ -50,12 +57,15 @@ import com.anitail.desktop.storage.QuickPicks
 import com.anitail.desktop.storage.SliderStyle
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.NavigationTitle
+import com.anitail.desktop.ui.component.RemoteImage
+import kotlinx.coroutines.launch
 
 /**
  * Settings navigation destinations
  */
 enum class SettingsDestination {
     MAIN,
+    ACCOUNT,
     APPEARANCE,
     PLAYER,
     CONTENT,
@@ -71,6 +81,10 @@ enum class SettingsDestination {
 @Composable
 fun SettingsScreen(
     preferences: DesktopPreferences = DesktopPreferences.getInstance(),
+    authService: DesktopAuthService,
+    authCredentials: AuthCredentials?,
+    onOpenLogin: () -> Unit,
+    onAuthChanged: (AuthCredentials?) -> Unit,
 ) {
     var currentDestination by remember { mutableStateOf(SettingsDestination.MAIN) }
 
@@ -78,6 +92,15 @@ fun SettingsScreen(
         when (currentDestination) {
             SettingsDestination.MAIN -> SettingsMainScreen(
                 onNavigate = { currentDestination = it },
+            )
+
+            SettingsDestination.ACCOUNT -> AccountSettingsScreen(
+                preferences = preferences,
+                authService = authService,
+                authCredentials = authCredentials,
+                onBack = { currentDestination = SettingsDestination.MAIN },
+                onOpenLogin = onOpenLogin,
+                onAuthChanged = onAuthChanged,
             )
 
             SettingsDestination.APPEARANCE -> AppearanceSettingsScreen(
@@ -117,6 +140,12 @@ private fun SettingsMainScreen(
     onNavigate: (SettingsDestination) -> Unit,
 ) {
     val settingsCategories = listOf(
+        SettingsCategory(
+            title = "Cuenta",
+            subtitle = "Google, inicio de sesión",
+            icon = IconAssets.account(),
+            destination = SettingsDestination.ACCOUNT,
+        ),
         SettingsCategory(
             title = "Apariencia",
             subtitle = "Tema, colores, fuente",
@@ -167,6 +196,224 @@ private fun SettingsMainScreen(
             SettingsCategoryItem(
                 category = category,
                 onClick = { onNavigate(category.destination) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccountSettingsScreen(
+    preferences: DesktopPreferences,
+    authService: DesktopAuthService,
+    authCredentials: AuthCredentials?,
+    onBack: () -> Unit,
+    onOpenLogin: () -> Unit,
+    onAuthChanged: (AuthCredentials?) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val useLoginForBrowse by preferences.useLoginForBrowse.collectAsState()
+    val ytmSync by preferences.ytmSync.collectAsState()
+    val hasCookie = authCredentials?.cookie?.isNotBlank() == true
+    val hasDataSyncId = authCredentials?.dataSyncId?.isNotBlank() == true
+    val isLoggedIn = hasCookie
+    var accountInfo by remember { mutableStateOf<com.anitail.desktop.auth.AccountInfo?>(null) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var showToken by remember { mutableStateOf(false) }
+    var showTokenEditor by remember { mutableStateOf(false) }
+    val loginEnabled = false
+    val loginDisabled = !loginEnabled && !isLoggedIn
+    val loginEntryAlpha = if (loginDisabled) 0.5f else 1f
+
+    androidx.compose.runtime.LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) {
+            isRefreshing = true
+            accountInfo = authService.refreshAccountInfo()
+            onAuthChanged(authService.credentials)
+            isRefreshing = false
+        } else {
+            accountInfo = null
+            showToken = false
+        }
+    }
+
+    if (showTokenEditor) {
+        var tokenText by remember(authCredentials, showTokenEditor) {
+            mutableStateOf(DesktopAccountTokenParser.buildTokenText(authCredentials ?: AuthCredentials()))
+        }
+        val parsedToken = remember(tokenText) { DesktopAccountTokenParser.parse(tokenText) }
+        val cookieValue = parsedToken.cookie.orEmpty()
+        val hasAcceptedCookie = cookieValue.isBlank() ||
+            cookieValue.contains("SAPISID") ||
+            cookieValue.contains("__Secure-1PAPISID") ||
+            cookieValue.contains("__Secure-3PAPISID")
+        val canSave = parsedToken.hasAnyValue() && hasAcceptedCookie
+
+        AlertDialog(
+            onDismissRequest = { showTokenEditor = false },
+            title = { Text("Inicio de sesión avanzado") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = tokenText,
+                        onValueChange = { tokenText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 6,
+                        maxLines = 20,
+                        textStyle = MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
+                        text = "Pega el token avanzado de Android para sincronizar cuenta y datos.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = canSave,
+                    onClick = {
+                        val base = authCredentials ?: AuthCredentials()
+                        val updated = base.copy(
+                            cookie = parsedToken.cookie ?: base.cookie,
+                            visitorData = parsedToken.visitorData ?: base.visitorData,
+                            dataSyncId = parsedToken.dataSyncId ?: base.dataSyncId,
+                            accountName = parsedToken.accountName ?: base.accountName,
+                            accountEmail = parsedToken.accountEmail ?: base.accountEmail,
+                            channelHandle = parsedToken.channelHandle ?: base.channelHandle,
+                        )
+                        scope.launch {
+                            authService.saveCredentials(updated)
+                            accountInfo = authService.refreshAccountInfo()
+                            onAuthChanged(authService.credentials)
+                            showTokenEditor = false
+                        }
+                    },
+                ) { Text("Guardar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTokenEditor = false }) { Text("Cancelar") }
+            },
+        )
+    }
+
+    SettingsSubScreen(
+        title = "Cuenta",
+        onBack = onBack,
+    ) {
+        SettingsSectionTitle(title = "Google")
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = loginEnabled && !isLoggedIn) {
+                    if (loginEnabled) onOpenLogin()
+                },
+            shape = RoundedCornerShape(12.dp),
+            tonalElevation = 2.dp,
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .alpha(loginEntryAlpha),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (isLoggedIn && accountInfo?.thumbnailUrl != null) {
+                    RemoteImage(
+                        url = accountInfo?.thumbnailUrl,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        shape = CircleShape,
+                    )
+                } else {
+                    Icon(
+                        imageVector = IconAssets.account(),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (isLoggedIn) {
+                            accountInfo?.name
+                                ?: authCredentials?.accountName
+                                ?: "Usuario conectado"
+                        } else {
+                            "Iniciar sesión"
+                        },
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    val subtitle = if (isLoggedIn) {
+                        accountInfo?.email
+                            ?: authCredentials?.accountEmail
+                            ?: authCredentials?.channelHandle
+                    } else if (!loginEnabled) {
+                        if (hasDataSyncId && !hasCookie) {
+                            "Falta la cookie de YouTube. Pega el token avanzado completo."
+                        } else {
+                            "No disponible en desktop. Usa inicio de sesión avanzado."
+                        }
+                    } else null
+                    if (!subtitle.isNullOrBlank()) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (isLoggedIn) {
+                    TextButton(onClick = {
+                        scope.launch {
+                            authService.logout()
+                            accountInfo = null
+                            onAuthChanged(null)
+                        }
+                    }) {
+                        Text("Cerrar sesión")
+                    }
+                } else if (isRefreshing) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+
+        SettingsButton(
+            title = if (!isLoggedIn) {
+                "Inicio de sesión avanzado"
+            } else {
+                if (showToken) "Token visible" else "Token oculto"
+            },
+            subtitle = "Usa el token de Android para sincronizar cuenta",
+            onClick = {
+                if (!isLoggedIn) {
+                    showTokenEditor = true
+                } else if (!showToken) {
+                    showToken = true
+                } else {
+                    showTokenEditor = true
+                }
+            },
+            icon = IconAssets.lock(),
+        )
+
+        if (isLoggedIn) {
+            SettingsSwitch(
+                title = "Usar login para explorar",
+                subtitle = "Aplica tu cuenta al navegar y recomendaciones",
+                checked = useLoginForBrowse,
+                onCheckedChange = {
+                    preferences.setUseLoginForBrowse(it)
+                    com.anitail.innertube.YouTube.useLoginForBrowse = it
+                },
+            )
+
+            SettingsSwitch(
+                title = "YTM Sync",
+                subtitle = "Sincroniza biblioteca y playlists",
+                checked = ytmSync,
+                onCheckedChange = { preferences.setYtmSync(it) },
             )
         }
     }
@@ -511,21 +758,6 @@ private fun PrivacySettingsScreen(
 
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
-        // YouTube Cookie
-        val youtubeCookie by preferences.youtubeCookie.collectAsState()
-        var tempCookie by remember { mutableStateOf(youtubeCookie ?: "") }
-
-        SettingsTextField(
-            title = "Cookie de YouTube",
-            subtitle = "Pega aquí tus cookies de music.youtube.com para evitar errores '403' o 'Bot detection'.\nInstrucciones: F12 en Google Chrome -> Application -> Cookies -> Selecciona music.youtube.com -> Copia el valor de 'Cookie' de las cabeceras de red o exporta con una extensión.",
-            value = tempCookie,
-            onValueChange = { tempCookie = it },
-            onSave = { preferences.setYoutubeCookie(tempCookie.takeIf { it.isNotBlank() }) },
-            placeholder = "Papisid=...; SID=...;"
-        )
-
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
-
         // Clear buttons
         var showClearHistoryDialog by remember { mutableStateOf(false) }
         var showClearSearchDialog by remember { mutableStateOf(false) }
@@ -769,6 +1001,16 @@ private fun SettingsSubScreen(
 }
 
 @Composable
+private fun SettingsSectionTitle(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+    )
+}
+
+@Composable
 private fun SettingsSwitch(
     title: String,
     subtitle: String,
@@ -919,6 +1161,7 @@ private fun SettingsButton(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
+    icon: ImageVector = IconAssets.link(),
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -943,7 +1186,7 @@ private fun SettingsButton(
                 )
             }
             Icon(
-                imageVector = IconAssets.link(),
+                imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
             )

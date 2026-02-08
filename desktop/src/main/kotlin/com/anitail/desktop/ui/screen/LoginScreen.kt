@@ -40,10 +40,11 @@ fun LoginScreen(
     var extractedVisitorData by remember { mutableStateOf<String?>(null) }
     var extractedDataSyncId by remember { mutableStateOf<String?>(null) }
     var extractedCookie by remember { mutableStateOf<String?>(null) }
+    var loginCompleted by remember { mutableStateOf(false) }
 
     // Callback cuando se completa el login
-    LaunchedEffect(extractedDataSyncId) {
-        if (extractedDataSyncId != null && extractedVisitorData != null) {
+    LaunchedEffect(extractedDataSyncId, extractedVisitorData, extractedCookie) {
+        if (!loginCompleted && extractedDataSyncId != null && extractedVisitorData != null) {
             authService.saveCredentials(
                 AuthCredentials(
                     visitorData = extractedVisitorData,
@@ -54,8 +55,14 @@ fun LoginScreen(
             
             // Intentar obtener info de la cuenta
             authService.refreshAccountInfo()
-            
+            loginCompleted = true
             onLoginSuccess()
+        }
+    }
+
+    LaunchedEffect(extractedCookie, loginCompleted) {
+        if (loginCompleted && !extractedCookie.isNullOrBlank()) {
+            authService.updateCookie(extractedCookie!!)
         }
     }
 
@@ -118,8 +125,10 @@ fun LoginScreen(
                                         // Capturar cookies si estamos en YouTube Music
                                         if (currentUrl.contains("music.youtube.com")) {
                                             try {
-                                                val cookieMgr = java.net.CookieHandler.getDefault()
-                                                // Las cookies se manejarán de otra forma en sistemas de producción
+                                                val cookie = webView.engine.executeScript("document.cookie")?.toString()
+                                                if (!cookie.isNullOrBlank()) {
+                                                    extractedCookie = cookie
+                                                }
                                             } catch (e: Exception) {
                                                 // Ignorar
                                             }

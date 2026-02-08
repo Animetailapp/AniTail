@@ -22,7 +22,7 @@ class DesktopAuthService(
         get() = _credentials
     
     val isLoggedIn: Boolean
-        get() = _credentials?.dataSyncId?.isNotBlank() == true
+        get() = _credentials?.cookie?.isNotBlank() == true
     
     init {
         loadCredentials()

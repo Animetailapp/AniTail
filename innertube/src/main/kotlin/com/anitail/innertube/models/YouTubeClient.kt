@@ -34,14 +34,10 @@ data class YouTubeClient(
         /**
          * Should be the latest Firefox ESR version.
          */
-        const val USER_AGENT_WEB =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
+        const val USER_AGENT_WEB = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0"
 
         const val ORIGIN_YOUTUBE_MUSIC = "https://music.youtube.com"
         const val REFERER_YOUTUBE_MUSIC = "$ORIGIN_YOUTUBE_MUSIC/"
-        const val ORIGIN_YOUTUBE = "https://www.youtube.com"
-        const val REFERER_YOUTUBE = "$ORIGIN_YOUTUBE/"
-        const val API_URL_YOUTUBE = "$ORIGIN_YOUTUBE/youtubei/v1/"
         const val API_URL_YOUTUBE_MUSIC = "$ORIGIN_YOUTUBE_MUSIC/youtubei/v1/"
 
         val WEB = YouTubeClient(
@@ -71,12 +67,12 @@ data class YouTubeClient(
         )
 
         val TVHTML5_SIMPLY_EMBEDDED_PLAYER = YouTubeClient(
-            clientName = "TVHTML5",
-            clientVersion = "2.20241021",
-            clientId = "18",
+            clientName = "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+            clientVersion = "2.0",
+            clientId = "85",
             userAgent = "Mozilla/5.0 (PlayStation; PlayStation 4/12.02) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.4 Safari/605.1.15",
             loginSupported = true,
-            loginRequired = false,
+            loginRequired = true,
             useSignatureTimestamp = true,
             isEmbedded = true,
         )
@@ -85,7 +81,7 @@ data class YouTubeClient(
             clientName = "IOS",
             clientVersion = "20.10.4",
             clientId = "5",
-            userAgent = "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X)",
+            userAgent = "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)",
             osVersion = "18.3.2.22D82",
         )
 
@@ -94,16 +90,7 @@ data class YouTubeClient(
             clientVersion = "20.10.38",
             clientId = "3",
             userAgent = "com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip",
-            // osVersion = "11",
             loginSupported = true,
-            useSignatureTimestamp = true
-        )
-
-        val MWEB = YouTubeClient(
-            clientName = "MWEB",
-            clientVersion = "2.20250311.00.00",
-            clientId = "2",
-            userAgent = "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Mobile Safari/537.36",
             useSignatureTimestamp = true
         )
 

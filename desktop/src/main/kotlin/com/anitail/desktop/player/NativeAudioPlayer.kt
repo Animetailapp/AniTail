@@ -5,18 +5,20 @@ import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.YouTubeClient
 import com.anitail.innertube.pages.NewPipeUtils
 import javafx.application.Platform
-import javafx.scene.media.Media
-import javafx.scene.media.MediaPlayer
-import javafx.util.Duration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import uk.co.caprica.vlcj.factory.MediaPlayerFactory
+import uk.co.caprica.vlcj.factory.discovery.NativeDiscovery
+import uk.co.caprica.vlcj.player.base.MediaPlayer
+import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
 import kotlin.coroutines.resume
 
 /**
- * Servicio de reproducción de audio nativo usando JavaFX Media.
- * Reemplaza el WebView con reproducción directa de streams de YouTube.
+ * Servicio de reproducción de audio nativo usando VLCJ (VLC for Java).
+ * Reemplaza el WebView y JavaFX Media para soportar formatos modernos (WebM/Opus)
+ * y mejorar la compatibilidad con streams de YouTube.
  */
 class NativeAudioPlayer {
 
@@ -24,9 +26,10 @@ class NativeAudioPlayer {
         .proxy(YouTube.proxy)
         .build()
 
+    private var factory: MediaPlayerFactory? = null
     private var mediaPlayer: MediaPlayer? = null
-    private var volume: Double = 1.0
-    private var playbackRate: Double = 1.0
+    private var volume: Int = 100 // VLC volume is 0-100 (can go up to 200 sometimes)
+    private var playbackRate: Float = 1.0f
 
     // Callbacks de estado
     var onStatusChanged: ((PlaybackStatus) -> Unit)? = null
@@ -35,377 +38,314 @@ class NativeAudioPlayer {
     var onBuffering: ((Boolean) -> Unit)? = null
 
     init {
+        // Asegurar que JavaFX esté inicializado para los callbacks (si se usan)
         JavaFxManager.ensureInitialized()
+
+        // Descubrir librerías nativas de VLC
+        if (NativeDiscovery().discover()) {
+            println("NativeAudioPlayer: VLC nativo encontrado e inicializado.")
+            try {
+                factory = MediaPlayerFactory()
+                mediaPlayer = factory?.mediaPlayers()?.newMediaPlayer()
+                setupVlcEvents()
+            } catch (e: Exception) {
+                println("NativeAudioPlayer: Error al inicializar VLC Factory: ${e.message}")
+                e.printStackTrace()
+            }
+        } else {
+            println("NativeAudioPlayer: CRITICAL - No se encontró VLC nativo en el sistema.")
+            // Aquí podríamos fallar o notificar, pero dejaremos que los métodos fallen controladamente
+        }
     }
 
-    private val STREAM_FALLBACK_CLIENTS = arrayOf(
-        YouTubeClient.IOS,
-        YouTubeClient.MOBILE,
-        YouTubeClient.MWEB,
-        YouTubeClient.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
-        YouTubeClient.WEB,
-        YouTubeClient.WEB_CREATOR
-    )
+    private fun setupVlcEvents() {
+        mediaPlayer?.events()?.addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
+            override fun playing(player: MediaPlayer?) {
+                Platform.runLater {
+                    onStatusChanged?.invoke(PlaybackStatus.PLAYING)
+                    onBuffering?.invoke(false)
+                }
+            }
+
+            override fun paused(player: MediaPlayer?) {
+                Platform.runLater {
+                    onStatusChanged?.invoke(PlaybackStatus.PAUSED)
+                }
+            }
+
+            override fun stopped(player: MediaPlayer?) {
+                Platform.runLater {
+                    onStatusChanged?.invoke(PlaybackStatus.STOPPED)
+                }
+            }
+
+            override fun finished(player: MediaPlayer?) {
+                Platform.runLater {
+                    onStatusChanged?.invoke(PlaybackStatus.ENDED)
+                }
+            }
+
+            override fun buffering(player: MediaPlayer?, newCache: Float) {
+                Platform.runLater {
+                    if (newCache < 100.0f) {
+                        onBuffering?.invoke(true)
+                    } else {
+                        onBuffering?.invoke(false)
+                    }
+                }
+            }
+
+            override fun error(player: MediaPlayer?) {
+                Platform.runLater {
+                    val msg = "Error interno de VLC"
+                    println("NativeAudioPlayer: VLC ERROR: $msg")
+                    onError?.invoke(msg)
+                    onStatusChanged?.invoke(PlaybackStatus.ERROR)
+                }
+            }
+            
+            override fun timeChanged(player: MediaPlayer?, newTime: Long) {
+                 // VLC llama a esto muy frecuentemente, quizás no necesitemos runLater para todo si ralentiza
+                 Platform.runLater {
+                     onTimeChanged?.invoke(newTime, player?.status()?.length() ?: 0L)
+                 }
+            }
+            
+            override fun positionChanged(player: MediaPlayer?, newPosition: Float) {
+                // Alternativa a timeChanged
+            }
+        })
+    }
 
     /**
      * Reproduce un video de YouTube por su ID.
      * Obtiene la URL de streaming de audio y la reproduce nativamente.
      */
     suspend fun play(videoId: String): Result<Unit> = withContext(Dispatchers.IO) {
-        println("NativeAudioPlayer: Intentando reproducir videoId: $videoId")
+        if (mediaPlayer == null) {
+            return@withContext Result.failure(IllegalStateException("VLC no está disponible. Instale VLC Media Player."))
+        }
+
+        println("NativeAudioPlayer: Intentando reproducir videoId: $videoId con VLC")
 
         val signatureTimestamp = NewPipeUtils.getSignatureTimestamp(videoId).getOrNull()
-        println("NativeAudioPlayer: Signature timestamp: $signatureTimestamp")
-
         val isLoggedIn = YouTube.cookie != null
-        val mainClient = YouTubeClient.WEB_REMIX
-
-        // Intentar con el cliente principal y luego con los fallbacks
         var lastError: String? = null
-
-        // Priorizar el cliente principal y luego los fallbacks más robustos
-        val clientsToTry = (listOf(
-            mainClient,
-            YouTubeClient.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
-            YouTubeClient.WEB
-        ) + STREAM_FALLBACK_CLIENTS).distinct()
+        val clientsToTry = StreamClientOrder.build()
 
         for (client in clientsToTry) {
+            if (client.loginRequired && !isLoggedIn) continue
+            
             println("NativeAudioPlayer: Probando cliente: ${client.clientName}")
+            val currentTimestamp = if (client.clientName.contains("TVHTML5")) null else signatureTimestamp
 
-            if (client.loginRequired && !isLoggedIn) {
-                println("NativeAudioPlayer: Saltando cliente ${client.clientName} (requiere login)")
-                continue
-            }
+            try {
+                // PoToken placeholder (can be linked to settings in the future)
+                val poToken: String? = null 
+                val playerResponse = YouTube.player(videoId, null, client, currentTimestamp).getOrNull()
+                val status = playerResponse?.playabilityStatus?.status
+                val hasFormats = playerResponse?.streamingData?.adaptiveFormats?.isNotEmpty() == true
 
-            // Para TVHTML5_SIMPLY_EMBEDDED_PLAYER, a veces no necesitamos el signatureTimestamp
-            val currentTimestamp =
-                if (client.clientName.contains("TVHTML5")) null else signatureTimestamp
+                if (status == "OK" || hasFormats) {
+                    println("NativeAudioPlayer: Formatos encontrados para cliente ${client.clientName}")
+                    val formats = playerResponse?.streamingData?.adaptiveFormats
+                        ?.filter { it.isAudio }
+                        ?.sortedByDescending { it.bitrate } ?: emptyList()
 
-            val playerResponse = try {
-                println("NativeAudioPlayer: Llamando a YouTube.player para ${client.clientName}...")
-                val res = YouTube.player(videoId, null, client, currentTimestamp).getOrNull()
-                if (res == null) println("NativeAudioPlayer: YouTube.player devolvió NULL para ${client.clientName}")
-                res
-            } catch (e: Exception) {
-                println("NativeAudioPlayer: EXCEPCIÓN en YouTube.player para ${client.clientName}: ${e.message}")
-                e.printStackTrace()
-                null
-            }
-
-            if (playerResponse?.playabilityStatus?.status == "OK") {
-                println("NativeAudioPlayer: PlayabilityStatus OK para cliente ${client.clientName}")
-
-                // Filtrar formatos compatibles con JavaFX (audio/mp4 suele ser AAC)
-                val formats = playerResponse.streamingData?.adaptiveFormats
-                    ?.filter { it.isAudio && it.mimeType.contains("audio/mp4") }
-                    ?.sortedByDescending { it.bitrate } ?: emptyList()
-
-                if (formats.isEmpty()) {
-                    println("NativeAudioPlayer: No se encontraron formatos audio/mp4 adecuados para ${client.clientName}")
-                }
-
-                for (format in formats) {
-                    println("NativeAudioPlayer: Probando formato: ${format.mimeType} (${format.bitrate})")
-                    val url =
-                        NewPipeUtils.getStreamUrl(format, videoId, client.userAgent).getOrNull()
-
-                    if (url != null) {
-                        println("NativeAudioPlayer: URL obtenida, usando PlaybackProxy con headers del cliente...")
-
-                        // Determinar referer adecuado: solo para clientes WEB
-                        val referer = if (client.clientName.contains("WEB")) {
-                            if (client.clientName.contains("REMIX")) {
-                                "https://music.youtube.com/"
-                            } else {
-                                "https://www.youtube.com/"
-                            }
-                        } else {
-                            "" // Apps móviles no suelen enviar referer en el stream, enviamos vacío explícito
-                        }
-
-
-                        val proxyUrl = PlaybackProxy.createProxyUrl(
-                            url = url,
-                            userAgent = client.userAgent,
-                            referer = referer
-                        )
-
-                        val prepared = preparePlayer(proxyUrl)
-                        if (prepared) {
-                            println("NativeAudioPlayer: ¡Reproducción iniciada con éxito! (Cliente: ${client.clientName})")
-                            return@withContext Result.success(Unit)
-                        } else {
-                            println("NativeAudioPlayer: MediaPlayer falló al cargar stream del cliente ${client.clientName}")
-                        }
-                    } else {
-                        // Si falla la deofuscación, pasamos al siguiente formato/cliente
-                        println("NativeAudioPlayer: Falló la deofuscación para ${client.clientName}. Probablemente regex desactualizado.")
+                    if (formats.isEmpty()) {
+                        println("NativeAudioPlayer: No se encontraron formatos de audio para ${client.clientName}")
+                        continue
                     }
+
+                    for (format in formats) {
+                        println("NativeAudioPlayer: Probando formato: ${format.mimeType} (${format.bitrate})")
+                        val url = StreamUrlResolution.resolveStreamUrl(NewPipeStreamUrlResolver, format, videoId, client).getOrNull()
+
+                        if (url != null) {
+                            println("NativeAudioPlayer: URL obtenida. Iniciando VLC...")
+                            val referer = when {
+                                client.clientName.contains("REMIX") -> "https://music.youtube.com/"
+                                client.clientName.contains("WEB") -> "https://www.youtube.com/"
+                                else -> ""
+                            }
+
+                            val prepared = preparePlayer(url, client.userAgent, referer)
+                            if (prepared) {
+                                println("NativeAudioPlayer: ¡Reproducción iniciada con éxito! (Cliente: ${client.clientName})")
+                                return@withContext Result.success(Unit)
+                            } else {
+                                println("NativeAudioPlayer: VLC falló al cargar stream del cliente ${client.clientName}")
+                            }
+                        }
+                    }
+                } else {
+                    lastError = playerResponse?.playabilityStatus?.reason ?: "Playability error"
                 }
-            } else {
-                val reason = playerResponse?.playabilityStatus?.reason
-                println("NativeAudioPlayer: PlayabilityStatus no OK para cliente ${client.clientName}: $reason")
-                lastError = reason
+            } catch (e: Exception) {
+                lastError = e.message ?: "Error desconocido en cliente ${client.clientName}"
+                println("NativeAudioPlayer: EXCEPCIÓN en loop de cliente ${client.clientName}: ${e.message}")
             }
         }
 
-        val rawError = lastError ?: "Error de red o formatos no compatibles"
-        val userFriendlyError = if (rawError.contains("bot") || rawError.contains("sesión")) {
-            "YouTube requiere iniciar sesión para esta canción (Ajustes -> Privacidad)"
-        } else {
-            "No se pudo reproducir ningún stream. Razón: $rawError"
+        // Si todos los clientes locales fallaron, intentar con Remote Fallbacks (Piped)
+        println("NativeAudioPlayer: Fallback local agotado. Intentando con Remote APIs (Piped)...")
+        
+        // 1. Intentar con Piped
+        try {
+            val pipedUrl = PipedResolver.resolveAudioUrl(videoId)
+            if (pipedUrl != null) {
+                println("NativeAudioPlayer: Éxito con Piped Fallback. Reproduciendo DIRECTAMENTE...")
+                stop()
+                val success = preparePlayer(pipedUrl, YouTubeClient.USER_AGENT_WEB, "https://piped.video/")
+                if (success) return@withContext Result.success(Unit)
+            }
+        } catch (e: Exception) {
+            println("NativeAudioPlayer: Error en Piped fallback: ${e.message}")
         }
 
-        println("NativeAudioPlayer: ERROR FINAL: $userFriendlyError")
-        Result.failure(IllegalStateException(userFriendlyError))
+        val rawError = lastError ?: "No se pudo iniciar reproducción con ningún cliente."
+        println("NativeAudioPlayer: ERROR FINAL: $rawError")
+        Result.failure(IllegalStateException(rawError))
     }
 
-    /**
-     * Reproduce una URL de audio directa (MP3, AAC, etc).
-     * Usa el PlaybackProxy para añadir cabeceras si es necesario.
-     */
+
     suspend fun playStream(
         url: String,
         userAgent: String? = null,
         referer: String? = null
     ): Result<Unit> = withContext(Dispatchers.Main) {
-        val proxyUrl = PlaybackProxy.createProxyUrl(
-            url = url,
-            userAgent = userAgent ?: YouTubeClient.USER_AGENT_WEB,
-            referer = referer ?: ""
-        )
-
-        val prepared = preparePlayer(proxyUrl)
+        if (mediaPlayer == null) return@withContext Result.failure(IllegalStateException("VLC no inicializado"))
+        
+        val prepared = preparePlayer(url, userAgent, referer)
         if (prepared) {
             Result.success(Unit)
         } else {
-            Result.failure(IllegalStateException("No se pudo cargar el stream directo"))
+            Result.failure(IllegalStateException("Error al cargar stream"))
         }
     }
 
     /**
-     * Prepara el MediaPlayer y espera a que esté listo (READY) o falle (ERROR).
-     * Devuelve true si se pudo iniciar la reproducción.
+     * Prepara VLC para reproducir la URL.
+     * Dado que VLC es asíncrono, iniciamos la reproducción y esperamos un evento de éxito o error.
      */
-    private suspend fun preparePlayer(url: String): Boolean =
-        suspendCancellableCoroutine { continuation ->
-        Platform.runLater {
-            try {
-                // Liberar el anterior si existe
-                mediaPlayer?.dispose()
-                
-                val media = Media(url)
-                val player = MediaPlayer(media)
+    private suspend fun preparePlayer(url: String, userAgent: String? = null, referer: String? = null): Boolean =
+        withContext(Dispatchers.Main) {
+            suspendCancellableCoroutine { continuation ->
+                val player = mediaPlayer ?: run {
+                    continuation.resume(false)
+                    return@suspendCancellableCoroutine
+                }
 
-                // Configurar callbacks generales (permanentes)
-                setupPlayerCallbacks(player)
-
-                // Callbacks específicos para la preparación
-                player.setOnReady {
-                    mediaPlayer = player
-                    onStatusChanged?.invoke(PlaybackStatus.READY)
-                    player.rate = playbackRate
-                    player.play()
+            // Listener temporal para detectar el inicio o fallo inicial
+            val listener = object : MediaPlayerEventAdapter() {
+                override fun playing(mp: MediaPlayer?) {
+                    mp?.events()?.removeMediaPlayerEventListener(this)
                     if (continuation.isActive) continuation.resume(true)
                 }
 
-                player.setOnError {
-                    val err = player.error?.message ?: "Error desconocido"
-                    println("NativeAudioPlayer: Error de JavaFX durante la carga: $err")
-                    onError?.invoke(err) // Reportar error de carga
-                    player.dispose()
+                override fun error(mp: MediaPlayer?) {
+                    mp?.events()?.removeMediaPlayerEventListener(this)
                     if (continuation.isActive) continuation.resume(false)
                 }
+                
+                // Si el player se para inmediatamente (ej: end of media inmediato por error de formato)
+                override fun finished(mediaPlayer: MediaPlayer?) {
+                    mediaPlayer?.events()?.removeMediaPlayerEventListener(this)
+                     // Si termina inmediatamente sin haber hecho "playing", asumimos fallo de carga
+                     // Pero es difícil saber si reproducio un frame o no.
+                     // Asumiremos false si fue inmediato.
+                     if (continuation.isActive) continuation.resume(false)
+                }
+            }
 
-                // Si la URL es inválida o falla inmediatamente
-                if (player.status == MediaPlayer.Status.HALTED) {
-                    player.dispose()
-                    if (continuation.isActive) continuation.resume(false)
-                }
-            } catch (e: Exception) {
-                println("NativeAudioPlayer: Excepción al crear Media: ${e.message}")
-                onError?.invoke(
-                    e.message ?: "Error al inicializar reproductor"
-                ) // Reportar error de creación
+            player.events().addMediaPlayerEventListener(listener)
+            
+            val options = mutableListOf<String>()
+            userAgent?.let { options.add(":http-user-agent=$it") }
+            referer?.let { options.add(":http-referrer=$it") }
+
+            val success = player.media().play(url, *options.toTypedArray())
+            if (!success) {
+                player.events().removeMediaPlayerEventListener(listener)
                 if (continuation.isActive) continuation.resume(false)
             }
-        }
+            
+            // Set playback rate and volume
+             player.controls().setRate(playbackRate)
+             player.audio().setVolume(volume)
 
             continuation.invokeOnCancellation {
-                Platform.runLater {
-                    // Si el usuario cancela (ej: cambia de canción rápido)
-                    // Se detiene el proceso de carga
-                    mediaPlayer?.dispose() // Asegurarse de liberar recursos si se cancela
-                    mediaPlayer = null
-                }
+                player.events().removeMediaPlayerEventListener(listener)
+                player.controls().stop()
             }
         }
-
-    /**
-     * Configura los listeners estándar del reproductor.
-     */
-    private fun setupPlayerCallbacks(player: MediaPlayer) {
-        player.setOnPlaying {
-            onStatusChanged?.invoke(PlaybackStatus.PLAYING)
-            onBuffering?.invoke(false)
-        }
-
-        player.setOnPaused {
-            onStatusChanged?.invoke(PlaybackStatus.PAUSED)
-        }
-
-        player.setOnStopped {
-            onStatusChanged?.invoke(PlaybackStatus.STOPPED)
-        }
-
-        player.setOnEndOfMedia {
-            onStatusChanged?.invoke(PlaybackStatus.ENDED)
-        }
-
-        player.setOnStalled {
-            onBuffering?.invoke(true)
-        }
-
-        player.setOnError {
-            val error = player.error?.message ?: "Error desconocido"
-            println("NativeAudioPlayer: JAVA FX ERROR durante reproducción: $error")
-            onError?.invoke(error)
-            onStatusChanged?.invoke(PlaybackStatus.ERROR)
-        }
-
-        player.currentTimeProperty().addListener { _, _, newValue ->
-            val currentMs = newValue?.toMillis()?.toLong() ?: 0L
-            val totalMs = player.totalDuration?.toMillis()?.toLong() ?: 0L
-            onTimeChanged?.invoke(currentMs, totalMs)
-        }
-
-        // Volumen inicial
-        player.volume = volume
     }
-    
-    /**
-     * Pausar reproducción.
-     */
+
+
     fun pause() {
-        Platform.runLater {
-            mediaPlayer?.pause()
-        }
+        mediaPlayer?.controls()?.pause()
     }
-    
-    /**
-     * Reanudar reproducción.
-     */
+
     fun resume() {
-        Platform.runLater {
-            mediaPlayer?.play()
-        }
+        mediaPlayer?.controls()?.play()
     }
-    
-    /**
-     * Alternar entre pausar y reproducir.
-     */
+
     fun togglePlayPause() {
-        Platform.runLater {
-            val player = mediaPlayer ?: return@runLater
-            when (player.status) {
-                MediaPlayer.Status.PLAYING -> player.pause()
-                MediaPlayer.Status.PAUSED -> player.play()
-                else -> { /* Ignorar otros estados */ }
-            }
+        val player = mediaPlayer ?: return
+        if (player.status().isPlaying) {
+            player.controls().pause()
+        } else {
+            player.controls().play()
         }
     }
 
     fun setPlaybackRate(rate: Double) {
-        playbackRate = rate
-        Platform.runLater {
-            mediaPlayer?.rate = rate
-        }
+        playbackRate = rate.toFloat()
+        mediaPlayer?.controls()?.setRate(playbackRate)
     }
-    
-    /**
-     * Detener reproducción.
-     */
+
     fun stop() {
-        Platform.runLater {
-            mediaPlayer?.stop()
-        }
+        mediaPlayer?.controls()?.stop()
     }
-    
-    /**
-     * Buscar a una posición específica.
-     */
+
     fun seekTo(positionMs: Long) {
-        Platform.runLater {
-            mediaPlayer?.seek(Duration.millis(positionMs.toDouble()))
-        }
+        mediaPlayer?.controls()?.setTime(positionMs)
     }
-    
-    /**
-     * Establecer volumen (0.0 a 1.0).
-     */
+
     fun setVolume(volume: Double) {
-        this.volume = volume.coerceIn(0.0, 1.0)
-        Platform.runLater {
-            mediaPlayer?.volume = this.volume
-        }
+        // VLC volume 0-100 (standard), can be up to 200 via software amp
+        this.volume = (volume * 100).toInt().coerceIn(0, 100)
+        mediaPlayer?.audio()?.setVolume(this.volume)
     }
-    
-    /**
-     * Obtener volumen actual.
-     */
-    fun getVolume(): Double = mediaPlayer?.volume ?: 1.0
-    
-    /**
-     * Obtener posición actual en milisegundos.
-     */
+
+    fun getVolume(): Double = (mediaPlayer?.audio()?.volume() ?: 100) / 100.0
+
     fun getCurrentPosition(): Long {
-        return mediaPlayer?.currentTime?.toMillis()?.toLong() ?: 0L
+        return mediaPlayer?.status()?.time() ?: 0L
     }
-    
-    /**
-     * Obtener duración total en milisegundos.
-     */
+
     fun getDuration(): Long {
-        return mediaPlayer?.totalDuration?.toMillis()?.toLong() ?: 0L
+        return mediaPlayer?.status()?.length() ?: 0L
     }
-    
-    /**
-     * Verificar si está reproduciendo.
-     */
+
     fun isPlaying(): Boolean {
-        return mediaPlayer?.status == MediaPlayer.Status.PLAYING
+        return mediaPlayer?.status()?.isPlaying == true
     }
-    
-    /**
-     * Obtener estado actual.
-     */
+
     fun getStatus(): PlaybackStatus {
-        return when (mediaPlayer?.status) {
-            MediaPlayer.Status.READY -> PlaybackStatus.READY
-            MediaPlayer.Status.PLAYING -> PlaybackStatus.PLAYING
-            MediaPlayer.Status.PAUSED -> PlaybackStatus.PAUSED
-            MediaPlayer.Status.STOPPED -> PlaybackStatus.STOPPED
-            MediaPlayer.Status.STALLED -> PlaybackStatus.BUFFERING
-            MediaPlayer.Status.HALTED -> PlaybackStatus.ERROR
-            MediaPlayer.Status.DISPOSED -> PlaybackStatus.STOPPED
-            else -> PlaybackStatus.IDLE
-        }
+        val mp = mediaPlayer ?: return PlaybackStatus.IDLE
+        return if (mp.status().isPlaying) PlaybackStatus.PLAYING
+        else if (mp.status().length() > 0 && mp.status().time() == 0L && !mp.status().isPlaying) PlaybackStatus.READY
+        else if (!mp.status().isPlaying && mp.status().length() > 0) PlaybackStatus.PAUSED 
+        else PlaybackStatus.IDLE
+        // VLCJ mapping is implied by events, direct status check is simpler
     }
-    
-    /**
-     * Liberar recursos.
-     */
+
     fun release() {
-        Platform.runLater {
-            mediaPlayer?.dispose()
-            mediaPlayer = null
-        }
+        mediaPlayer?.release()
+        factory?.release()
     }
-    
-    /**
-     * Estados de reproducción.
-     */
+
     enum class PlaybackStatus {
         IDLE,
         READY,

@@ -46,6 +46,7 @@ import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.constants.MiniPlayerBottomSpacing
 import com.anitail.desktop.constants.MiniPlayerHeight
 import com.anitail.desktop.constants.NavigationBarHeight
+import com.anitail.desktop.auth.DesktopAuthService
 import com.anitail.desktop.home.HomeListenAlbum
 import com.anitail.desktop.home.HomeListenArtist
 import com.anitail.desktop.home.HomeListenSong
@@ -98,6 +99,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
+import com.anitail.desktop.sync.LibrarySyncService
 import java.net.URL
 
 private enum class DesktopScreen {
@@ -145,6 +147,7 @@ private fun AniTailDesktopApp() {
     val database = remember { DesktopDatabase.getInstance() }
     val downloadService = remember { DesktopDownloadService() }
     val preferences = remember { DesktopPreferences.getInstance() }
+    val authService = remember { DesktopAuthService() }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val playerState = rememberPlayerState()
@@ -155,10 +158,15 @@ private fun AniTailDesktopApp() {
     val quickPicksMode by preferences.quickPicks.collectAsState()
     val pauseListenHistory by preferences.pauseListenHistory.collectAsState()
     val historyDuration by preferences.historyDuration.collectAsState()
+    val useLoginForBrowse by preferences.useLoginForBrowse.collectAsState()
+    val ytmSync by preferences.ytmSync.collectAsState()
+    val syncService = remember { LibrarySyncService(database) }
+    val isSyncing by syncService.isSyncing.collectAsState()
     var themeColor by remember { mutableStateOf(DefaultThemeColor) }
     var lastArtworkUrl by remember { mutableStateOf<String?>(null) }
 
     var currentScreen by remember { mutableStateOf(DesktopScreen.Home) }
+    var authCredentials by remember { mutableStateOf(authService.credentials) }
     var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
     var searchState by remember { mutableStateOf(SearchState()) }
     var searchActive by remember { mutableStateOf(false) }
@@ -168,11 +176,17 @@ private fun AniTailDesktopApp() {
     val allSongs by database.songs.collectAsState(initial = emptyList())
     val albums by database.albums.collectAsState(initial = emptyList())
     val artists by database.artists.collectAsState(initial = emptyList())
+    val playlists by database.allPlaylists().collectAsState(initial = emptyList())
     val relatedSongMaps by database.relatedSongMaps.collectAsState(initial = emptyList())
     val events by database.events.collectAsState(initial = emptyList())
     // For backward compatibility with existing code that expects LibraryItem
-    val libraryItems = remember(songs) {
-        songs.map { it.toLibraryItem() }.toMutableStateList()
+    val libraryItems = remember(songs, playlists, albums, artists) {
+        val list = mutableListOf<LibraryItem>()
+        list.addAll(songs.map { it.toLibraryItem() })
+        list.addAll(playlists.map { it.toLibraryItem() })
+        list.addAll(albums.map { it.toLibraryItem() })
+        list.addAll(artists.map { it.toLibraryItem() })
+        list.toMutableStateList()
     }
 
     var homePage by remember { mutableStateOf<HomePage?>(null) }
@@ -186,6 +200,7 @@ private fun AniTailDesktopApp() {
     var quickPicks by remember { mutableStateOf<List<LibraryItem>>(emptyList()) }
     var keepListening by remember { mutableStateOf<List<LibraryItem>>(emptyList()) }
     var forgottenFavorites by remember { mutableStateOf<List<LibraryItem>>(emptyList()) }
+    var accountPlaylists by remember { mutableStateOf<List<PlaylistItem>>(emptyList()) }
     var similarRecommendations by remember { mutableStateOf<List<SimilarRecommendation>>(emptyList()) }
     var detailNavigation by remember { mutableStateOf(DetailNavigation()) }
     val navigationHistory = remember { mutableStateListOf<DesktopScreen>() }
@@ -312,8 +327,18 @@ private fun AniTailDesktopApp() {
     val contentLanguage by preferences.contentLanguage.collectAsState()
     val contentCountry by preferences.contentCountry.collectAsState()
 
-    LaunchedEffect(youtubeCookie, contentLanguage, contentCountry) {
-        YouTube.cookie = youtubeCookie
+    LaunchedEffect(
+        youtubeCookie,
+        contentLanguage,
+        contentCountry,
+        authCredentials,
+        useLoginForBrowse,
+    ) {
+        val credentials = authCredentials
+        YouTube.cookie = credentials?.cookie ?: youtubeCookie
+        YouTube.visitorData = credentials?.visitorData
+        YouTube.dataSyncId = credentials?.dataSyncId
+        YouTube.useLoginForBrowse = credentials?.dataSyncId?.isNotBlank() == true && useLoginForBrowse
         YouTube.locale = com.anitail.innertube.models.YouTubeLocale(
             hl = contentLanguage,
             gl = contentCountry
@@ -321,7 +346,29 @@ private fun AniTailDesktopApp() {
         println("Anitail: YouTube API initialized with Cookie: ${youtubeCookie?.take(20)}..., Locale: $contentLanguage-$contentCountry")
     }
 
-    LaunchedEffect(Unit) {
+    // Initial page loading and reload on auth changes
+    LaunchedEffect(
+        authCredentials,
+        useLoginForBrowse,
+        contentLanguage,
+        contentCountry
+    ) {
+        // Wait for YouTube API to be updated by the other LaunchedEffect
+        // or just update it here as well for safety
+        val credentials = authCredentials
+        YouTube.cookie = credentials?.cookie ?: youtubeCookie
+        YouTube.visitorData = credentials?.visitorData
+        YouTube.dataSyncId = credentials?.dataSyncId
+        YouTube.useLoginForBrowse = credentials?.dataSyncId?.isNotBlank() == true && useLoginForBrowse
+        YouTube.locale = com.anitail.innertube.models.YouTubeLocale(
+            hl = contentLanguage,
+            gl = contentCountry
+        )
+        
+        homePage = null
+        explorePage = null
+        chartsPage = null
+
         loadHomePage(
             onLoading = { isHomeLoading = it },
             onPage = { page -> homePage = page },
@@ -331,6 +378,18 @@ private fun AniTailDesktopApp() {
             onExplore = { page -> explorePage = page },
             onCharts = { page -> chartsPage = page },
         )
+        
+        // Trigger library sync if enabled
+        if (ytmSync && authCredentials?.cookie?.isNotBlank() == true) {
+            scope.launch {
+                syncService.syncAll()
+            }
+            scope.launch {
+                YouTube.library("FEmusic_liked_playlists").onSuccess { page ->
+                    accountPlaylists = page.items.filterIsInstance<PlaylistItem>()
+                }
+            }
+        }
     }
 
     LaunchedEffect(
@@ -513,6 +572,7 @@ private fun AniTailDesktopApp() {
                             quickPicks = quickPicks,
                             keepListening = keepListening,
                             forgottenFavorites = forgottenFavorites,
+                            accountPlaylists = accountPlaylists,
                             similarRecommendations = similarRecommendations,
                             playerState = playerState,
                             onChipSelected = { chip ->
@@ -542,6 +602,20 @@ private fun AniTailDesktopApp() {
                                         )
                                     }
                                     isLoadingMore = false
+                                }
+                            },
+                            onNavigate = { route ->
+                                when (route) {
+                                    "account" -> currentScreen = DesktopScreen.Library
+                                    "moods_and_genres" -> currentScreen = DesktopScreen.MoodAndGenres
+                                    "charts" -> currentScreen = DesktopScreen.Charts
+                                    else -> {
+                                        if (route.startsWith("browse/")) {
+                                            // Handle generic browse if possible, or specific types
+                                            val id = route.removePrefix("browse/")
+                                            // TODO: specific browse
+                                        }
+                                    }
                                 }
                             },
                             onItemSelected = { item ->
@@ -699,7 +773,13 @@ private fun AniTailDesktopApp() {
                 }
 
                 DesktopScreen.Settings -> {
-                    SettingsScreen(preferences = preferences)
+                    SettingsScreen(
+                        preferences = preferences,
+                        authService = authService,
+                        authCredentials = authCredentials,
+                        onOpenLogin = {},
+                        onAuthChanged = { authCredentials = it },
+                    )
                 }
 
                 DesktopScreen.Charts -> {

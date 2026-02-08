@@ -36,6 +36,7 @@ dependencies {
     // Ktor for lyrics and API calls
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.json)
 
@@ -48,6 +49,7 @@ dependencies {
 
     // New multiplatform player (VLC/Media3/AVPlayer)
     implementation(libs.compose.multiplatform.media.player)
+    implementation(libs.vlcj)
 
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")

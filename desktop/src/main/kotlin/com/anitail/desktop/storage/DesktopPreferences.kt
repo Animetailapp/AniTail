@@ -71,6 +71,13 @@ class DesktopPreferences private constructor(
     private val _quickPicks = MutableStateFlow(QuickPicks.QUICK_PICKS)
     val quickPicks: StateFlow<QuickPicks> = _quickPicks.asStateFlow()
 
+    // === Account Settings ===
+    private val _useLoginForBrowse = MutableStateFlow(true)
+    val useLoginForBrowse: StateFlow<Boolean> = _useLoginForBrowse.asStateFlow()
+
+    private val _ytmSync = MutableStateFlow(true)
+    val ytmSync: StateFlow<Boolean> = _ytmSync.asStateFlow()
+
     // === Privacy Settings ===
     private val _pauseListenHistory = MutableStateFlow(false)
     val pauseListenHistory: StateFlow<Boolean> = _pauseListenHistory.asStateFlow()
@@ -182,6 +189,16 @@ class DesktopPreferences private constructor(
         save()
     }
 
+    fun setUseLoginForBrowse(value: Boolean) {
+        _useLoginForBrowse.value = value
+        save()
+    }
+
+    fun setYtmSync(value: Boolean) {
+        _ytmSync.value = value
+        save()
+    }
+
     fun setPauseListenHistory(value: Boolean) {
         _pauseListenHistory.value = value
         save()
@@ -249,6 +266,8 @@ class DesktopPreferences private constructor(
             _contentCountry.value = json.optString("contentCountry", "ES")
             _hideExplicit.value = json.optBoolean("hideExplicit", false)
             _quickPicks.value = QuickPicks.fromString(json.optString("quickPicks", "quick_picks"))
+            _useLoginForBrowse.value = json.optBoolean("useLoginForBrowse", true)
+            _ytmSync.value = json.optBoolean("ytmSync", true)
 
             _pauseListenHistory.value = json.optBoolean("pauseListenHistory", false)
             _pauseSearchHistory.value = json.optBoolean("pauseSearchHistory", false)
@@ -285,6 +304,8 @@ class DesktopPreferences private constructor(
                 put("contentCountry", _contentCountry.value)
                 put("hideExplicit", _hideExplicit.value)
                 put("quickPicks", _quickPicks.value.name.lowercase())
+                put("useLoginForBrowse", _useLoginForBrowse.value)
+                put("ytmSync", _ytmSync.value)
 
                 put("pauseListenHistory", _pauseListenHistory.value)
                 put("pauseSearchHistory", _pauseSearchHistory.value)
