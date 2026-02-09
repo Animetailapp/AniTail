@@ -81,6 +81,22 @@ compose.desktop {
             targetFormats(*formats.toTypedArray())
             packageName = "AniTail"
             packageVersion = "1.13.1"
+            windows {
+                iconFile.set(project.file("src/main/resources/drawable/ic_anitail.ico"))
+                menuGroup = "AniTail"
+                shortcut = true
+                menu = true
+                perUserInstall = false
+            }
+        }
+        buildTypes {
+            release {
+                proguard {
+                    configurationFiles.from(project.file("proguard-rules.pro"))
+                    obfuscate.set(false)
+                    optimize.set(false)
+                }
+            }
         }
     }
 }

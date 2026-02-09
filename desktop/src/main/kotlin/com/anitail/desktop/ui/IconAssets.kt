@@ -51,6 +51,12 @@ object IconAssets {
 
     fun close(): ImageVector = VectorResource.load("close.xml")
 
+    fun windowMinimize(): ImageVector = VectorResource.load("window_minimize.xml")
+
+    fun windowMaximize(): ImageVector = VectorResource.load("window_maximize.xml")
+
+    fun windowRestore(): ImageVector = VectorResource.load("window_restore.xml")
+
     fun refresh(): ImageVector = VectorResource.load("refresh.xml")
 
     fun moreVert(): ImageVector = VectorResource.load("more_vert.xml")

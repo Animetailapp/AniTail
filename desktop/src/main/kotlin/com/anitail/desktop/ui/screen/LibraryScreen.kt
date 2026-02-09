@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.ui.component.ChipsRow
 import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.shared.model.LibraryItem
 
@@ -43,12 +44,10 @@ fun LibraryScreen(
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         NavigationTitle(title = "Biblioteca")
-        SimpleChipsRow(
-            chips = LibraryFilter.values().map { it.label },
-            selectedIndex = filterState.value.ordinal,
-            onSelected = { index ->
-                filterState.value = LibraryFilter.values()[index]
-            },
+        ChipsRow(
+            chips = LibraryFilter.values().map { it to it.label },
+            currentValue = filterState.value,
+            onValueUpdate = { value -> filterState.value = value },
         )
         Spacer(modifier = Modifier.height(12.dp))
 

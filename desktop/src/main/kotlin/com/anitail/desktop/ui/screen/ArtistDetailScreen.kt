@@ -575,13 +575,3 @@ private fun YouTubeGridItem(
     }
 }
 
-private fun songItemToLibraryItem(song: SongItem): LibraryItem {
-    return LibraryItem(
-        id = song.id,
-        title = song.title,
-        artist = song.artists.joinToString { it.name },
-        artworkUrl = song.thumbnail,
-        playbackUrl = "https://music.youtube.com/watch?v=${song.id}",
-        durationMs = song.duration?.times(1000)?.toLong(),
-    )
-}

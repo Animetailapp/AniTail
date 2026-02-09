@@ -1,6 +1,8 @@
 package com.anitail.desktop
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -31,7 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -66,10 +68,14 @@ import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.storage.QuickPicks
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.anitail.desktop.ui.AnitailTheme
 import com.anitail.desktop.ui.DefaultThemeColor
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.extractThemeColor
+import com.anitail.desktop.ui.loadBitmapResource
 import com.anitail.desktop.ui.component.BottomSheet
 import com.anitail.desktop.ui.component.DesktopTopBar
 import com.anitail.desktop.ui.component.MiniPlayer
@@ -78,6 +84,7 @@ import com.anitail.desktop.ui.screen.AlbumDetailScreen
 import com.anitail.desktop.ui.screen.ArtistDetailScreen
 import com.anitail.desktop.ui.screen.ChartsScreen
 import com.anitail.desktop.ui.screen.ExploreScreen
+import com.anitail.desktop.ui.screen.BrowseScreen
 import com.anitail.desktop.ui.screen.HistoryScreen
 import com.anitail.desktop.ui.screen.HomeScreen
 import com.anitail.desktop.ui.screen.LibraryScreenEnhanced
@@ -100,8 +107,6 @@ import com.anitail.innertube.pages.ExplorePage
 import com.anitail.innertube.pages.HomePage
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.shared.model.LibraryItem
-import com.anitail.shared.model.SearchState
-import com.anitail.shared.repository.InnertubeMusicRepository
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -111,6 +116,12 @@ import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 import com.anitail.desktop.sync.LibrarySyncService
 import java.net.URL
+import androidx.compose.ui.window.FrameWindowScope
+import androidx.compose.ui.window.WindowState
+import androidx.compose.ui.window.rememberWindowState
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
+import java.awt.geom.RoundRectangle2D
 
 private enum class DesktopScreen {
     Home,
@@ -126,6 +137,7 @@ private enum class DesktopScreen {
     Charts,
     MoodAndGenres,
     NewRelease,
+    Browse,
 }
 
 /**
@@ -138,21 +150,33 @@ private data class DetailNavigation(
     val albumName: String? = null,
     val playlistId: String? = null,
     val playlistName: String? = null,
+    val browseId: String? = null,
+    val browseParams: String? = null,
 )
 
 fun main() = application {
+    val windowState = rememberWindowState()
+    val windowIcon = remember { loadBitmapResource("drawable/ic_anitail.png") }
     Window(
         onCloseRequest = ::exitApplication,
         title = "AniTail Desktop",
+        state = windowState,
+        icon = windowIcon?.let { BitmapPainter(it) },
+        undecorated = true,
     ) {
-        AniTailDesktopApp()
+        AniTailDesktopApp(
+            windowState = windowState,
+            onCloseRequest = ::exitApplication,
+        )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AniTailDesktopApp() {
-    val repository = remember { InnertubeMusicRepository() }
+private fun FrameWindowScope.AniTailDesktopApp(
+    windowState: WindowState,
+    onCloseRequest: () -> Unit,
+) {
     // Replace legacy store with Database and Preferences
     val database = remember { DesktopDatabase.getInstance() }
     val downloadService = remember { DesktopDownloadService() }
@@ -179,9 +203,6 @@ private fun AniTailDesktopApp() {
     var currentScreen by remember { mutableStateOf(DesktopScreen.Home) }
     var authCredentials by remember { mutableStateOf(authService.credentials) }
     var accountInfo by remember { mutableStateOf<AccountInfo?>(null) }
-    var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
-    var searchState by remember { mutableStateOf(SearchState()) }
-    var searchActive by remember { mutableStateOf(false) }
     var syncStatus by remember { mutableStateOf<String?>(null) }
     var wasSyncing by remember { mutableStateOf(false) }
 
@@ -619,12 +640,72 @@ private fun AniTailDesktopApp() {
         pureBlack = pureBlackEnabled,
         themeColor = themeColor,
     ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val windowCornerRadius = 12.dp
+        val isMaximized = windowState.placement == androidx.compose.ui.window.WindowPlacement.Maximized
+        val windowShape: Shape = if (isMaximized) {
+            RoundedCornerShape(0.dp)
+        } else {
+            RoundedCornerShape(windowCornerRadius)
+        }
+        val density = LocalDensity.current
+        val topBarHeight = 48.dp
+        val borderColor = if (pureBlackEnabled) {
+            Color(0xFF2A2A2A)
+        } else {
+            MaterialTheme.colorScheme.outlineVariant
+        }
+
+        DisposableEffect(window, windowState.placement, density) {
+            fun updateWindowShape() {
+                if (windowState.placement == androidx.compose.ui.window.WindowPlacement.Maximized) {
+                    window.shape = null
+                    return
+                }
+                val radiusPx = with(density) { windowCornerRadius.toPx() }
+                val bounds = window.bounds
+                val width = bounds.width.coerceAtLeast(1)
+                val height = bounds.height.coerceAtLeast(1)
+                window.shape = RoundRectangle2D.Double(
+                    0.0,
+                    0.0,
+                    width.toDouble(),
+                    height.toDouble(),
+                    (radiusPx * 2).toDouble(),
+                    (radiusPx * 2).toDouble(),
+                )
+            }
+
+            val listener = object : ComponentAdapter() {
+                override fun componentResized(e: ComponentEvent) {
+                    updateWindowShape()
+                }
+            }
+            updateWindowShape()
+            window.addComponentListener(listener)
+            onDispose {
+                window.removeComponentListener(listener)
+            }
+        }
+
+        val baseModifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+        val windowModifier = if (isMaximized) {
+            baseModifier
+        } else {
+            baseModifier
+                .clip(windowShape)
+                .border(1.dp, borderColor, windowShape)
+        }
+        BoxWithConstraints(
+            modifier = windowModifier
+        ) {
+            val contentHeight = maxHeight - topBarHeight
             val playerBottomSheetState =
                 rememberBottomSheetState(
                     dismissedBound = 0.dp,
                     collapsedBound = NavigationBarHeight + MiniPlayerBottomSpacing + MiniPlayerHeight,
-                    expandedBound = maxHeight,
+                    expandedBound = contentHeight,
                 )
             val playerBottomPadding = if (!playerBottomSheetState.isDismissed) {
                 MiniPlayerHeight + MiniPlayerBottomSpacing
@@ -648,8 +729,8 @@ private fun AniTailDesktopApp() {
                     topBar = {
                         DesktopTopBar(
                             onSearch = {
-                                currentScreen = DesktopScreen.Explore
-                                searchActive = true
+                                navigationHistory.add(currentScreen)
+                                currentScreen = DesktopScreen.Search
                             },
                             onHistory = {
                                 currentScreen = DesktopScreen.History
@@ -661,19 +742,26 @@ private fun AniTailDesktopApp() {
                                 currentScreen = DesktopScreen.Settings
                             },
                             pureBlack = pureBlackEnabled,
+                            window = window,
+                            windowState = windowState,
+                            onWindowClose = onCloseRequest,
                             onRefreshHome = if (currentScreen == DesktopScreen.Home) refreshHome else null,
                         )
                     },
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                 ) { padding ->
-                    Column(
+                    Box(
                         modifier = Modifier
                             .padding(padding)
-                            .padding(bottom = contentBottomPadding)
                             .fillMaxSize()
-                            .padding(16.dp),
                     ) {
-                        when (currentScreen) {
+                        Column(
+                            modifier = Modifier
+                                .padding(bottom = contentBottomPadding)
+                                .fillMaxSize()
+                                .padding(16.dp),
+                        ) {
+                            when (currentScreen) {
                         DesktopScreen.Home -> {
                         HomeScreen(
                             homePage = homePage,
@@ -734,9 +822,15 @@ private fun AniTailDesktopApp() {
                                     "charts" -> currentScreen = DesktopScreen.Charts
                                     else -> {
                                         if (route.startsWith("browse/")) {
-                                            // Handle generic browse if possible, or specific types
                                             val id = route.removePrefix("browse/")
-                                            // TODO: specific browse
+                                            if (id.isNotBlank()) {
+                                                navigationHistory.add(DesktopScreen.Home)
+                                                detailNavigation = detailNavigation.copy(
+                                                    browseId = id,
+                                                    browseParams = null,
+                                                )
+                                                currentScreen = DesktopScreen.Browse
+                                            }
                                         }
                                     }
                                 }
@@ -914,38 +1008,42 @@ private fun AniTailDesktopApp() {
 
                     DesktopScreen.Explore -> {
                         ExploreScreen(
-                            query = searchQuery,
-                            searchState = searchState,
                             explorePage = explorePage,
                             chartsPage = chartsPage,
                             isLoading = isExploreLoading,
-                            onQueryChange = { searchQuery = it },
-                            onSearch = {
-                                scope.launch {
-                                    searchState =
-                                        searchState.copy(isLoading = true, errorMessage = null)
-                                    val results = repository.search(searchQuery.text)
-                                    searchState = searchState.copy(
-                                        isLoading = false,
-                                        results = results,
-                                        errorMessage = if (results.isEmpty()) "Sin resultados" else null,
-                                    )
-                                }
-                            },
+                            playerState = playerState,
+                            database = database,
+                            downloadService = downloadService,
+                            playlists = playlists,
+                            songsById = songsById,
                             onPlay = { item ->
                                 playerState.play(item)
                                 playerBottomSheetState.collapseSoft()
                             },
-                            onAddToLibrary = { item ->
-                                val songEntity = item.toSongEntity()
-                                scope.launch {
-                                    database.insertSong(songEntity)
-                                }
+                            onOpenArtist = { artistId, artistName ->
+                                navigationHistory.add(DesktopScreen.Explore)
+                                detailNavigation = detailNavigation.copy(
+                                    artistId = artistId,
+                                    artistName = artistName,
+                                )
+                                currentScreen = DesktopScreen.ArtistDetail
                             },
-                            searchActive = searchActive,
-                            onSearchActiveChange = { searchActive = it },
-                            pureBlack = pureBlackEnabled,
-                            onChartsClick = { currentScreen = DesktopScreen.Charts },
+                            onOpenAlbum = { albumId, albumName ->
+                                navigationHistory.add(DesktopScreen.Explore)
+                                detailNavigation = detailNavigation.copy(
+                                    albumId = albumId,
+                                    albumName = albumName,
+                                )
+                                currentScreen = DesktopScreen.AlbumDetail
+                            },
+                            onBrowse = { browseId, params ->
+                                navigationHistory.add(DesktopScreen.Explore)
+                                detailNavigation = detailNavigation.copy(
+                                    browseId = browseId,
+                                    browseParams = params,
+                                )
+                                currentScreen = DesktopScreen.Browse
+                            },
                             onMoodGreClick = { currentScreen = DesktopScreen.MoodAndGenres },
                             onNewReleaseClick = { currentScreen = DesktopScreen.NewRelease },
                         )
@@ -1043,12 +1141,21 @@ private fun AniTailDesktopApp() {
                     )
                 }
 
-                            DesktopScreen.MoodAndGenres -> {
-                                MoodAndGenresScreen(
-                                    onBack = { currentScreen = DesktopScreen.Explore },
-                                    onCategoryClick = { _, _, _ -> }
+                DesktopScreen.MoodAndGenres -> {
+                    MoodAndGenresScreen(
+                        onBack = { currentScreen = DesktopScreen.Explore },
+                        onCategoryClick = { browseId, params, _ ->
+                            if (browseId.isNotBlank()) {
+                                navigationHistory.add(DesktopScreen.MoodAndGenres)
+                                detailNavigation = detailNavigation.copy(
+                                    browseId = browseId,
+                                    browseParams = params,
                                 )
+                                currentScreen = DesktopScreen.Browse
                             }
+                        },
+                    )
+                }
 
                 DesktopScreen.NewRelease -> {
                     NewReleaseScreen(
@@ -1064,6 +1171,46 @@ private fun AniTailDesktopApp() {
                             detailNavigation = detailNavigation.copy(artistId = artistId)
                             currentScreen = DesktopScreen.ArtistDetail
                         }
+                    )
+                }
+
+                DesktopScreen.Browse -> {
+                    BrowseScreen(
+                        browseId = detailNavigation.browseId,
+                        browseParams = detailNavigation.browseParams,
+                        hideExplicit = hideExplicit,
+                        playerState = playerState,
+                        database = database,
+                        downloadService = downloadService,
+                        playlists = playlists,
+                        songsById = songsById,
+                        onOpenArtist = { artistId, artistName ->
+                            navigationHistory.add(DesktopScreen.Browse)
+                            detailNavigation = detailNavigation.copy(
+                                artistId = artistId,
+                                artistName = artistName,
+                            )
+                            currentScreen = DesktopScreen.ArtistDetail
+                        },
+                        onOpenAlbum = { albumId, albumName ->
+                            navigationHistory.add(DesktopScreen.Browse)
+                            detailNavigation = detailNavigation.copy(
+                                albumId = albumId,
+                                albumName = albumName,
+                            )
+                            currentScreen = DesktopScreen.AlbumDetail
+                        },
+                        onOpenPlaylist = { playlistId, playlistName ->
+                            navigationHistory.add(DesktopScreen.Browse)
+                            detailNavigation = detailNavigation.copy(
+                                playlistId = playlistId,
+                                playlistName = playlistName,
+                            )
+                            currentScreen = DesktopScreen.PlaylistDetail
+                        },
+                        onBack = {
+                            currentScreen = navigationHistory.removeLastOrNull() ?: DesktopScreen.Home
+                        },
                     )
                 }
 
@@ -1180,53 +1327,54 @@ private fun AniTailDesktopApp() {
                         },
                     )
                 }
+                            }
+                        }
+
+                        BottomSheet(
+                            state = playerBottomSheetState,
+                            background = {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(bottomSheetBackgroundColor)
+                                )
+                            },
+                            onDismiss = { playerState.stop() },
+                            collapsedContent = {
+                                if (playerState.currentItem != null) {
+                                    MiniPlayer(
+                                        playerState = playerState,
+                                        onOpenFullPlayer = { playerBottomSheetState.expandSoft() },
+                                    )
+                                }
+                            },
+                        ) {
+                            PlayerScreen(
+                                item = playerState.currentItem,
+                                playerState = playerState,
+                                database = database,
+                                downloadService = downloadService,
+                                onOpenArtist = { artistId, artistName ->
+                                    navigationHistory.add(currentScreen)
+                                    detailNavigation = detailNavigation.copy(
+                                        artistId = artistId,
+                                        artistName = artistName,
+                                    )
+                                    currentScreen = DesktopScreen.ArtistDetail
+                                },
+                                onOpenAlbum = { albumId, albumName ->
+                                    navigationHistory.add(currentScreen)
+                                    detailNavigation = detailNavigation.copy(
+                                        albumId = albumId,
+                                        albumName = albumName,
+                                    )
+                                    currentScreen = DesktopScreen.AlbumDetail
+                                },
+                                onCollapsePlayer = { playerBottomSheetState.collapseSoft() },
+                                modifier = Modifier.fillMaxSize(),
+                            )
                         }
                     }
-                }
-
-                BottomSheet(
-                    state = playerBottomSheetState,
-                    background = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(bottomSheetBackgroundColor)
-                        )
-                    },
-                    onDismiss = { playerState.stop() },
-                    collapsedContent = {
-                        if (playerState.currentItem != null) {
-                            MiniPlayer(
-                                playerState = playerState,
-                                onOpenFullPlayer = { playerBottomSheetState.expandSoft() },
-                            )
-                        }
-                    },
-                ) {
-                    PlayerScreen(
-                        item = playerState.currentItem,
-                        playerState = playerState,
-                        database = database,
-                        downloadService = downloadService,
-                        onOpenArtist = { artistId, artistName ->
-                            navigationHistory.add(currentScreen)
-                            detailNavigation = detailNavigation.copy(
-                                artistId = artistId,
-                                artistName = artistName,
-                            )
-                            currentScreen = DesktopScreen.ArtistDetail
-                        },
-                        onOpenAlbum = { albumId, albumName ->
-                            navigationHistory.add(currentScreen)
-                            detailNavigation = detailNavigation.copy(
-                                albumId = albumId,
-                                albumName = albumName,
-                            )
-                            currentScreen = DesktopScreen.AlbumDetail
-                        },
-                        onCollapsePlayer = { playerBottomSheetState.collapseSoft() },
-                        modifier = Modifier.fillMaxSize(),
-                    )
                 }
 
                 NavigationBar(

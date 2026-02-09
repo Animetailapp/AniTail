@@ -967,7 +967,7 @@ private val YTItem.thumbnail: String?
         else -> null
     }
 
-private data class DownloadMenuState(
+data class DownloadMenuState(
     val label: String,
     val enabled: Boolean,
 )
@@ -977,7 +977,7 @@ private data class HomeSongTarget(
     val songItem: SongItem?,
 )
 
-private fun resolveDownloadMenuState(
+fun resolveDownloadMenuState(
     songId: String,
     downloadStates: Map<String, DownloadState>,
     downloadedSongs: List<DownloadedSong>,
@@ -994,7 +994,7 @@ private fun resolveDownloadMenuState(
     return DownloadMenuState(label = label, enabled = enabled)
 }
 
-private fun buildHomeSongMenuActions(
+fun buildHomeSongMenuActions(
     order: List<HomeSongMenuActionId>,
     downloadState: DownloadMenuState,
     isInLibrary: Boolean,
@@ -1066,12 +1066,12 @@ private fun buildHomeSongMenuActions(
     }
 }
 
-private fun toContextMenuItems(actions: List<ContextMenuAction>): List<ContextMenuItem> {
+fun toContextMenuItems(actions: List<ContextMenuAction>): List<ContextMenuItem> {
     return actions
         .filter { it.enabled }
         .map { action -> ContextMenuItem(action.label, action.onClick) }
 }
 
-private fun songItemToLibraryItem(item: SongItem): LibraryItem {
+fun songItemToLibraryItem(item: SongItem): LibraryItem {
     return item.toSongEntity().toLibraryItem()
 }

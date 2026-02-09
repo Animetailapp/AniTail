@@ -67,7 +67,7 @@ jobs:
           - os: windows-latest
             label: Windows MSI
             gradle_cmd: ./gradlew.bat
-            gradle_task: :desktop:packageMsi
+            gradle_task: :desktop:packageReleaseMsi
             artifact_name: desktop-msi-release
 
     steps:
