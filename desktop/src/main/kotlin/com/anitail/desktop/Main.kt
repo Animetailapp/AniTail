@@ -119,6 +119,7 @@ import java.net.URL
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.rememberWindowState
+import com.sun.jna.platform.win32.User32
 import java.awt.Rectangle
 import java.awt.Toolkit
 import java.awt.event.ComponentAdapter
@@ -126,6 +127,7 @@ import java.awt.event.ComponentEvent
 import java.awt.geom.Rectangle2D
 import java.awt.geom.RoundRectangle2D
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private enum class DesktopScreen {
     Home,
@@ -144,38 +146,195 @@ private enum class DesktopScreen {
     Browse,
 }
 
-private fun isWindowAtWorkArea(window: java.awt.Window): Boolean {
-    val gc = window.graphicsConfiguration ?: return false
-    val bounds = gc.bounds
-    val insets = Toolkit.getDefaultToolkit().getScreenInsets(gc)
-    val workX = bounds.x + insets.left
-    val workY = bounds.y + insets.top
-    val workWidth = bounds.width - insets.left - insets.right
-    val workHeight = bounds.height - insets.top - insets.bottom
+private enum class WindowSnapMode {
+    FLOATING,
+    MAXIMIZED,
+    LEFT,
+    RIGHT,
+    TOP_LEFT,
+    TOP_RIGHT,
+    BOTTOM_LEFT,
+    BOTTOM_RIGHT,
+}
+
+private const val SNAP_THRESHOLD_PX = 16
+
+private fun isWindowAtWorkArea(bounds: Rectangle, workArea: Rectangle): Boolean {
+    val workX = workArea.x
+    val workY = workArea.y
+    val workWidth = workArea.width
+    val workHeight = workArea.height
     if (workWidth <= 0 || workHeight <= 0) return false
     val tolerance = 2
-    return abs(window.x - workX) <= tolerance &&
-        abs(window.y - workY) <= tolerance &&
-        abs(window.width - workWidth) <= tolerance &&
-        abs(window.height - workHeight) <= tolerance
+    return abs(bounds.x - workX) <= tolerance &&
+        abs(bounds.y - workY) <= tolerance &&
+        abs(bounds.width - workWidth) <= tolerance &&
+        abs(bounds.height - workHeight) <= tolerance
+}
+
+private fun isWindowAtWorkArea(window: java.awt.Window): Boolean {
+    val workArea = getWorkAreaForWindow(window)
+    return isWindowAtWorkArea(getVisualBoundsForSnap(window), workArea)
 }
 
 private fun isValidBounds(bounds: Rectangle): Boolean {
     return bounds.width >= 200 && bounds.height >= 200
 }
 
-private fun applyWorkAreaBounds(window: java.awt.Window) {
-    val gc = window.graphicsConfiguration ?: return
+private fun getWorkAreaForWindow(window: java.awt.Window): Rectangle {
+    val gc = window.graphicsConfiguration ?: return Rectangle(0, 0, 0, 0)
     val bounds = gc.bounds
     val insets = Toolkit.getDefaultToolkit().getScreenInsets(gc)
     val x = bounds.x + insets.left
     val y = bounds.y + insets.top
     val width = bounds.width - insets.left - insets.right
     val height = bounds.height - insets.top - insets.bottom
-    if (width <= 0 || height <= 0) return
-    if (window.x == x && window.y == y && window.width == width && window.height == height) return
-    window.setBounds(x, y, width, height)
+    return Rectangle(x, y, width.coerceAtLeast(0), height.coerceAtLeast(0))
 }
+
+private fun determineSnapTargetByBounds(bounds: Rectangle, workArea: Rectangle): WindowSnapMode? {
+    if (workArea.width <= 0 || workArea.height <= 0) return null
+    val left = workArea.x
+    val right = workArea.x + workArea.width
+    val top = workArea.y
+    val bottom = workArea.y + workArea.height
+
+    val nearLeft = abs(bounds.x - left) <= SNAP_THRESHOLD_PX
+    val nearRight = abs(bounds.x + bounds.width - right) <= SNAP_THRESHOLD_PX
+    val nearTop = abs(bounds.y - top) <= SNAP_THRESHOLD_PX
+    val nearBottom = abs(bounds.y + bounds.height - bottom) <= SNAP_THRESHOLD_PX
+
+    val spansFullWidth = nearLeft && nearRight
+    return when {
+        nearTop && spansFullWidth -> WindowSnapMode.MAXIMIZED
+        nearTop && nearLeft -> WindowSnapMode.TOP_LEFT
+        nearTop && nearRight -> WindowSnapMode.TOP_RIGHT
+        nearBottom && nearLeft -> WindowSnapMode.BOTTOM_LEFT
+        nearBottom && nearRight -> WindowSnapMode.BOTTOM_RIGHT
+        nearTop -> WindowSnapMode.MAXIMIZED
+        nearLeft -> WindowSnapMode.LEFT
+        nearRight -> WindowSnapMode.RIGHT
+        else -> null
+    }
+}
+
+private fun determineSnapTargetByPointer(point: java.awt.Point, workArea: Rectangle): WindowSnapMode? {
+    if (workArea.width <= 0 || workArea.height <= 0) return null
+    val left = workArea.x
+    val right = workArea.x + workArea.width
+    val top = workArea.y
+    val bottom = workArea.y + workArea.height
+
+    val nearLeft = kotlin.math.abs(point.x - left) <= SNAP_THRESHOLD_PX
+    val nearRight = kotlin.math.abs(point.x - right) <= SNAP_THRESHOLD_PX
+    val nearTop = kotlin.math.abs(point.y - top) <= SNAP_THRESHOLD_PX
+    val nearBottom = kotlin.math.abs(point.y - bottom) <= SNAP_THRESHOLD_PX
+
+    return when {
+        nearTop && nearLeft -> WindowSnapMode.TOP_LEFT
+        nearTop && nearRight -> WindowSnapMode.TOP_RIGHT
+        nearBottom && nearLeft -> WindowSnapMode.BOTTOM_LEFT
+        nearBottom && nearRight -> WindowSnapMode.BOTTOM_RIGHT
+        nearTop -> WindowSnapMode.MAXIMIZED
+        nearLeft -> WindowSnapMode.LEFT
+        nearRight -> WindowSnapMode.RIGHT
+        else -> null
+    }
+}
+
+private fun computeSnapBounds(workArea: Rectangle, snapMode: WindowSnapMode): Rectangle? {
+    if (workArea.width <= 0 || workArea.height <= 0) return null
+    val halfWidth = workArea.width / 2
+    val halfHeight = workArea.height / 2
+    val rightX = workArea.x + workArea.width - halfWidth
+    val bottomY = workArea.y + workArea.height - halfHeight
+
+    return when (snapMode) {
+        WindowSnapMode.MAXIMIZED ->
+            Rectangle(workArea.x, workArea.y, workArea.width, workArea.height)
+        WindowSnapMode.LEFT ->
+            Rectangle(workArea.x, workArea.y, halfWidth, workArea.height)
+        WindowSnapMode.RIGHT ->
+            Rectangle(rightX, workArea.y, workArea.width - (rightX - workArea.x), workArea.height)
+        WindowSnapMode.TOP_LEFT ->
+            Rectangle(workArea.x, workArea.y, halfWidth, halfHeight)
+        WindowSnapMode.TOP_RIGHT ->
+            Rectangle(rightX, workArea.y, workArea.width - (rightX - workArea.x), halfHeight)
+        WindowSnapMode.BOTTOM_LEFT ->
+            Rectangle(workArea.x, bottomY, halfWidth, workArea.height - (bottomY - workArea.y))
+        WindowSnapMode.BOTTOM_RIGHT ->
+            Rectangle(rightX, bottomY, workArea.width - (rightX - workArea.x), workArea.height - (bottomY - workArea.y))
+        WindowSnapMode.FLOATING -> null
+    }
+}
+
+private fun boundsMatch(a: Rectangle, b: Rectangle, tolerance: Int = 2): Boolean {
+    return abs(a.x - b.x) <= tolerance &&
+        abs(a.y - b.y) <= tolerance &&
+        abs(a.width - b.width) <= tolerance &&
+        abs(a.height - b.height) <= tolerance
+}
+
+private fun resolveSnapModeFromBounds(bounds: Rectangle, workArea: Rectangle): WindowSnapMode {
+    val target = determineSnapTargetByBounds(bounds, workArea) ?: return WindowSnapMode.FLOATING
+    val expected = computeSnapBounds(workArea, target) ?: return WindowSnapMode.FLOATING
+    return if (boundsMatch(bounds, expected)) target else WindowSnapMode.FLOATING
+}
+
+private fun applySnapBounds(window: java.awt.Window, workArea: Rectangle, snapMode: WindowSnapMode) {
+    val target = computeSnapBounds(workArea, snapMode) ?: return
+    val adjusted = if (isWindows()) adjustBoundsForResizeBorder(window, target) else target
+    if (window.x == adjusted.x && window.y == adjusted.y &&
+        window.width == adjusted.width && window.height == adjusted.height
+    ) {
+        return
+    }
+    window.setBounds(adjusted)
+}
+
+private fun adjustBoundsForResizeBorder(window: java.awt.Window, bounds: Rectangle): Rectangle {
+    val border = getResizeBorderThickness(window)
+    if (border.x <= 0 && border.y <= 0) return bounds
+    return Rectangle(
+        bounds.x - border.x,
+        bounds.y - border.y,
+        bounds.width + border.x * 2,
+        bounds.height + border.y * 2,
+    )
+}
+
+private fun getVisualBoundsForSnap(window: java.awt.Window, bounds: Rectangle = window.bounds): Rectangle {
+    val border = getResizeBorderThickness(window)
+    if (border.x <= 0 && border.y <= 0) return Rectangle(bounds)
+    val width = (bounds.width - border.x * 2).coerceAtLeast(1)
+    val height = (bounds.height - border.y * 2).coerceAtLeast(1)
+    return Rectangle(
+        bounds.x + border.x,
+        bounds.y + border.y,
+        width,
+        height,
+    )
+}
+
+private fun getResizeBorderThickness(window: java.awt.Window): Rectangle {
+    if (!isWindows()) return Rectangle(0, 0, 0, 0)
+    val scaleX = window.graphicsConfiguration?.defaultTransform?.scaleX ?: 1.0
+    val scaleY = window.graphicsConfiguration?.defaultTransform?.scaleY ?: 1.0
+    val padded = User32.INSTANCE.GetSystemMetrics(SM_CXPADDEDBORDER)
+    val rawX = User32.INSTANCE.GetSystemMetrics(SM_CXSIZEFRAME) + padded
+    val rawY = User32.INSTANCE.GetSystemMetrics(SM_CYSIZEFRAME) + padded
+    val x = (rawX / scaleX).roundToInt()
+    val y = (rawY / scaleY).roundToInt()
+    return Rectangle(x, y, 0, 0)
+}
+
+private fun isWindows(): Boolean {
+    return System.getProperty("os.name")?.startsWith("Windows", ignoreCase = true) == true
+}
+
+private const val SM_CXSIZEFRAME = 32
+private const val SM_CYSIZEFRAME = 33
+private const val SM_CXPADDEDBORDER = 92
 
 /**
  * Datos de navegación para pantallas de detalle.
@@ -192,7 +351,7 @@ private data class DetailNavigation(
 )
 
 fun main() = application {
-    val windowState = rememberWindowState()
+    val windowState = rememberWindowState(width = 1400.dp, height = 900.dp)
     val windowIcon = remember { loadBitmapResource("drawable/ic_anitail.png") }
     Window(
         onCloseRequest = ::exitApplication,
@@ -678,12 +837,16 @@ private fun FrameWindowScope.AniTailDesktopApp(
         themeColor = themeColor,
     ) {
         val windowCornerRadius = 12.dp
-        var isMaximizedManual by remember { mutableStateOf(false) }
-        val isMaximizedByBounds = isWindowAtWorkArea(window)
-        val isMaximized = isMaximizedManual || isMaximizedByBounds
-        val showMaximizedState = isMaximizedManual
+        var snapMode by remember { mutableStateOf(WindowSnapMode.FLOATING) }
+        var windowBounds by remember { mutableStateOf(window.bounds) }
+        val isMaximizedByBounds = isWindowAtWorkArea(
+            getVisualBoundsForSnap(window, windowBounds),
+            getWorkAreaForWindow(window),
+        )
+        val isSnapped = snapMode != WindowSnapMode.FLOATING || isMaximizedByBounds
+        val showMaximizedState = isSnapped
         val lastFloatingBounds = remember { mutableStateOf(window.bounds) }
-        val windowShape: Shape = if (isMaximized) {
+        val windowShape: Shape = if (isSnapped) {
             RoundedCornerShape(0.dp)
         } else {
             RoundedCornerShape(windowCornerRadius)
@@ -702,15 +865,34 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
         LaunchedEffect(windowState.placement) {
             if (windowState.placement == androidx.compose.ui.window.WindowPlacement.Maximized) {
-                isMaximizedManual = true
+                if (snapMode == WindowSnapMode.FLOATING && isValidBounds(window.bounds)) {
+                    lastFloatingBounds.value = Rectangle(window.bounds)
+                }
+                snapMode = WindowSnapMode.MAXIMIZED
                 windowState.placement = androidx.compose.ui.window.WindowPlacement.Floating
-                applyWorkAreaBounds(window)
+                applySnapBounds(window, getWorkAreaForWindow(window), snapMode)
             }
         }
 
         DisposableEffect(window, windowState.placement, density) {
+            fun updateWindowBounds() {
+                val bounds = window.bounds
+                if (bounds != windowBounds) {
+                    windowBounds = Rectangle(bounds)
+                }
+            }
+
+            fun updateSnapModeFromBounds() {
+                if (windowState.isMinimized) return
+                val workArea = getWorkAreaForWindow(window)
+                val resolved = resolveSnapModeFromBounds(getVisualBoundsForSnap(window), workArea)
+                if (resolved != snapMode) {
+                    snapMode = resolved
+                }
+            }
+
             fun updateWindowShape() {
-                if (isMaximizedManual || isWindowAtWorkArea(window)) {
+                if (snapMode != WindowSnapMode.FLOATING || isWindowAtWorkArea(window)) {
                     val bounds = window.bounds
                     val width = bounds.width.coerceAtLeast(1)
                     val height = bounds.height.coerceAtLeast(1)
@@ -737,7 +919,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
             }
 
             fun updateLastFloatingBounds() {
-                if (isMaximizedManual) return
+                if (snapMode != WindowSnapMode.FLOATING) return
                 if (isWindowAtWorkArea(window)) return
                 val bounds = window.bounds
                 if (isValidBounds(bounds)) {
@@ -746,22 +928,27 @@ private fun FrameWindowScope.AniTailDesktopApp(
             }
 
             fun applyMaximizedBounds() {
-                if (!isMaximizedManual) return
+                if (snapMode == WindowSnapMode.FLOATING) return
                 if (windowState.isMinimized) return
-                applyWorkAreaBounds(window)
+                applySnapBounds(window, getWorkAreaForWindow(window), snapMode)
             }
 
             val listener = object : ComponentAdapter() {
                 override fun componentResized(e: ComponentEvent) {
+                    updateWindowBounds()
+                    updateSnapModeFromBounds()
                     updateWindowShape()
                     applyMaximizedBounds()
                     updateLastFloatingBounds()
                 }
 
                 override fun componentMoved(e: ComponentEvent) {
+                    updateWindowBounds()
                     updateLastFloatingBounds()
                 }
             }
+            updateWindowBounds()
+            updateSnapModeFromBounds()
             updateWindowShape()
             applyMaximizedBounds()
             updateLastFloatingBounds()
@@ -774,7 +961,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
         val baseModifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-        val windowModifier = if (isMaximized) {
+        val windowModifier = if (isSnapped) {
             baseModifier
         } else {
             baseModifier
@@ -831,8 +1018,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             windowState = windowState,
                             onToggleMaximize = {
                                 windowState.isMinimized = false
-                                if (isMaximizedManual) {
-                                    isMaximizedManual = false
+                                if (isSnapped) {
+                                    snapMode = WindowSnapMode.FLOATING
                                     val bounds = lastFloatingBounds.value
                                     if (isValidBounds(bounds)) {
                                         window.setBounds(bounds)
@@ -841,9 +1028,30 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                     if (isValidBounds(window.bounds)) {
                                         lastFloatingBounds.value = Rectangle(window.bounds)
                                     }
-                                    isMaximizedManual = true
-                                    applyWorkAreaBounds(window)
+                                    snapMode = WindowSnapMode.MAXIMIZED
+                                    applySnapBounds(window, getWorkAreaForWindow(window), snapMode)
                                 }
+                            },
+                            onRestoreFromSnap = {
+                                if (isSnapped) {
+                                    windowState.isMinimized = false
+                                    snapMode = WindowSnapMode.FLOATING
+                                    val bounds = lastFloatingBounds.value
+                                    if (isValidBounds(bounds)) {
+                                        window.setBounds(bounds)
+                                    }
+                                }
+                            },
+                            onSnapFromDragEnd = { point ->
+                                val workArea = getWorkAreaForWindow(window)
+                                val target = determineSnapTargetByPointer(point, workArea)
+                                    ?: determineSnapTargetByBounds(getVisualBoundsForSnap(window), workArea)
+                                    ?: return@DesktopTopBar
+                                if (snapMode == WindowSnapMode.FLOATING && isValidBounds(window.bounds)) {
+                                    lastFloatingBounds.value = Rectangle(window.bounds)
+                                }
+                                snapMode = target
+                                applySnapBounds(window, workArea, snapMode)
                             },
                             onWindowClose = onCloseRequest,
                             onRefreshHome = if (currentScreen == DesktopScreen.Home) refreshHome else null,

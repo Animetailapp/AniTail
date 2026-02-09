@@ -18,6 +18,7 @@ room = "2.8.4"
 hilt = "2.57.2"
 ktor = "3.4.0"
 vlcj = "4.11.0"
+jna = "5.14.0"
 ksp = "2.3.5"
 okhttp = "5.0.0-alpha.14"
 newpipe = "dev-SNAPSHOT"
@@ -91,6 +92,8 @@ ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.r
 ktor-client-android = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 vlcj = { module = "uk.co.caprica:vlcj", version.ref = "vlcj" }
+jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
+jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
 ktor-client-encoding = { group = "io.ktor", name = "ktor-client-encoding", version.ref = "ktor" }
 ktor-serialization-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
 

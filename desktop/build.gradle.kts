@@ -32,6 +32,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
     implementation(libs.json)
     implementation(libs.okhttp)
+    implementation(libs.jna)
+    implementation(libs.jna.platform)
 
     // Ktor for lyrics and API calls
     implementation(libs.ktor.client.core)
