@@ -160,4 +160,22 @@ object IconAssets {
     fun subscribe(): ImageVector = VectorResource.load("subscribe.xml")
 
     fun subscribed(): ImageVector = VectorResource.load("subscribed.xml")
+
+    fun discord(): ImageVector = VectorResource.load("discord.xml")
+
+    fun patreon(): ImageVector = VectorResource.load("patreon.xml")
+
+    fun babelSoftwareApps(): ImageVector = VectorResource.load("babel_software_apps.xml")
+
+    fun links(): ImageVector = VectorResource.load("links.xml")
+
+    fun openInNew(): ImageVector = VectorResource.load("open_in_new.xml")
+
+    fun icAni(): ImageVector = VectorResource.load("ic_ani.xml")
+
+    fun buildIcon(): ImageVector = VectorResource.load("build.xml")
+
+    fun verified(): ImageVector = VectorResource.load("verified.xml")
+
+    fun devices(): ImageVector = VectorResource.load("devices.xml")
 }

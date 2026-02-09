@@ -1,7 +1,21 @@
 package com.anitail.desktop.ui.screen
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,6 +33,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
@@ -43,7 +59,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.auth.AuthCredentials
 import com.anitail.desktop.auth.DesktopAccountTokenParser
@@ -922,77 +947,603 @@ private fun StorageSettingsScreen(
     }
 }
 
+// ==================== DOMAIN MODELS ====================
+private data class AboutBuildInfo(
+    val buildType: String,
+    val versionName: String,
+    val versionCode: Int,
+    val deviceInfo: String,
+)
+
+private data class AboutCardItem(
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val url: String,
+)
+
+private data class AboutTeamMember(
+    val id: String,
+    val name: String,
+    val avatarUrl: String? = null,
+    val role: String,
+    val url: String,
+)
+
 @Composable
 private fun AboutScreen(
     onBack: () -> Unit,
 ) {
-    SettingsSubScreen(
-        title = stringResource("about"),
-        onBack = onBack,
-    ) {
-        Surface(
+    // ==================== DATA ====================
+    val osName = System.getProperty("os.name") ?: "Desktop"
+    val osVersion = System.getProperty("os.version") ?: ""
+    val osArch = System.getProperty("os.arch") ?: ""
+
+    val buildInfo = AboutBuildInfo(
+        buildType = "Desktop",
+        versionName = "1.13.1",
+        versionCode = 1,
+        deviceInfo = "$osName $osVersion ($osArch)",
+    )
+
+    val linkItems = listOf(
+        AboutCardItem(
+            title = stringResource("my_channel"),
+            subtitle = stringResource("my_channel_info"),
+            icon = IconAssets.discord(),
+            url = "https://discord.gg/fvskrQZb9j",
+        ),
+        AboutCardItem(
+            title = stringResource("other_apps"),
+            subtitle = stringResource("other_apps_info"),
+            icon = IconAssets.babelSoftwareApps(),
+            url = "https://github.com/Animetailapp",
+        ),
+        AboutCardItem(
+            title = stringResource("patreon"),
+            subtitle = stringResource("patreon_info"),
+            icon = IconAssets.patreon(),
+            url = "https://www.patreon.com/abydev",
+        ),
+    )
+
+    val developer = AboutTeamMember(
+        id = "dev",
+        name = "[̲̅A̲̅][̲̅b̲̅][̲̅y̲̅]",
+        role = stringResource("info_dev"),
+        avatarUrl = "https://avatars.githubusercontent.com/u/21024973?v=4",
+        url = "https://github.com/Dark25",
+    )
+
+    val testers = listOf(
+        AboutTeamMember(id = "t1", name = "im.shoul", role = "Beta Tester", avatarUrl = "https://i.ibb.co/pjkzBvGn/image.png", url = "https://discord.com/users/237686500567810058"),
+        AboutTeamMember(id = "t2", name = "Lucia (Lú)", role = "Beta Tester", avatarUrl = "https://i.ibb.co/DPjf5V78/61fc6cc5422936a8fd81a913fbdf773b.png", url = "https://discord.com/users/553307420688908320"),
+        AboutTeamMember(id = "t3", name = "ElDeLasTojas", role = "Beta Tester", avatarUrl = "https://i.ibb.co/mrgvc1nb/14f2a18fa8b9e553a048027375db5f81.png", url = "https://discord.com/users/444680132393697291"),
+        AboutTeamMember(id = "t4", name = "SKHLORDKIRA", role = "Beta Tester", avatarUrl = "https://i.ibb.co/gnXkhnJ/be81ecb723cfd4186e85bfe81793f594.png", url = "https://discord.com/users/445310321717018626"),
+        AboutTeamMember(id = "t5", name = "Abyss", role = "Beta Tester", avatarUrl = "https://i.ibb.co/TDdPq2jF/0f0f47f2a47eca3eda2a433237b4a05d.png", url = "https://discord.com/users/341662495301304323"),
+        AboutTeamMember(id = "t6", name = "Jack", role = "Beta Tester", avatarUrl = "https://i.ibb.co/3YPX1wsj/dec881377d42d58473b6d988165406b6.png", url = "https://discord.com/users/1166985299885309954"),
+        AboutTeamMember(id = "t7", name = "R4fa3l_2008", role = "Beta Tester", avatarUrl = "https://i.ibb.co/htmds91/b514910877f4b585309265fbe922f020.png", url = "https://discord.com/users/1318948121782521890"),
+        AboutTeamMember(id = "t8", name = "Ryak", role = "Beta Tester", avatarUrl = "https://i.ibb.co/mrwz7J7K/165cbedbd96ae35c2489286c8db9777d.png", url = "https://discord.com/users/1075797587770228856"),
+        AboutTeamMember(id = "t9", name = "LucianRC", role = "Beta Tester", avatarUrl = "https://i.ibb.co/LXXWGJCt/e8cdcf2c32ee7056806c5a8bfa607830.png", url = "https://discord.com/users/420641532446769157"),
+        AboutTeamMember(id = "t10", name = "Alexx", role = "Beta Tester", avatarUrl = "https://i.ibb.co/8Dc1f67r/image.png", url = "https://discord.com/users/743896907184734268"),
+    )
+
+    // ==================== ANIMATIONS ====================
+    var isVisible by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100)
+        isVisible = true
+    }
+
+    // Helper to open URLs on desktop
+    val openUrl: (String) -> Unit = { url ->
+        try {
+            java.awt.Desktop.getDesktop().browse(java.net.URI(url.trim()))
+        } catch (_: Exception) { }
+    }
+
+    // ==================== UI ====================
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Top bar
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp),
-            tonalElevation = 4.dp,
+                .padding(bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
+            IconButton(onClick = onBack) {
                 Icon(
-                    imageVector = IconAssets.musicNote(),
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.primary,
+                    imageVector = IconAssets.arrowBack(),
+                    contentDescription = stringResource("about"),
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "AniTail",
-                    style = MaterialTheme.typography.headlineMedium,
+            }
+            Text(
+                text = stringResource("about"),
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.alpha(
+                    androidx.compose.animation.core.animateFloatAsState(
+                        targetValue = if (isVisible) 1f else 0f,
+                    ).value
+                ),
+            )
+        }
+
+        // Content
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            // ============ HEADER CARD ============
+            item(key = "header") {
+                AboutHeaderCard(buildInfo)
+            }
+
+            // ============ LINKS SECTION ============
+            item(key = "links") {
+                AboutSectionCard(
+                    title = stringResource("links_about"),
+                    icon = IconAssets.links(),
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    items = linkItems,
+                    onItemClick = openUrl,
                 )
-                Text(
-                    text = stringResource("desktop_edition"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+            }
+
+            // ============ DEVELOPER SECTION ============
+            item(key = "dev") {
+                AboutTeamGrid(
+                    title = stringResource("developer_about"),
+                    icon = IconAssets.person(),
+                    members = listOf(developer),
+                    onMemberClick = openUrl,
                 )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "v1.0.0-desktop",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+            }
+
+            // ============ BETA TESTERS SECTION ============
+            item(key = "testers") {
+                AboutTeamGrid(
+                    title = stringResource("beta_testers"),
+                    icon = IconAssets.person(),
+                    members = testers,
+                    onMemberClick = openUrl,
                 )
             }
         }
+    }
+}
 
-        SettingsInfoItem(
-            title = stringResource("about_version_title"),
-            value = "1.0.0-desktop",
+// ==================== PREMIUM COMPOSABLES ====================
+
+@Composable
+private fun AboutHeaderCard(buildInfo: AboutBuildInfo) {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMedium),
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp)
+            .scale(scale)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        isPressed = true
+                        tryAwaitRelease()
+                        isPressed = false
+                    },
+                )
+            },
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.1f),
+                            MaterialTheme.colorScheme.surface,
+                        ),
+                        start = Offset.Zero,
+                        end = Offset.Infinite,
+                    ),
+                ),
+        ) {
+            // Animated logo with pulse
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp),
+            ) {
+                val infiniteTransition = rememberInfiniteTransition("pulse")
+                val pulseScale by infiniteTransition.animateFloat(
+                    initialValue = 1f,
+                    targetValue = 1.05f,
+                    animationSpec = infiniteRepeatable<Float>(
+                        animation = tween(2000, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "pulse",
+                )
+
+                Surface(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .scale(pulseScale),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shadowElevation = 8.dp,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = IconAssets.icAni(),
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+
+                        // Shimmer overlay
+                        Surface(
+                            modifier = Modifier.matchParentSize(),
+                            shape = RoundedCornerShape(16.dp),
+                            color = Color.Transparent,
+                        ) {
+                            AboutShimmerOverlay()
+                        }
+                    }
+                }
+            }
+
+            // Build info
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                AboutBuildInfoRow(IconAssets.buildIcon(), "Build", buildInfo.buildType)
+                AboutBuildInfoRow(IconAssets.verified(), "Version", buildInfo.versionName)
+                AboutBuildInfoRow(IconAssets.devices(), "Device", buildInfo.deviceInfo)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutShimmerOverlay() {
+    val shimmerColors = listOf(
+        Color.White.copy(alpha = 0f),
+        Color.White.copy(alpha = 0.3f),
+        Color.White.copy(alpha = 0f),
+    )
+    val transition = rememberInfiniteTransition("shimmer")
+    val translate by transition.animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable<Float>(
+            tween(2000, easing = FastOutSlowInEasing),
+            RepeatMode.Restart,
+        ),
+        label = "shimmer",
+    )
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        drawRect(
+            brush = Brush.linearGradient(
+                colors = shimmerColors,
+                start = Offset(translate * size.width, 0f),
+                end = Offset(translate * size.width + size.width / 2, 0f),
+            ),
+            blendMode = BlendMode.Screen,
+        )
+    }
+}
+
+@Composable
+private fun AboutBuildInfoRow(icon: ImageVector, label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Icon(icon, contentDescription = label, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun AboutSectionCard(
+    title: String,
+    icon: ImageVector,
+    iconTint: Color,
+    items: List<AboutCardItem>,
+    onItemClick: (String) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Section header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 12.dp),
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = iconTint,
+                    modifier = Modifier.size(24.dp),
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+
+            // Link cards
+            items.forEach { item ->
+                AboutLinkCardItem(item.title, item.subtitle, item.icon, item.url, onItemClick)
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutLinkCardItem(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    url: String,
+    onItemClick: (String) -> Unit,
+) {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessHigh),
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .scale(scale)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        isPressed = true
+                        tryAwaitRelease()
+                        isPressed = false
+                    },
+                    onTap = { onItemClick(url) },
+                )
+            },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                modifier = Modifier.size(28.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                )
+            }
+            Icon(
+                imageVector = IconAssets.openInNew(),
+                contentDescription = "Open link",
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AboutTeamGrid(
+    title: String,
+    icon: ImageVector,
+    members: List<AboutTeamMember>,
+    onMemberClick: (String) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 16.dp),
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(24.dp),
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.width(8.dp))
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                ) {
+                    Text(
+                        text = "${members.size}",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                }
+            }
+
+            // Member grid — desktop uses 5 columns
+            val columns = 5
+            val rows = members.chunked(columns)
+            rows.forEach { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    row.forEach { member ->
+                        AboutTeamMemberCard(
+                            id = member.id,
+                            name = member.name,
+                            role = member.role,
+                            avatarUrl = member.avatarUrl,
+                            onClick = { onMemberClick(member.url) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    // Fill remaining columns with spacers
+                    repeat(columns - row.size) {
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutTeamMemberCard(
+    id: String,
+    name: String,
+    role: String,
+    avatarUrl: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isPressed) 0.9f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMedium),
+    )
+
+    Column(
+        modifier = modifier
+            .scale(scale)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        isPressed = true
+                        tryAwaitRelease()
+                        isPressed = false
+                    },
+                    onTap = { onClick() },
+                )
+            },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Surface(
+            shape = CircleShape,
+            shadowElevation = if (isPressed) 2.dp else 4.dp,
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Box(modifier = Modifier.size(64.dp)) {
+                if (avatarUrl != null) {
+                    RemoteImage(
+                        url = avatarUrl.trim(),
+                        contentDescription = name,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                        shape = CircleShape,
+                    )
+                } else {
+                    Icon(
+                        imageVector = IconAssets.person(),
+                        contentDescription = name,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer)
+                            .padding(16.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+
+                // Online indicator (for developer)
+                if (id == "dev") {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(16.dp)
+                            .background(MaterialTheme.colorScheme.surface, CircleShape)
+                            .padding(2.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.tertiary, CircleShape),
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            text = name,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
 
-        SettingsInfoItem(
-            title = stringResource("about_kotlin"),
-            value = "2.0+",
-        )
-
-        SettingsInfoItem(
-            title = stringResource("about_compose_desktop"),
-            value = "1.7.x",
-        )
-
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
-
-        SettingsButton(
-            title = stringResource("about_source_code"),
-            subtitle = stringResource("about_source_code_desc"),
-            onClick = { /* TODO: Open GitHub */ },
-        )
-
-        SettingsButton(
-            title = stringResource("about_licenses"),
-            subtitle = stringResource("about_licenses_desc"),
-            onClick = { /* TODO: Show licenses */ },
+        Text(
+            text = role,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
         )
     }
 }
