@@ -105,3 +105,54 @@ jobs:
         with:
           name: app-universal-debug
           path: app/build/outputs/apk/universal/debug/*.apk
+
+  desktop_debug:
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageAppImage
+            artifact_name: desktop-appimage-debug
+          - os: macos-latest
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageDmg
+            artifact_name: desktop-dmg-debug
+          - os: windows-latest
+            gradle_cmd: ./gradlew.bat
+            gradle_task: :desktop:packageMsi
+            artifact_name: desktop-msi-debug
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set Up Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-cleanup: on-success
+
+      - name: Grant execute permission for gradlew
+        if: runner.os != 'Windows'
+        run: chmod +x gradlew
+
+      - name: Build Desktop Debug Package
+        run: ${{ matrix.gradle_cmd }} ${{ matrix.gradle_task }}
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+
+      - name: Upload Desktop Debug Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: desktop/build/compose/binaries/**
+          if-no-files-found: error
