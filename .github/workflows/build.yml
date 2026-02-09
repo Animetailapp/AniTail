@@ -120,21 +120,31 @@ jobs:
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageReleaseDeb
             artifact_name: desktop-deb-release
+            java_arch: x64
           - os: ubuntu-latest
             label: Linux RPM
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageReleaseRpm
             artifact_name: desktop-rpm-release
+            java_arch: x64
           - os: macos-latest
             label: macOS DMG
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageReleaseDmg
             artifact_name: desktop-dmg-release
+            java_arch: aarch64
           - os: windows-latest
             label: Windows MSI
             gradle_cmd: ./gradlew.bat
             gradle_task: :desktop:packageReleaseMsi
             artifact_name: desktop-msi-release
+            java_arch: x64
+          - os: windows-11-arm
+            label: Windows ARM64 MSI
+            gradle_cmd: ./gradlew.bat
+            gradle_task: :desktop:packageReleaseMsi
+            artifact_name: desktop-msi-arm64-release
+            java_arch: aarch64
 
     steps:
       - uses: actions/checkout@v6
@@ -144,6 +154,7 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+          architecture: ${{ matrix.java_arch }}
 
       - name: Set Up Gradle
         uses: gradle/actions/setup-gradle@v5
