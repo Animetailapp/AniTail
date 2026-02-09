@@ -47,6 +47,7 @@ jobs:
           path: app/build/outputs/apk/universal/debug/*.apk
 
   desktop_release:
+    name: Desktop Release (${{ matrix.label }})
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -54,14 +55,17 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            label: Linux AppImage
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageAppImage
             artifact_name: desktop-appimage-release
           - os: macos-latest
+            label: macOS DMG
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageDmg
             artifact_name: desktop-dmg-release
           - os: windows-latest
+            label: Windows MSI
             gradle_cmd: ./gradlew.bat
             gradle_task: :desktop:packageMsi
             artifact_name: desktop-msi-release
