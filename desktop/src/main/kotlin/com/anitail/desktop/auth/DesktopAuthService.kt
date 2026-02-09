@@ -57,7 +57,7 @@ class DesktopAuthService(
             // Aplicar credenciales a YouTube API
             _credentials?.let { creds ->
                 YouTube.visitorData = creds.visitorData
-                YouTube.dataSyncId = creds.dataSyncId
+                YouTube.dataSyncId = normalizeDataSyncId(creds.dataSyncId)
                 YouTube.cookie = creds.cookie
             }
         }.onFailure {
@@ -73,7 +73,7 @@ class DesktopAuthService(
         
         // Aplicar credenciales a YouTube API
         YouTube.visitorData = credentials.visitorData
-        YouTube.dataSyncId = credentials.dataSyncId
+        YouTube.dataSyncId = normalizeDataSyncId(credentials.dataSyncId)
         YouTube.cookie = credentials.cookie
         
         ensureParent()

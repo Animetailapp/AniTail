@@ -22,7 +22,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import com.anitail.desktop.ui.IconAssets
 import com.anitail.shared.model.LibraryItem
 
 /**
@@ -44,12 +43,7 @@ fun ItemContextMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
     item: LibraryItem,
-    onPlay: () -> Unit,
-    onPlayNext: () -> Unit,
-    onAddToQueue: () -> Unit,
-    onAddToLibrary: () -> Unit,
-    onToggleFavorite: (() -> Unit)? = null,
-    isFavorite: Boolean = false,
+    actions: List<ContextMenuAction>,
     offset: DpOffset = DpOffset.Zero,
 ) {
     DropdownMenu(
@@ -63,72 +57,22 @@ fun ItemContextMenu(
         // Header con info del item
         ItemContextMenuHeader(item = item)
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-        // Opciones
-        ContextMenuItem(
-            label = "Reproducir",
-            icon = IconAssets.play(),
-            onClick = {
-                onPlay()
-                onDismiss()
-            },
-        )
-
-        ContextMenuItem(
-            label = "Reproducir siguiente",
-            icon = IconAssets.queueMusic(),
-            onClick = {
-                onPlayNext()
-                onDismiss()
-            },
-        )
-
-        ContextMenuItem(
-            label = "Agregar a la cola",
-            icon = IconAssets.playlistAdd(),
-            onClick = {
-                onAddToQueue()
-                onDismiss()
-            },
-        )
-
-        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-        ContextMenuItem(
-            label = "Agregar a biblioteca",
-            icon = IconAssets.add(),
-            onClick = {
-                onAddToLibrary()
-                onDismiss()
-            },
-        )
-
-        if (onToggleFavorite != null) {
-            ContextMenuItem(
-                label = if (isFavorite) "Quitar de favoritos" else "Agregar a favoritos",
-                icon = if (isFavorite) IconAssets.favorite() else IconAssets.favoriteBorder(),
-                onClick = {
-                    onToggleFavorite()
-                    onDismiss()
-                },
-            )
+        if (actions.isNotEmpty()) {
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            actions.forEach { action ->
+                ContextMenuItem(
+                    label = action.label,
+                    icon = action.icon,
+                    enabled = action.enabled,
+                    onClick = {
+                        if (action.enabled) {
+                            action.onClick()
+                            onDismiss()
+                        }
+                    },
+                )
+            }
         }
-
-        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-        ContextMenuItem(
-            label = "Compartir",
-            icon = IconAssets.share(),
-            onClick = {
-                // Copy URL to clipboard
-                val url = item.playbackUrl
-                java.awt.Toolkit.getDefaultToolkit()
-                    .systemClipboard
-                    .setContents(java.awt.datatransfer.StringSelection(url), null)
-                onDismiss()
-            },
-        )
     }
 }
 

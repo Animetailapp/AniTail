@@ -12,6 +12,7 @@ data class SimilarRecommendation(
     val thumbnailUrl: String?,
     val isArtist: Boolean,
     val items: List<YTItem>,
+    val sourceItem: LibraryItem? = null,
 )
 
 /**

@@ -46,13 +46,22 @@ import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.constants.MiniPlayerBottomSpacing
 import com.anitail.desktop.constants.MiniPlayerHeight
 import com.anitail.desktop.constants.NavigationBarHeight
+import com.anitail.desktop.auth.AccountInfo
 import com.anitail.desktop.auth.DesktopAuthService
+import com.anitail.desktop.auth.normalizeDataSyncId
 import com.anitail.desktop.home.HomeListenAlbum
 import com.anitail.desktop.home.HomeListenArtist
 import com.anitail.desktop.home.HomeListenSong
+import com.anitail.desktop.home.LocalItemType
+import com.anitail.desktop.home.ShuffleSource
+import com.anitail.desktop.home.buildAllYtItems
 import com.anitail.desktop.home.buildHomeRecommendations
+import com.anitail.desktop.home.resolveLocalItemType
+import com.anitail.desktop.home.selectShuffleSource
 import com.anitail.desktop.model.SimilarRecommendation
+import com.anitail.desktop.player.buildRadioQueuePlan
 import com.anitail.desktop.player.rememberPlayerState
+import com.anitail.desktop.sync.shouldStartSync
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.storage.QuickPicks
 import androidx.compose.ui.graphics.Color
@@ -95,6 +104,7 @@ import com.anitail.shared.model.SearchState
 import com.anitail.shared.repository.InnertubeMusicRepository
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -162,18 +172,53 @@ private fun AniTailDesktopApp() {
     val ytmSync by preferences.ytmSync.collectAsState()
     val syncService = remember { LibrarySyncService(database) }
     val isSyncing by syncService.isSyncing.collectAsState()
+    val lastSyncError by syncService.lastSyncError.collectAsState()
     var themeColor by remember { mutableStateOf(DefaultThemeColor) }
     var lastArtworkUrl by remember { mutableStateOf<String?>(null) }
 
     var currentScreen by remember { mutableStateOf(DesktopScreen.Home) }
     var authCredentials by remember { mutableStateOf(authService.credentials) }
+    var accountInfo by remember { mutableStateOf<AccountInfo?>(null) }
     var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
     var searchState by remember { mutableStateOf(SearchState()) }
     var searchActive by remember { mutableStateOf(false) }
+    var syncStatus by remember { mutableStateOf<String?>(null) }
+    var wasSyncing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(authCredentials?.cookie) {
+        accountInfo = authService.refreshAccountInfo()
+    }
+
+    LaunchedEffect(authCredentials?.visitorData, authCredentials?.cookie) {
+        if (authCredentials?.visitorData.isNullOrBlank() && authCredentials?.cookie?.isNotBlank() == true) {
+            authService.ensureVisitorData()
+            authCredentials = authService.credentials
+        }
+    }
+
+    LaunchedEffect(isSyncing, lastSyncError) {
+        if (isSyncing) {
+            wasSyncing = true
+            syncStatus = "Sincronizando..."
+            return@LaunchedEffect
+        }
+
+        if (wasSyncing) {
+            syncStatus = if (lastSyncError != null) {
+                "Error de sincronización"
+            } else {
+                "Sincronización completa"
+            }
+            delay(3000)
+            syncStatus = null
+            wasSyncing = false
+        }
+    }
 
     // Library state from Database
     val songs by database.songsInLibrary().collectAsState(initial = emptyList())
     val allSongs by database.songs.collectAsState(initial = emptyList())
+    val songsById = remember(allSongs) { allSongs.associateBy { it.id } }
     val albums by database.albums.collectAsState(initial = emptyList())
     val artists by database.artists.collectAsState(initial = emptyList())
     val playlists by database.allPlaylists().collectAsState(initial = emptyList())
@@ -193,6 +238,7 @@ private fun AniTailDesktopApp() {
     var selectedChip by remember { mutableStateOf<HomePage.Chip?>(null) }
     var previousHomePage by remember { mutableStateOf<HomePage?>(null) }
     var isHomeLoading by remember { mutableStateOf(false) }
+    var isHomeRefreshing by remember { mutableStateOf(false) }
     var isLoadingMore by remember { mutableStateOf(false) }
     var explorePage by remember { mutableStateOf<ExplorePage?>(null) }
     var chartsPage by remember { mutableStateOf<ChartsPage?>(null) }
@@ -337,8 +383,8 @@ private fun AniTailDesktopApp() {
         val credentials = authCredentials
         YouTube.cookie = credentials?.cookie ?: youtubeCookie
         YouTube.visitorData = credentials?.visitorData
-        YouTube.dataSyncId = credentials?.dataSyncId
-        YouTube.useLoginForBrowse = credentials?.dataSyncId?.isNotBlank() == true && useLoginForBrowse
+        YouTube.dataSyncId = normalizeDataSyncId(credentials?.dataSyncId)
+        YouTube.useLoginForBrowse = useLoginForBrowse
         YouTube.locale = com.anitail.innertube.models.YouTubeLocale(
             hl = contentLanguage,
             gl = contentCountry
@@ -358,8 +404,8 @@ private fun AniTailDesktopApp() {
         val credentials = authCredentials
         YouTube.cookie = credentials?.cookie ?: youtubeCookie
         YouTube.visitorData = credentials?.visitorData
-        YouTube.dataSyncId = credentials?.dataSyncId
-        YouTube.useLoginForBrowse = credentials?.dataSyncId?.isNotBlank() == true && useLoginForBrowse
+        YouTube.dataSyncId = normalizeDataSyncId(credentials?.dataSyncId)
+        YouTube.useLoginForBrowse = useLoginForBrowse
         YouTube.locale = com.anitail.innertube.models.YouTubeLocale(
             hl = contentLanguage,
             gl = contentCountry
@@ -379,15 +425,20 @@ private fun AniTailDesktopApp() {
             onCharts = { page -> chartsPage = page },
         )
         
-        // Trigger library sync if enabled
-        if (ytmSync && authCredentials?.cookie?.isNotBlank() == true) {
-            scope.launch {
-                syncService.syncAll()
-            }
-            scope.launch {
-                YouTube.library("FEmusic_liked_playlists").onSuccess { page ->
-                    accountPlaylists = page.items.filterIsInstance<PlaylistItem>()
-                }
+    }
+
+    // Trigger library sync when enabled and cookie available
+    LaunchedEffect(ytmSync, authCredentials?.cookie, youtubeCookie) {
+        val activeCookie = authCredentials?.cookie ?: youtubeCookie
+        if (!shouldStartSync(ytmSync, activeCookie)) return@LaunchedEffect
+
+        YouTube.cookie = activeCookie
+        scope.launch {
+            syncService.syncAll()
+        }
+        scope.launch {
+            YouTube.library("FEmusic_liked_playlists").onSuccess { page ->
+                accountPlaylists = page.items.filterIsInstance<PlaylistItem>()
             }
         }
     }
@@ -456,6 +507,16 @@ private fun AniTailDesktopApp() {
             val recommendations = mutableListOf<SimilarRecommendation>()
             
             sampledItems.forEach { item ->
+                val songEntity = songs.firstOrNull { it.id == item.id }
+                val albumEntity = songEntity?.albumId?.let { albumId ->
+                    albums.firstOrNull { it.id == albumId }
+                }
+                val artistEntity = songEntity?.artistId?.let { artistId ->
+                    artists.firstOrNull { it.id == artistId }
+                }
+                val titleItem = albumEntity?.toLibraryItem()
+                    ?: artistEntity?.toLibraryItem()
+                    ?: item
                 val videoId = extractVideoId(item.playbackUrl)
                 
                 if (videoId != null) {
@@ -466,10 +527,11 @@ private fun AniTailDesktopApp() {
                     if (relatedPage != null && relatedPage.songs.isNotEmpty()) {
                         recommendations.add(
                             SimilarRecommendation(
-                                title = item.title,
-                                thumbnailUrl = item.artworkUrl,
-                                isArtist = false,
+                                title = titleItem.title,
+                                thumbnailUrl = titleItem.artworkUrl,
+                                isArtist = resolveLocalItemType(titleItem) == LocalItemType.ARTIST,
                                 items = relatedPage.songs.take(8),
+                                sourceItem = titleItem,
                             )
                         )
                     }
@@ -480,11 +542,14 @@ private fun AniTailDesktopApp() {
                 val artistGroups = libraryItems.groupBy { it.artist }
                 artistGroups.entries.take(2).forEach { (artist, songs) ->
                     if (songs.size >= 2) {
+                        val artistEntity = artists.firstOrNull { it.name == artist }
+                        val titleItem = artistEntity?.toLibraryItem()
                         recommendations.add(
                             SimilarRecommendation(
-                                title = artist,
-                                thumbnailUrl = songs.firstOrNull()?.artworkUrl,
-                                isArtist = true,
+                                title = titleItem?.title ?: artist,
+                                thumbnailUrl = titleItem?.artworkUrl
+                                    ?: songs.firstOrNull()?.artworkUrl,
+                                isArtist = titleItem != null,
                                 items = songs.take(6).map { song ->
                                     SongItem(
                                         id = song.id,
@@ -494,6 +559,7 @@ private fun AniTailDesktopApp() {
                                         explicit = false,
                                     )
                                 },
+                                sourceItem = titleItem,
                             )
                         )
                     }
@@ -502,6 +568,50 @@ private fun AniTailDesktopApp() {
             
             similarRecommendations = recommendations.take(3)
         }
+    }
+
+    val allYtItems = remember(homePage, accountPlaylists, similarRecommendations) {
+        buildAllYtItems(
+            homePage = homePage,
+            accountPlaylists = accountPlaylists,
+            similarRecommendations = similarRecommendations,
+        )
+    }
+
+    val refreshHome: () -> Unit = refreshHome@{
+        if (isHomeRefreshing) return@refreshHome
+        scope.launch {
+            isHomeRefreshing = true
+            loadHomePage(
+                onLoading = { isHomeLoading = it },
+                onPage = { page -> homePage = page },
+            )
+            if (authCredentials?.cookie?.isNotBlank() == true) {
+                accountInfo = authService.refreshAccountInfo()
+                YouTube.library("FEmusic_liked_playlists").onSuccess { page ->
+                    accountPlaylists = page.items.filterIsInstance<PlaylistItem>()
+                }
+            }
+            isHomeRefreshing = false
+        }
+    }
+
+    val openArtist: (String, String?) -> Unit = { artistId, artistName ->
+        navigationHistory.add(DesktopScreen.Home)
+        detailNavigation = detailNavigation.copy(
+            artistId = artistId,
+            artistName = artistName,
+        )
+        currentScreen = DesktopScreen.ArtistDetail
+    }
+
+    val openAlbum: (String, String?) -> Unit = { albumId, albumName ->
+        navigationHistory.add(DesktopScreen.Home)
+        detailNavigation = detailNavigation.copy(
+            albumId = albumId,
+            albumName = albumName,
+        )
+        currentScreen = DesktopScreen.AlbumDetail
     }
 
     AnitailTheme(
@@ -551,6 +661,7 @@ private fun AniTailDesktopApp() {
                                 currentScreen = DesktopScreen.Settings
                             },
                             pureBlack = pureBlackEnabled,
+                            onRefreshHome = if (currentScreen == DesktopScreen.Home) refreshHome else null,
                         )
                     },
                     snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -568,6 +679,9 @@ private fun AniTailDesktopApp() {
                             homePage = homePage,
                             selectedChip = selectedChip,
                             isLoading = isHomeLoading,
+                            isRefreshing = isHomeRefreshing,
+                            syncStatus = syncStatus,
+                            isSyncing = isSyncing,
                             isLoadingMore = isLoadingMore,
                             quickPicks = quickPicks,
                             keepListening = keepListening,
@@ -575,6 +689,12 @@ private fun AniTailDesktopApp() {
                             accountPlaylists = accountPlaylists,
                             similarRecommendations = similarRecommendations,
                             playerState = playerState,
+                            accountName = accountInfo?.name ?: authCredentials?.accountName,
+                            accountThumbnailUrl = accountInfo?.thumbnailUrl,
+                            database = database,
+                            downloadService = downloadService,
+                            playlists = playlists,
+                            songsById = songsById,
                             onChipSelected = { chip ->
                                 scope.launch {
                                     handleChipSelection(
@@ -604,6 +724,9 @@ private fun AniTailDesktopApp() {
                                     isLoadingMore = false
                                 }
                             },
+                            onRefresh = refreshHome,
+                            onOpenArtist = openArtist,
+                            onOpenAlbum = openAlbum,
                             onNavigate = { route ->
                                 when (route) {
                                     "account" -> currentScreen = DesktopScreen.Library
@@ -615,6 +738,49 @@ private fun AniTailDesktopApp() {
                                             val id = route.removePrefix("browse/")
                                             // TODO: specific browse
                                         }
+                                    }
+                                }
+                            },
+                            onLocalItemSelected = { item ->
+                                when (resolveLocalItemType(item)) {
+                                    LocalItemType.SONG -> {
+                                        scope.launch {
+                                            val videoId = extractVideoId(item.playbackUrl) ?: return@launch
+                                            val result = YouTube.next(
+                                                WatchEndpoint(videoId = videoId)
+                                            ).getOrNull() ?: return@launch
+                                            val plan = buildRadioQueuePlan(item, result)
+                                            playerState.playQueue(plan.items, plan.startIndex)
+                                            playerBottomSheetState.collapseSoft()
+                                        }
+                                    }
+                                    LocalItemType.ALBUM -> {
+                                        navigationHistory.add(DesktopScreen.Home)
+                                        detailNavigation = detailNavigation.copy(
+                                            albumId = item.id,
+                                            albumName = item.title,
+                                        )
+                                        currentScreen = DesktopScreen.AlbumDetail
+                                    }
+                                    LocalItemType.ARTIST -> {
+                                        navigationHistory.add(DesktopScreen.Home)
+                                        detailNavigation = detailNavigation.copy(
+                                            artistId = item.id,
+                                            artistName = item.title,
+                                        )
+                                        currentScreen = DesktopScreen.ArtistDetail
+                                    }
+                                    LocalItemType.PLAYLIST -> {
+                                        navigationHistory.add(DesktopScreen.Home)
+                                        detailNavigation = detailNavigation.copy(
+                                            playlistId = item.id,
+                                            playlistName = item.title,
+                                        )
+                                        currentScreen = DesktopScreen.PlaylistDetail
+                                    }
+                                    LocalItemType.UNKNOWN -> {
+                                        playerState.play(item)
+                                        playerBottomSheetState.collapseSoft()
                                     }
                                 }
                             },
@@ -652,21 +818,95 @@ private fun AniTailDesktopApp() {
                                     }
                                 }
                             },
-                            onAddToLibrary = { item ->
-                                val songEntity = itemToLibraryItem(item)?.toSongEntity()
-                                if (songEntity != null) {
-                                    scope.launch {
-                                        database.insertSong(songEntity)
-                                    }
-                                }
-                            },
                             onShuffleAll = {
-                                val shuffled = quickPicks.shuffled()
-                                if (shuffled.isNotEmpty()) {
-                                    playerState.shuffleEnabled = true
-                                    playerState.play(shuffled.first())
-                                    shuffled.drop(1).forEach { playerState.addToQueue(it) }
-                                    playerBottomSheetState.collapseSoft()
+                                val source = selectShuffleSource(
+                                    localCount = libraryItems.size,
+                                    ytCount = allYtItems.size,
+                                    randomValue = kotlin.random.Random.nextFloat(),
+                                )
+                                if (source == ShuffleSource.NONE) return@HomeScreen
+
+                                scope.launch {
+                                    when (source) {
+                                        ShuffleSource.LOCAL -> {
+                                            val lucky = libraryItems.randomOrNull() ?: return@launch
+                                            when (resolveLocalItemType(lucky)) {
+                                                LocalItemType.SONG -> {
+                                                    val videoId = extractVideoId(lucky.playbackUrl) ?: return@launch
+                                                    val result = YouTube.next(
+                                                        WatchEndpoint(videoId = videoId)
+                                                    ).getOrNull() ?: return@launch
+                                                    val plan = buildRadioQueuePlan(lucky, result)
+                                                    playerState.playQueue(plan.items, plan.startIndex)
+                                                }
+                                                LocalItemType.ALBUM -> {
+                                                    val songsForAlbum = songs
+                                                        .filter { it.albumId == lucky.id }
+                                                        .map { it.toLibraryItem() }
+                                                    if (songsForAlbum.isNotEmpty()) {
+                                                        playerState.playQueue(songsForAlbum, startIndex = 0)
+                                                    }
+                                                }
+                                                LocalItemType.ARTIST -> {
+                                                    // Android no reproduce artistas desde shuffle local
+                                                }
+                                                LocalItemType.PLAYLIST -> {
+                                                    // Android no reproduce playlists desde shuffle local
+                                                }
+                                                LocalItemType.UNKNOWN -> {
+                                                    playerState.play(lucky)
+                                                }
+                                            }
+                                            playerBottomSheetState.collapseSoft()
+                                        }
+                                        ShuffleSource.YT -> {
+                                            val lucky = allYtItems.randomOrNull() ?: return@launch
+                                            when (lucky) {
+                                                is SongItem -> {
+                                                    val libraryItem = itemToLibraryItem(lucky) ?: return@launch
+                                                    val result = YouTube.next(
+                                                        WatchEndpoint(videoId = lucky.id)
+                                                    ).getOrNull() ?: return@launch
+                                                    val plan = buildRadioQueuePlan(libraryItem, result)
+                                                    playerState.playQueue(plan.items, plan.startIndex)
+                                                }
+                                                is AlbumItem -> {
+                                                    val page = YouTube.album(lucky.browseId).getOrNull() ?: return@launch
+                                                    val queue = page.songs.map { song ->
+                                                        song.toSongEntity().toLibraryItem()
+                                                    }
+                                                    if (queue.isNotEmpty()) {
+                                                        playerState.playQueue(queue, startIndex = 0)
+                                                    }
+                                                }
+                                                is PlaylistItem -> {
+                                                    val page = YouTube.playlist(lucky.id).getOrNull() ?: return@launch
+                                                    val queue = page.songs.map { song ->
+                                                        song.toSongEntity().toLibraryItem()
+                                                    }
+                                                    if (queue.isNotEmpty()) {
+                                                        playerState.playQueue(queue, startIndex = 0)
+                                                    }
+                                                }
+                                                is ArtistItem -> {
+                                                    val endpoint = lucky.radioEndpoint ?: return@launch
+                                                    val result = YouTube.next(endpoint).getOrNull() ?: return@launch
+                                                    val seed = LibraryItem(
+                                                        id = lucky.id,
+                                                        title = lucky.title,
+                                                        artist = lucky.title,
+                                                        artworkUrl = lucky.thumbnail,
+                                                        playbackUrl = lucky.shareLink,
+                                                    )
+                                                    val plan = buildRadioQueuePlan(seed, result)
+                                                    playerState.playQueue(plan.items, plan.startIndex)
+                                                }
+                                                else -> {}
+                                            }
+                                            playerBottomSheetState.collapseSoft()
+                                        }
+                                        ShuffleSource.NONE -> Unit
+                                    }
                                 }
                             },
                         )

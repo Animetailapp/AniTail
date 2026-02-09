@@ -35,6 +35,7 @@ fun DesktopTopBar(
     onSettings: () -> Unit,
     pureBlack: Boolean,
     showUpdateBadge: Boolean = false,
+    onRefreshHome: (() -> Unit)? = null,
 ) {
     val logoBitmap = remember { loadBitmapResource("drawable/ic_anitail.png") }
     TopAppBar(
@@ -56,6 +57,11 @@ fun DesktopTopBar(
             }
         },
         actions = {
+            if (onRefreshHome != null) {
+                IconButton(onClick = onRefreshHome) {
+                    Icon(IconAssets.refresh(), contentDescription = "Actualizar")
+                }
+            }
             IconButton(onClick = onHistory) {
                 Icon(IconAssets.history(), contentDescription = "Historial")
             }
