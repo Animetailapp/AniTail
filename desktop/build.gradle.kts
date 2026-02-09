@@ -24,7 +24,6 @@ dependencies {
 
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
-    implementation(compose.materialIconsExtended)
     implementation(libs.materialKolor)
     implementation(libs.compose.reorderable)
 
@@ -42,13 +41,10 @@ dependencies {
 
     implementation("org.openjfx:javafx-base:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-graphics:$javafxVersion:$javafxPlatform")
-    implementation("org.openjfx:javafx-controls:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-swing:$javafxVersion:$javafxPlatform")
-    implementation("org.openjfx:javafx-media:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-web:$javafxVersion:$javafxPlatform")
 
-    // New multiplatform player (VLC/Media3/AVPlayer)
-    implementation(libs.compose.multiplatform.media.player)
+    // VLC-based player
     implementation(libs.vlcj)
 
     testImplementation(kotlin("test"))
