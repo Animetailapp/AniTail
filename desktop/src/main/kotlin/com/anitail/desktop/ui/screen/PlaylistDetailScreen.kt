@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -70,6 +71,7 @@ fun PlaylistDetailScreen(
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
+    val topBarHeight = 56.dp
     val lazyListState = rememberLazyListState()
     val showTopBarTitle by remember {
         derivedStateOf { lazyListState.firstVisibleItemIndex > 0 }
@@ -103,6 +105,7 @@ fun PlaylistDetailScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = lazyListState,
+            contentPadding = PaddingValues(top = topBarHeight),
             modifier = Modifier.fillMaxSize(),
         ) {
             playlistPage?.let { page ->
@@ -297,8 +300,9 @@ fun PlaylistDetailScreen(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
+                .height(topBarHeight)
                 .background(MaterialTheme.colorScheme.surface)
-                .padding(8.dp)
+                .padding(horizontal = 8.dp)
         ) {
             IconButton(
                 onClick = {

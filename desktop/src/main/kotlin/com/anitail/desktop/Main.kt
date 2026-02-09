@@ -82,12 +82,13 @@ import com.anitail.desktop.ui.component.MiniPlayer
 import com.anitail.desktop.ui.component.rememberBottomSheetState
 import com.anitail.desktop.ui.screen.AlbumDetailScreen
 import com.anitail.desktop.ui.screen.ArtistDetailScreen
+import com.anitail.desktop.ui.screen.ArtistItemsScreen
 import com.anitail.desktop.ui.screen.ChartsScreen
 import com.anitail.desktop.ui.screen.ExploreScreen
 import com.anitail.desktop.ui.screen.BrowseScreen
 import com.anitail.desktop.ui.screen.HistoryScreen
 import com.anitail.desktop.ui.screen.HomeScreen
-import com.anitail.desktop.ui.screen.LibraryScreenEnhanced
+import com.anitail.desktop.ui.screen.library.LibraryScreen
 import com.anitail.desktop.ui.screen.MoodAndGenresScreen
 import com.anitail.desktop.ui.screen.NewReleaseScreen
 import com.anitail.desktop.ui.screen.PlayerScreen
@@ -137,6 +138,7 @@ private enum class DesktopScreen {
     Stats,
     Settings,
     ArtistDetail,
+    ArtistItems,
     AlbumDetail,
     PlaylistDetail,
     Search,
@@ -1359,14 +1361,12 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     }
 
                 DesktopScreen.Library -> {
-                    LibraryScreenEnhanced(
-                        items = libraryItems,
+                    LibraryScreen(
+                        database = database,
+                        downloadService = downloadService,
+                        preferences = preferences,
                         playerState = playerState,
-                        onPlayItem = { item ->
-                            playerState.play(item)
-                            playerBottomSheetState.collapseSoft()
-                        },
-                        onArtistClick = { artistId, artistName ->
+                        onOpenArtist = { artistId, artistName ->
                             navigationHistory.add(DesktopScreen.Library)
                             detailNavigation = detailNavigation.copy(
                                 artistId = artistId,
@@ -1374,7 +1374,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             )
                             currentScreen = DesktopScreen.ArtistDetail
                         },
-                        onAlbumClick = { albumId, albumName ->
+                        onOpenAlbum = { albumId, albumName ->
                             navigationHistory.add(DesktopScreen.Library)
                             detailNavigation = detailNavigation.copy(
                                 albumId = albumId,
@@ -1382,7 +1382,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             )
                             currentScreen = DesktopScreen.AlbumDetail
                         },
-                        onPlaylistClick = { playlistId, playlistName ->
+                        onOpenPlaylist = { playlistId, playlistName ->
                             navigationHistory.add(DesktopScreen.Library)
                             detailNavigation = detailNavigation.copy(
                                 playlistId = playlistId,
@@ -1399,7 +1399,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                     )
                                 )
                             }
-                        }
+                        },
                     )
                 }
 
@@ -1528,8 +1528,20 @@ private fun FrameWindowScope.AniTailDesktopApp(
                         artistId = detailNavigation.artistId.orEmpty(),
                         artistName = detailNavigation.artistName.orEmpty(),
                         playerState = playerState,
+                        database = database,
+                        downloadService = downloadService,
+                        playlists = playlists,
+                        songsById = songsById,
                         onBack = {
                             currentScreen = navigationHistory.removeLastOrNull() ?: DesktopScreen.Home
+                        },
+                        onBrowse = { browseId, params ->
+                            navigationHistory.add(DesktopScreen.ArtistDetail)
+                            detailNavigation = detailNavigation.copy(
+                                browseId = browseId,
+                                browseParams = params,
+                            )
+                            currentScreen = DesktopScreen.ArtistItems
                         },
                         onAlbumClick = { albumId, albumName ->
                             navigationHistory.add(DesktopScreen.ArtistDetail)
@@ -1558,6 +1570,46 @@ private fun FrameWindowScope.AniTailDesktopApp(
                         onSongClick = { item ->
                             playerState.play(item)
                             playerBottomSheetState.collapseSoft()
+                        },
+                    )
+                }
+
+                DesktopScreen.ArtistItems -> {
+                    ArtistItemsScreen(
+                        browseId = detailNavigation.browseId.orEmpty(),
+                        browseParams = detailNavigation.browseParams,
+                        hideExplicit = hideExplicit,
+                        playerState = playerState,
+                        database = database,
+                        downloadService = downloadService,
+                        playlists = playlists,
+                        songsById = songsById,
+                        onOpenArtist = { artistId, artistName ->
+                            navigationHistory.add(DesktopScreen.ArtistItems)
+                            detailNavigation = detailNavigation.copy(
+                                artistId = artistId,
+                                artistName = artistName,
+                            )
+                            currentScreen = DesktopScreen.ArtistDetail
+                        },
+                        onOpenAlbum = { albumId, albumName ->
+                            navigationHistory.add(DesktopScreen.ArtistItems)
+                            detailNavigation = detailNavigation.copy(
+                                albumId = albumId,
+                                albumName = albumName,
+                            )
+                            currentScreen = DesktopScreen.AlbumDetail
+                        },
+                        onOpenPlaylist = { playlistId, playlistName ->
+                            navigationHistory.add(DesktopScreen.ArtistItems)
+                            detailNavigation = detailNavigation.copy(
+                                playlistId = playlistId,
+                                playlistName = playlistName,
+                            )
+                            currentScreen = DesktopScreen.PlaylistDetail
+                        },
+                        onBack = {
+                            currentScreen = navigationHistory.removeLastOrNull() ?: DesktopScreen.Home
                         },
                     )
                 }

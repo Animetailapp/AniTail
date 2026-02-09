@@ -1,7 +1,9 @@
 package com.anitail.desktop.ui.screen
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,10 +30,12 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,18 +50,37 @@ import androidx.compose.ui.unit.dp
 import com.anitail.desktop.ui.IconAssets
 import androidx.compose.ui.unit.sp
 import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.player.buildRadioQueuePlan
+import com.anitail.desktop.db.DesktopDatabase
+import com.anitail.desktop.db.entities.ArtistEntity
+import com.anitail.desktop.db.entities.PlaylistEntity
+import com.anitail.desktop.db.entities.SongEntity
+import com.anitail.desktop.db.mapper.toSongEntity
+import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.component.ArtistPickerDialog
+import com.anitail.desktop.ui.component.ContextMenuAction
+import com.anitail.desktop.ui.component.ItemContextMenu
+import com.anitail.desktop.ui.component.MediaDetailsDialog
 import com.anitail.desktop.ui.component.NavigationTitle
+import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.component.ShimmerBox
 import com.anitail.desktop.ui.component.ShimmerListItem
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.AlbumItem
+import com.anitail.innertube.models.Artist
 import com.anitail.innertube.models.ArtistItem
 import com.anitail.innertube.models.PlaylistItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.YTItem
 import com.anitail.innertube.pages.ArtistPage
 import com.anitail.shared.model.LibraryItem
+import java.awt.Desktop
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
+import java.net.URI
+import java.time.LocalDateTime
+import kotlinx.coroutines.launch
 
 /**
  * Pantalla de detalle de artista para Desktop - Idéntica a Android.
@@ -67,7 +90,12 @@ fun ArtistDetailScreen(
     artistId: String,
     artistName: String,
     playerState: PlayerState,
+    database: DesktopDatabase,
+    downloadService: DesktopDownloadService,
+    playlists: List<PlaylistEntity>,
+    songsById: Map<String, SongEntity>,
     onBack: () -> Unit,
+    onBrowse: (String, String?) -> Unit,
     onAlbumClick: (String, String) -> Unit,
     onArtistClick: (String, String) -> Unit,
     onPlaylistClick: (String, String) -> Unit,
@@ -76,7 +104,14 @@ fun ArtistDetailScreen(
     var artistPage by remember { mutableStateOf<ArtistPage?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
-    var isSubscribed by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val artistEntity by database.artist(artistId).collectAsState(initial = null)
+    val isSubscribed = artistEntity?.bookmarkedAt != null
+    val downloadedSongs by downloadService.downloadedSongs.collectAsState()
+    val downloadStates by downloadService.downloadStates.collectAsState()
+    var pendingPlaylistItem by remember { mutableStateOf<BrowseSongTarget?>(null) }
+    var pendingArtists by remember { mutableStateOf<List<Artist>>(emptyList()) }
+    var detailsItem by remember { mutableStateOf<LibraryItem?>(null) }
 
     val lazyListState = rememberLazyListState()
     val transparentAppBar by remember {
@@ -92,6 +127,22 @@ fun ArtistDetailScreen(
             error = e.message ?: "Error al cargar artista"
         }
         isLoading = false
+    }
+
+    fun copyToClipboard(text: String) {
+        Toolkit.getDefaultToolkit()
+            .systemClipboard
+            .setContents(StringSelection(text), null)
+    }
+
+    fun openInBrowser(url: String) {
+        runCatching { Desktop.getDesktop().browse(URI(url)) }
+    }
+
+    suspend fun ensureSongInDatabase(target: BrowseSongTarget) {
+        if (songsById.containsKey(target.item.id)) return
+        val entity = target.songItem?.toSongEntity(inLibrary = true) ?: target.item.toSongEntity()
+        database.insertSong(entity)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -150,7 +201,23 @@ fun ArtistDetailScreen(
                                 ) {
                                     // Botón Subscribe
                                     OutlinedButton(
-                                        onClick = { isSubscribed = !isSubscribed },
+                                        onClick = {
+                                            scope.launch {
+                                                if (artistEntity == null) {
+                                                    database.insertArtist(
+                                                        ArtistEntity(
+                                                            id = artistId,
+                                                            name = artistPage?.artist?.title ?: artistName,
+                                                            thumbnailUrl = artistPage?.artist?.thumbnail,
+                                                            channelId = null,
+                                                            bookmarkedAt = LocalDateTime.now(),
+                                                        ),
+                                                    )
+                                                } else {
+                                                    database.toggleArtistBookmark(artistId)
+                                                }
+                                            }
+                                        },
                                         colors = ButtonDefaults.outlinedButtonColors(
                                             containerColor = if (isSubscribed)
                                                 MaterialTheme.colorScheme.surface
@@ -180,7 +247,13 @@ fun ArtistDetailScreen(
                                         page.artist.radioEndpoint?.let {
                                             OutlinedButton(
                                                 onClick = {
-                                                    // TODO: Implementar radio
+                                                    val endpoint = page.artist.radioEndpoint ?: return@OutlinedButton
+                                                    scope.launch {
+                                                        val result = YouTube.next(endpoint).getOrNull() ?: return@launch
+                                                        val seedSong = result.items.firstOrNull() ?: return@launch
+                                                        val plan = buildRadioQueuePlan(songItemToLibraryItem(seedSong), result)
+                                                        playerState.playQueue(plan.items, plan.startIndex)
+                                                    }
                                                 },
                                                 shape = RoundedCornerShape(50),
                                                 modifier = Modifier.height(40.dp)
@@ -202,16 +275,14 @@ fun ArtistDetailScreen(
                                         page.artist.shuffleEndpoint?.let {
                                             IconButton(
                                                 onClick = {
-                                                    val allSongs = page.sections
-                                                        .flatMap { it.items }
-                                                        .filterIsInstance<SongItem>()
-                                                        .shuffled()
-                                                    if (allSongs.isNotEmpty()) {
-                                                        playerState.shuffleEnabled = true
-                                                        playerState.playQueue(
-                                                            allSongs.map { songItemToLibraryItem(it) },
-                                                            0
-                                                        )
+                                                    val endpoint = page.artist.shuffleEndpoint ?: return@IconButton
+                                                    scope.launch {
+                                                        val result = YouTube.next(endpoint).getOrNull() ?: return@launch
+                                                        val items = result.items.map { songItemToLibraryItem(it) }
+                                                        if (items.isNotEmpty()) {
+                                                            playerState.shuffleEnabled = true
+                                                            playerState.playQueue(items, startIndex = 0)
+                                                        }
                                                     }
                                                 },
                                                 modifier = Modifier
@@ -243,7 +314,9 @@ fun ArtistDetailScreen(
                             item(key = "section_title_${section.title}") {
                                 NavigationTitle(
                                     title = section.title,
-                                    onClick = section.moreEndpoint?.let { { /* Navigate to more */ } }
+                                    onClick = section.moreEndpoint?.let { endpoint ->
+                                        { onBrowse(endpoint.browseId, endpoint.params) }
+                                    }
                                 )
                             }
 
@@ -254,12 +327,56 @@ fun ArtistDetailScreen(
                                     items = section.items.filterIsInstance<SongItem>(),
                                     key = { "song_${it.id}" }
                                 ) { song ->
+                                    val libraryItem = songItemToLibraryItem(song)
+                                    val songEntity = songsById[song.id]
+                                    val menuActions = buildBrowseSongMenuActions(
+                                        libraryItem = libraryItem,
+                                        songItem = song,
+                                        songsById = songsById,
+                                        downloadStates = downloadStates,
+                                        downloadedSongs = downloadedSongs,
+                                        database = database,
+                                        downloadService = downloadService,
+                                        playerState = playerState,
+                                        coroutineScope = scope,
+                                        onOpenArtist = { id, name -> onArtistClick(id, name ?: "") },
+                                        onOpenAlbum = { id, name -> onAlbumClick(id, name ?: "") },
+                                        onRequestPlaylist = { pendingPlaylistItem = it },
+                                        onRequestArtists = { pendingArtists = it },
+                                        onShowDetails = { detailsItem = it },
+                                        copyToClipboard = ::copyToClipboard,
+                                    )
                                     YouTubeListItem(
                                         item = song,
+                                        libraryItem = libraryItem,
                                         isActive = playerState.currentItem?.id == song.id,
                                         isPlaying = playerState.isPlaying,
-                                        onClick = { onSongClick(songItemToLibraryItem(song)) },
-                                        onMoreClick = { /* TODO: Menu */ }
+                                        menuActions = menuActions,
+                                        menuHeader = { onDismiss ->
+                                            SongMenuHeader(
+                                                title = song.title,
+                                                subtitle = joinByBullet(
+                                                    song.artists.joinToString { it.name },
+                                                    song.duration?.let { formatTime(it * 1000L) },
+                                                ).orEmpty(),
+                                                thumbnailUrl = song.thumbnail,
+                                                isLiked = songEntity?.liked == true,
+                                                onToggleLike = {
+                                                    scope.launch {
+                                                        if (songEntity == null) {
+                                                            database.insertSong(song.toSongEntity(inLibrary = true).toggleLike())
+                                                        } else {
+                                                            database.toggleSongLike(song.id)
+                                                        }
+                                                    }
+                                                },
+                                                onPlayNext = { playerState.addToQueue(libraryItem, playNext = true) },
+                                                onAddToPlaylist = { pendingPlaylistItem = BrowseSongTarget(libraryItem, song) },
+                                                onShare = { copyToClipboard(song.shareLink) },
+                                                onDismiss = onDismiss,
+                                            )
+                                        },
+                                        onClick = { onSongClick(libraryItem) },
                                     )
                                 }
                             } else {
@@ -336,6 +453,51 @@ fun ArtistDetailScreen(
             }
         }
     }
+
+    pendingPlaylistItem?.let { target ->
+        PlaylistPickerDialog(
+            visible = true,
+            playlists = playlists,
+            onCreatePlaylist = { name ->
+                val playlist = PlaylistEntity(name = name)
+                scope.launch {
+                    database.insertPlaylist(playlist)
+                    ensureSongInDatabase(target)
+                    database.addSongToPlaylist(playlist.id, target.item.id)
+                }
+                pendingPlaylistItem = null
+            },
+            onSelectPlaylist = { playlist ->
+                scope.launch {
+                    ensureSongInDatabase(target)
+                    database.addSongToPlaylist(playlist.id, target.item.id)
+                }
+                pendingPlaylistItem = null
+            },
+            onDismiss = { pendingPlaylistItem = null },
+        )
+    }
+
+    ArtistPickerDialog(
+        visible = pendingArtists.isNotEmpty(),
+        artists = pendingArtists,
+        onSelect = selectArtist@{ artist ->
+            val artistId = artist.id ?: return@selectArtist
+            onArtistClick(artistId, artist.name)
+            pendingArtists = emptyList()
+        },
+        onDismiss = { pendingArtists = emptyList() },
+    )
+
+    detailsItem?.let { item ->
+        MediaDetailsDialog(
+            visible = true,
+            item = item,
+            onCopyLink = { copyToClipboard(item.playbackUrl) },
+            onOpenInBrowser = { openInBrowser(item.playbackUrl) },
+            onDismiss = { detailsItem = null },
+        )
+    }
 }
 
 // Extensión para fading edge como en Android
@@ -348,6 +510,15 @@ private fun Modifier.fadingEdge(bottom: androidx.compose.ui.unit.Dp) = this.draw
             endY = size.height
         )
     )
+}
+
+private fun joinByBullet(left: String?, right: String?): String? {
+    return when {
+        left.isNullOrBlank() && right.isNullOrBlank() -> null
+        left.isNullOrBlank() -> right
+        right.isNullOrBlank() -> left
+        else -> "$left • $right"
+    }
 }
 
 @Composable
@@ -411,19 +582,30 @@ private fun ArtistShimmerPlaceholder() {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun YouTubeListItem(
     item: SongItem,
+    libraryItem: LibraryItem,
     isActive: Boolean,
     isPlaying: Boolean,
+    menuActions: List<ContextMenuAction>,
+    menuHeader: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     onClick: () -> Unit,
-    onMoreClick: () -> Unit,
 ) {
+    val menuExpanded = remember(item.id) { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    if (menuActions.isNotEmpty()) {
+                        menuExpanded.value = true
+                    }
+                },
+            )
             .background(
                 if (isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                 else Color.Transparent
@@ -482,14 +664,34 @@ private fun YouTubeListItem(
             }
         }
 
-        IconButton(onClick = onMoreClick) {
-            Icon(
-                IconAssets.moreVert(),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Box {
+            IconButton(
+                onClick = {
+                    if (menuActions.isNotEmpty()) {
+                        menuExpanded.value = true
+                    }
+                },
+            ) {
+                Icon(
+                    IconAssets.moreVert(),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (menuActions.isNotEmpty()) {
+                ItemContextMenu(
+                    expanded = menuExpanded.value,
+                    onDismiss = { menuExpanded.value = false },
+                    item = libraryItem,
+                    actions = menuActions,
+                    headerContent = menuHeader?.let { header ->
+                        { header { menuExpanded.value = false } }
+                    },
+                )
+            }
         }
     }
+
 }
 
 @Composable

@@ -45,16 +45,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.anitail.desktop.ui.IconAssets
+import com.anitail.desktop.db.DesktopDatabase
+import com.anitail.desktop.db.entities.ArtistEntity
+import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.storage.DesktopPreferences
+import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.screen.library.LibraryArtistsScreen
 import com.anitail.shared.model.LibraryItem
 
 /**
  * Filtros para la biblioteca - replica Android LibraryFilter
  */
 enum class LibraryFilterType(val label: String) {
-    TODOS("Todo"),
+    MIXES("Mixes"),
     PLAYLISTS("Playlists"),
     CANCIONES("Canciones"),
     ALBUMES("Álbumes"),
@@ -80,14 +85,18 @@ data class SpecialPlaylist(
 @Composable
 fun LibraryScreenEnhanced(
     items: List<LibraryItem>,
+    artists: List<ArtistEntity>,
+    songs: List<SongEntity>,
     playerState: PlayerState,
+    preferences: DesktopPreferences,
+    database: DesktopDatabase,
     onPlayItem: (LibraryItem) -> Unit,
     onArtistClick: (String, String) -> Unit,
     onAlbumClick: (String, String) -> Unit,
     onPlaylistClick: (String, String) -> Unit,
     onCreatePlaylist: (String) -> Unit = {},
 ) {
-    var currentFilter by remember { mutableStateOf(LibraryFilterType.TODOS) }
+    var currentFilter by remember { mutableStateOf(LibraryFilterType.MIXES) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
 
@@ -119,17 +128,20 @@ fun LibraryScreenEnhanced(
     }
 
     // Categorizar items
-    val playlists = remember(items) {
-        items.filter { it.playbackUrl.contains("playlist?list=") || it.playbackUrl.contains("/playlist/") }
+    val filteredItems = remember(items) {
+        items.filterNot { isCachedPlaylistItem(it) }
     }
-    val artists = remember(items) {
-        items.filter { it.playbackUrl.contains("/channel/") || it.playbackUrl.contains("/artist/") }
+    val libraryPlaylists = remember(filteredItems) {
+        filteredItems.filter { isPlaylistItem(it) }
     }
-    val songs = remember(items) {
-        items.filterNot { it in playlists || it in artists }
+    val libraryArtists = remember(filteredItems) {
+        filteredItems.filter { it.playbackUrl.contains("/channel/") || it.playbackUrl.contains("/artist/") }
     }
-    val albums = remember(items) {
-        items.filter { it.playbackUrl.contains("/album/") }
+    val librarySongs = remember(filteredItems) {
+        filteredItems.filterNot { it in libraryPlaylists || it in libraryArtists }
+    }
+    val libraryAlbums = remember(filteredItems) {
+        filteredItems.filter { it.playbackUrl.contains("/album/") }
     }
 
     // Dialogo crear playlist
@@ -177,6 +189,7 @@ fun LibraryScreenEnhanced(
         NavigationTitle(title = "Biblioteca")
         ChipsRow(
             chips = listOf(
+                LibraryFilterType.MIXES to "Mixes",
                 LibraryFilterType.PLAYLISTS to "Playlists",
                 LibraryFilterType.CANCIONES to "Canciones",
                 LibraryFilterType.ALBUMES to "Álbumes",
@@ -185,7 +198,7 @@ fun LibraryScreenEnhanced(
             ),
             currentValue = currentFilter,
             onValueUpdate = { filter ->
-                currentFilter = if (currentFilter == filter) LibraryFilterType.TODOS else filter
+                currentFilter = filter
             },
         )
 
@@ -193,12 +206,12 @@ fun LibraryScreenEnhanced(
 
         // Contenido según filtro
         when (currentFilter) {
-            LibraryFilterType.TODOS -> LibraryMixContent(
+            LibraryFilterType.MIXES -> LibraryMixContent(
                 specialPlaylists = specialPlaylists,
-                playlists = playlists,
-                artists = artists,
-                songs = songs,
-                albums = albums,
+                playlists = libraryPlaylists,
+                artists = libraryArtists,
+                songs = librarySongs,
+                albums = libraryAlbums,
                 onPlayItem = onPlayItem,
                 onArtistClick = onArtistClick,
                 onAlbumClick = onAlbumClick,
@@ -209,24 +222,29 @@ fun LibraryScreenEnhanced(
             
             LibraryFilterType.PLAYLISTS -> LibraryPlaylistsContent(
                 specialPlaylists = specialPlaylists,
-                playlists = playlists,
+                playlists = libraryPlaylists,
                 onPlaylistClick = onPlaylistClick,
                 onSpecialPlaylistClick = { /* TODO */ },
                 onCreatePlaylist = { showCreatePlaylistDialog = true },
             )
             
             LibraryFilterType.CANCIONES -> LibrarySongsContent(
-                songs = songs,
+                songs = librarySongs,
                 onPlayItem = onPlayItem,
             )
             
             LibraryFilterType.ALBUMES -> LibraryAlbumsContent(
-                albums = albums,
+                albums = libraryAlbums,
                 onAlbumClick = onAlbumClick,
             )
             
-            LibraryFilterType.ARTISTAS -> LibraryArtistsContent(
+            LibraryFilterType.ARTISTAS -> LibraryArtistsScreen(
                 artists = artists,
+                songs = songs,
+                playerState = playerState,
+                preferences = preferences,
+                database = database,
+                onDeselect = { currentFilter = LibraryFilterType.MIXES },
                 onArtistClick = onArtistClick,
             )
             
@@ -500,40 +518,6 @@ private fun LibraryAlbumsContent(
                     onClick = {
                         val id = extractIdFromUrl(album.playbackUrl, "album")
                         onAlbumClick(id, album.title)
-                    },
-                )
-            }
-        }
-    }
-}
-
-/**
- * Contenido para pestaña Artistas
- */
-@Composable
-private fun LibraryArtistsContent(
-    artists: List<LibraryItem>,
-    onArtistClick: (String, String) -> Unit,
-) {
-    if (artists.isEmpty()) {
-        EmptyStateMessage(
-            icon = IconAssets.person(),
-            title = "No hay artistas",
-            subtitle = "Los artistas que sigas aparecerán aquí",
-        )
-    } else {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 140.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            items(artists) { artist ->
-                ArtistGridItem(
-                    item = artist,
-                    onClick = {
-                        val id = extractIdFromUrl(artist.playbackUrl, "channel")
-                        onArtistClick(id, artist.title)
                     },
                 )
             }
@@ -909,4 +893,18 @@ private fun extractIdFromUrl(url: String, type: String): String {
         }
         else -> url
     }
+}
+
+private fun isPlaylistItem(item: LibraryItem): Boolean {
+    val url = item.playbackUrl
+    return url.contains("playlist?list=") || url.contains("/playlist/")
+}
+
+private fun isCachedPlaylistItem(item: LibraryItem): Boolean {
+    return isPlaylistItem(item) && isCachedPlaylist(item.title)
+}
+
+private fun isCachedPlaylist(name: String): Boolean {
+    val normalized = name.trim().lowercase()
+    return normalized == "en caché" || normalized == "en cache"
 }
