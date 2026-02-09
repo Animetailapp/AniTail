@@ -54,13 +54,10 @@ dependencies {
 configurations.all {
     resolutionStrategy {
         // Force CM version to match plugin to avoid Skiko UnsatisfiedLinkError
-        force("org.jetbrains.compose.runtime:runtime:1.7.3")
-        force("org.jetbrains.compose.ui:ui:1.7.3")
-        force("org.jetbrains.compose.foundation:foundation:1.7.3")
-        force("org.jetbrains.compose.material3:material3:1.7.3")
-        // Skiko version alignment (matching CM 1.7.3)
-        force("org.jetbrains.skiko:skiko:0.8.18")
-        force("org.jetbrains.skiko:skiko-jvm:0.8.18")
+        force("org.jetbrains.compose.runtime:runtime:1.9.3")
+        force("org.jetbrains.compose.ui:ui:1.9.3")
+        force("org.jetbrains.compose.foundation:foundation:1.9.3")
+        force("org.jetbrains.compose.material3:material3:1.9.0")
     }
 }
 
