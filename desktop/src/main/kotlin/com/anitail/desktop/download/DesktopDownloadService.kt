@@ -2,6 +2,11 @@ package com.anitail.desktop.download
 
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.YouTubeClient
+import com.anitail.innertube.pages.NewPipeUtils
+import com.anitail.desktop.player.PipedResolver
+import com.anitail.desktop.player.StreamClientOrder
+import com.anitail.desktop.storage.AudioQuality
+import com.anitail.desktop.storage.DesktopPreferences
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
@@ -19,6 +24,8 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.RandomAccessFile
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 
 /**
  * Estado de una descarga individual.
@@ -90,6 +97,7 @@ class DesktopDownloadService {
             requestTimeout = 0 // Sin timeout para descargas largas
         }
     }
+    private val preferences = DesktopPreferences.getInstance()
     
     // Estados de descargas activas
     private val _downloadStates = MutableStateFlow<Map<String, DownloadState>>(emptyMap())
@@ -213,31 +221,21 @@ class DesktopDownloadService {
             _downloadStates.value[songId]?.copy(status = DownloadStatus.DOWNLOADING) ?: return
         )
         
-        // Obtener stream URL
-        val playerResponse = YouTube.player(
-            videoId = songId,
-            playlistId = null,
-            client = YouTubeClient.WEB_REMIX,
-        ).getOrNull()
-            ?: throw Exception("No se pudo obtener información del stream")
-        
-        val streamingData = playerResponse.streamingData
-            ?: throw Exception("No hay datos de streaming disponibles")
-        
-        // Encontrar el mejor formato de audio
-        val audioFormat = streamingData.adaptiveFormats
-            .filter { it.mimeType.startsWith("audio/") }
-            .maxByOrNull { it.bitrate }
-            ?: throw Exception("No se encontró formato de audio")
-        
-        // Obtener URL del stream (usar URL directa si está disponible)
-        val streamUrl = audioFormat.url
-            ?: throw Exception("No se pudo obtener URL del stream")
-        
-        val totalBytes = audioFormat.contentLength ?: 0L
+        // Obtener stream URL con fallback entre clientes
+        val resolvedStream = resolveStreamForDownload(songId)
+        val streamUrl = resolvedStream?.url
+            ?: PipedResolver.resolveAudioUrl(songId)?.also {
+                println("DesktopDownloadService: Using Piped fallback for songId=$songId")
+            }
+        if (streamUrl == null) {
+            throw Exception("No se pudo obtener URL del stream")
+        }
+
+        val resolvedFormat = resolvedStream?.format ?: resolveBestAudioFormatFromRemix(songId)
+        val totalBytes = resolvedFormat?.contentLength ?: 0L
         val extension = when {
-            audioFormat.mimeType.contains("webm") -> "webm"
-            audioFormat.mimeType.contains("mp4") -> "m4a"
+            resolvedFormat?.mimeType?.contains("webm") == true -> "webm"
+            resolvedFormat?.mimeType?.contains("mp4") == true -> "m4a"
             else -> "opus"
         }
         
@@ -246,6 +244,7 @@ class DesktopDownloadService {
         val safeArtist = artist.replace(Regex("[\\\\/:*?\"<>|]"), "_")
         val fileName = "${safeArtist} - ${safeTitle} [$songId].$extension"
         val outputFile = File(downloadDir, fileName)
+        val downloadAsMp3 = preferences.downloadAsMp3.value
         
         updateDownloadState(
             _downloadStates.value[songId]?.copy(
@@ -283,6 +282,27 @@ class DesktopDownloadService {
             }
         }
         
+        val finalFile = if (downloadAsMp3) {
+            val targetBitrateKbps = resolveMp3BitrateKbps(preferences.audioQuality.value)
+            try {
+                transcodeToMp3(outputFile, songId, safeTitle, safeArtist, targetBitrateKbps)
+            } catch (e: Exception) {
+                outputFile.delete()
+                throw e
+            }
+        } else {
+            outputFile
+        }
+
+        if (finalFile != outputFile) {
+            outputFile.delete()
+            updateDownloadState(
+                _downloadStates.value[songId]?.copy(
+                    filePath = finalFile.absolutePath,
+                ) ?: return
+            )
+        }
+
         // Descarga completada
         val downloadedSong = DownloadedSong(
             songId = songId,
@@ -291,9 +311,9 @@ class DesktopDownloadService {
             album = album,
             thumbnailUrl = thumbnailUrl,
             duration = duration,
-            filePath = outputFile.absolutePath,
-            fileSize = outputFile.length(),
-            bitrate = audioFormat.bitrate,
+            filePath = finalFile.absolutePath,
+            fileSize = finalFile.length(),
+            bitrate = resolvedFormat?.bitrate,
             downloadedAt = System.currentTimeMillis(),
         )
         
@@ -304,7 +324,7 @@ class DesktopDownloadService {
             _downloadStates.value[songId]?.copy(
                 status = DownloadStatus.COMPLETED,
                 progress = 1f,
-                downloadedBytes = outputFile.length(),
+                downloadedBytes = finalFile.length(),
             ) ?: return
         )
         
@@ -394,7 +414,136 @@ class DesktopDownloadService {
     fun getLocalFilePath(songId: String): String? {
         return _downloadedSongs.value.find { it.songId == songId }?.filePath
     }
-    
+
+    private data class ResolvedStream(
+        val url: String,
+        val format: com.anitail.innertube.models.response.PlayerResponse.StreamingData.Format,
+        val client: YouTubeClient,
+    )
+
+    private suspend fun resolveStreamForDownload(videoId: String): ResolvedStream? {
+        val signatureTimestamp = NewPipeUtils.getSignatureTimestamp(videoId).getOrNull()
+        val isLoggedIn = YouTube.cookie != null
+        val clientsToTry = StreamClientOrder.build()
+        val audioQuality = preferences.audioQuality.value
+
+        for (client in clientsToTry) {
+            if (client.loginRequired && !isLoggedIn) continue
+            val currentTimestamp = if (client.clientName.contains("TVHTML5")) null else signatureTimestamp
+            val playerResponse = YouTube.player(videoId, null, client, currentTimestamp).getOrNull()
+            val streamingData = playerResponse?.streamingData
+            val rawFormats = streamingData?.adaptiveFormats
+                ?.filter { it.isAudio }
+                ?: emptyList()
+            val formats = orderFormatsByQuality(rawFormats, audioQuality)
+            if (formats.isEmpty()) continue
+
+            for (format in formats) {
+                val url = NewPipeUtils.getStreamUrl(format, videoId).getOrNull()
+                if (url != null) {
+                    return ResolvedStream(url = url, format = format, client = client)
+                }
+            }
+        }
+
+        return null
+    }
+
+    private suspend fun resolveBestAudioFormatFromRemix(
+        videoId: String
+    ): com.anitail.innertube.models.response.PlayerResponse.StreamingData.Format? {
+        val playerResponse = YouTube.player(
+            videoId = videoId,
+            playlistId = null,
+            client = YouTubeClient.WEB_REMIX,
+        ).getOrNull() ?: return null
+
+        val streamingData = playerResponse.streamingData ?: return null
+        val rawFormats = streamingData.adaptiveFormats
+            .filter { it.mimeType.startsWith("audio/") }
+        val orderedFormats = orderFormatsByQuality(rawFormats, preferences.audioQuality.value)
+        return orderedFormats.firstOrNull()
+    }
+
+    private fun orderFormatsByQuality(
+        formats: List<com.anitail.innertube.models.response.PlayerResponse.StreamingData.Format>,
+        audioQuality: AudioQuality
+    ): List<com.anitail.innertube.models.response.PlayerResponse.StreamingData.Format> {
+        if (formats.isEmpty()) return formats
+        return when (audioQuality) {
+            AudioQuality.HIGH, AudioQuality.AUTO -> formats.sortedByDescending { it.bitrate }
+            AudioQuality.LOW -> formats.sortedBy { it.bitrate }
+            AudioQuality.MEDIUM -> formats.sortedWith(
+                compareBy<com.anitail.innertube.models.response.PlayerResponse.StreamingData.Format> {
+                    abs(it.bitrate - 192_000)
+                }.thenByDescending { it.bitrate }
+            )
+        }
+    }
+
+    private fun resolveMp3BitrateKbps(audioQuality: AudioQuality): Int {
+        return when (audioQuality) {
+            AudioQuality.LOW -> 128
+            AudioQuality.MEDIUM -> 192
+            AudioQuality.HIGH, AudioQuality.AUTO -> 320
+        }
+    }
+
+    private val ffmpegAvailable: Boolean by lazy { detectFfmpeg() }
+
+    private fun detectFfmpeg(): Boolean {
+        return runCatching {
+            val process = ProcessBuilder("ffmpeg", "-version")
+                .redirectErrorStream(true)
+                .start()
+            if (!process.waitFor(2, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                return@runCatching false
+            }
+            process.exitValue() == 0
+        }.getOrDefault(false)
+    }
+
+    private fun transcodeToMp3(
+        inputFile: File,
+        songId: String,
+        safeTitle: String,
+        safeArtist: String,
+        targetBitrateKbps: Int,
+    ): File {
+        if (!ffmpegAvailable) {
+            throw Exception("FFmpeg no encontrado. Instala FFmpeg para descargar en MP3.")
+        }
+
+        val outputFile = File(downloadDir, "${safeArtist} - ${safeTitle} [$songId].mp3")
+        val process = ProcessBuilder(
+            "ffmpeg",
+            "-y",
+            "-i",
+            inputFile.absolutePath,
+            "-vn",
+            "-acodec",
+            "libmp3lame",
+            "-b:a",
+            "${targetBitrateKbps}k",
+            outputFile.absolutePath,
+        )
+            .redirectErrorStream(true)
+            .start()
+
+        val output = process.inputStream.bufferedReader().use { it.readText() }
+        val finished = process.waitFor(10, TimeUnit.MINUTES)
+        if (!finished || process.exitValue() != 0) {
+            throw Exception("FFmpeg falló al convertir a MP3: ${output.take(500)}")
+        }
+
+        if (!outputFile.exists() || outputFile.length() == 0L) {
+            throw Exception("FFmpeg no generó archivo MP3 válido.")
+        }
+
+        return outputFile
+    }
+
     private fun updateDownloadState(state: DownloadState) {
         _downloadStates.update { map ->
             map.toMutableMap().apply {

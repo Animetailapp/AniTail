@@ -8,6 +8,17 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import com.anitail.desktop.ui.screen.library.AlbumFilter
+import com.anitail.desktop.ui.screen.library.AlbumSortType
+import com.anitail.desktop.ui.screen.library.ArtistFilter
+import com.anitail.desktop.ui.screen.library.ArtistSortType
+import com.anitail.desktop.ui.screen.library.GridItemSize
+import com.anitail.desktop.ui.screen.library.LibraryFilter
+import com.anitail.desktop.ui.screen.library.LibraryViewType
+import com.anitail.desktop.ui.screen.library.MixSortType
+import com.anitail.desktop.ui.screen.library.PlaylistSortType
+import com.anitail.desktop.ui.screen.library.SongFilter
+import com.anitail.desktop.ui.screen.library.SongSortType
 
 /**
  * Desktop preferences storage system.
@@ -40,6 +51,9 @@ class DesktopPreferences private constructor(
     private val _audioQuality = MutableStateFlow(AudioQuality.AUTO)
     val audioQuality: StateFlow<AudioQuality> = _audioQuality.asStateFlow()
 
+    private val _normalizeAudio = MutableStateFlow(true)
+    val normalizeAudio: StateFlow<Boolean> = _normalizeAudio.asStateFlow()
+
     private val _skipSilence = MutableStateFlow(false)
     val skipSilence: StateFlow<Boolean> = _skipSilence.asStateFlow()
 
@@ -71,6 +85,76 @@ class DesktopPreferences private constructor(
     private val _quickPicks = MutableStateFlow(QuickPicks.QUICK_PICKS)
     val quickPicks: StateFlow<QuickPicks> = _quickPicks.asStateFlow()
 
+    // === Library Settings ===
+    private val _libraryFilter = MutableStateFlow(LibraryFilter.LIBRARY)
+    val libraryFilter: StateFlow<LibraryFilter> = _libraryFilter.asStateFlow()
+
+    private val _mixViewType = MutableStateFlow(LibraryViewType.GRID)
+    val mixViewType: StateFlow<LibraryViewType> = _mixViewType.asStateFlow()
+
+    private val _playlistViewType = MutableStateFlow(LibraryViewType.GRID)
+    val playlistViewType: StateFlow<LibraryViewType> = _playlistViewType.asStateFlow()
+
+    private val _albumViewType = MutableStateFlow(LibraryViewType.GRID)
+    val albumViewType: StateFlow<LibraryViewType> = _albumViewType.asStateFlow()
+
+    private val _artistViewType = MutableStateFlow(LibraryViewType.GRID)
+    val artistViewType: StateFlow<LibraryViewType> = _artistViewType.asStateFlow()
+
+    private val _gridItemSize = MutableStateFlow(GridItemSize.BIG)
+    val gridItemSize: StateFlow<GridItemSize> = _gridItemSize.asStateFlow()
+
+    private val _mixSortType = MutableStateFlow(MixSortType.CREATE_DATE)
+    val mixSortType: StateFlow<MixSortType> = _mixSortType.asStateFlow()
+
+    private val _mixSortDescending = MutableStateFlow(true)
+    val mixSortDescending: StateFlow<Boolean> = _mixSortDescending.asStateFlow()
+
+    private val _playlistSortType = MutableStateFlow(PlaylistSortType.CREATE_DATE)
+    val playlistSortType: StateFlow<PlaylistSortType> = _playlistSortType.asStateFlow()
+
+    private val _playlistSortDescending = MutableStateFlow(true)
+    val playlistSortDescending: StateFlow<Boolean> = _playlistSortDescending.asStateFlow()
+
+    private val _albumSortType = MutableStateFlow(AlbumSortType.CREATE_DATE)
+    val albumSortType: StateFlow<AlbumSortType> = _albumSortType.asStateFlow()
+
+    private val _albumSortDescending = MutableStateFlow(true)
+    val albumSortDescending: StateFlow<Boolean> = _albumSortDescending.asStateFlow()
+
+    private val _artistSortType = MutableStateFlow(ArtistSortType.CREATE_DATE)
+    val artistSortType: StateFlow<ArtistSortType> = _artistSortType.asStateFlow()
+
+    private val _artistSortDescending = MutableStateFlow(true)
+    val artistSortDescending: StateFlow<Boolean> = _artistSortDescending.asStateFlow()
+
+    private val _songSortType = MutableStateFlow(SongSortType.CREATE_DATE)
+    val songSortType: StateFlow<SongSortType> = _songSortType.asStateFlow()
+
+    private val _songSortDescending = MutableStateFlow(true)
+    val songSortDescending: StateFlow<Boolean> = _songSortDescending.asStateFlow()
+
+    private val _songFilter = MutableStateFlow(SongFilter.LIKED)
+    val songFilter: StateFlow<SongFilter> = _songFilter.asStateFlow()
+
+    private val _albumFilter = MutableStateFlow(AlbumFilter.LIKED)
+    val albumFilter: StateFlow<AlbumFilter> = _albumFilter.asStateFlow()
+
+    private val _artistFilter = MutableStateFlow(ArtistFilter.LIKED)
+    val artistFilter: StateFlow<ArtistFilter> = _artistFilter.asStateFlow()
+
+    private val _showLikedPlaylist = MutableStateFlow(true)
+    val showLikedPlaylist: StateFlow<Boolean> = _showLikedPlaylist.asStateFlow()
+
+    private val _showDownloadedPlaylist = MutableStateFlow(true)
+    val showDownloadedPlaylist: StateFlow<Boolean> = _showDownloadedPlaylist.asStateFlow()
+
+    private val _showTopPlaylist = MutableStateFlow(true)
+    val showTopPlaylist: StateFlow<Boolean> = _showTopPlaylist.asStateFlow()
+
+    private val _showCachedPlaylist = MutableStateFlow(true)
+    val showCachedPlaylist: StateFlow<Boolean> = _showCachedPlaylist.asStateFlow()
+
     // === Account Settings ===
     private val _useLoginForBrowse = MutableStateFlow(true)
     val useLoginForBrowse: StateFlow<Boolean> = _useLoginForBrowse.asStateFlow()
@@ -91,6 +175,9 @@ class DesktopPreferences private constructor(
 
     private val _maxSongCacheSizeMB = MutableStateFlow(1000)
     val maxSongCacheSizeMB: StateFlow<Int> = _maxSongCacheSizeMB.asStateFlow()
+
+    private val _downloadAsMp3 = MutableStateFlow(true)
+    val downloadAsMp3: StateFlow<Boolean> = _downloadAsMp3.asStateFlow()
 
     // === Lyrics Settings ===
     private val _showLyrics = MutableStateFlow(true)
@@ -136,6 +223,11 @@ class DesktopPreferences private constructor(
 
     fun setAudioQuality(value: AudioQuality) {
         _audioQuality.value = value
+        save()
+    }
+
+    fun setNormalizeAudio(value: Boolean) {
+        _normalizeAudio.value = value
         save()
     }
 
@@ -189,6 +281,121 @@ class DesktopPreferences private constructor(
         save()
     }
 
+    fun setLibraryFilter(value: LibraryFilter) {
+        _libraryFilter.value = value
+        save()
+    }
+
+    fun setMixViewType(value: LibraryViewType) {
+        _mixViewType.value = value
+        save()
+    }
+
+    fun setPlaylistViewType(value: LibraryViewType) {
+        _playlistViewType.value = value
+        save()
+    }
+
+    fun setAlbumViewType(value: LibraryViewType) {
+        _albumViewType.value = value
+        save()
+    }
+
+    fun setArtistViewType(value: LibraryViewType) {
+        _artistViewType.value = value
+        save()
+    }
+
+    fun setGridItemSize(value: GridItemSize) {
+        _gridItemSize.value = value
+        save()
+    }
+
+    fun setMixSortType(value: MixSortType) {
+        _mixSortType.value = value
+        save()
+    }
+
+    fun setMixSortDescending(value: Boolean) {
+        _mixSortDescending.value = value
+        save()
+    }
+
+    fun setPlaylistSortType(value: PlaylistSortType) {
+        _playlistSortType.value = value
+        save()
+    }
+
+    fun setPlaylistSortDescending(value: Boolean) {
+        _playlistSortDescending.value = value
+        save()
+    }
+
+    fun setAlbumSortType(value: AlbumSortType) {
+        _albumSortType.value = value
+        save()
+    }
+
+    fun setAlbumSortDescending(value: Boolean) {
+        _albumSortDescending.value = value
+        save()
+    }
+
+    fun setArtistSortType(value: ArtistSortType) {
+        _artistSortType.value = value
+        save()
+    }
+
+    fun setArtistSortDescending(value: Boolean) {
+        _artistSortDescending.value = value
+        save()
+    }
+
+    fun setSongSortType(value: SongSortType) {
+        _songSortType.value = value
+        save()
+    }
+
+    fun setSongSortDescending(value: Boolean) {
+        _songSortDescending.value = value
+        save()
+    }
+
+    fun setSongFilter(value: SongFilter) {
+        _songFilter.value = value
+        save()
+    }
+
+    fun setAlbumFilter(value: AlbumFilter) {
+        _albumFilter.value = value
+        save()
+    }
+
+    fun setArtistFilter(value: ArtistFilter) {
+        _artistFilter.value = value
+        save()
+    }
+
+    fun setShowLikedPlaylist(value: Boolean) {
+        _showLikedPlaylist.value = value
+        save()
+    }
+
+    fun setShowDownloadedPlaylist(value: Boolean) {
+        _showDownloadedPlaylist.value = value
+        save()
+    }
+
+    fun setShowTopPlaylist(value: Boolean) {
+        _showTopPlaylist.value = value
+        save()
+    }
+
+    fun setShowCachedPlaylist(value: Boolean) {
+        _showCachedPlaylist.value = value
+        save()
+    }
+
     fun setUseLoginForBrowse(value: Boolean) {
         _useLoginForBrowse.value = value
         save()
@@ -216,6 +423,11 @@ class DesktopPreferences private constructor(
 
     fun setMaxSongCacheSizeMB(value: Int) {
         _maxSongCacheSizeMB.value = value.coerceIn(500, 10000)
+        save()
+    }
+
+    fun setDownloadAsMp3(value: Boolean) {
+        _downloadAsMp3.value = value
         save()
     }
 
@@ -255,6 +467,7 @@ class DesktopPreferences private constructor(
             _sliderStyle.value = SliderStyle.fromString(json.optString("sliderStyle", "default"))
 
             _audioQuality.value = AudioQuality.fromString(json.optString("audioQuality", "auto"))
+            _normalizeAudio.value = json.optBoolean("normalizeAudio", true)
             _skipSilence.value = json.optBoolean("skipSilence", false)
             _crossfadeDuration.value = json.optInt("crossfadeDuration", 0)
             _historyDuration.value = json.optDouble("historyDuration", 30.0).toFloat()
@@ -269,11 +482,52 @@ class DesktopPreferences private constructor(
             _useLoginForBrowse.value = json.optBoolean("useLoginForBrowse", true)
             _ytmSync.value = json.optBoolean("ytmSync", true)
 
+            _libraryFilter.value = json.optString("libraryFilter", "library")
+                .let { value -> runCatching { LibraryFilter.valueOf(value.uppercase()) }.getOrDefault(LibraryFilter.LIBRARY) }
+            _mixViewType.value = json.optString("mixViewType", "grid")
+                .let { value -> runCatching { LibraryViewType.valueOf(value.uppercase()) }.getOrDefault(LibraryViewType.GRID) }
+            _playlistViewType.value = json.optString("playlistViewType", "grid")
+                .let { value -> runCatching { LibraryViewType.valueOf(value.uppercase()) }.getOrDefault(LibraryViewType.GRID) }
+            _albumViewType.value = json.optString("albumViewType", "grid")
+                .let { value -> runCatching { LibraryViewType.valueOf(value.uppercase()) }.getOrDefault(LibraryViewType.GRID) }
+            _artistViewType.value = json.optString("artistViewType", "grid")
+                .let { value -> runCatching { LibraryViewType.valueOf(value.uppercase()) }.getOrDefault(LibraryViewType.GRID) }
+            _gridItemSize.value = json.optString("gridItemSize", "big")
+                .let { value -> runCatching { GridItemSize.valueOf(value.uppercase()) }.getOrDefault(GridItemSize.BIG) }
+
+            _mixSortType.value = json.optString("mixSortType", "create_date")
+                .let { value -> runCatching { MixSortType.valueOf(value.uppercase()) }.getOrDefault(MixSortType.CREATE_DATE) }
+            _mixSortDescending.value = json.optBoolean("mixSortDescending", true)
+            _playlistSortType.value = json.optString("playlistSortType", "create_date")
+                .let { value -> runCatching { PlaylistSortType.valueOf(value.uppercase()) }.getOrDefault(PlaylistSortType.CREATE_DATE) }
+            _playlistSortDescending.value = json.optBoolean("playlistSortDescending", true)
+            _albumSortType.value = json.optString("albumSortType", "create_date")
+                .let { value -> runCatching { AlbumSortType.valueOf(value.uppercase()) }.getOrDefault(AlbumSortType.CREATE_DATE) }
+            _albumSortDescending.value = json.optBoolean("albumSortDescending", true)
+            _artistSortType.value = json.optString("artistSortType", "create_date")
+                .let { value -> runCatching { ArtistSortType.valueOf(value.uppercase()) }.getOrDefault(ArtistSortType.CREATE_DATE) }
+            _artistSortDescending.value = json.optBoolean("artistSortDescending", true)
+            _songSortType.value = json.optString("songSortType", "create_date")
+                .let { value -> runCatching { SongSortType.valueOf(value.uppercase()) }.getOrDefault(SongSortType.CREATE_DATE) }
+            _songSortDescending.value = json.optBoolean("songSortDescending", true)
+            _songFilter.value = json.optString("songFilter", "liked")
+                .let { value -> runCatching { SongFilter.valueOf(value.uppercase()) }.getOrDefault(SongFilter.LIKED) }
+            _albumFilter.value = json.optString("albumFilter", "liked")
+                .let { value -> runCatching { AlbumFilter.valueOf(value.uppercase()) }.getOrDefault(AlbumFilter.LIKED) }
+            _artistFilter.value = json.optString("artistFilter", "liked")
+                .let { value -> runCatching { ArtistFilter.valueOf(value.uppercase()) }.getOrDefault(ArtistFilter.LIKED) }
+
+            _showLikedPlaylist.value = json.optBoolean("showLikedPlaylist", true)
+            _showDownloadedPlaylist.value = json.optBoolean("showDownloadedPlaylist", true)
+            _showTopPlaylist.value = json.optBoolean("showTopPlaylist", true)
+            _showCachedPlaylist.value = json.optBoolean("showCachedPlaylist", true)
+
             _pauseListenHistory.value = json.optBoolean("pauseListenHistory", false)
             _pauseSearchHistory.value = json.optBoolean("pauseSearchHistory", false)
 
             _maxImageCacheSizeMB.value = json.optInt("maxImageCacheSizeMB", 500)
             _maxSongCacheSizeMB.value = json.optInt("maxSongCacheSizeMB", 1000)
+            _downloadAsMp3.value = json.optBoolean("downloadAsMp3", true)
 
             _showLyrics.value = json.optBoolean("showLyrics", true)
             _romanizeLyrics.value = json.optBoolean("romanizeLyrics", false)
@@ -293,6 +547,7 @@ class DesktopPreferences private constructor(
                 put("sliderStyle", _sliderStyle.value.name.lowercase())
 
                 put("audioQuality", _audioQuality.value.name.lowercase())
+                put("normalizeAudio", _normalizeAudio.value)
                 put("skipSilence", _skipSilence.value)
                 put("crossfadeDuration", _crossfadeDuration.value)
                 put("historyDuration", _historyDuration.value)
@@ -307,11 +562,36 @@ class DesktopPreferences private constructor(
                 put("useLoginForBrowse", _useLoginForBrowse.value)
                 put("ytmSync", _ytmSync.value)
 
+                put("libraryFilter", _libraryFilter.value.name.lowercase())
+                put("mixViewType", _mixViewType.value.name.lowercase())
+                put("playlistViewType", _playlistViewType.value.name.lowercase())
+                put("albumViewType", _albumViewType.value.name.lowercase())
+                put("artistViewType", _artistViewType.value.name.lowercase())
+                put("gridItemSize", _gridItemSize.value.name.lowercase())
+                put("mixSortType", _mixSortType.value.name.lowercase())
+                put("mixSortDescending", _mixSortDescending.value)
+                put("playlistSortType", _playlistSortType.value.name.lowercase())
+                put("playlistSortDescending", _playlistSortDescending.value)
+                put("albumSortType", _albumSortType.value.name.lowercase())
+                put("albumSortDescending", _albumSortDescending.value)
+                put("artistSortType", _artistSortType.value.name.lowercase())
+                put("artistSortDescending", _artistSortDescending.value)
+                put("songSortType", _songSortType.value.name.lowercase())
+                put("songSortDescending", _songSortDescending.value)
+                put("songFilter", _songFilter.value.name.lowercase())
+                put("albumFilter", _albumFilter.value.name.lowercase())
+                put("artistFilter", _artistFilter.value.name.lowercase())
+                put("showLikedPlaylist", _showLikedPlaylist.value)
+                put("showDownloadedPlaylist", _showDownloadedPlaylist.value)
+                put("showTopPlaylist", _showTopPlaylist.value)
+                put("showCachedPlaylist", _showCachedPlaylist.value)
+
                 put("pauseListenHistory", _pauseListenHistory.value)
                 put("pauseSearchHistory", _pauseSearchHistory.value)
 
                 put("maxImageCacheSizeMB", _maxImageCacheSizeMB.value)
                 put("maxSongCacheSizeMB", _maxSongCacheSizeMB.value)
+                put("downloadAsMp3", _downloadAsMp3.value)
 
                 put("showLyrics", _showLyrics.value)
                 put("romanizeLyrics", _romanizeLyrics.value)

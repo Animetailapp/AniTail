@@ -231,6 +231,7 @@ fun PlayerScreen(
     }
 
     val backgroundColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface
+    val hiResArtworkUrl = remember(item.artworkUrl) { toHighResArtworkUrl(item.artworkUrl) }
     val textBackgroundColor = when (playerBackgroundStyle) {
         PlayerBackgroundStyle.DEFAULT -> if (pureBlack) Color.White else MaterialTheme.colorScheme.onBackground
         PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.BLUR -> Color.White
@@ -258,7 +259,7 @@ fun PlayerScreen(
             .background(backgroundColor)
     ) {
         PlayerBackgroundLayer(
-            artworkUrl = item.artworkUrl,
+            artworkUrl = hiResArtworkUrl,
             style = playerBackgroundStyle,
             pureBlack = pureBlack,
             showLyrics = showLyrics,
@@ -302,7 +303,7 @@ fun PlayerScreen(
                     )
                 } else {
                     RemoteImage(
-                        url = item.artworkUrl ?: "",
+                        url = hiResArtworkUrl ?: "",
                         contentDescription = item.title,
                         modifier = Modifier
                             .fillMaxHeight(0.82f)
@@ -495,4 +496,17 @@ private fun EmptyPlayerState(modifier: Modifier) {
             )
         }
     }
+}
+
+private fun toHighResArtworkUrl(url: String?): String? {
+    if (url.isNullOrBlank()) return url
+    var result = url
+    result = result.replace(Regex("w\\d+-h\\d+"), "w1200-h1200")
+    result = result.replace(Regex("s\\d+"), "s1200")
+    result = result.replace("=w60-h60", "=w1200-h1200")
+    result = result.replace("=w120-h120", "=w1200-h1200")
+    result = result.replace("hqdefault", "maxresdefault")
+    result = result.replace("mqdefault", "maxresdefault")
+    result = result.replace("sddefault", "maxresdefault")
+    return result
 }

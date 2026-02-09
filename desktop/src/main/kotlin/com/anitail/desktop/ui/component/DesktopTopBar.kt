@@ -44,8 +44,10 @@ fun DesktopTopBar(
     onStats: () -> Unit,
     onSettings: () -> Unit,
     pureBlack: Boolean,
+    isMaximized: Boolean,
     window: Window,
     windowState: WindowState,
+    onToggleMaximize: () -> Unit,
     onWindowClose: () -> Unit,
     showUpdateBadge: Boolean = false,
     onRefreshHome: (() -> Unit)? = null,
@@ -54,7 +56,6 @@ fun DesktopTopBar(
     val surfaceColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
     val titleColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurface
     val iconColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-    val isMaximized = windowState.placement == WindowPlacement.Maximized
     val actionColors = IconButtonDefaults.iconButtonColors(contentColor = iconColor)
 
     Row(
@@ -68,6 +69,8 @@ fun DesktopTopBar(
         WindowDragArea(
             window = window,
             windowState = windowState,
+            isMaximized = isMaximized,
+            onRestoreFromMaximize = onToggleMaximize,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight(),
@@ -87,6 +90,7 @@ fun DesktopTopBar(
         WindowControls(
             isMaximized = isMaximized,
             windowState = windowState,
+            onToggleMaximize = onToggleMaximize,
             onWindowClose = onWindowClose,
             colors = actionColors,
         )
@@ -153,6 +157,7 @@ private fun ActionButtons(
 private fun WindowControls(
     isMaximized: Boolean,
     windowState: WindowState,
+    onToggleMaximize: () -> Unit,
     onWindowClose: () -> Unit,
     colors: IconButtonColors,
 ) {
@@ -164,13 +169,7 @@ private fun WindowControls(
             Icon(IconAssets.windowMinimize(), contentDescription = "Minimizar")
         }
         IconButton(
-            onClick = {
-                windowState.placement = if (isMaximized) {
-                    WindowPlacement.Floating
-                } else {
-                    WindowPlacement.Maximized
-                }
-            },
+            onClick = onToggleMaximize,
             colors = colors,
         ) {
             val icon = if (isMaximized) IconAssets.windowRestore() else IconAssets.windowMaximize()
@@ -187,16 +186,20 @@ private fun WindowControls(
 private fun WindowDragArea(
     window: Window,
     windowState: WindowState,
+    isMaximized: Boolean,
+    onRestoreFromMaximize: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     Box(
-        modifier = modifier.pointerInput(windowState.placement) {
+        modifier = modifier.pointerInput(windowState.placement, isMaximized) {
             var dragStartPointer: Point? = null
             var dragStartWindow: Point? = null
             detectDragGestures(
                 onDragStart = {
-                    if (windowState.placement == WindowPlacement.Maximized) {
+                    if (isMaximized) {
+                        onRestoreFromMaximize()
+                    } else if (windowState.placement == WindowPlacement.Maximized) {
                         windowState.placement = WindowPlacement.Floating
                     }
                     dragStartPointer = MouseInfo.getPointerInfo()?.location

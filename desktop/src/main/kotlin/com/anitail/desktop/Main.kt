@@ -119,9 +119,13 @@ import java.net.URL
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.rememberWindowState
+import java.awt.Rectangle
+import java.awt.Toolkit
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
+import java.awt.geom.Rectangle2D
 import java.awt.geom.RoundRectangle2D
+import kotlin.math.abs
 
 private enum class DesktopScreen {
     Home,
@@ -138,6 +142,39 @@ private enum class DesktopScreen {
     MoodAndGenres,
     NewRelease,
     Browse,
+}
+
+private fun isWindowAtWorkArea(window: java.awt.Window): Boolean {
+    val gc = window.graphicsConfiguration ?: return false
+    val bounds = gc.bounds
+    val insets = Toolkit.getDefaultToolkit().getScreenInsets(gc)
+    val workX = bounds.x + insets.left
+    val workY = bounds.y + insets.top
+    val workWidth = bounds.width - insets.left - insets.right
+    val workHeight = bounds.height - insets.top - insets.bottom
+    if (workWidth <= 0 || workHeight <= 0) return false
+    val tolerance = 2
+    return abs(window.x - workX) <= tolerance &&
+        abs(window.y - workY) <= tolerance &&
+        abs(window.width - workWidth) <= tolerance &&
+        abs(window.height - workHeight) <= tolerance
+}
+
+private fun isValidBounds(bounds: Rectangle): Boolean {
+    return bounds.width >= 200 && bounds.height >= 200
+}
+
+private fun applyWorkAreaBounds(window: java.awt.Window) {
+    val gc = window.graphicsConfiguration ?: return
+    val bounds = gc.bounds
+    val insets = Toolkit.getDefaultToolkit().getScreenInsets(gc)
+    val x = bounds.x + insets.left
+    val y = bounds.y + insets.top
+    val width = bounds.width - insets.left - insets.right
+    val height = bounds.height - insets.top - insets.bottom
+    if (width <= 0 || height <= 0) return
+    if (window.x == x && window.y == y && window.width == width && window.height == height) return
+    window.setBounds(x, y, width, height)
 }
 
 /**
@@ -641,7 +678,11 @@ private fun FrameWindowScope.AniTailDesktopApp(
         themeColor = themeColor,
     ) {
         val windowCornerRadius = 12.dp
-        val isMaximized = windowState.placement == androidx.compose.ui.window.WindowPlacement.Maximized
+        var isMaximizedManual by remember { mutableStateOf(false) }
+        val isMaximizedByBounds = isWindowAtWorkArea(window)
+        val isMaximized = isMaximizedManual || isMaximizedByBounds
+        val showMaximizedState = isMaximizedManual
+        val lastFloatingBounds = remember { mutableStateOf(window.bounds) }
         val windowShape: Shape = if (isMaximized) {
             RoundedCornerShape(0.dp)
         } else {
@@ -655,10 +696,30 @@ private fun FrameWindowScope.AniTailDesktopApp(
             MaterialTheme.colorScheme.outlineVariant
         }
 
+        LaunchedEffect(Unit) {
+            windowState.isMinimized = false
+        }
+
+        LaunchedEffect(windowState.placement) {
+            if (windowState.placement == androidx.compose.ui.window.WindowPlacement.Maximized) {
+                isMaximizedManual = true
+                windowState.placement = androidx.compose.ui.window.WindowPlacement.Floating
+                applyWorkAreaBounds(window)
+            }
+        }
+
         DisposableEffect(window, windowState.placement, density) {
             fun updateWindowShape() {
-                if (windowState.placement == androidx.compose.ui.window.WindowPlacement.Maximized) {
-                    window.shape = null
+                if (isMaximizedManual || isWindowAtWorkArea(window)) {
+                    val bounds = window.bounds
+                    val width = bounds.width.coerceAtLeast(1)
+                    val height = bounds.height.coerceAtLeast(1)
+                    window.shape = Rectangle2D.Double(
+                        0.0,
+                        0.0,
+                        width.toDouble(),
+                        height.toDouble(),
+                    )
                     return
                 }
                 val radiusPx = with(density) { windowCornerRadius.toPx() }
@@ -675,12 +736,35 @@ private fun FrameWindowScope.AniTailDesktopApp(
                 )
             }
 
+            fun updateLastFloatingBounds() {
+                if (isMaximizedManual) return
+                if (isWindowAtWorkArea(window)) return
+                val bounds = window.bounds
+                if (isValidBounds(bounds)) {
+                    lastFloatingBounds.value = Rectangle(bounds)
+                }
+            }
+
+            fun applyMaximizedBounds() {
+                if (!isMaximizedManual) return
+                if (windowState.isMinimized) return
+                applyWorkAreaBounds(window)
+            }
+
             val listener = object : ComponentAdapter() {
                 override fun componentResized(e: ComponentEvent) {
                     updateWindowShape()
+                    applyMaximizedBounds()
+                    updateLastFloatingBounds()
+                }
+
+                override fun componentMoved(e: ComponentEvent) {
+                    updateLastFloatingBounds()
                 }
             }
             updateWindowShape()
+            applyMaximizedBounds()
+            updateLastFloatingBounds()
             window.addComponentListener(listener)
             onDispose {
                 window.removeComponentListener(listener)
@@ -742,8 +826,25 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                 currentScreen = DesktopScreen.Settings
                             },
                             pureBlack = pureBlackEnabled,
+                            isMaximized = showMaximizedState,
                             window = window,
                             windowState = windowState,
+                            onToggleMaximize = {
+                                windowState.isMinimized = false
+                                if (isMaximizedManual) {
+                                    isMaximizedManual = false
+                                    val bounds = lastFloatingBounds.value
+                                    if (isValidBounds(bounds)) {
+                                        window.setBounds(bounds)
+                                    }
+                                } else {
+                                    if (isValidBounds(window.bounds)) {
+                                        lastFloatingBounds.value = Rectangle(window.bounds)
+                                    }
+                                    isMaximizedManual = true
+                                    applyWorkAreaBounds(window)
+                                }
+                            },
                             onWindowClose = onCloseRequest,
                             onRefreshHome = if (currentScreen == DesktopScreen.Home) refreshHome else null,
                         )

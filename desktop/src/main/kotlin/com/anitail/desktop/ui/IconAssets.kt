@@ -81,6 +81,18 @@ object IconAssets {
 
     fun radio(): ImageVector = VectorResource.load("radio.xml")
 
+    fun arrowUpward(): ImageVector = VectorResource.load("arrow_upward.xml")
+
+    fun arrowDownward(): ImageVector = VectorResource.load("arrow_downward.xml")
+
+    fun list(): ImageVector = VectorResource.load("list.xml")
+
+    fun gridView(): ImageVector = VectorResource.load("grid_view.xml")
+
+    fun radioChecked(): ImageVector = VectorResource.load("radio_button_checked.xml")
+
+    fun radioUnchecked(): ImageVector = VectorResource.load("radio_button_unchecked.xml")
+
     fun album(): ImageVector = VectorResource.load("album.xml")
 
     fun artist(): ImageVector = VectorResource.load("artist.xml")
@@ -122,6 +134,8 @@ object IconAssets {
     fun error(): ImageVector = VectorResource.load("error.xml")
 
     fun offline(): ImageVector = VectorResource.load("offline.xml")
+
+    fun cached(): ImageVector = VectorResource.load("cached.xml")
 
     fun delete(): ImageVector = VectorResource.load("delete.xml")
 

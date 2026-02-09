@@ -48,6 +48,7 @@ class DesktopDatabase private constructor(
     val artists: Flow<List<ArtistEntity>> = _artists.map { it.values.toList() }
     val albums: Flow<List<AlbumEntity>> = _albums.map { it.values.toList() }
     val playlists: Flow<List<PlaylistEntity>> = _playlists.map { it.values.toList() }
+    val playlistSongMaps: Flow<List<PlaylistSongMap>> = _playlistSongMaps
     val relatedSongMaps: Flow<List<RelatedSongMap>> = _relatedSongMaps
     val events: Flow<List<EventEntity>> = _events
     val searchHistory: Flow<List<SearchHistory>> = _searchHistory

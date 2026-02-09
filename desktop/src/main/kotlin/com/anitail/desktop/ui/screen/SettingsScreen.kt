@@ -560,6 +560,7 @@ private fun PlayerSettingsScreen(
     onBack: () -> Unit,
 ) {
     val audioQuality by preferences.audioQuality.collectAsState()
+    val normalizeAudio by preferences.normalizeAudio.collectAsState()
     val skipSilence by preferences.skipSilence.collectAsState()
     val crossfadeDuration by preferences.crossfadeDuration.collectAsState()
     val historyDuration by preferences.historyDuration.collectAsState()
@@ -581,6 +582,13 @@ private fun PlayerSettingsScreen(
             onSelect = { index ->
                 preferences.setAudioQuality(AudioQuality.entries[index])
             },
+        )
+
+        SettingsSwitch(
+            title = "Normalizar volumen",
+            subtitle = "Iguala el volumen entre canciones (como Android)",
+            checked = normalizeAudio,
+            onCheckedChange = { preferences.setNormalizeAudio(it) },
         )
 
         // Historial de reproducción
@@ -825,11 +833,19 @@ private fun StorageSettingsScreen(
 ) {
     val maxImageCacheSizeMB by preferences.maxImageCacheSizeMB.collectAsState()
     val maxSongCacheSizeMB by preferences.maxSongCacheSizeMB.collectAsState()
+    val downloadAsMp3 by preferences.downloadAsMp3.collectAsState()
 
     SettingsSubScreen(
         title = "Almacenamiento",
         onBack = onBack,
     ) {
+        SettingsSwitch(
+            title = "Descargar en MP3",
+            subtitle = "Requiere FFmpeg instalado en el sistema",
+            checked = downloadAsMp3,
+            onCheckedChange = { preferences.setDownloadAsMp3(it) },
+        )
+
         // Image Cache Size
         SettingsSlider(
             title = "Caché de imágenes",

@@ -4,6 +4,8 @@ import com.anitail.desktop.util.JavaFxManager
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.YouTubeClient
 import com.anitail.innertube.pages.NewPipeUtils
+import com.anitail.desktop.storage.AudioQuality
+import com.anitail.desktop.storage.DesktopPreferences
 import javafx.application.Platform
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -13,6 +15,9 @@ import uk.co.caprica.vlcj.factory.MediaPlayerFactory
 import uk.co.caprica.vlcj.factory.discovery.NativeDiscovery
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
+import kotlin.math.abs
+import kotlin.math.min
+import kotlin.math.pow
 import kotlin.coroutines.resume
 
 /**
@@ -26,9 +31,12 @@ class NativeAudioPlayer {
         .proxy(YouTube.proxy)
         .build()
 
+    private val preferences = DesktopPreferences.getInstance()
+
     private var factory: MediaPlayerFactory? = null
     private var mediaPlayer: MediaPlayer? = null
-    private var volume: Int = 100 // VLC volume is 0-100 (can go up to 200 sometimes)
+    private var baseVolume: Double = 1.0
+    private var normalizationFactor: Double = 1.0
     private var playbackRate: Float = 1.0f
 
     // Callbacks de estado
@@ -132,25 +140,38 @@ class NativeAudioPlayer {
         val isLoggedIn = YouTube.cookie != null
         var lastError: String? = null
         val clientsToTry = StreamClientOrder.build()
+        val audioQuality = preferences.audioQuality.value
+        val normalizationEnabled = preferences.normalizeAudio.value
+        val mainResponse = YouTube.player(videoId, null, YouTubeClient.WEB_REMIX, signatureTimestamp).getOrNull()
+        val loudnessDb = mainResponse?.playerConfig?.audioConfig?.loudnessDb
+        val normalization = if (normalizationEnabled && loudnessDb != null) {
+            min(10.0.pow(-loudnessDb / 20.0), 1.0)
+        } else {
+            1.0
+        }
+        setNormalizationFactor(normalization)
 
+        val candidates = mutableListOf<ResolvedCandidate>()
         for (client in clientsToTry) {
             if (client.loginRequired && !isLoggedIn) continue
-            
+
             println("NativeAudioPlayer: Probando cliente: ${client.clientName}")
             val currentTimestamp = if (client.clientName.contains("TVHTML5")) null else signatureTimestamp
 
             try {
-                // PoToken placeholder (can be linked to settings in the future)
-                val poToken: String? = null 
-                val playerResponse = YouTube.player(videoId, null, client, currentTimestamp).getOrNull()
+                val playerResponse = if (client == YouTubeClient.WEB_REMIX && mainResponse != null) {
+                    mainResponse
+                } else {
+                    YouTube.player(videoId, null, client, currentTimestamp).getOrNull()
+                }
                 val status = playerResponse?.playabilityStatus?.status
                 val hasFormats = playerResponse?.streamingData?.adaptiveFormats?.isNotEmpty() == true
 
                 if (status == "OK" || hasFormats) {
                     println("NativeAudioPlayer: Formatos encontrados para cliente ${client.clientName}")
-                    val formats = playerResponse?.streamingData?.adaptiveFormats
-                        ?.filter { it.isAudio }
-                        ?.sortedByDescending { it.bitrate } ?: emptyList()
+                    val rawFormats = playerResponse?.streamingData?.adaptiveFormats
+                        ?.filter { it.isAudio } ?: emptyList()
+                    val formats = orderFormatsByQuality(rawFormats, audioQuality)
 
                     if (formats.isEmpty()) {
                         println("NativeAudioPlayer: No se encontraron formatos de audio para ${client.clientName}")
@@ -159,23 +180,16 @@ class NativeAudioPlayer {
 
                     for (format in formats) {
                         println("NativeAudioPlayer: Probando formato: ${format.mimeType} (${format.bitrate})")
-                        val url = StreamUrlResolution.resolveStreamUrl(NewPipeStreamUrlResolver, format, videoId, client).getOrNull()
+                        val url = StreamUrlResolution.resolveStreamUrl(
+                            NewPipeStreamUrlResolver,
+                            format,
+                            videoId,
+                            client
+                        ).getOrNull()
 
                         if (url != null) {
-                            println("NativeAudioPlayer: URL obtenida. Iniciando VLC...")
-                            val referer = when {
-                                client.clientName.contains("REMIX") -> "https://music.youtube.com/"
-                                client.clientName.contains("WEB") -> "https://www.youtube.com/"
-                                else -> ""
-                            }
-
-                            val prepared = preparePlayer(url, client.userAgent, referer)
-                            if (prepared) {
-                                println("NativeAudioPlayer: ¡Reproducción iniciada con éxito! (Cliente: ${client.clientName})")
-                                return@withContext Result.success(Unit)
-                            } else {
-                                println("NativeAudioPlayer: VLC falló al cargar stream del cliente ${client.clientName}")
-                            }
+                            candidates.add(ResolvedCandidate(client, format, url))
+                            break
                         }
                     }
                 } else {
@@ -184,6 +198,26 @@ class NativeAudioPlayer {
             } catch (e: Exception) {
                 lastError = e.message ?: "Error desconocido en cliente ${client.clientName}"
                 println("NativeAudioPlayer: EXCEPCIÓN en loop de cliente ${client.clientName}: ${e.message}")
+            }
+        }
+
+        val orderedCandidates = orderCandidatesByQuality(candidates, audioQuality)
+        for (candidate in orderedCandidates) {
+            val referer = when {
+                candidate.client.clientName.contains("REMIX") -> "https://music.youtube.com/"
+                candidate.client.clientName.contains("WEB") -> "https://www.youtube.com/"
+                else -> ""
+            }
+            println(
+                "NativeAudioPlayer: Iniciando VLC con formato ${candidate.format.mimeType} " +
+                    "(${candidate.format.bitrate}) del cliente ${candidate.client.clientName}"
+            )
+            val prepared = preparePlayer(candidate.url, candidate.client.userAgent, referer)
+            if (prepared) {
+                println("NativeAudioPlayer: ¡Reproducción iniciada con éxito! (Cliente: ${candidate.client.clientName})")
+                return@withContext Result.success(Unit)
+            } else {
+                println("NativeAudioPlayer: VLC falló al cargar stream del cliente ${candidate.client.clientName}")
             }
         }
 
@@ -215,6 +249,7 @@ class NativeAudioPlayer {
         referer: String? = null
     ): Result<Unit> = withContext(Dispatchers.Main) {
         if (mediaPlayer == null) return@withContext Result.failure(IllegalStateException("VLC no inicializado"))
+        setNormalizationFactor(1.0)
         
         val prepared = preparePlayer(url, userAgent, referer)
         if (prepared) {
@@ -272,7 +307,7 @@ class NativeAudioPlayer {
             
             // Set playback rate and volume
              player.controls().setRate(playbackRate)
-             player.audio().setVolume(volume)
+             applyVolume()
 
             continuation.invokeOnCancellation {
                 player.events().removeMediaPlayerEventListener(listener)
@@ -314,8 +349,8 @@ class NativeAudioPlayer {
 
     fun setVolume(volume: Double) {
         // VLC volume 0-100 (standard), can be up to 200 via software amp
-        this.volume = (volume * 100).toInt().coerceIn(0, 100)
-        mediaPlayer?.audio()?.setVolume(this.volume)
+        baseVolume = volume.coerceIn(0.0, 1.0)
+        applyVolume()
     }
 
     fun getVolume(): Double = (mediaPlayer?.audio()?.volume() ?: 100) / 100.0
@@ -344,6 +379,53 @@ class NativeAudioPlayer {
     fun release() {
         mediaPlayer?.release()
         factory?.release()
+    }
+
+    private fun applyVolume() {
+        val applied = (baseVolume * normalizationFactor).coerceIn(0.0, 1.0)
+        mediaPlayer?.audio()?.setVolume((applied * 100).toInt())
+    }
+
+    private fun setNormalizationFactor(factor: Double) {
+        normalizationFactor = factor.coerceIn(0.0, 1.0)
+        applyVolume()
+    }
+
+    private data class ResolvedCandidate(
+        val client: YouTubeClient,
+        val format: com.anitail.innertube.models.response.PlayerResponse.StreamingData.Format,
+        val url: String,
+    )
+
+    private fun orderCandidatesByQuality(
+        candidates: List<ResolvedCandidate>,
+        audioQuality: AudioQuality
+    ): List<ResolvedCandidate> {
+        if (candidates.isEmpty()) return candidates
+        return when (audioQuality) {
+            AudioQuality.HIGH, AudioQuality.AUTO -> candidates.sortedByDescending { it.format.bitrate }
+            AudioQuality.LOW -> candidates.sortedBy { it.format.bitrate }
+            AudioQuality.MEDIUM -> candidates.sortedWith(
+                compareBy<ResolvedCandidate> { abs(it.format.bitrate - 192_000) }
+                    .thenByDescending { it.format.bitrate }
+            )
+        }
+    }
+
+    private fun orderFormatsByQuality(
+        formats: List<com.anitail.innertube.models.response.PlayerResponse.StreamingData.Format>,
+        audioQuality: AudioQuality
+    ): List<com.anitail.innertube.models.response.PlayerResponse.StreamingData.Format> {
+        if (formats.isEmpty()) return formats
+        return when (audioQuality) {
+            AudioQuality.HIGH, AudioQuality.AUTO -> formats.sortedByDescending { it.bitrate }
+            AudioQuality.LOW -> formats.sortedBy { it.bitrate }
+            AudioQuality.MEDIUM -> formats.sortedWith(
+                compareBy<com.anitail.innertube.models.response.PlayerResponse.StreamingData.Format> {
+                    abs(it.bitrate - 192_000)
+                }.thenByDescending { it.bitrate }
+            )
+        }
     }
 
     enum class PlaybackStatus {
