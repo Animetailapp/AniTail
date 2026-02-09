@@ -58,6 +58,12 @@ import com.anitail.desktop.storage.SliderStyle
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.i18n.CountryCodeToName
+import com.anitail.desktop.i18n.LanguageCodeToName
+import com.anitail.desktop.i18n.SYSTEM_DEFAULT
+import com.anitail.desktop.i18n.appLanguageOptions
+import com.anitail.desktop.i18n.pluralStringResource
+import com.anitail.desktop.i18n.stringResource
 import kotlinx.coroutines.launch
 
 /**
@@ -141,44 +147,44 @@ private fun SettingsMainScreen(
 ) {
     val settingsCategories = listOf(
         SettingsCategory(
-            title = "Cuenta",
-            subtitle = "Google, inicio de sesión",
+            title = stringResource("account"),
+            subtitle = stringResource("category_interface"),
             icon = IconAssets.account(),
             destination = SettingsDestination.ACCOUNT,
         ),
         SettingsCategory(
-            title = "Apariencia",
-            subtitle = "Tema, colores, fuente",
+            title = stringResource("appearance"),
+            subtitle = stringResource("category_interface"),
             icon = IconAssets.palette(),
             destination = SettingsDestination.APPEARANCE,
         ),
         SettingsCategory(
-            title = "Reproducción",
-            subtitle = "Calidad, crossfade, cola",
+            title = stringResource("player_and_audio"),
+            subtitle = stringResource("category_player"),
             icon = IconAssets.play(),
             destination = SettingsDestination.PLAYER,
         ),
         SettingsCategory(
-            title = "Contenido",
-            subtitle = "Idioma, país, filtros",
+            title = stringResource("content"),
+            subtitle = stringResource("category_content"),
             icon = IconAssets.language(),
             destination = SettingsDestination.CONTENT,
         ),
         SettingsCategory(
-            title = "Privacidad",
-            subtitle = "Historial, datos",
+            title = stringResource("privacy"),
+            subtitle = stringResource("category_content"),
             icon = IconAssets.security(),
             destination = SettingsDestination.PRIVACY,
         ),
         SettingsCategory(
-            title = "Almacenamiento",
-            subtitle = "Caché, espacio",
+            title = stringResource("storage"),
+            subtitle = stringResource("category_system"),
             icon = IconAssets.storage(),
             destination = SettingsDestination.STORAGE,
         ),
         SettingsCategory(
-            title = "Acerca de",
-            subtitle = "Versión, licencias",
+            title = stringResource("about"),
+            subtitle = stringResource("category_system"),
             icon = IconAssets.info(),
             destination = SettingsDestination.ABOUT,
         ),
@@ -189,7 +195,7 @@ private fun SettingsMainScreen(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         item {
-            NavigationTitle(title = "Ajustes")
+            NavigationTitle(title = stringResource("settings"))
         }
 
         items(settingsCategories) { category ->
@@ -250,7 +256,7 @@ private fun AccountSettingsScreen(
 
         AlertDialog(
             onDismissRequest = { showTokenEditor = false },
-            title = { Text("Inicio de sesión avanzado") },
+            title = { Text(stringResource("advanced_login")) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -262,7 +268,7 @@ private fun AccountSettingsScreen(
                         textStyle = MaterialTheme.typography.bodySmall,
                     )
                     Text(
-                        text = "Pega el token avanzado de Android para sincronizar cuenta y datos.",
+                        text = stringResource("token_adv_login_description"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -288,16 +294,16 @@ private fun AccountSettingsScreen(
                             showTokenEditor = false
                         }
                     },
-                ) { Text("Guardar") }
+                ) { Text(stringResource("save")) }
             },
             dismissButton = {
-                TextButton(onClick = { showTokenEditor = false }) { Text("Cancelar") }
+                TextButton(onClick = { showTokenEditor = false }) { Text(stringResource("cancel")) }
             },
         )
     }
 
     SettingsSubScreen(
-        title = "Cuenta",
+        title = stringResource("account"),
         onBack = onBack,
     ) {
         SettingsSectionTitle(title = "Google")
@@ -338,9 +344,9 @@ private fun AccountSettingsScreen(
                         text = if (isLoggedIn) {
                             accountInfo?.name
                                 ?: authCredentials?.accountName
-                                ?: "Usuario conectado"
+                                ?: stringResource("account")
                         } else {
-                            "Iniciar sesión"
+                            stringResource("login")
                         },
                         style = MaterialTheme.typography.bodyLarge,
                     )
@@ -350,9 +356,9 @@ private fun AccountSettingsScreen(
                             ?: authCredentials?.channelHandle
                     } else if (!loginEnabled) {
                         if (hasDataSyncId && !hasCookie) {
-                            "Falta la cookie de YouTube. Pega el token avanzado completo."
+                            stringResource("login_requires_cookie")
                         } else {
-                            "No disponible en desktop. Usa inicio de sesión avanzado."
+                            stringResource("login_not_available_desktop")
                         }
                     } else null
                     if (!subtitle.isNullOrBlank()) {
@@ -371,7 +377,7 @@ private fun AccountSettingsScreen(
                             onAuthChanged(null)
                         }
                     }) {
-                        Text("Cerrar sesión")
+                        Text(stringResource("logout"))
                     }
                 } else if (isRefreshing) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp))
@@ -381,11 +387,11 @@ private fun AccountSettingsScreen(
 
         SettingsButton(
             title = if (!isLoggedIn) {
-                "Inicio de sesión avanzado"
+                stringResource("advanced_login")
             } else {
-                if (showToken) "Token visible" else "Token oculto"
+                if (showToken) stringResource("token_shown") else stringResource("token_hidden")
             },
-            subtitle = "Usa el token de Android para sincronizar cuenta",
+            subtitle = stringResource("token_adv_login_description"),
             onClick = {
                 if (!isLoggedIn) {
                     showTokenEditor = true
@@ -400,8 +406,8 @@ private fun AccountSettingsScreen(
 
         if (isLoggedIn) {
             SettingsSwitch(
-                title = "Usar login para explorar",
-                subtitle = "Aplica tu cuenta al navegar y recomendaciones",
+                title = stringResource("use_login_for_browse"),
+                subtitle = stringResource("use_login_for_browse_desc"),
                 checked = useLoginForBrowse,
                 onCheckedChange = {
                     preferences.setUseLoginForBrowse(it)
@@ -410,8 +416,8 @@ private fun AccountSettingsScreen(
             )
 
             SettingsSwitch(
-                title = "YTM Sync",
-                subtitle = "Sincroniza biblioteca y playlists",
+                title = stringResource("ytm_sync"),
+                subtitle = "",
                 checked = ytmSync,
                 onCheckedChange = { preferences.setYtmSync(it) },
             )
@@ -478,24 +484,24 @@ private fun AppearanceSettingsScreen(
     val sliderStyle by preferences.sliderStyle.collectAsState()
 
     SettingsSubScreen(
-        title = "Apariencia",
+        title = stringResource("appearance"),
         onBack = onBack,
     ) {
         // Dark Mode
         SettingsDropdown(
-            title = "Modo oscuro",
+            title = stringResource("dark_theme"),
             subtitle = when (darkMode) {
-                DarkModePreference.ON -> "Oscuro"
-                DarkModePreference.OFF -> "Claro"
-                DarkModePreference.AUTO -> "Sistema"
-                DarkModePreference.TIME_BASED -> "Horario"
+                DarkModePreference.ON -> stringResource("dark_theme_on")
+                DarkModePreference.OFF -> stringResource("dark_theme_off")
+                DarkModePreference.AUTO -> stringResource("dark_theme_follow_system")
+                DarkModePreference.TIME_BASED -> stringResource("dark_theme_time_based")
             },
             options = DarkModePreference.entries.map {
                 when (it) {
-                    DarkModePreference.ON -> "Oscuro"
-                    DarkModePreference.OFF -> "Claro"
-                    DarkModePreference.AUTO -> "Sistema"
-                    DarkModePreference.TIME_BASED -> "Horario"
+                    DarkModePreference.ON -> stringResource("dark_theme_on")
+                    DarkModePreference.OFF -> stringResource("dark_theme_off")
+                    DarkModePreference.AUTO -> stringResource("dark_theme_follow_system")
+                    DarkModePreference.TIME_BASED -> stringResource("dark_theme_time_based")
                 }
             },
             selectedIndex = DarkModePreference.entries.indexOf(darkMode),
@@ -506,16 +512,16 @@ private fun AppearanceSettingsScreen(
 
         // Pure Black
         SettingsSwitch(
-            title = "Negro puro",
-            subtitle = "Usa negro puro en modo oscuro (OLED)",
+            title = stringResource("pure_black"),
+            subtitle = stringResource("pure_black_desc"),
             checked = pureBlack,
             onCheckedChange = { preferences.setPureBlack(it) },
         )
 
         // Dynamic Color
         SettingsSwitch(
-            title = "Color dinámico",
-            subtitle = "Usa colores de la carátula actual",
+            title = stringResource("enable_dynamic_theme"),
+            subtitle = stringResource("enable_dynamic_theme_desc"),
             checked = dynamicColor,
             onCheckedChange = { preferences.setDynamicColor(it) },
         )
@@ -523,7 +529,7 @@ private fun AppearanceSettingsScreen(
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
         SettingsDropdown(
-            title = "Fondo del reproductor",
+            title = stringResource("player_background_style"),
             subtitle = playerBackgroundStyle.displayName,
             options = PlayerBackgroundStyle.entries.map { it.displayName },
             selectedIndex = PlayerBackgroundStyle.entries.indexOf(playerBackgroundStyle),
@@ -533,7 +539,7 @@ private fun AppearanceSettingsScreen(
         )
 
         SettingsDropdown(
-            title = "Estilo de botones",
+            title = stringResource("player_buttons_style"),
             subtitle = playerButtonsStyle.displayName,
             options = PlayerButtonsStyle.entries.map { it.displayName },
             selectedIndex = PlayerButtonsStyle.entries.indexOf(playerButtonsStyle),
@@ -543,7 +549,7 @@ private fun AppearanceSettingsScreen(
         )
 
         SettingsDropdown(
-            title = "Estilo del deslizador",
+            title = stringResource("player_slider_style"),
             subtitle = sliderStyle.displayName,
             options = SliderStyle.entries.map { it.displayName },
             selectedIndex = SliderStyle.entries.indexOf(sliderStyle),
@@ -570,14 +576,24 @@ private fun PlayerSettingsScreen(
     val romanizeLyrics by preferences.romanizeLyrics.collectAsState()
 
     SettingsSubScreen(
-        title = "Reproducción",
+        title = stringResource("player_and_audio"),
         onBack = onBack,
     ) {
+        val audioQualityLabels = mapOf(
+            AudioQuality.LOW to stringResource("audio_quality_low"),
+            AudioQuality.MEDIUM to stringResource("audio_quality_medium"),
+            AudioQuality.HIGH to stringResource("audio_quality_high"),
+            AudioQuality.AUTO to stringResource("audio_quality_auto"),
+        )
+        val audioQualityLabel: (AudioQuality) -> String = { quality ->
+            audioQualityLabels[quality] ?: quality.name.lowercase()
+        }
+
         // Audio Quality
         SettingsDropdown(
-            title = "Calidad de audio",
-            subtitle = audioQuality.displayName,
-            options = AudioQuality.entries.map { it.displayName },
+            title = stringResource("audio_quality"),
+            subtitle = audioQualityLabel(audioQuality),
+            options = AudioQuality.entries.map(audioQualityLabel),
             selectedIndex = AudioQuality.entries.indexOf(audioQuality),
             onSelect = { index ->
                 preferences.setAudioQuality(AudioQuality.entries[index])
@@ -585,16 +601,20 @@ private fun PlayerSettingsScreen(
         )
 
         SettingsSwitch(
-            title = "Normalizar volumen",
-            subtitle = "Iguala el volumen entre canciones (como Android)",
+            title = stringResource("audio_normalization"),
+            subtitle = "",
             checked = normalizeAudio,
             onCheckedChange = { preferences.setNormalizeAudio(it) },
         )
 
         // Historial de reproducción
         SettingsSlider(
-            title = "Duración del historial",
-            subtitle = if (historyDuration <= 0f) "Ilimitado" else "${historyDuration.toInt()} segundos",
+            title = stringResource("history_duration"),
+            subtitle = if (historyDuration <= 0f) {
+                stringResource("unlimited")
+            } else {
+                pluralStringResource("seconds", historyDuration.toInt(), historyDuration.toInt())
+            },
             value = historyDuration.coerceIn(0f, 60f),
             valueRange = 0f..60f,
             steps = 59,
@@ -603,16 +623,20 @@ private fun PlayerSettingsScreen(
 
         // Skip Silence
         SettingsSwitch(
-            title = "Saltar silencios",
-            subtitle = "Salta automáticamente las partes silenciosas",
+            title = stringResource("skip_silence"),
+            subtitle = "",
             checked = skipSilence,
             onCheckedChange = { preferences.setSkipSilence(it) },
         )
 
         // Crossfade
         SettingsSlider(
-            title = "Crossfade",
-            subtitle = if (crossfadeDuration == 0) "Desactivado" else "$crossfadeDuration segundos",
+            title = stringResource("crossfade"),
+            subtitle = if (crossfadeDuration == 0) {
+                stringResource("disabled")
+            } else {
+                pluralStringResource("seconds", crossfadeDuration, crossfadeDuration)
+            },
             value = crossfadeDuration.toFloat(),
             valueRange = 0f..12f,
             steps = 11,
@@ -621,16 +645,16 @@ private fun PlayerSettingsScreen(
 
         // Persistent Queue
         SettingsSwitch(
-            title = "Cola persistente",
-            subtitle = "Restaura la cola al iniciar la app",
+            title = stringResource("persistent_queue"),
+            subtitle = "",
             checked = persistentQueue,
             onCheckedChange = { preferences.setPersistentQueue(it) },
         )
 
         // Auto Start Radio
         SettingsSwitch(
-            title = "Radio automática",
-            subtitle = "Inicia radio cuando termina la cola",
+            title = stringResource("auto_load_more"),
+            subtitle = stringResource("auto_load_more_desc"),
             checked = autoStartRadio,
             onCheckedChange = { preferences.setAutoStartRadio(it) },
         )
@@ -639,16 +663,16 @@ private fun PlayerSettingsScreen(
 
         // Show Lyrics
         SettingsSwitch(
-            title = "Mostrar letras",
-            subtitle = "Muestra letras en el reproductor",
+            title = stringResource("lyrics"),
+            subtitle = "",
             checked = showLyrics,
             onCheckedChange = { preferences.setShowLyrics(it) },
         )
 
         // Romanize Lyrics
         SettingsSwitch(
-            title = "Romanizar letras",
-            subtitle = "Convierte letras asiáticas a romanji",
+            title = stringResource("lyrics_romanization"),
+            subtitle = "",
             checked = romanizeLyrics,
             onCheckedChange = { preferences.setRomanizeLyrics(it) },
             enabled = showLyrics,
@@ -663,73 +687,72 @@ private fun ContentSettingsScreen(
 ) {
     val contentLanguage by preferences.contentLanguage.collectAsState()
     val contentCountry by preferences.contentCountry.collectAsState()
+    val appLanguage by preferences.appLanguage.collectAsState()
     val hideExplicit by preferences.hideExplicit.collectAsState()
     val quickPicks by preferences.quickPicks.collectAsState()
 
-    val languages = listOf(
-        "es" to "Español",
-        "en" to "English",
-        "pt" to "Português",
-        "fr" to "Français",
-        "de" to "Deutsch",
-        "it" to "Italiano",
-        "ja" to "日本語",
-        "ko" to "한국어",
-    )
-
-    val countries = listOf(
-        "ES" to "España",
-        "MX" to "México",
-        "AR" to "Argentina",
-        "US" to "Estados Unidos",
-        "GB" to "Reino Unido",
-        "DE" to "Alemania",
-        "FR" to "Francia",
-        "JP" to "Japón",
-    )
+    val languageCodes = appLanguageOptions()
+    val countryCodes = listOf(SYSTEM_DEFAULT) + CountryCodeToName.keys.toList()
+    val systemDefaultLabel = stringResource("system_default")
+    val languageLabel: (String) -> String = { code ->
+        if (code == SYSTEM_DEFAULT) systemDefaultLabel else LanguageCodeToName[code] ?: code
+    }
+    val countryLabel: (String) -> String = { code ->
+        if (code == SYSTEM_DEFAULT) systemDefaultLabel else CountryCodeToName[code] ?: code
+    }
 
     SettingsSubScreen(
-        title = "Contenido",
+        title = stringResource("content"),
         onBack = onBack,
     ) {
+        SettingsDropdown(
+            title = stringResource("app_language"),
+            subtitle = languageLabel(appLanguage),
+            options = languageCodes.map(languageLabel),
+            selectedIndex = languageCodes.indexOf(appLanguage).coerceAtLeast(0),
+            onSelect = { index ->
+                preferences.setAppLanguage(languageCodes[index])
+            },
+        )
+
         // Language
         SettingsDropdown(
-            title = "Idioma del contenido",
-            subtitle = languages.find { it.first == contentLanguage }?.second ?: contentLanguage,
-            options = languages.map { it.second },
-            selectedIndex = languages.indexOfFirst { it.first == contentLanguage }.coerceAtLeast(0),
+            title = stringResource("content_language"),
+            subtitle = languageLabel(contentLanguage),
+            options = languageCodes.map(languageLabel),
+            selectedIndex = languageCodes.indexOf(contentLanguage).coerceAtLeast(0),
             onSelect = { index ->
-                preferences.setContentLanguage(languages[index].first)
+                preferences.setContentLanguage(languageCodes[index])
             },
         )
 
         // Country
         SettingsDropdown(
-            title = "País/Región",
-            subtitle = countries.find { it.first == contentCountry }?.second ?: contentCountry,
-            options = countries.map { it.second },
-            selectedIndex = countries.indexOfFirst { it.first == contentCountry }.coerceAtLeast(0),
+            title = stringResource("content_country"),
+            subtitle = countryLabel(contentCountry),
+            options = countryCodes.map(countryLabel),
+            selectedIndex = countryCodes.indexOf(contentCountry).coerceAtLeast(0),
             onSelect = { index ->
-                preferences.setContentCountry(countries[index].first)
+                preferences.setContentCountry(countryCodes[index])
             },
         )
 
         // Hide Explicit
         SettingsSwitch(
-            title = "Ocultar contenido explícito",
-            subtitle = "Filtra canciones con contenido explícito",
+            title = stringResource("hide_explicit"),
+            subtitle = stringResource("hide_explicit_desc"),
             checked = hideExplicit,
             onCheckedChange = { preferences.setHideExplicit(it) },
         )
 
         // Quick Picks mode
         SettingsDropdown(
-            title = "Quick picks",
+            title = stringResource("quick_picks"),
             subtitle = when (quickPicks) {
-                QuickPicks.QUICK_PICKS -> "Quick picks"
-                QuickPicks.LAST_LISTEN -> "Última canción escuchada"
+                QuickPicks.QUICK_PICKS -> stringResource("quick_picks")
+                QuickPicks.LAST_LISTEN -> stringResource("last_song_listened")
             },
-            options = listOf("Quick picks", "Última canción escuchada"),
+            options = listOf(stringResource("quick_picks"), stringResource("last_song_listened")),
             selectedIndex = if (quickPicks == QuickPicks.QUICK_PICKS) 0 else 1,
             onSelect = { index ->
                 preferences.setQuickPicks(if (index == 0) QuickPicks.QUICK_PICKS else QuickPicks.LAST_LISTEN)
@@ -747,19 +770,19 @@ private fun PrivacySettingsScreen(
     val pauseSearchHistory by preferences.pauseSearchHistory.collectAsState()
 
     SettingsSubScreen(
-        title = "Privacidad",
+        title = stringResource("privacy"),
         onBack = onBack,
     ) {
         SettingsSwitch(
-            title = "Pausar historial de escucha",
-            subtitle = "No guardar canciones reproducidas",
+            title = stringResource("pause_listen_history"),
+            subtitle = "",
             checked = pauseListenHistory,
             onCheckedChange = { preferences.setPauseListenHistory(it) },
         )
 
         SettingsSwitch(
-            title = "Pausar historial de búsqueda",
-            subtitle = "No guardar búsquedas realizadas",
+            title = stringResource("pause_search_history"),
+            subtitle = "",
             checked = pauseSearchHistory,
             onCheckedChange = { preferences.setPauseSearchHistory(it) },
         )
@@ -771,33 +794,33 @@ private fun PrivacySettingsScreen(
         var showClearSearchDialog by remember { mutableStateOf(false) }
 
         SettingsButton(
-            title = "Borrar historial de escucha",
-            subtitle = "Elimina todo el historial",
+            title = stringResource("clear_listen_history"),
+            subtitle = "",
             onClick = { showClearHistoryDialog = true },
         )
 
         SettingsButton(
-            title = "Borrar historial de búsqueda",
-            subtitle = "Elimina todas las búsquedas",
+            title = stringResource("clear_search_history"),
+            subtitle = "",
             onClick = { showClearSearchDialog = true },
         )
 
         if (showClearHistoryDialog) {
             AlertDialog(
                 onDismissRequest = { showClearHistoryDialog = false },
-                title = { Text("¿Borrar historial?") },
-                text = { Text("Se eliminará todo tu historial de escucha. Esta acción no se puede deshacer.") },
+                title = { Text(stringResource("clear_listen_history")) },
+                text = { Text(stringResource("clear_listen_history_confirm")) },
                 confirmButton = {
                     TextButton(onClick = {
                         // TODO: Clear history via database
                         showClearHistoryDialog = false
                     }) {
-                        Text("Borrar")
+                        Text(stringResource("delete"))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showClearHistoryDialog = false }) {
-                        Text("Cancelar")
+                        Text(stringResource("cancel"))
                     }
                 },
             )
@@ -806,19 +829,19 @@ private fun PrivacySettingsScreen(
         if (showClearSearchDialog) {
             AlertDialog(
                 onDismissRequest = { showClearSearchDialog = false },
-                title = { Text("¿Borrar búsquedas?") },
-                text = { Text("Se eliminará todo tu historial de búsqueda. Esta acción no se puede deshacer.") },
+                title = { Text(stringResource("clear_search_history")) },
+                text = { Text(stringResource("clear_search_history_confirm")) },
                 confirmButton = {
                     TextButton(onClick = {
                         // TODO: Clear search history via database
                         showClearSearchDialog = false
                     }) {
-                        Text("Borrar")
+                        Text(stringResource("delete"))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showClearSearchDialog = false }) {
-                        Text("Cancelar")
+                        Text(stringResource("cancel"))
                     }
                 },
             )
@@ -836,19 +859,19 @@ private fun StorageSettingsScreen(
     val downloadAsMp3 by preferences.downloadAsMp3.collectAsState()
 
     SettingsSubScreen(
-        title = "Almacenamiento",
+        title = stringResource("storage"),
         onBack = onBack,
     ) {
         SettingsSwitch(
-            title = "Descargar en MP3",
-            subtitle = "Requiere FFmpeg instalado en el sistema",
+            title = stringResource("download_as_mp3"),
+            subtitle = stringResource("download_as_mp3_desc"),
             checked = downloadAsMp3,
             onCheckedChange = { preferences.setDownloadAsMp3(it) },
         )
 
         // Image Cache Size
         SettingsSlider(
-            title = "Caché de imágenes",
+            title = stringResource("image_cache"),
             subtitle = "$maxImageCacheSizeMB MB",
             value = maxImageCacheSizeMB.toFloat(),
             valueRange = 100f..2000f,
@@ -858,7 +881,7 @@ private fun StorageSettingsScreen(
 
         // Song Cache Size
         SettingsSlider(
-            title = "Caché de canciones",
+            title = stringResource("song_cache"),
             subtitle = "$maxSongCacheSizeMB MB",
             value = maxSongCacheSizeMB.toFloat(),
             valueRange = 500f..10000f,
@@ -871,8 +894,8 @@ private fun StorageSettingsScreen(
         var showClearCacheDialog by remember { mutableStateOf(false) }
 
         SettingsButton(
-            title = "Limpiar caché",
-            subtitle = "Libera espacio eliminando archivos temporales",
+            title = stringResource("clear_cache"),
+            subtitle = stringResource("clear_cache_desc"),
             onClick = { showClearCacheDialog = true },
         )
 
@@ -880,18 +903,18 @@ private fun StorageSettingsScreen(
             AlertDialog(
                 onDismissRequest = { showClearCacheDialog = false },
                 title = { Text("¿Limpiar caché?") },
-                text = { Text("Se eliminarán las imágenes y datos en caché. Las canciones descargadas no se verán afectadas.") },
+                text = { Text(stringResource("clear_cache_confirm_desc")) },
                 confirmButton = {
                     TextButton(onClick = {
                         // TODO: Clear cache
                         showClearCacheDialog = false
                     }) {
-                        Text("Limpiar")
+                        Text(stringResource("clear"))
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showClearCacheDialog = false }) {
-                        Text("Cancelar")
+                        Text(stringResource("cancel"))
                     }
                 },
             )
@@ -904,7 +927,7 @@ private fun AboutScreen(
     onBack: () -> Unit,
 ) {
     SettingsSubScreen(
-        title = "Acerca de",
+        title = stringResource("about"),
         onBack = onBack,
     ) {
         Surface(
@@ -930,7 +953,7 @@ private fun AboutScreen(
                     style = MaterialTheme.typography.headlineMedium,
                 )
                 Text(
-                    text = "Desktop Edition",
+                    text = stringResource("desktop_edition"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -944,31 +967,31 @@ private fun AboutScreen(
         }
 
         SettingsInfoItem(
-            title = "Versión",
+            title = stringResource("about_version_title"),
             value = "1.0.0-desktop",
         )
 
         SettingsInfoItem(
-            title = "Kotlin",
+            title = stringResource("about_kotlin"),
             value = "2.0+",
         )
 
         SettingsInfoItem(
-            title = "Compose Desktop",
+            title = stringResource("about_compose_desktop"),
             value = "1.7.x",
         )
 
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
         SettingsButton(
-            title = "Código fuente",
-            subtitle = "Ver en GitHub",
+            title = stringResource("about_source_code"),
+            subtitle = stringResource("about_source_code_desc"),
             onClick = { /* TODO: Open GitHub */ },
         )
 
         SettingsButton(
-            title = "Licencias",
-            subtitle = "Bibliotecas de código abierto",
+            title = stringResource("about_licenses"),
+            subtitle = stringResource("about_licenses_desc"),
             onClick = { /* TODO: Show licenses */ },
         )
     }
@@ -992,7 +1015,7 @@ private fun SettingsSubScreen(
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = IconAssets.arrowBack(),
-                    contentDescription = "Volver",
+                    contentDescription = stringResource("back"),
                 )
             }
             Text(
@@ -1250,7 +1273,7 @@ private fun SettingsTextField(
                 onClick = onSave,
                 modifier = Modifier.align(Alignment.End)
             ) {
-                Text("Guardar Cookie")
+                Text(stringResource("save"))
             }
         }
     }

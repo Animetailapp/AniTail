@@ -53,6 +53,8 @@ import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.screen.library.LibraryArtistsScreen
+import com.anitail.desktop.i18n.stringResource
+import com.anitail.desktop.i18n.pluralStringResource
 import com.anitail.shared.model.LibraryItem
 
 /**
@@ -100,26 +102,28 @@ fun LibraryScreenEnhanced(
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
 
-    // Playlists especiales (como Android)
-    val specialPlaylists = remember {
+    val likedLabel = stringResource("liked_songs")
+    val offlineLabel = stringResource("offline")
+    val topLabel = stringResource("my_top")
+    val specialPlaylists = remember(likedLabel, offlineLabel, topLabel) {
         listOf(
             SpecialPlaylist(
                 id = "liked",
-                name = "Me gusta",
+                name = likedLabel,
                 icon = IconAssets.favorite(),
                 iconTint = Color(0xFFE91E63),
                 songCount = 0,
             ),
             SpecialPlaylist(
                 id = "offline",
-                name = "Sin conexión",
+                name = offlineLabel,
                 icon = IconAssets.download(),
                 iconTint = Color(0xFF4CAF50),
                 songCount = 0,
             ),
             SpecialPlaylist(
                 id = "top50",
-                name = "Mi Top 50",
+                name = topLabel,
                 icon = IconAssets.trendingUp(),
                 iconTint = Color(0xFFFF9800),
                 songCount = 0,
@@ -151,12 +155,12 @@ fun LibraryScreenEnhanced(
                 showCreatePlaylistDialog = false
                 newPlaylistName = ""
             },
-            title = { Text("Nueva Playlist") },
+            title = { Text(stringResource("create_playlist")) },
             text = {
                 OutlinedTextField(
                     value = newPlaylistName,
                     onValueChange = { newPlaylistName = it },
-                    label = { Text("Nombre") },
+                    label = { Text(stringResource("playlist_name")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -171,7 +175,7 @@ fun LibraryScreenEnhanced(
                         }
                     },
                 ) {
-                    Text("Crear")
+                    Text(stringResource("create_playlist"))
                 }
             },
             dismissButton = {
@@ -179,22 +183,22 @@ fun LibraryScreenEnhanced(
                     showCreatePlaylistDialog = false
                     newPlaylistName = ""
                 }) {
-                    Text("Cancelar")
+                    Text(stringResource("cancel"))
                 }
             },
         )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        NavigationTitle(title = "Biblioteca")
+        NavigationTitle(title = stringResource("filter_library"))
         ChipsRow(
             chips = listOf(
-                LibraryFilterType.MIXES to "Mixes",
-                LibraryFilterType.PLAYLISTS to "Playlists",
-                LibraryFilterType.CANCIONES to "Canciones",
-                LibraryFilterType.ALBUMES to "Álbumes",
-                LibraryFilterType.ARTISTAS to "Artistas",
-                LibraryFilterType.DESCARGAS to "Descargas",
+                LibraryFilterType.MIXES to stringResource("filter_library"),
+                LibraryFilterType.PLAYLISTS to stringResource("filter_playlists"),
+                LibraryFilterType.CANCIONES to stringResource("filter_songs"),
+                LibraryFilterType.ALBUMES to stringResource("filter_albums"),
+                LibraryFilterType.ARTISTAS to stringResource("filter_artists"),
+                LibraryFilterType.DESCARGAS to stringResource("filter_downloaded"),
             ),
             currentValue = currentFilter,
             onValueUpdate = { filter ->
@@ -283,12 +287,12 @@ private fun LibraryMixContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Playlists",
+                        text = stringResource("playlists"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                     )
                     IconButton(onClick = onCreatePlaylist) {
-                        Icon(IconAssets.add(), contentDescription = "Crear playlist")
+                        Icon(IconAssets.add(), contentDescription = stringResource("create_playlist"))
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -338,7 +342,7 @@ private fun LibraryMixContent(
         if (artists.isNotEmpty()) {
             item {
                 Text(
-                    text = "Artistas",
+                    text = stringResource("artists"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
@@ -369,7 +373,7 @@ private fun LibraryMixContent(
         if (albums.isNotEmpty()) {
             item {
                 Text(
-                    text = "Álbumes",
+                    text = stringResource("albums"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
@@ -400,7 +404,7 @@ private fun LibraryMixContent(
         if (songs.isNotEmpty()) {
             item {
                 Text(
-                    text = "Canciones añadidas recientemente",
+                    text = stringResource("songs"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
@@ -584,7 +588,7 @@ private fun SpecialPlaylistCard(
                 )
                 if (playlist.songCount > 0) {
                     Text(
-                        text = "${playlist.songCount} canciones",
+                        text = pluralStringResource("n_song", playlist.songCount, playlist.songCount),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -622,7 +626,7 @@ private fun CreatePlaylistCard(
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    text = "Nueva Playlist",
+                    text = stringResource("create_playlist"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -796,7 +800,7 @@ private fun SongListItem(
             IconButton(onClick = { onPlay(item) }) {
                 Icon(
                     imageVector = IconAssets.play(),
-                    contentDescription = "Reproducir",
+                    contentDescription = stringResource("play"),
                 )
             }
         }

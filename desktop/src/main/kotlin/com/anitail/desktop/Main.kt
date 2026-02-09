@@ -20,6 +20,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -60,6 +61,11 @@ import com.anitail.desktop.home.buildAllYtItems
 import com.anitail.desktop.home.buildHomeRecommendations
 import com.anitail.desktop.home.resolveLocalItemType
 import com.anitail.desktop.home.selectShuffleSource
+import com.anitail.desktop.i18n.AndroidStringLoader
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.resolveContentCountry
+import com.anitail.desktop.i18n.resolveContentLanguage
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.model.SimilarRecommendation
 import com.anitail.desktop.player.buildRadioQueuePlan
 import com.anitail.desktop.player.rememberPlayerState
@@ -127,6 +133,7 @@ import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import java.awt.geom.Rectangle2D
 import java.awt.geom.RoundRectangle2D
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -383,6 +390,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val playerState = rememberPlayerState()
+    val appLanguage by preferences.appLanguage.collectAsState()
+    val strings = remember(appLanguage) { AndroidStringLoader.load(appLanguage) }
     val darkMode by preferences.darkMode.collectAsState()
     val pureBlackEnabled by preferences.pureBlack.collectAsState()
     val dynamicColorEnabled by preferences.dynamicColor.collectAsState()
@@ -403,6 +412,10 @@ private fun FrameWindowScope.AniTailDesktopApp(
     var accountInfo by remember { mutableStateOf<AccountInfo?>(null) }
     var syncStatus by remember { mutableStateOf<String?>(null) }
     var wasSyncing by remember { mutableStateOf(false) }
+
+    LaunchedEffect(strings.locale) {
+        Locale.setDefault(strings.locale)
+    }
 
     LaunchedEffect(authCredentials?.cookie) {
         accountInfo = authService.refreshAccountInfo()
@@ -605,8 +618,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
         YouTube.dataSyncId = normalizeDataSyncId(credentials?.dataSyncId)
         YouTube.useLoginForBrowse = useLoginForBrowse
         YouTube.locale = com.anitail.innertube.models.YouTubeLocale(
-            hl = contentLanguage,
-            gl = contentCountry
+            hl = resolveContentLanguage(contentLanguage),
+            gl = resolveContentCountry(contentCountry)
         )
         println("Anitail: YouTube API initialized with Cookie: ${youtubeCookie?.take(20)}..., Locale: $contentLanguage-$contentCountry")
     }
@@ -626,8 +639,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
         YouTube.dataSyncId = normalizeDataSyncId(credentials?.dataSyncId)
         YouTube.useLoginForBrowse = useLoginForBrowse
         YouTube.locale = com.anitail.innertube.models.YouTubeLocale(
-            hl = contentLanguage,
-            gl = contentCountry
+            hl = resolveContentLanguage(contentLanguage),
+            gl = resolveContentCountry(contentCountry)
         )
         
         homePage = null
@@ -833,33 +846,34 @@ private fun FrameWindowScope.AniTailDesktopApp(
         currentScreen = DesktopScreen.AlbumDetail
     }
 
-    AnitailTheme(
-        darkMode = darkMode,
-        pureBlack = pureBlackEnabled,
-        themeColor = themeColor,
-    ) {
-        val windowCornerRadius = 12.dp
-        var snapMode by remember { mutableStateOf(WindowSnapMode.FLOATING) }
-        var windowBounds by remember { mutableStateOf(window.bounds) }
-        val isMaximizedByBounds = isWindowAtWorkArea(
-            getVisualBoundsForSnap(window, windowBounds),
-            getWorkAreaForWindow(window),
-        )
-        val isSnapped = snapMode != WindowSnapMode.FLOATING || isMaximizedByBounds
-        val showMaximizedState = isSnapped
-        val lastFloatingBounds = remember { mutableStateOf(window.bounds) }
-        val windowShape: Shape = if (isSnapped) {
-            RoundedCornerShape(0.dp)
-        } else {
-            RoundedCornerShape(windowCornerRadius)
-        }
-        val density = LocalDensity.current
-        val topBarHeight = 48.dp
-        val borderColor = if (pureBlackEnabled) {
-            Color(0xFF2A2A2A)
-        } else {
-            MaterialTheme.colorScheme.outlineVariant
-        }
+    CompositionLocalProvider(LocalStrings provides strings) {
+        AnitailTheme(
+            darkMode = darkMode,
+            pureBlack = pureBlackEnabled,
+            themeColor = themeColor,
+        ) {
+            val windowCornerRadius = 12.dp
+            var snapMode by remember { mutableStateOf(WindowSnapMode.FLOATING) }
+            var windowBounds by remember { mutableStateOf(window.bounds) }
+            val isMaximizedByBounds = isWindowAtWorkArea(
+                getVisualBoundsForSnap(window, windowBounds),
+                getWorkAreaForWindow(window),
+            )
+            val isSnapped = snapMode != WindowSnapMode.FLOATING || isMaximizedByBounds
+            val showMaximizedState = isSnapped
+            val lastFloatingBounds = remember { mutableStateOf(window.bounds) }
+            val windowShape: Shape = if (isSnapped) {
+                RoundedCornerShape(0.dp)
+            } else {
+                RoundedCornerShape(windowCornerRadius)
+            }
+            val density = LocalDensity.current
+            val topBarHeight = 48.dp
+            val borderColor = if (pureBlackEnabled) {
+                Color(0xFF2A2A2A)
+            } else {
+                MaterialTheme.colorScheme.outlineVariant
+            }
 
         LaunchedEffect(Unit) {
             windowState.isMinimized = false
@@ -876,7 +890,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
             }
         }
 
-        DisposableEffect(window, windowState.placement, density) {
+            DisposableEffect(window, windowState.placement, density) {
             fun updateWindowBounds() {
                 val bounds = window.bounds
                 if (bounds != windowBounds) {
@@ -1749,7 +1763,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     NavigationBarItem(
                         selected = currentScreen == DesktopScreen.Home,
                         onClick = { currentScreen = DesktopScreen.Home },
-                        label = { Text("Inicio") },
+                        label = { Text(stringResource("home")) },
                         icon = {
                             val selected = currentScreen == DesktopScreen.Home
                             Icon(
@@ -1762,7 +1776,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     NavigationBarItem(
                         selected = currentScreen == DesktopScreen.Explore,
                         onClick = { currentScreen = DesktopScreen.Explore },
-                        label = { Text("Explorar") },
+                        label = { Text(stringResource("explore")) },
                         icon = {
                             val selected = currentScreen == DesktopScreen.Explore
                             Icon(
@@ -1775,7 +1789,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     NavigationBarItem(
                         selected = currentScreen == DesktopScreen.Library,
                         onClick = { currentScreen = DesktopScreen.Library },
-                        label = { Text("Biblioteca") },
+                        label = { Text(stringResource("filter_library")) },
                         icon = {
                             val selected = currentScreen == DesktopScreen.Library
                             Icon(
@@ -1787,6 +1801,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     )
                 }
             }
+        }
         }
     }
 

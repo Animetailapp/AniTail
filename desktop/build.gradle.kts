@@ -12,6 +12,12 @@ kotlin {
     jvmToolchain(21)
 }
 
+tasks.named<ProcessResources>("processResources") {
+    from("../app/src/main/res") {
+        include("values/**", "values-*/**")
+    }
+}
+
 val javafxVersion = "21.0.2"
 val javafxPlatform = when {
     OperatingSystem.current().isWindows -> "win"

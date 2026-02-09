@@ -19,6 +19,7 @@ import com.anitail.desktop.ui.screen.library.MixSortType
 import com.anitail.desktop.ui.screen.library.PlaylistSortType
 import com.anitail.desktop.ui.screen.library.SongFilter
 import com.anitail.desktop.ui.screen.library.SongSortType
+import com.anitail.desktop.i18n.SYSTEM_DEFAULT
 
 /**
  * Desktop preferences storage system.
@@ -78,6 +79,9 @@ class DesktopPreferences private constructor(
 
     private val _contentCountry = MutableStateFlow("ES")
     val contentCountry: StateFlow<String> = _contentCountry.asStateFlow()
+
+    private val _appLanguage = MutableStateFlow(SYSTEM_DEFAULT)
+    val appLanguage: StateFlow<String> = _appLanguage.asStateFlow()
 
     private val _hideExplicit = MutableStateFlow(false)
     val hideExplicit: StateFlow<Boolean> = _hideExplicit.asStateFlow()
@@ -268,6 +272,11 @@ class DesktopPreferences private constructor(
 
     fun setContentCountry(value: String) {
         _contentCountry.value = value
+        save()
+    }
+
+    fun setAppLanguage(value: String) {
+        _appLanguage.value = value
         save()
     }
 
@@ -477,6 +486,7 @@ class DesktopPreferences private constructor(
 
             _contentLanguage.value = json.optString("contentLanguage", "es")
             _contentCountry.value = json.optString("contentCountry", "ES")
+            _appLanguage.value = json.optString("appLanguage", SYSTEM_DEFAULT)
             _hideExplicit.value = json.optBoolean("hideExplicit", false)
             _quickPicks.value = QuickPicks.fromString(json.optString("quickPicks", "quick_picks"))
             _useLoginForBrowse.value = json.optBoolean("useLoginForBrowse", true)
@@ -557,6 +567,7 @@ class DesktopPreferences private constructor(
 
                 put("contentLanguage", _contentLanguage.value)
                 put("contentCountry", _contentCountry.value)
+                put("appLanguage", _appLanguage.value)
                 put("hideExplicit", _hideExplicit.value)
                 put("quickPicks", _quickPicks.value.name.lowercase())
                 put("useLoginForBrowse", _useLoginForBrowse.value)
