@@ -116,14 +116,19 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            label: Linux AppImage
+            label: Linux DEB
             gradle_cmd: ./gradlew
-            gradle_task: :desktop:packageAppImage
-            artifact_name: desktop-appimage-release
+            gradle_task: :desktop:packageReleaseDeb
+            artifact_name: desktop-deb-release
+          - os: ubuntu-latest
+            label: Linux RPM
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageReleaseRpm
+            artifact_name: desktop-rpm-release
           - os: macos-latest
             label: macOS DMG
             gradle_cmd: ./gradlew
-            gradle_task: :desktop:packageDmg
+            gradle_task: :desktop:packageReleaseDmg
             artifact_name: desktop-dmg-release
           - os: windows-latest
             label: Windows MSI
@@ -148,6 +153,10 @@ jobs:
       - name: Grant execute permission for gradlew
         if: runner.os != 'Windows'
         run: chmod +x gradlew
+      
+      - name: Install RPM tools
+        if: matrix.label == 'Linux RPM'
+        run: sudo apt-get update && sudo apt-get install -y rpm
 
       - name: Build Desktop Release Package
         run: ${{ matrix.gradle_cmd }} ${{ matrix.gradle_task }}

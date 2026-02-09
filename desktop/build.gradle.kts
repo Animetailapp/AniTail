@@ -72,11 +72,20 @@ compose.desktop {
             val formats = when {
                 os.isMacOsX -> listOf(TargetFormat.Dmg)
                 os.isWindows -> listOf(TargetFormat.Msi)
-                else -> listOf(TargetFormat.AppImage)
+                else -> listOf(TargetFormat.Deb, TargetFormat.Rpm)
             }
             targetFormats(*formats.toTypedArray())
             packageName = "AniTail"
             packageVersion = "1.13.1"
+            macOS {
+                iconFile.set(project.file("src/main/resources/drawable/ic_anitail.icns"))
+                bundleID = "com.anitail.desktop"
+            }
+            linux {
+                iconFile.set(project.file("src/main/resources/drawable/ic_anitail.png"))
+                shortcut = true
+                menuGroup = "AniTail"
+            }
             windows {
                 iconFile.set(project.file("src/main/resources/drawable/ic_anitail.ico"))
                 menuGroup = "AniTail"
