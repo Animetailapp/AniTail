@@ -265,27 +265,6 @@ fun ExploreScreen(
         )
     }
 
-    fun menuActionsForAlbum(
-        album: AlbumItem,
-    ): List<ContextMenuAction> {
-        return listOf(
-            ContextMenuAction(
-                label = "Abrir",
-                icon = IconAssets.info(),
-                onClick = { onOpenAlbum(album.browseId, album.title) },
-            ),
-            ContextMenuAction(
-                label = "Copiar enlace",
-                icon = IconAssets.link(),
-                onClick = { copyToClipboard(album.shareLink) },
-            ),
-            ContextMenuAction(
-                label = "Compartir",
-                icon = IconAssets.share(),
-                onClick = { copyToClipboard(album.shareLink) },
-            ),
-        )
-    }
 
     Column(
         modifier = Modifier
@@ -378,7 +357,11 @@ fun ExploreScreen(
                             isActive = false,
                             isPlaying = false,
                             libraryItem = albumLibraryItem,
-                            menuActions = menuActionsForAlbum(album),
+                            menuActions = buildExploreAlbumMenuActions(
+                                album = album,
+                                onOpenAlbum = onOpenAlbum,
+                                copyToClipboard = ::copyToClipboard,
+                            ),
                             songEntity = null,
                             downloadState = null,
                             isDownloaded = false,

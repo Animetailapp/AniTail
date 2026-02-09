@@ -1,2 +1,5 @@
 # Desktop Proguard rules.
-# Start minimal; add keep rules here if shrinker removes reflection-based classes.
+# We don't obfuscate or optimize, and we suppress unresolved references from
+# optional runtime-only libraries to keep the release build working.
+-ignorewarnings
+-dontwarn **
