@@ -72,7 +72,13 @@ compose.desktop {
     application {
         mainClass = "com.anitail.desktop.MainKt"
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.AppImage)
+            val os = OperatingSystem.current()
+            val formats = when {
+                os.isMacOsX -> listOf(TargetFormat.Dmg)
+                os.isWindows -> listOf(TargetFormat.Msi)
+                else -> listOf(TargetFormat.AppImage)
+            }
+            targetFormats(*formats.toTypedArray())
             packageName = "AniTail"
             packageVersion = "1.13.1"
         }

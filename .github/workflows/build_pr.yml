@@ -46,7 +46,7 @@ jobs:
           name: app-universal-debug
           path: app/build/outputs/apk/universal/debug/*.apk
 
-  desktop_debug:
+  desktop_release:
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -56,15 +56,15 @@ jobs:
           - os: ubuntu-latest
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageAppImage
-            artifact_name: desktop-appimage-debug
+            artifact_name: desktop-appimage-release
           - os: macos-latest
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageDmg
-            artifact_name: desktop-dmg-debug
+            artifact_name: desktop-dmg-release
           - os: windows-latest
             gradle_cmd: ./gradlew.bat
             gradle_task: :desktop:packageMsi
-            artifact_name: desktop-msi-debug
+            artifact_name: desktop-msi-release
 
     steps:
       - uses: actions/checkout@v6
@@ -80,12 +80,12 @@ jobs:
         if: runner.os != 'Windows'
         run: chmod +x gradlew
 
-      - name: Build Desktop Debug Package
+      - name: Build Desktop Release Package
         run: ${{ matrix.gradle_cmd }} ${{ matrix.gradle_task }}
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
 
-      - name: Upload Desktop Debug Artifact
+      - name: Upload Desktop Release Artifact
         uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact_name }}
