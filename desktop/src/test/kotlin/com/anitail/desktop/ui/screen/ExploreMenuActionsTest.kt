@@ -1,39 +1,43 @@
 package com.anitail.desktop.ui.screen
 
-import com.anitail.innertube.models.AlbumItem
-import com.anitail.innertube.models.Artist
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class ExploreMenuActionsTest {
     @Test
     fun buildExploreAlbumMenuActionsMatchesAndroidOrderAndCallbacks() {
-        val album = AlbumItem(
-            browseId = "browse123",
-            playlistId = "playlist123",
-            title = "Nuevo Album",
-            artists = listOf(Artist(name = "Artista", id = "artist123")),
-            thumbnail = "https://example.com/cover.jpg",
-        )
-        val opened = mutableListOf<Pair<String, String?>>()
-        val copied = mutableListOf<String>()
+        val calls = mutableListOf<String>()
 
         val actions = buildExploreAlbumMenuActions(
-            album = album,
-            onOpenAlbum = { id, title -> opened.add(id to title) },
-            copyToClipboard = { copied.add(it) },
+            hasArtists = true,
+            downloadLabel = "Descargar",
+            downloadEnabled = true,
+            onStartRadio = { calls.add("radio") },
+            onPlayNext = { calls.add("next") },
+            onAddToQueue = { calls.add("queue") },
+            onAddToPlaylist = { calls.add("playlist") },
+            onDownload = { calls.add("download") },
+            onOpenArtist = { calls.add("artist") },
+            onShare = { calls.add("share") },
         )
 
         assertEquals(
-            listOf("Abrir", "Copiar enlace", "Compartir"),
+            listOf(
+                "Iniciar radio",
+                "Reproducir siguiente",
+                "Agregar a la cola",
+                "Agregar a playlist",
+                "Descargar",
+                "Ir al artista",
+                "Compartir",
+            ),
             actions.map { it.label },
         )
 
-        actions[0].onClick()
-        actions[1].onClick()
-        actions[2].onClick()
-
-        assertEquals(listOf(album.browseId to album.title), opened)
-        assertEquals(listOf(album.shareLink, album.shareLink), copied)
+        actions.forEach { it.onClick() }
+        assertEquals(
+            listOf("radio", "next", "queue", "playlist", "download", "artist", "share"),
+            calls,
+        )
     }
 }

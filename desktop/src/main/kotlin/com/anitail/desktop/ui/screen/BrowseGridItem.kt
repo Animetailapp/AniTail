@@ -59,7 +59,9 @@ fun BrowseGridItem(
     songEntity: SongEntity?,
     downloadState: DownloadState?,
     isDownloaded: Boolean,
+    menuHeader: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     onClick: () -> Unit,
+    onMenuOpened: (() -> Unit)? = null,
     onAlbumPlay: () -> Unit,
 ) {
     val menuExpanded = remember(item.id) { mutableStateOf(false) }
@@ -85,6 +87,7 @@ fun BrowseGridItem(
                     onClick = onClick,
                     onLongClick = {
                         if (menuActions.isNotEmpty()) {
+                            onMenuOpened?.invoke()
                             menuExpanded.value = true
                         }
                     },
@@ -159,6 +162,9 @@ fun BrowseGridItem(
             onDismiss = { menuExpanded.value = false },
             item = libraryItem,
             actions = menuActions,
+            headerContent = menuHeader?.let { header ->
+                { header { menuExpanded.value = false } }
+            },
         )
     }
 }

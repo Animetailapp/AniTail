@@ -45,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -57,13 +58,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.db.DesktopDatabase
+import com.anitail.desktop.db.entities.AlbumEntity
 import com.anitail.desktop.db.entities.PlaylistEntity
 import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.mapper.extractVideoId
+import com.anitail.desktop.db.mapper.toAlbumEntity
 import com.anitail.desktop.db.mapper.toLibraryItem
 import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadState
+import com.anitail.desktop.download.DownloadStatus
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.player.buildRadioQueuePlan
 import com.anitail.desktop.ui.IconAssets
@@ -129,8 +133,10 @@ fun ExploreScreen(
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
     val downloadStates by downloadService.downloadStates.collectAsState()
     var pendingPlaylistItem by remember { mutableStateOf<ExploreSongTarget?>(null) }
+    var pendingAlbumPlaylist by remember { mutableStateOf<AlbumItem?>(null) }
     var detailsItem by remember { mutableStateOf<LibraryItem?>(null) }
     var pendingArtists by remember { mutableStateOf<List<Artist>>(emptyList()) }
+    val albumMenuStates = remember { mutableStateMapOf<String, AlbumMenuState>() }
 
     fun copyToClipboard(text: String) {
         Toolkit.getDefaultToolkit()
@@ -159,6 +165,151 @@ fun ExploreScreen(
             if (queue.isNotEmpty()) {
                 playerState.playQueue(queue, startIndex = 0)
             }
+        }
+    }
+
+    suspend fun loadAlbumSongs(album: AlbumItem): List<SongItem> {
+        val albumPage = withContext(Dispatchers.IO) {
+            YouTube.album(album.browseId).getOrNull()
+        }
+        if (albumPage != null && albumPage.songs.isNotEmpty()) {
+            return albumPage.songs
+        }
+        return withContext(Dispatchers.IO) {
+            YouTube.albumSongs(album.playlistId, album).getOrNull().orEmpty()
+        }
+    }
+
+    fun ensureAlbumMenuState(album: AlbumItem) {
+        if (albumMenuStates.containsKey(album.browseId)) return
+        coroutineScope.launch {
+            val songs = loadAlbumSongs(album)
+            albumMenuStates[album.browseId] = AlbumMenuState(songs)
+        }
+    }
+
+    fun resolveAlbumDownloadMenuState(albumSongs: List<SongItem>): AlbumDownloadMenuState {
+        if (albumSongs.isEmpty()) {
+            return AlbumDownloadMenuState(
+                label = "Descargar",
+                action = AlbumDownloadAction.DOWNLOAD,
+            )
+        }
+        val downloadedIds = downloadedSongs.map { it.songId }.toSet()
+        val statuses = albumSongs.mapNotNull { song -> downloadStates[song.id]?.status }
+        val allDownloaded = albumSongs.all { song -> downloadedIds.contains(song.id) }
+        val anyActive = statuses.any { status ->
+            status == DownloadStatus.QUEUED || status == DownloadStatus.DOWNLOADING
+        }
+        return when {
+            allDownloaded -> AlbumDownloadMenuState(
+                label = "Eliminar descarga",
+                action = AlbumDownloadAction.REMOVE,
+            )
+            anyActive -> AlbumDownloadMenuState(
+                label = "Descargando",
+                action = AlbumDownloadAction.CANCEL,
+            )
+            else -> AlbumDownloadMenuState(
+                label = "Descargar",
+                action = AlbumDownloadAction.DOWNLOAD,
+            )
+        }
+    }
+
+    fun menuActionsForAlbum(
+        album: AlbumItem,
+        albumSongs: List<SongItem>,
+    ): List<ContextMenuAction> {
+        val downloadMenu = resolveAlbumDownloadMenuState(albumSongs)
+        val artistCandidates = album.artists.orEmpty()
+        return buildExploreAlbumMenuActions(
+            hasArtists = artistCandidates.isNotEmpty(),
+            downloadLabel = downloadMenu.label,
+            downloadEnabled = true,
+            onStartRadio = {
+                coroutineScope.launch {
+                    val songs = if (albumSongs.isEmpty()) loadAlbumSongs(album) else albumSongs
+                    val firstSong = songs.firstOrNull() ?: return@launch
+                    val libraryItem = songItemToLibraryItem(firstSong)
+                    val result = YouTube.next(WatchEndpoint(videoId = firstSong.id)).getOrNull() ?: return@launch
+                    val plan = buildRadioQueuePlan(libraryItem, result)
+                    playerState.playQueue(plan.items, plan.startIndex)
+                }
+            },
+            onPlayNext = {
+                coroutineScope.launch {
+                    val songs = if (albumSongs.isEmpty()) loadAlbumSongs(album) else albumSongs
+                    val items = songs.map { songItemToLibraryItem(it) }
+                    items.asReversed().forEach { item ->
+                        playerState.addToQueue(item, playNext = true)
+                    }
+                }
+            },
+            onAddToQueue = {
+                coroutineScope.launch {
+                    val songs = if (albumSongs.isEmpty()) loadAlbumSongs(album) else albumSongs
+                    songs.map { songItemToLibraryItem(it) }.forEach { item ->
+                        playerState.addToQueue(item)
+                    }
+                }
+            },
+            onAddToPlaylist = { pendingAlbumPlaylist = album },
+            onDownload = {
+                coroutineScope.launch {
+                    val songs = if (albumSongs.isEmpty()) loadAlbumSongs(album) else albumSongs
+                    when (downloadMenu.action) {
+                        AlbumDownloadAction.DOWNLOAD -> {
+                            songs.forEach { song ->
+                                downloadService.downloadSong(
+                                    songId = song.id,
+                                    title = song.title,
+                                    artist = song.artists.joinToString { it.name },
+                                    album = album.title,
+                                    thumbnailUrl = song.thumbnail,
+                                    duration = song.duration ?: 0,
+                                )
+                            }
+                        }
+                        AlbumDownloadAction.CANCEL -> {
+                            songs.forEach { song ->
+                                downloadService.cancelDownload(song.id)
+                            }
+                        }
+                        AlbumDownloadAction.REMOVE -> {
+                            songs.forEach { song ->
+                                downloadService.deleteDownload(song.id)
+                            }
+                        }
+                    }
+                }
+            },
+            onOpenArtist = openArtist@{
+                when {
+                    artistCandidates.size == 1 -> {
+                        val artist = artistCandidates.first()
+                        val artistId = artist.id ?: return@openArtist
+                        onOpenArtist(artistId, artist.name)
+                    }
+                    artistCandidates.size > 1 -> {
+                        pendingArtists = artistCandidates
+                    }
+                }
+            },
+            onShare = { copyToClipboard(album.shareLink) },
+        )
+    }
+
+    suspend fun addAlbumSongsToPlaylist(
+        album: AlbumItem,
+        playlistId: String,
+    ) {
+        val songs = loadAlbumSongs(album)
+        if (songs.isEmpty()) return
+        songs.forEach { song ->
+            val entity = song.toSongEntity(inLibrary = true)
+            database.insertSong(entity)
+            database.addSongToPlaylist(playlistId, song.id)
         }
     }
     fun menuActionsForSong(
@@ -324,6 +475,35 @@ fun ExploreScreen(
                                 downloadState = downloadState,
                                 isDownloaded = isDownloaded,
                                 menuActions = menuActionsForSong(libraryItem, song),
+                                menuHeader = { onDismiss ->
+                                    SongMenuHeader(
+                                        title = song.title,
+                                        subtitle = joinByBullet(
+                                            song.artists.joinToString { it.name },
+                                            song.duration?.let { formatTime(it * 1000L) },
+                                        ).orEmpty(),
+                                        thumbnailUrl = song.thumbnail,
+                                        isLiked = songEntity?.liked == true,
+                                        onToggleLike = {
+                                            coroutineScope.launch {
+                                                if (songEntity == null) {
+                                                    database.insertSong(song.toSongEntity(inLibrary = true).toggleLike())
+                                                } else {
+                                                    database.toggleSongLike(song.id)
+                                                }
+                                            }
+                                            onDismiss()
+                                        },
+                                        onPlayNext = {
+                                            playerState.addToQueue(libraryItem, playNext = true)
+                                        },
+                                        onAddToPlaylist = {
+                                            pendingPlaylistItem = ExploreSongTarget(libraryItem, song)
+                                        },
+                                        onShare = { copyToClipboard(song.shareLink) },
+                                        onDismiss = onDismiss,
+                                    )
+                                },
                                 onClick = {
                                     if (isActive) {
                                         playerState.togglePlayPause()
@@ -352,20 +532,42 @@ fun ExploreScreen(
                         key = { it.id },
                     ) { album ->
                         val albumLibraryItem = albumItemToLibraryItem(album)
+                        val albumEntity by database.album(album.browseId).collectAsState(initial = null)
+                        val albumMenuState = albumMenuStates[album.browseId]
+                        val albumSongs = albumMenuState?.songs.orEmpty()
                         ExploreGridItem(
                             item = album,
                             isActive = false,
                             isPlaying = false,
                             libraryItem = albumLibraryItem,
-                            menuActions = buildExploreAlbumMenuActions(
-                                album = album,
-                                onOpenAlbum = onOpenAlbum,
-                                copyToClipboard = ::copyToClipboard,
-                            ),
+                            menuActions = menuActionsForAlbum(album, albumSongs),
                             songEntity = null,
                             downloadState = null,
                             isDownloaded = false,
                             onClick = { onOpenAlbum(album.browseId, album.title) },
+                            onMenuOpened = {
+                                if (albumEntity == null) {
+                                    coroutineScope.launch {
+                                        database.insertAlbum(album.toAlbumEntity())
+                                    }
+                                }
+                                ensureAlbumMenuState(album)
+                            },
+                            menuHeader = { onDismiss ->
+                                ExploreAlbumMenuHeader(
+                                    album = album,
+                                    albumEntity = albumEntity,
+                                    onToggleLike = {
+                                        coroutineScope.launch {
+                                            if (albumEntity == null) {
+                                                database.insertAlbum(album.toAlbumEntity())
+                                            }
+                                            database.toggleAlbumBookmark(album.browseId)
+                                        }
+                                        onDismiss()
+                                    },
+                                )
+                            },
                             onAlbumPlay = { playAlbum(album) },
                         )
                     }
@@ -402,6 +604,35 @@ fun ExploreScreen(
                                 } else {
                                     onPlay(libraryItem)
                                 }
+                            },
+                            menuHeader = { onDismiss ->
+                                SongMenuHeader(
+                                    title = video.title,
+                                    subtitle = joinByBullet(
+                                        video.artists.joinToString { it.name },
+                                        video.duration?.let { formatTime(it * 1000L) },
+                                    ).orEmpty(),
+                                    thumbnailUrl = video.thumbnail,
+                                    isLiked = songEntity?.liked == true,
+                                    onToggleLike = {
+                                        coroutineScope.launch {
+                                            if (songEntity == null) {
+                                                database.insertSong(video.toSongEntity(inLibrary = true).toggleLike())
+                                            } else {
+                                                database.toggleSongLike(video.id)
+                                            }
+                                        }
+                                        onDismiss()
+                                    },
+                                    onPlayNext = {
+                                        playerState.addToQueue(libraryItem, playNext = true)
+                                    },
+                                    onAddToPlaylist = {
+                                        pendingPlaylistItem = ExploreSongTarget(libraryItem, video)
+                                    },
+                                    onShare = { copyToClipboard(video.shareLink) },
+                                    onDismiss = onDismiss,
+                                )
                             },
                         )
                     }
@@ -465,6 +696,28 @@ fun ExploreScreen(
         )
     }
 
+    pendingAlbumPlaylist?.let { album ->
+        PlaylistPickerDialog(
+            visible = true,
+            playlists = playlists,
+            onCreatePlaylist = { name ->
+                val playlist = PlaylistEntity(name = name)
+                coroutineScope.launch {
+                    database.insertPlaylist(playlist)
+                    addAlbumSongsToPlaylist(album, playlist.id)
+                }
+                pendingAlbumPlaylist = null
+            },
+            onSelectPlaylist = { playlist ->
+                coroutineScope.launch {
+                    addAlbumSongsToPlaylist(album, playlist.id)
+                }
+                pendingAlbumPlaylist = null
+            },
+            onDismiss = { pendingAlbumPlaylist = null },
+        )
+    }
+
     ArtistPickerDialog(
         visible = pendingArtists.isNotEmpty(),
         artists = pendingArtists,
@@ -498,6 +751,7 @@ private fun ExploreChartListItem(
     downloadState: DownloadState?,
     isDownloaded: Boolean,
     menuActions: List<ContextMenuAction>,
+    menuHeader: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     val menuExpanded = remember(song.id) { mutableStateOf(false) }
@@ -607,6 +861,9 @@ private fun ExploreChartListItem(
                 onDismiss = { menuExpanded.value = false },
                 item = libraryItem,
                 actions = menuActions,
+                headerContent = menuHeader?.let { header ->
+                    { header { menuExpanded.value = false } }
+                },
             )
         }
     }
@@ -624,6 +881,8 @@ private fun ExploreGridItem(
     downloadState: DownloadState?,
     isDownloaded: Boolean,
     onClick: () -> Unit,
+    onMenuOpened: (() -> Unit)? = null,
+    menuHeader: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
     onAlbumPlay: (() -> Unit)? = null,
 ) {
     val menuExpanded = remember(item.id) { mutableStateOf(false) }
@@ -649,6 +908,7 @@ private fun ExploreGridItem(
                     onClick = onClick,
                     onLongClick = {
                         if (menuActions.isNotEmpty() && libraryItem != null) {
+                            onMenuOpened?.invoke()
                             menuExpanded.value = true
                         }
                     },
@@ -721,6 +981,9 @@ private fun ExploreGridItem(
                 onDismiss = { menuExpanded.value = false },
                 item = libraryItem,
                 actions = menuActions,
+                headerContent = menuHeader?.let { header ->
+                    { header { menuExpanded.value = false } }
+                },
             )
         }
     }
@@ -878,6 +1141,56 @@ private fun ExploreBadgesRow(
     }
 }
 
+@Composable
+private fun ExploreAlbumMenuHeader(
+    album: AlbumItem,
+    albumEntity: AlbumEntity?,
+    onToggleLike: () -> Unit,
+) {
+    val isLiked = albumEntity?.bookmarkedAt != null
+    val artists = album.artists?.joinToString { it.name }.orEmpty()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        RemoteImage(
+            url = album.thumbnail,
+            modifier = Modifier
+                .size(ListThumbnailSize)
+                .clip(RoundedCornerShape(ThumbnailCornerRadius)),
+            shape = RoundedCornerShape(ThumbnailCornerRadius),
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = album.title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (artists.isNotBlank()) {
+                Text(
+                    text = artists,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        IconButton(onClick = onToggleLike) {
+            Icon(
+                imageVector = if (isLiked) IconAssets.favorite() else IconAssets.favoriteBorder(),
+                contentDescription = null,
+                tint = if (isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 private fun albumItemToLibraryItem(album: AlbumItem): LibraryItem {
     return LibraryItem(
         id = album.browseId,
@@ -973,6 +1286,21 @@ private fun BoxScope.AlbumPlayButton(
 private data class ExploreSongTarget(
     val item: LibraryItem,
     val songItem: SongItem?,
+)
+
+private data class AlbumMenuState(
+    val songs: List<SongItem>,
+)
+
+private enum class AlbumDownloadAction {
+    DOWNLOAD,
+    CANCEL,
+    REMOVE,
+}
+
+private data class AlbumDownloadMenuState(
+    val label: String,
+    val action: AlbumDownloadAction,
 )
 
 private fun mapExploreChartsTitle(title: String?): String {

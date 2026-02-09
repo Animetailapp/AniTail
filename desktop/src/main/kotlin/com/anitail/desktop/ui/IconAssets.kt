@@ -67,6 +67,8 @@ object IconAssets {
 
     fun playlistAdd(): ImageVector = VectorResource.load("playlist_add.xml")
 
+    fun playlistPlay(): ImageVector = VectorResource.load("playlist_play.xml")
+
     fun share(): ImageVector = VectorResource.load("share.xml")
 
     fun arrowBack(): ImageVector = VectorResource.load("arrow_back.xml")
@@ -127,6 +129,10 @@ object IconAssets {
 
     fun libraryMusic(): ImageVector = VectorResource.load("library_music.xml")
 
+    fun libraryAdd(): ImageVector = VectorResource.load("library_add.xml")
+
+    fun libraryAddCheck(): ImageVector = VectorResource.load("library_add_check.xml")
+
     fun lock(): ImageVector = VectorResource.load("lock.xml")
 
     fun lockOpen(): ImageVector = VectorResource.load("lock_open.xml")
@@ -136,4 +142,8 @@ object IconAssets {
     fun selectAll(): ImageVector = VectorResource.load("select_all.xml")
 
     fun deselect(): ImageVector = VectorResource.load("deselect.xml")
+
+    fun subscribe(): ImageVector = VectorResource.load("subscribe.xml")
+
+    fun subscribed(): ImageVector = VectorResource.load("subscribed.xml")
 }

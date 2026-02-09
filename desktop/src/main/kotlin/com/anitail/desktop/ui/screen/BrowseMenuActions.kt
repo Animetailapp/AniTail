@@ -143,27 +143,165 @@ fun buildBrowseSongMenuActions(
     )
 }
 
-fun buildBrowseCollectionMenuActions(
-    item: YTItem,
-    onOpen: () -> Unit,
-    copyToClipboard: (String) -> Unit,
+fun buildBrowseAlbumMenuActions(
+    hasArtists: Boolean,
+    downloadLabel: String,
+    downloadEnabled: Boolean,
+    onStartRadio: () -> Unit,
+    onPlayNext: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onDownload: () -> Unit,
+    onOpenArtist: () -> Unit,
+    onShare: () -> Unit,
 ): List<ContextMenuAction> {
-    val shareUrl = item.shareLink
-    return listOf(
+    val actions = mutableListOf(
         ContextMenuAction(
-            label = "Abrir",
-            icon = IconAssets.info(),
-            onClick = onOpen,
+            label = "Iniciar radio",
+            icon = IconAssets.radio(),
+            onClick = onStartRadio,
         ),
         ContextMenuAction(
-            label = "Copiar enlace",
-            icon = IconAssets.link(),
-            onClick = { copyToClipboard(shareUrl) },
+            label = "Reproducir siguiente",
+            icon = IconAssets.playlistPlay(),
+            onClick = onPlayNext,
         ),
+        ContextMenuAction(
+            label = "Agregar a la cola",
+            icon = IconAssets.queueMusic(),
+            onClick = onAddToQueue,
+        ),
+        ContextMenuAction(
+            label = "Agregar a playlist",
+            icon = IconAssets.playlistAdd(),
+            onClick = onAddToPlaylist,
+        ),
+        ContextMenuAction(
+            label = downloadLabel,
+            icon = IconAssets.download(),
+            onClick = onDownload,
+            enabled = downloadEnabled,
+        ),
+    )
+
+    if (hasArtists) {
+        actions.add(
+            ContextMenuAction(
+                label = "Ir al artista",
+                icon = IconAssets.artist(),
+                onClick = onOpenArtist,
+            ),
+        )
+    }
+
+    actions.add(
         ContextMenuAction(
             label = "Compartir",
             icon = IconAssets.share(),
-            onClick = { copyToClipboard(shareUrl) },
+            onClick = onShare,
+        ),
+    )
+
+    return actions
+}
+
+fun buildBrowsePlaylistMenuActions(
+    canPlay: Boolean,
+    canShuffle: Boolean,
+    canRadio: Boolean,
+    showDownload: Boolean,
+    downloadLabel: String,
+    downloadEnabled: Boolean,
+    onPlay: () -> Unit,
+    onShuffle: () -> Unit,
+    onStartRadio: () -> Unit,
+    onPlayNext: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onDownload: () -> Unit,
+    onShare: () -> Unit,
+): List<ContextMenuAction> {
+    val actions = mutableListOf<ContextMenuAction>()
+
+    if (canPlay) {
+        actions.add(
+            ContextMenuAction(
+                label = "Reproducir",
+                icon = IconAssets.play(),
+                onClick = onPlay,
+            ),
+        )
+    }
+    if (canShuffle) {
+        actions.add(
+            ContextMenuAction(
+                label = "Aleatorio",
+                icon = IconAssets.shuffle(),
+                onClick = onShuffle,
+            ),
+        )
+    }
+    if (canRadio) {
+        actions.add(
+            ContextMenuAction(
+                label = "Iniciar radio",
+                icon = IconAssets.radio(),
+                onClick = onStartRadio,
+            ),
+        )
+    }
+
+    actions.add(
+        ContextMenuAction(
+            label = "Reproducir siguiente",
+            icon = IconAssets.playlistPlay(),
+            onClick = onPlayNext,
+        ),
+    )
+    actions.add(
+        ContextMenuAction(
+            label = "Agregar a la cola",
+            icon = IconAssets.queueMusic(),
+            onClick = onAddToQueue,
+        ),
+    )
+    actions.add(
+        ContextMenuAction(
+            label = "Agregar a playlist",
+            icon = IconAssets.playlistAdd(),
+            onClick = onAddToPlaylist,
+        ),
+    )
+    if (showDownload) {
+        actions.add(
+            ContextMenuAction(
+                label = downloadLabel,
+                icon = IconAssets.download(),
+                onClick = onDownload,
+                enabled = downloadEnabled,
+            ),
+        )
+    }
+    actions.add(
+        ContextMenuAction(
+            label = "Compartir",
+            icon = IconAssets.share(),
+            onClick = onShare,
+        ),
+    )
+
+    return actions
+}
+
+fun buildBrowseArtistMenuActions(
+    isSubscribed: Boolean,
+    onToggleSubscribe: () -> Unit,
+): List<ContextMenuAction> {
+    return listOf(
+        ContextMenuAction(
+            label = if (isSubscribed) "Suscrito" else "Suscribirse",
+            icon = if (isSubscribed) IconAssets.subscribed() else IconAssets.subscribe(),
+            onClick = onToggleSubscribe,
         ),
     )
 }

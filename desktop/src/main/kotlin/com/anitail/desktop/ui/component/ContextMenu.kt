@@ -45,6 +45,7 @@ fun ItemContextMenu(
     item: LibraryItem,
     actions: List<ContextMenuAction>,
     offset: DpOffset = DpOffset.Zero,
+    headerContent: (@Composable () -> Unit)? = null,
 ) {
     DropdownMenu(
         expanded = expanded,
@@ -54,8 +55,12 @@ fun ItemContextMenu(
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer),
     ) {
-        // Header con info del item
-        ItemContextMenuHeader(item = item)
+        if (headerContent != null) {
+            headerContent()
+        } else {
+            // Header con info del item
+            ItemContextMenuHeader(item = item)
+        }
 
         if (actions.isNotEmpty()) {
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))

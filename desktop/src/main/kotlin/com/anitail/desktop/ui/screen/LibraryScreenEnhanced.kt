@@ -22,8 +22,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import com.anitail.desktop.ui.component.ChipsRow
+import com.anitail.desktop.ui.component.NavigationTitle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -174,27 +174,20 @@ fun LibraryScreenEnhanced(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Filtros chips
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            LibraryFilterType.entries.forEach { filter ->
-                FilterChip(
-                    selected = currentFilter == filter,
-                    onClick = { 
-                        currentFilter = if (currentFilter == filter) LibraryFilterType.TODOS else filter
-                    },
-                    label = { Text(filter.label) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ),
-                )
-            }
-        }
+        NavigationTitle(title = "Biblioteca")
+        ChipsRow(
+            chips = listOf(
+                LibraryFilterType.PLAYLISTS to "Playlists",
+                LibraryFilterType.CANCIONES to "Canciones",
+                LibraryFilterType.ALBUMES to "Álbumes",
+                LibraryFilterType.ARTISTAS to "Artistas",
+                LibraryFilterType.DESCARGAS to "Descargas",
+            ),
+            currentValue = currentFilter,
+            onValueUpdate = { filter ->
+                currentFilter = if (currentFilter == filter) LibraryFilterType.TODOS else filter
+            },
+        )
 
         Spacer(modifier = Modifier.height(8.dp))
 
