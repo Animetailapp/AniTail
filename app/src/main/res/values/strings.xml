@@ -821,7 +821,6 @@
     <string name="remove_downloads_confirmation">Selected downloads will be removed.</string>
     <string name="open_in_browser">Open in browser</string>
     <string name="remove_from_queue">Remove from queue</string>
-    <string name="view_album">View album</string>
     <string name="close_selection">Close selection</string>
     <string name="deselect_all">Deselect all</string>
     <string name="connected_user">Connected user</string>

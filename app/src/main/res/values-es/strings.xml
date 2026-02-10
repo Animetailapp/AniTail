@@ -794,7 +794,6 @@
     <string name="remove_downloads_confirmation">Se eliminarán las descargas seleccionadas.</string>
     <string name="open_in_browser">Abrir en navegador</string>
     <string name="remove_from_queue">Quitar de la cola</string>
-    <string name="view_album">Ver álbum</string>
     <string name="close_selection">Cerrar selección</string>
     <string name="deselect_all">Deseleccionar todo</string>
     <string name="connected_user">Usuario conectado</string>
