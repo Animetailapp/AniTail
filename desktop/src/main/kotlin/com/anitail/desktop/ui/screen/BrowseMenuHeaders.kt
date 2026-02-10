@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
 
@@ -62,7 +63,7 @@ fun SongMenuHeader(
         horizontalArrangement = Arrangement.spacedBy(MenuQuickActionSpacing),
     ) {
         MenuQuickActionButton(
-            label = "Reproducir siguiente",
+            label = stringResource("play_next"),
             icon = IconAssets.playlistPlay(),
             onClick = {
                 onPlayNext()
@@ -70,7 +71,7 @@ fun SongMenuHeader(
             },
         )
         MenuQuickActionButton(
-            label = "Agregar a playlist",
+            label = stringResource("add_to_playlist"),
             icon = IconAssets.playlistAdd(),
             onClick = {
                 onAddToPlaylist()
@@ -78,7 +79,7 @@ fun SongMenuHeader(
             },
         )
         MenuQuickActionButton(
-            label = "Compartir",
+            label = stringResource("share"),
             icon = IconAssets.share(),
             onClick = {
                 onShare()
@@ -116,7 +117,7 @@ fun ArtistMenuHeader(
     ) {
         if (showRadio) {
             MenuQuickActionButton(
-                label = "Iniciar radio",
+                label = stringResource("start_radio"),
                 icon = IconAssets.radio(),
                 onClick = {
                     onStartRadio()
@@ -126,7 +127,7 @@ fun ArtistMenuHeader(
         }
         if (showShuffle) {
             MenuQuickActionButton(
-                label = "Aleatorio",
+                label = stringResource("shuffle"),
                 icon = IconAssets.shuffle(),
                 onClick = {
                     onShuffle()
@@ -135,7 +136,7 @@ fun ArtistMenuHeader(
             )
         }
         MenuQuickActionButton(
-            label = "Compartir",
+            label = stringResource("share"),
             icon = IconAssets.share(),
             onClick = {
                 onShare()
