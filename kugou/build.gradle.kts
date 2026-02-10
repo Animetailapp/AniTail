@@ -12,7 +12,7 @@ dependencies {
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.android)
     implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.serialization.json)
+    // Dependencia gestionada por root
     implementation(libs.ktor.client.encoding)
     testImplementation(libs.junit)
 }

@@ -1,12 +1,10 @@
 package com.anitail.desktop.player
 
-import com.anitail.desktop.util.JavaFxManager
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.YouTubeClient
 import com.anitail.innertube.pages.NewPipeUtils
 import com.anitail.desktop.storage.AudioQuality
 import com.anitail.desktop.storage.DesktopPreferences
-import javafx.application.Platform
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -19,6 +17,7 @@ import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.coroutines.resume
+import javax.swing.SwingUtilities
 
 /**
  * Servicio de reproducción de audio nativo usando VLCJ (VLC for Java).
@@ -46,9 +45,6 @@ class NativeAudioPlayer {
     var onBuffering: ((Boolean) -> Unit)? = null
 
     init {
-        // Asegurar que JavaFX esté inicializado para los callbacks (si se usan)
-        JavaFxManager.ensureInitialized()
-
         // Descubrir librerías nativas de VLC
         if (NativeDiscovery().discover()) {
             println("NativeAudioPlayer: VLC nativo encontrado e inicializado.")
@@ -69,32 +65,32 @@ class NativeAudioPlayer {
     private fun setupVlcEvents() {
         mediaPlayer?.events()?.addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
             override fun playing(player: MediaPlayer?) {
-                Platform.runLater {
+                SwingUtilities.invokeLater {
                     onStatusChanged?.invoke(PlaybackStatus.PLAYING)
                     onBuffering?.invoke(false)
                 }
             }
 
             override fun paused(player: MediaPlayer?) {
-                Platform.runLater {
+                SwingUtilities.invokeLater {
                     onStatusChanged?.invoke(PlaybackStatus.PAUSED)
                 }
             }
 
             override fun stopped(player: MediaPlayer?) {
-                Platform.runLater {
+                SwingUtilities.invokeLater {
                     onStatusChanged?.invoke(PlaybackStatus.STOPPED)
                 }
             }
 
             override fun finished(player: MediaPlayer?) {
-                Platform.runLater {
+                SwingUtilities.invokeLater {
                     onStatusChanged?.invoke(PlaybackStatus.ENDED)
                 }
             }
 
             override fun buffering(player: MediaPlayer?, newCache: Float) {
-                Platform.runLater {
+                SwingUtilities.invokeLater {
                     if (newCache < 100.0f) {
                         onBuffering?.invoke(true)
                     } else {
@@ -104,7 +100,7 @@ class NativeAudioPlayer {
             }
 
             override fun error(player: MediaPlayer?) {
-                Platform.runLater {
+                SwingUtilities.invokeLater {
                     val msg = "Error interno de VLC"
                     println("NativeAudioPlayer: VLC ERROR: $msg")
                     onError?.invoke(msg)
@@ -113,8 +109,7 @@ class NativeAudioPlayer {
             }
             
             override fun timeChanged(player: MediaPlayer?, newTime: Long) {
-                 // VLC llama a esto muy frecuentemente, quizás no necesitemos runLater para todo si ralentiza
-                 Platform.runLater {
+                 SwingUtilities.invokeLater {
                      onTimeChanged?.invoke(newTime, player?.status()?.length() ?: 0L)
                  }
             }
