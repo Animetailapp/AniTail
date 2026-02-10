@@ -61,10 +61,11 @@ class LibrarySyncService(
         println("LibrarySyncService: Sincronizando 'Tus me gusta'...")
         YouTube.playlist("LM").onSuccess { page ->
             page.songs.forEach { song ->
-                val entity = song.toSongEntity().copy(
+                val base = song.toSongEntity()
+                val entity = base.copy(
                     liked = true,
                     likedDate = LocalDateTime.now(),
-                    inLibrary = song.toSongEntity().inLibrary ?: LocalDateTime.now()
+                    inLibrary = base.inLibrary ?: LocalDateTime.now()
                 )
                 database.insertSong(entity)
             }
