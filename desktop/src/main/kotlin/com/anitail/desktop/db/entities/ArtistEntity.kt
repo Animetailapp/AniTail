@@ -1,5 +1,10 @@
 package com.anitail.desktop.db.entities
 
+import com.anitail.innertube.YouTube
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import kotlin.random.Random
 
@@ -24,9 +29,19 @@ data class ArtistEntity(
     val isLocalArtist: Boolean
         get() = id.startsWith("LA")
 
-    fun toggleLike() = copy(
-        bookmarkedAt = if (bookmarkedAt != null) null else LocalDateTime.now()
+    fun localToggleLike() = copy(
+        bookmarkedAt = if (bookmarkedAt != null) null else LocalDateTime.now(),
     )
+
+    fun toggleLike() = localToggleLike().also {
+        CoroutineScope(Dispatchers.IO).launch {
+            if (channelId == null)
+                YouTube.subscribeChannel(YouTube.getChannelId(id), bookmarkedAt == null)
+            else
+                YouTube.subscribeChannel(channelId, bookmarkedAt == null)
+            this.cancel()
+        }
+    }
 
     companion object {
         private val charPool = ('A'..'Z') + ('a'..'z')

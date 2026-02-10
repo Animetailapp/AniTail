@@ -3,6 +3,7 @@ package com.anitail.desktop.db.mapper
 import com.anitail.desktop.db.entities.AlbumEntity
 import com.anitail.desktop.db.entities.ArtistEntity
 import com.anitail.desktop.db.entities.PlaylistEntity
+import com.anitail.desktop.db.entities.SongArtistMap
 import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
@@ -25,7 +26,6 @@ fun SongItem.toSongEntity(inLibrary: Boolean = false): SongEntity = SongEntity(
     thumbnailUrl = thumbnail,
     albumId = album?.id,
     albumName = album?.name,
-    artistId = artists.firstOrNull()?.id,
     artistName = artists.joinToString(", ") { it.name },
     explicit = explicit,
     year = null,
@@ -37,7 +37,20 @@ fun SongItem.toSongEntity(inLibrary: Boolean = false): SongEntity = SongEntity(
     inLibrary = if (inLibrary) LocalDateTime.now() else null,
     dateDownload = null,
     isLocal = false,
+    romanizeLyrics = true,
+    mediaStoreUri = null,
 )
+
+fun SongItem.toSongArtistMaps(): List<SongArtistMap> {
+    return artists.mapIndexedNotNull { index, artist ->
+        val artistId = artist.id ?: return@mapIndexedNotNull null
+        SongArtistMap(
+            songId = id,
+            artistId = artistId,
+            position = index,
+        )
+    }
+}
 
 fun SongEntity.toLibraryItem(): LibraryItem = LibraryItem(
     id = id,
@@ -131,7 +144,6 @@ fun LibraryItem.toSongEntity(inLibrary: Boolean): SongEntity = SongEntity(
     thumbnailUrl = artworkUrl,
     albumId = null,
     albumName = null,
-    artistId = null,
     artistName = artist,
     explicit = false,
     year = null,
@@ -143,6 +155,8 @@ fun LibraryItem.toSongEntity(inLibrary: Boolean): SongEntity = SongEntity(
     inLibrary = if (inLibrary) LocalDateTime.now() else null,
     dateDownload = null,
     isLocal = false,
+    romanizeLyrics = true,
+    mediaStoreUri = null,
 )
 
 fun LibraryItem.toSongEntity(): SongEntity = toSongEntity(inLibrary = true)

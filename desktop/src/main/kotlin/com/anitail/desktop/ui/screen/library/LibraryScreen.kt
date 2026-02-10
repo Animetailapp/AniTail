@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.download.DesktopDownloadService
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.component.ChipsRow
@@ -48,12 +49,12 @@ fun LibraryScreen(
         Row {
             ChipsRow(
                 chips = listOf(
-                    LibraryFilter.LIBRARY to "Mixes",
-                    LibraryFilter.PLAYLISTS to "Playlists",
-                    LibraryFilter.SONGS to "Canciones",
-                    LibraryFilter.ALBUMS to "Álbumes",
-                    LibraryFilter.ARTISTS to "Artistas",
-                    LibraryFilter.DOWNLOADED to "Descargas",
+                    LibraryFilter.LIBRARY to stringResource("mixes"),
+                    LibraryFilter.PLAYLISTS to stringResource("playlists"),
+                    LibraryFilter.SONGS to stringResource("songs"),
+                    LibraryFilter.ALBUMS to stringResource("albums"),
+                    LibraryFilter.ARTISTS to stringResource("artists"),
+                    LibraryFilter.DOWNLOADED to stringResource("filter_downloaded"),
                 ),
                 currentValue = filter,
                 onValueUpdate = { value ->

@@ -31,6 +31,7 @@ import com.anitail.desktop.db.entities.PlaylistEntity
 import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.mapper.toLibraryItem
 import com.anitail.desktop.db.mapper.toSongEntity
+import com.anitail.desktop.db.mapper.toSongArtistMaps
 import com.anitail.desktop.db.mapper.toAlbumEntity
 import com.anitail.desktop.db.mapper.toArtistEntity
 import com.anitail.desktop.db.mapper.toPlaylistEntity
@@ -83,6 +84,7 @@ fun BrowseScreen(
     val strings = LocalStrings.current
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
     val downloadStates by downloadService.downloadStates.collectAsState()
+    val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
     var browseResult by remember { mutableStateOf<BrowseResult?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var pendingPlaylistItem by remember { mutableStateOf<BrowseSongTarget?>(null) }
@@ -110,7 +112,11 @@ fun BrowseScreen(
     suspend fun ensureSongInDatabase(target: BrowseSongTarget) {
         if (songsById.containsKey(target.item.id)) return
         val entity = target.songItem?.toSongEntity(inLibrary = true) ?: target.item.toSongEntity()
-        database.insertSong(entity)
+        if (target.songItem != null) {
+            database.insertSong(entity, target.songItem.toSongArtistMaps())
+        } else {
+            database.insertSong(entity)
+        }
     }
 
     suspend fun loadAlbumSongs(album: AlbumItem): List<SongItem> {
@@ -183,7 +189,7 @@ fun BrowseScreen(
         if (songs.isEmpty()) return
         songs.forEach { song ->
             val entity = song.toSongEntity(inLibrary = true)
-            database.insertSong(entity)
+            database.insertSong(entity, song.toSongArtistMaps())
             database.addSongToPlaylist(playlistId, song.id)
         }
     }
@@ -196,7 +202,7 @@ fun BrowseScreen(
         if (songs.isEmpty()) return
         songs.forEach { song ->
             val entity = song.toSongEntity(inLibrary = true)
-            database.insertSong(entity)
+            database.insertSong(entity, song.toSongArtistMaps())
             database.addSongToPlaylist(playlistId, song.id)
         }
     }
@@ -265,6 +271,7 @@ fun BrowseScreen(
                                 libraryItem = libraryItem,
                                 songItem = item,
                                 songsById = songsById,
+                                songArtistMaps = songArtistMaps,
                                 downloadStates = downloadStates,
                                 downloadedSongs = downloadedSongs,
                                 database = database,
@@ -289,11 +296,14 @@ fun BrowseScreen(
                                     isLiked = songEntity?.liked == true,
                                     onToggleLike = {
                                         scope.launch {
-                                            if (songEntity == null) {
-                                                database.insertSong(item.toSongEntity(inLibrary = true).toggleLike())
-                                            } else {
-                                                database.toggleSongLike(item.id)
-                                            }
+                                                if (songEntity == null) {
+                                                    database.insertSong(
+                                                        item.toSongEntity(inLibrary = true).toggleLike(),
+                                                        item.toSongArtistMaps(),
+                                                    )
+                                                } else {
+                                                    database.toggleSongLike(item.id)
+                                                }
                                         }
                                     },
                                     onPlayNext = { playerState.addToQueue(libraryItem, playNext = true) },
@@ -507,7 +517,10 @@ fun BrowseScreen(
                                                 database.insertPlaylist(entity)
                                                 val songs = resolvePlaylistSongs(item)
                                                 songs.forEach { song ->
-                                                    database.insertSong(song.toSongEntity(inLibrary = true))
+                                                    database.insertSong(
+                                                        song.toSongEntity(inLibrary = true),
+                                                        song.toSongArtistMaps(),
+                                                    )
                                                     database.addSongToPlaylist(entity.id, song.id)
                                                 }
                                             } else {

@@ -61,10 +61,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.db.entities.PlaylistEntity
+import com.anitail.desktop.db.entities.SongArtistMap
 import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.mapper.extractVideoId
 import com.anitail.desktop.db.mapper.toLibraryItem
+import com.anitail.desktop.db.mapper.toSongArtistMaps
 import com.anitail.desktop.db.mapper.toSongEntity
+import com.anitail.desktop.db.relations.primaryArtistIdForSong
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadState
 import com.anitail.desktop.download.DownloadStatus
@@ -134,6 +137,7 @@ fun HomeScreen(
     downloadService: DesktopDownloadService,
     playlists: List<PlaylistEntity>,
     songsById: Map<String, SongEntity>,
+    songArtistMaps: List<SongArtistMap>,
     onChipSelected: (HomePage.Chip?) -> Unit,
     onLoadMore: () -> Unit,
     onRefresh: () -> Unit,
@@ -168,7 +172,11 @@ fun HomeScreen(
     suspend fun ensureSongInDatabase(target: HomeSongTarget) {
         if (songsById.containsKey(target.item.id)) return
         val entity = target.songItem?.toSongEntity(inLibrary = true) ?: target.item.toSongEntity()
-        database.insertSong(entity)
+        if (target.songItem != null) {
+            database.insertSong(entity, target.songItem.toSongArtistMaps())
+        } else {
+            database.insertSong(entity)
+        }
     }
 
     fun menuActionsForSong(
@@ -179,10 +187,11 @@ fun HomeScreen(
         val artistCandidates = songItem?.artists
             ?.mapNotNull { artist -> artist.id?.let { Artist(artist.name, it) } }
             .orEmpty()
+        val libraryArtistId = songEntity?.let { primaryArtistIdForSong(libraryItem.id, songArtistMaps) }
         val hasArtist = if (songItem != null) {
             artistCandidates.isNotEmpty()
         } else {
-            !songEntity?.artistId.isNullOrBlank()
+            !libraryArtistId.isNullOrBlank()
         }
         val hasAlbum = if (songItem != null) {
             !songItem.album?.id.isNullOrBlank()
@@ -238,7 +247,11 @@ fun HomeScreen(
                 coroutineScope.launch {
                     if (songEntity == null) {
                         val entity = songItem?.toSongEntity(inLibrary = true) ?: libraryItem.toSongEntity()
-                        database.insertSong(entity)
+                        if (songItem != null) {
+                            database.insertSong(entity, songItem.toSongArtistMaps())
+                        } else {
+                            database.insertSong(entity)
+                        }
                     } else {
                         database.toggleSongInLibrary(libraryItem.id)
                     }
@@ -254,9 +267,9 @@ fun HomeScreen(
                     artistCandidates.size > 1 -> {
                         pendingArtists = artistCandidates
                     }
-                    !songEntity?.artistId.isNullOrBlank() -> {
-                        val artistId = songEntity.artistId ?: return@openArtist
-                        onOpenArtist(artistId, songEntity.artistName)
+                    !libraryArtistId.isNullOrBlank() -> {
+                        val artistId = libraryArtistId ?: return@openArtist
+                        onOpenArtist(artistId, songEntity?.artistName)
                     }
                 }
             },

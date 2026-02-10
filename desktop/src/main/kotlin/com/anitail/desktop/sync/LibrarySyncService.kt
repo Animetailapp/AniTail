@@ -1,11 +1,14 @@
 package com.anitail.desktop.sync
 
 import com.anitail.desktop.db.DesktopDatabase
-import com.anitail.desktop.db.entities.PlaylistEntity
+import com.anitail.desktop.db.mapper.toSongArtistMaps
 import com.anitail.desktop.db.mapper.toSongEntity
+import com.anitail.desktop.db.mapper.toPlaylistEntity
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.PlaylistItem
 import com.anitail.innertube.models.SongItem
+import com.anitail.innertube.pages.PlaylistContinuationPage
+import com.anitail.innertube.pages.PlaylistPage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,21 +62,22 @@ class LibrarySyncService(
      */
     suspend fun syncLikedSongs() {
         println("LibrarySyncService: Sincronizando 'Tus me gusta'...")
-        YouTube.playlist("LM").onSuccess { page ->
-            page.songs.forEach { song ->
-                val base = song.toSongEntity()
-                val entity = base.copy(
-                    liked = true,
-                    likedDate = LocalDateTime.now(),
-                    inLibrary = base.inLibrary ?: LocalDateTime.now()
-                )
-                database.insertSong(entity)
-            }
-            
-            // Si hay continuación, podríamos traer más, pero por ahora las primeras son suficientes
-            // para una sincronización inicial rápida.
-        }.onFailure {
-            throw it
+        val page = YouTube.playlist("LM").getOrThrow()
+        val allSongs = collectPlaylistSongs(
+            initial = page,
+            fetchContinuation = { continuation ->
+                YouTube.playlistContinuation(continuation).getOrThrow()
+            },
+        )
+        allSongs.forEach { song ->
+            val base = song.toSongEntity()
+            val entity = base.copy(
+                liked = true,
+                likedDate = LocalDateTime.now(),
+                inLibrary = base.inLibrary ?: LocalDateTime.now()
+            )
+            database.insertSong(entity)
+            database.insertSongArtistMaps(song.toSongArtistMaps())
         }
     }
 
@@ -83,26 +87,58 @@ class LibrarySyncService(
     suspend fun syncUserPlaylists() {
         println("LibrarySyncService: Sincronizando playlists del usuario...")
         // FEmusic_liked_playlists contiene las playlists en la biblioteca del usuario
-        YouTube.library("FEmusic_liked_playlists").onSuccess { page ->
-            page.items.filterIsInstance<PlaylistItem>().forEach { playlist ->
-                // Insertar o actualizar playlist en DB
-                val entity = PlaylistEntity(
-                    id = playlist.id,
-                    name = playlist.title,
-                    browseId = playlist.id,
-                    createdAt = LocalDateTime.now(),
-                    lastUpdateTime = LocalDateTime.now(),
-                    isEditable = playlist.isEditable,
-                    thumbnailUrl = playlist.thumbnail,
-                    playEndpointParams = playlist.playEndpoint?.params,
-                    shuffleEndpointParams = playlist.shuffleEndpoint?.params,
-                    radioEndpointParams = playlist.radioEndpoint?.params
-                )
+        val page = runCatching { YouTube.library("FEmusic_liked_playlists").getOrThrow() }
+            .getOrElse {
+                // No fallamos toda la sincronización si esto falla, pero lo logueamos
+                println("LibrarySyncService: Error al sincronizar playlists: ${it.message}")
+                return
+            }
+
+        page.items
+            .filterIsInstance<PlaylistItem>()
+            .filterNot { it.id == "SE" }
+            .forEach { playlist ->
+                var entity = mapPlaylistForSync(playlist)
+                if (entity.remoteSongCount == null) {
+                    val headerCount = runCatching {
+                        YouTube.playlist(playlist.id).getOrThrow().playlist.songCountText
+                    }.getOrNull()
+                    val parsed = parseSongCountText(headerCount)
+                    if (parsed != null) {
+                        entity = entity.copy(remoteSongCount = parsed)
+                    }
+                }
                 database.insertPlaylist(entity)
             }
-        }.onFailure {
-            // No fallamos toda la sincronización si esto falla, pero lo logueamos
-            println("LibrarySyncService: Error al sincronizar playlists: ${it.message}")
-        }
     }
+}
+
+internal fun mapPlaylistForSync(
+    playlist: PlaylistItem,
+    now: LocalDateTime = LocalDateTime.now(),
+) = playlist.toPlaylistEntity().copy(
+    createdAt = now,
+    lastUpdateTime = now,
+)
+
+internal suspend fun collectPlaylistSongs(
+    initial: PlaylistPage,
+    fetchContinuation: suspend (String) -> PlaylistContinuationPage,
+    maxPages: Int = 100,
+): List<SongItem> {
+    val songs = initial.songs.toMutableList()
+    var continuation = initial.songsContinuation ?: initial.continuation
+    var pages = 0
+    while (!continuation.isNullOrBlank() && pages < maxPages) {
+        val next = fetchContinuation(continuation)
+        songs += next.songs
+        continuation = next.continuation
+        pages += 1
+    }
+    return songs
+}
+
+internal fun parseSongCountText(text: String?): Int? {
+    if (text.isNullOrBlank()) return null
+    return Regex("""\d+""").find(text)?.value?.toIntOrNull()
 }

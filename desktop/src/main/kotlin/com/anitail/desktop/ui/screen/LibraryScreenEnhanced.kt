@@ -52,6 +52,7 @@ import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.screen.library.AutoPlaylistType
 import com.anitail.desktop.ui.screen.library.LibraryArtistsScreen
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.i18n.pluralStringResource
@@ -99,6 +100,7 @@ fun LibraryScreenEnhanced(
     onAlbumClick: (String, String) -> Unit,
     onPlaylistClick: (String, String) -> Unit,
     onCreatePlaylist: (String) -> Unit = {},
+    onOpenAutoPlaylist: (AutoPlaylistType) -> Unit = {},
 ) {
     var currentFilter by remember { mutableStateOf(LibraryFilterType.MIXES) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
@@ -135,6 +137,13 @@ fun LibraryScreenEnhanced(
                 songCount = 0,
             ),
         )
+    }
+    val handleSpecialPlaylistClick: (SpecialPlaylist) -> Unit = { special ->
+        when (special.id) {
+            "liked" -> onOpenAutoPlaylist(AutoPlaylistType.LIKED)
+            "offline" -> onOpenAutoPlaylist(AutoPlaylistType.DOWNLOADED)
+            "top50" -> onOpenAutoPlaylist(AutoPlaylistType.TOP)
+        }
     }
 
     // Categorizar items
@@ -221,7 +230,7 @@ fun LibraryScreenEnhanced(
                 onArtistClick = onArtistClick,
                 onAlbumClick = onAlbumClick,
                 onPlaylistClick = onPlaylistClick,
-                onSpecialPlaylistClick = { /* TODO: Navigate to special playlist */ },
+                onSpecialPlaylistClick = handleSpecialPlaylistClick,
                 onCreatePlaylist = { showCreatePlaylistDialog = true },
             )
             
@@ -229,7 +238,7 @@ fun LibraryScreenEnhanced(
                 specialPlaylists = specialPlaylists,
                 playlists = libraryPlaylists,
                 onPlaylistClick = onPlaylistClick,
-                onSpecialPlaylistClick = { /* TODO */ },
+                onSpecialPlaylistClick = handleSpecialPlaylistClick,
                 onCreatePlaylist = { showCreatePlaylistDialog = true },
             )
             

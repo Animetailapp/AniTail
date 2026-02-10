@@ -47,8 +47,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.db.entities.ArtistEntity
+import com.anitail.desktop.db.entities.SongArtistMap
 import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.mapper.toLibraryItem
+import com.anitail.desktop.db.relations.primaryArtistIdForSong
+import com.anitail.desktop.db.relations.songHasArtist
 import com.anitail.desktop.i18n.LocalStrings
 import com.anitail.desktop.i18n.StringResolver
 import com.anitail.desktop.i18n.pluralStringResource
@@ -86,8 +89,9 @@ fun LibraryArtistsScreen(
     val viewType by preferences.artistViewType.collectAsState()
     val gridItemSize by preferences.gridItemSize.collectAsState()
     val strings = LocalStrings.current
+    val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
 
-    val stats = remember(songs) { buildArtistSongStats(songs) }
+    val stats = remember(songs, songArtistMaps) { buildArtistSongStats(songs, songArtistMaps) }
     val songCountByArtist = remember(artists, stats) {
         artists.associate { artist -> artist.id to artistSongCount(artist, stats) }
     }
@@ -191,14 +195,14 @@ fun LibraryArtistsScreen(
                                         artist = artist,
                                         songCount = songCount,
                                         onPlay = {
-                                            val queue = buildArtistQueue(artist, songs)
+                                            val queue = buildArtistQueue(artist, songs, songArtistMaps)
                                             if (queue.isNotEmpty()) {
                                                 playerState.shuffleEnabled = false
                                                 playerState.playQueue(queue, 0)
                                             }
                                         },
                                         onShuffle = {
-                                            val queue = buildArtistQueue(artist, songs).shuffled()
+                                            val queue = buildArtistQueue(artist, songs, songArtistMaps).shuffled()
                                             if (queue.isNotEmpty()) {
                                                 playerState.shuffleEnabled = true
                                                 playerState.playQueue(queue, 0)
@@ -297,14 +301,14 @@ fun LibraryArtistsScreen(
                                         artist = artist,
                                         songCount = songCount,
                                         onPlay = {
-                                            val queue = buildArtistQueue(artist, songs)
+                                            val queue = buildArtistQueue(artist, songs, songArtistMaps)
                                             if (queue.isNotEmpty()) {
                                                 playerState.shuffleEnabled = false
                                                 playerState.playQueue(queue, 0)
                                             }
                                         },
                                         onShuffle = {
-                                            val queue = buildArtistQueue(artist, songs).shuffled()
+                                            val queue = buildArtistQueue(artist, songs, songArtistMaps).shuffled()
                                             if (queue.isNotEmpty()) {
                                                 playerState.shuffleEnabled = true
                                                 playerState.playQueue(queue, 0)
@@ -574,7 +578,10 @@ private data class ArtistSongStats(
     val playTimeByName: Map<String, Long>,
 )
 
-private fun buildArtistSongStats(songs: List<SongEntity>): ArtistSongStats {
+private fun buildArtistSongStats(
+    songs: List<SongEntity>,
+    songArtistMaps: List<SongArtistMap>,
+): ArtistSongStats {
     val countById = mutableMapOf<String, Int>()
     val countByName = mutableMapOf<String, Int>()
     val playTimeById = mutableMapOf<String, Long>()
@@ -582,7 +589,7 @@ private fun buildArtistSongStats(songs: List<SongEntity>): ArtistSongStats {
 
     songs.forEach { song ->
         val playTime = song.totalPlayTime
-        val artistId = song.artistId
+        val artistId = primaryArtistIdForSong(song.id, songArtistMaps)
         val artistName = song.artistName
         if (!artistId.isNullOrBlank()) {
             countById[artistId] = (countById[artistId] ?: 0) + 1
@@ -617,10 +624,11 @@ private fun artistPlayTime(artist: ArtistEntity, stats: ArtistSongStats): Long {
 private fun buildArtistQueue(
     artist: ArtistEntity,
     songs: List<SongEntity>,
+    songArtistMaps: List<SongArtistMap>,
 ): List<com.anitail.shared.model.LibraryItem> {
     val artistSongs = songs.filter { song ->
         when {
-            !song.artistId.isNullOrBlank() -> song.artistId == artist.id
+            songHasArtist(song.id, artist.id, songArtistMaps) -> true
             !song.artistName.isNullOrBlank() -> song.artistName.equals(artist.name, ignoreCase = true)
             else -> false
         }

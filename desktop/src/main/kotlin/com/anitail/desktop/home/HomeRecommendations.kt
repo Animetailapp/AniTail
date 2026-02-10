@@ -4,7 +4,9 @@ import com.anitail.desktop.db.entities.AlbumEntity
 import com.anitail.desktop.db.entities.ArtistEntity
 import com.anitail.desktop.db.entities.EventEntity
 import com.anitail.desktop.db.entities.RelatedSongMap
+import com.anitail.desktop.db.entities.SongArtistMap
 import com.anitail.desktop.db.entities.SongEntity
+import com.anitail.desktop.db.relations.primaryArtistIdForSong
 import java.time.LocalDateTime
 
 sealed interface HomeListenItem {
@@ -36,6 +38,7 @@ fun buildHomeRecommendations(
     songs: List<SongEntity>,
     albums: List<AlbumEntity>,
     artists: List<ArtistEntity>,
+    songArtistMaps: List<SongArtistMap>,
     relatedSongMaps: List<RelatedSongMap>,
     events: List<EventEntity>,
     now: LocalDateTime = LocalDateTime.now(),
@@ -51,7 +54,14 @@ fun buildHomeRecommendations(
     val artistsById = artists.associateBy { it.id }
 
     val quickPicks = buildQuickPicks(filteredSongs, songsById, relatedSongMaps, events, now)
-    val keepListening = buildKeepListening(songsById, albumsById, artistsById, events, now)
+    val keepListening = buildKeepListening(
+        songsById = songsById,
+        albumsById = albumsById,
+        artistsById = artistsById,
+        songArtistMaps = songArtistMaps,
+        events = events,
+        now = now,
+    )
     val forgottenFavorites = buildForgottenFavorites(songsById, events, now)
 
     return HomeRecommendations(
@@ -108,6 +118,7 @@ private fun buildKeepListening(
     songsById: Map<String, SongEntity>,
     albumsById: Map<String, AlbumEntity>,
     artistsById: Map<String, ArtistEntity>,
+    songArtistMaps: List<SongArtistMap>,
     events: List<EventEntity>,
     now: LocalDateTime,
 ): List<HomeListenItem> {
@@ -145,7 +156,10 @@ private fun buildKeepListening(
         .map { HomeListenAlbum(it) }
 
     val artistIds = recentEvents
-        .mapNotNull { event -> songsById[event.songId]?.artistId?.let { it to event.playTime } }
+        .mapNotNull { event ->
+            val artistId = primaryArtistIdForSong(event.songId, songArtistMaps)
+            artistId?.let { it to event.playTime }
+        }
         .groupBy { it.first }
         .mapValues { entry -> entry.value.sumOf { it.second } }
         .entries

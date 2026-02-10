@@ -56,6 +56,7 @@ import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.db.entities.ArtistEntity
 import com.anitail.desktop.db.entities.PlaylistEntity
 import com.anitail.desktop.db.entities.SongEntity
+import com.anitail.desktop.db.mapper.toSongArtistMaps
 import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.ui.component.RemoteImage
@@ -108,6 +109,7 @@ fun ArtistDetailScreen(
     val scope = rememberCoroutineScope()
     val artistEntity by database.artist(artistId).collectAsState(initial = null)
     val isSubscribed = artistEntity?.bookmarkedAt != null
+    val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
     val downloadStates by downloadService.downloadStates.collectAsState()
     var pendingPlaylistItem by remember { mutableStateOf<BrowseSongTarget?>(null) }
@@ -144,7 +146,11 @@ fun ArtistDetailScreen(
     suspend fun ensureSongInDatabase(target: BrowseSongTarget) {
         if (songsById.containsKey(target.item.id)) return
         val entity = target.songItem?.toSongEntity(inLibrary = true) ?: target.item.toSongEntity()
-        database.insertSong(entity)
+        if (target.songItem != null) {
+            database.insertSong(entity, target.songItem.toSongArtistMaps())
+        } else {
+            database.insertSong(entity)
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -335,6 +341,7 @@ fun ArtistDetailScreen(
                                         libraryItem = libraryItem,
                                         songItem = song,
                                         songsById = songsById,
+                                        songArtistMaps = songArtistMaps,
                                         downloadStates = downloadStates,
                                         downloadedSongs = downloadedSongs,
                                         database = database,
@@ -366,7 +373,10 @@ fun ArtistDetailScreen(
                                                 onToggleLike = {
                                                     scope.launch {
                                                         if (songEntity == null) {
-                                                            database.insertSong(song.toSongEntity(inLibrary = true).toggleLike())
+                                                            database.insertSong(
+                                                                song.toSongEntity(inLibrary = true).toggleLike(),
+                                                                song.toSongArtistMaps(),
+                                                            )
                                                         } else {
                                                             database.toggleSongLike(song.id)
                                                         }

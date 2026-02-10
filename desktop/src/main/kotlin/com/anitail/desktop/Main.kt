@@ -45,7 +45,9 @@ import com.anitail.desktop.db.mapper.extractVideoId
 import com.anitail.desktop.db.mapper.toLibraryItem
 import com.anitail.desktop.db.mapper.toAlbumEntity
 import com.anitail.desktop.db.mapper.toArtistEntity
+import com.anitail.desktop.db.mapper.toSongArtistMaps
 import com.anitail.desktop.db.mapper.toSongEntity
+import com.anitail.desktop.db.relations.primaryArtistIdForSong
 import com.anitail.desktop.constants.MiniPlayerBottomSpacing
 import com.anitail.desktop.constants.MiniPlayerHeight
 import com.anitail.desktop.constants.NavigationBarHeight
@@ -455,6 +457,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
     val artists by database.artists.collectAsState(initial = emptyList())
     val playlists by database.allPlaylists().collectAsState(initial = emptyList())
     val relatedSongMaps by database.relatedSongMaps.collectAsState(initial = emptyList())
+    val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
     val events by database.events.collectAsState(initial = emptyList())
     // For backward compatibility with existing code that expects LibraryItem
     val libraryItems = remember(songs, playlists, albums, artists) {
@@ -550,7 +553,6 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     .takeIf { it.isNotBlank() } ?: base.thumbnailUrl,
                 albumId = songDetails.album?.id ?: base.albumId,
                 albumName = songDetails.album?.name ?: base.albumName,
-                artistId = songDetails.artists.firstOrNull()?.id ?: base.artistId,
                 artistName = if (songDetails.artists.isNotEmpty()) {
                     songDetails.artists.joinToString(", ") { it.name }
                 } else {
@@ -560,6 +562,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                 dateModified = LocalDateTime.now(),
             )
             database.updateSong(updated)
+            database.insertSongArtistMaps(songDetails.toSongArtistMaps())
 
             songDetails.artists.mapNotNull { it.id }.forEach { ensureArtist(it) }
             songDetails.album?.id?.let { ensureAlbum(it) }
@@ -570,7 +573,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
             val relatedPage = YouTube.related(relatedEndpoint).getOrNull() ?: return@LaunchedEffect
             val relatedSongs = relatedPage.songs
             relatedSongs.forEach { song ->
-                database.insertSong(song.toSongEntity())
+                database.insertSong(song.toSongEntity(), song.toSongArtistMaps())
             }
             database.insertRelatedSongs(item.id, relatedSongs.map { it.id })
         }
@@ -680,6 +683,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
         albums,
         artists,
         relatedSongMaps,
+        songArtistMaps,
         events,
         hideExplicit,
         quickPicksMode,
@@ -688,6 +692,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
             songs = allSongs,
             albums = albums,
             artists = artists,
+            songArtistMaps = songArtistMaps,
             relatedSongMaps = relatedSongMaps,
             events = events,
             hideExplicit = hideExplicit,
@@ -743,8 +748,9 @@ private fun FrameWindowScope.AniTailDesktopApp(
                 val albumEntity = songEntity?.albumId?.let { albumId ->
                     albums.firstOrNull { it.id == albumId }
                 }
-                val artistEntity = songEntity?.artistId?.let { artistId ->
-                    artists.firstOrNull { it.id == artistId }
+                val artistId = songEntity?.let { primaryArtistIdForSong(it.id, songArtistMaps) }
+                val artistEntity = artistId?.let { id ->
+                    artists.firstOrNull { it.id == id }
                 }
                 val titleItem = albumEntity?.toLibraryItem()
                     ?: artistEntity?.toLibraryItem()
@@ -1108,6 +1114,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             downloadService = downloadService,
                             playlists = playlists,
                             songsById = songsById,
+                            songArtistMaps = songArtistMaps,
                             onChipSelected = { chip ->
                                 scope.launch {
                                     handleChipSelection(

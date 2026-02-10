@@ -38,8 +38,10 @@ import androidx.compose.ui.unit.dp
 import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.db.entities.AlbumEntity
 import com.anitail.desktop.db.entities.PlaylistEntity
+import com.anitail.desktop.db.entities.SongArtistMap
 import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.mapper.toLibraryItem
+import com.anitail.desktop.db.relations.primaryArtistIdForSong
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadedSong
 import com.anitail.desktop.i18n.LocalStrings
@@ -83,6 +85,7 @@ fun LibraryAlbumsScreen(
     val scope = rememberCoroutineScope()
     val albums by database.albums.collectAsState(initial = emptyList())
     val songs by database.songs.collectAsState(initial = emptyList())
+    val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
     val playlists by database.playlists.collectAsState(initial = emptyList())
     val downloadStates by downloadService.downloadStates.collectAsState()
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
@@ -92,7 +95,12 @@ fun LibraryAlbumsScreen(
     val sortDescending by preferences.albumSortDescending.collectAsState()
     val viewType by preferences.albumViewType.collectAsState()
     val gridItemSize by preferences.gridItemSize.collectAsState()
+    val showCached by preferences.showCachedPlaylist.collectAsState()
     val strings = LocalStrings.current
+
+    val visiblePlaylists = remember(playlists, showCached) {
+        filterLibraryPlaylists(playlists, showCached)
+    }
 
     val songsByAlbumId = remember(songs) {
         songs.filter { !it.albumId.isNullOrBlank() }.groupBy { it.albumId.orEmpty() }
@@ -140,7 +148,7 @@ fun LibraryAlbumsScreen(
     pendingAddTarget?.let { target ->
         PlaylistPickerDialog(
             visible = true,
-            playlists = playlists.filterNot { isCachedName(it.name) },
+            playlists = visiblePlaylists,
             onCreatePlaylist = { name ->
                 val playlist = PlaylistEntity(name = name, createdAt = LocalDateTime.now())
                 scope.launch {
@@ -192,11 +200,18 @@ fun LibraryAlbumsScreen(
                     items(sortedAlbums, key = { it.id }) { album ->
                         val menuExpanded = remember(album.id) { mutableStateOf(false) }
                         val albumSongs = songsByAlbumId[album.id].orEmpty()
-                        val menuActions = remember(albumSongs, downloadStates, downloadedSongs, strings) {
+                        val menuActions = remember(
+                            albumSongs,
+                            songArtistMaps,
+                            downloadStates,
+                            downloadedSongs,
+                            strings,
+                        ) {
                             buildAlbumMenuActions(
                                 strings = strings,
                                 album = album,
                                 albumSongs = albumSongs,
+                                songArtistMaps = songArtistMaps,
                                 downloadStates = downloadStates,
                                 downloadedSongs = downloadedSongs,
                                 playerState = playerState,
@@ -291,11 +306,18 @@ fun LibraryAlbumsScreen(
                     items(sortedAlbums, key = { it.id }) { album ->
                         val menuExpanded = remember(album.id) { mutableStateOf(false) }
                         val albumSongs = songsByAlbumId[album.id].orEmpty()
-                        val menuActions = remember(albumSongs, downloadStates, downloadedSongs, strings) {
+                        val menuActions = remember(
+                            albumSongs,
+                            songArtistMaps,
+                            downloadStates,
+                            downloadedSongs,
+                            strings,
+                        ) {
                             buildAlbumMenuActions(
                                 strings = strings,
                                 album = album,
                                 albumSongs = albumSongs,
+                                songArtistMaps = songArtistMaps,
                                 downloadStates = downloadStates,
                                 downloadedSongs = downloadedSongs,
                                 playerState = playerState,
@@ -353,6 +375,7 @@ private fun buildAlbumMenuActions(
     strings: StringResolver,
     album: AlbumEntity,
     albumSongs: List<SongEntity>,
+    songArtistMaps: List<SongArtistMap>,
     downloadStates: Map<String, com.anitail.desktop.download.DownloadState>,
     downloadedSongs: List<DownloadedSong>,
     playerState: PlayerState,
@@ -369,7 +392,10 @@ private fun buildAlbumMenuActions(
         downloadedSongs = downloadedSongs,
         showWhenEmpty = true,
     ) ?: CollectionDownloadMenuState(label = strings.get("download"), action = CollectionDownloadAction.DOWNLOAD)
-    val artistId = albumSongs.firstOrNull { !it.artistId.isNullOrBlank() }?.artistId
+    val artistId = albumSongs
+        .asSequence()
+        .mapNotNull { song -> primaryArtistIdForSong(song.id, songArtistMaps) }
+        .firstOrNull()
     val artistName = albumSongs.firstOrNull { !it.artistName.isNullOrBlank() }?.artistName
 
     return buildBrowseAlbumMenuActions(
@@ -540,9 +566,4 @@ private fun joinByBullet(left: String?, right: String?): String? {
         right.isNullOrBlank() -> left
         else -> "$left • $right"
     }
-}
-
-private fun isCachedName(name: String): Boolean {
-    val normalized = name.trim().lowercase()
-    return normalized == "en caché" || normalized == "en cache" || normalized == "cached"
 }

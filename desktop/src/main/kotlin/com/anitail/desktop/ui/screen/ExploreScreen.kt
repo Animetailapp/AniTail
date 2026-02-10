@@ -65,6 +65,8 @@ import com.anitail.desktop.db.mapper.extractVideoId
 import com.anitail.desktop.db.mapper.toAlbumEntity
 import com.anitail.desktop.db.mapper.toLibraryItem
 import com.anitail.desktop.db.mapper.toSongEntity
+import com.anitail.desktop.db.mapper.toSongArtistMaps
+import com.anitail.desktop.db.relations.primaryArtistIdForSong
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadState
 import com.anitail.desktop.download.DownloadStatus
@@ -137,6 +139,7 @@ fun ExploreScreen(
     val coroutineScope = rememberCoroutineScope()
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
     val downloadStates by downloadService.downloadStates.collectAsState()
+    val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
     var pendingPlaylistItem by remember { mutableStateOf<ExploreSongTarget?>(null) }
     var pendingAlbumPlaylist by remember { mutableStateOf<AlbumItem?>(null) }
     var detailsItem by remember { mutableStateOf<LibraryItem?>(null) }
@@ -157,7 +160,11 @@ fun ExploreScreen(
     suspend fun ensureSongInDatabase(target: ExploreSongTarget) {
         if (songsById.containsKey(target.item.id)) return
         val entity = target.songItem?.toSongEntity(inLibrary = true) ?: target.item.toSongEntity()
-        database.insertSong(entity)
+        if (target.songItem != null) {
+            database.insertSong(entity, target.songItem.toSongArtistMaps())
+        } else {
+            database.insertSong(entity)
+        }
     }
 
     fun playAlbum(album: AlbumItem) {
@@ -315,7 +322,7 @@ fun ExploreScreen(
         if (songs.isEmpty()) return
         songs.forEach { song ->
             val entity = song.toSongEntity(inLibrary = true)
-            database.insertSong(entity)
+            database.insertSong(entity, song.toSongArtistMaps())
             database.addSongToPlaylist(playlistId, song.id)
         }
     }
@@ -327,10 +334,11 @@ fun ExploreScreen(
         val artistCandidates = songItem?.artists
             ?.mapNotNull { artist -> artist.id?.let { Artist(artist.name, it) } }
             .orEmpty()
+        val libraryArtistId = songEntity?.let { primaryArtistIdForSong(it.id, songArtistMaps) }
         val hasArtist = if (songItem != null) {
             artistCandidates.isNotEmpty()
         } else {
-            !songEntity?.artistId.isNullOrBlank()
+            !libraryArtistId.isNullOrBlank()
         }
         val hasAlbum = if (songItem != null) {
             !songItem.album?.id.isNullOrBlank()
@@ -386,7 +394,11 @@ fun ExploreScreen(
                 coroutineScope.launch {
                     if (songEntity == null) {
                         val entity = songItem?.toSongEntity(inLibrary = true) ?: libraryItem.toSongEntity()
-                        database.insertSong(entity)
+                        if (songItem != null) {
+                            database.insertSong(entity, songItem.toSongArtistMaps())
+                        } else {
+                            database.insertSong(entity)
+                        }
                     } else {
                         database.toggleSongInLibrary(libraryItem.id)
                     }
@@ -402,9 +414,9 @@ fun ExploreScreen(
                     artistCandidates.size > 1 -> {
                         pendingArtists = artistCandidates
                     }
-                    !songEntity?.artistId.isNullOrBlank() -> {
-                        val artistId = songEntity.artistId ?: return@openArtist
-                        onOpenArtist(artistId, songEntity.artistName)
+                    !libraryArtistId.isNullOrBlank() -> {
+                        val artistId = libraryArtistId ?: return@openArtist
+                        onOpenArtist(artistId, songEntity?.artistName)
                     }
                 }
             },
@@ -496,7 +508,10 @@ fun ExploreScreen(
                                         onToggleLike = {
                                             coroutineScope.launch {
                                                 if (songEntity == null) {
-                                                    database.insertSong(song.toSongEntity(inLibrary = true).toggleLike())
+                                                    database.insertSong(
+                                                        song.toSongEntity(inLibrary = true).toggleLike(),
+                                                        song.toSongArtistMaps(),
+                                                    )
                                                 } else {
                                                     database.toggleSongLike(song.id)
                                                 }
@@ -626,7 +641,10 @@ fun ExploreScreen(
                                     onToggleLike = {
                                         coroutineScope.launch {
                                             if (songEntity == null) {
-                                                database.insertSong(video.toSongEntity(inLibrary = true).toggleLike())
+                                                database.insertSong(
+                                                    video.toSongEntity(inLibrary = true).toggleLike(),
+                                                    video.toSongArtistMaps(),
+                                                )
                                             } else {
                                                 database.toggleSongLike(video.id)
                                             }

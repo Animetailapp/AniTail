@@ -1,5 +1,10 @@
 package com.anitail.desktop.db.entities
 
+import com.anitail.innertube.YouTube
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 
 /**
@@ -20,7 +25,15 @@ data class AlbumEntity(
     val likedDate: LocalDateTime? = null,
     val inLibrary: LocalDateTime? = null,
 ) {
-    fun toggleLike() = copy(
+    fun localToggleLike() = copy(
         bookmarkedAt = if (bookmarkedAt != null) null else LocalDateTime.now()
     )
+
+    fun toggleLike() = localToggleLike().also {
+        CoroutineScope(Dispatchers.IO).launch {
+            if (playlistId != null)
+                YouTube.likePlaylist(playlistId, bookmarkedAt == null)
+            this.cancel()
+        }
+    }
 }

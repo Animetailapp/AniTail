@@ -42,6 +42,7 @@ import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.db.entities.PlaylistEntity
 import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.mapper.toLibraryItem
+import com.anitail.desktop.db.mapper.toSongArtistMaps
 import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadedSong
@@ -90,10 +91,16 @@ fun LibraryAutoPlaylistScreen(
     val playlists by database.playlists.collectAsState(initial = emptyList())
     val downloadStates by downloadService.downloadStates.collectAsState()
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
+    val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
     val strings = LocalStrings.current
 
     val sortType by preferences.songSortType.collectAsState()
     val sortDescending by preferences.songSortDescending.collectAsState()
+    val showCached by preferences.showCachedPlaylist.collectAsState()
+
+    val visiblePlaylists = remember(playlists, showCached) {
+        filterLibraryPlaylists(playlists, showCached)
+    }
 
     val songsById = remember(songs) { songs.associateBy { it.id } }
     val downloadedIds = remember(downloadedSongs) { downloadedSongs.map { it.songId }.toSet() }
@@ -215,13 +222,17 @@ fun LibraryAutoPlaylistScreen(
     suspend fun ensureSongInDatabase(target: BrowseSongTarget) {
         if (songsById.containsKey(target.item.id)) return
         val entity = target.songItem?.toSongEntity(inLibrary = true) ?: target.item.toSongEntity()
-        database.insertSong(entity)
+        if (target.songItem != null) {
+            database.insertSong(entity, target.songItem.toSongArtistMaps())
+        } else {
+            database.insertSong(entity)
+        }
     }
 
     pendingPlaylistItem?.let { target ->
         PlaylistPickerDialog(
             visible = true,
-            playlists = playlists.filterNot { isCachedName(it.name) },
+            playlists = visiblePlaylists,
             onCreatePlaylist = { name ->
                 val playlist = PlaylistEntity(name = name, createdAt = LocalDateTime.now())
                 scope.launch {
@@ -461,12 +472,19 @@ fun LibraryAutoPlaylistScreen(
 
             itemsIndexed(filteredEntries, key = { _, entry -> entry.song.id }) { index, entry ->
                 val menuExpanded = remember(entry.song.id) { mutableStateOf(false) }
-                val menuActions = remember(entry.song.id, downloadStates, downloadedSongs, strings) {
+                val menuActions = remember(
+                    entry.song.id,
+                    songArtistMaps,
+                    downloadStates,
+                    downloadedSongs,
+                    strings,
+                ) {
                     buildBrowseSongMenuActions(
                         strings = strings,
                         libraryItem = entry.libraryItem,
                         songItem = null,
                         songsById = songsById,
+                        songArtistMaps = songArtistMaps,
                         downloadStates = downloadStates,
                         downloadedSongs = downloadedSongs,
                         database = database,
@@ -578,11 +596,6 @@ private fun joinByBullet(left: String?, right: String?): String? {
         right.isNullOrBlank() -> left
         else -> "$left • $right"
     }
-}
-
-private fun isCachedName(name: String): Boolean {
-    val normalized = name.trim().lowercase()
-    return normalized == "en caché" || normalized == "en cache" || normalized == "cached"
 }
 
 private fun DownloadedSong.toFallbackSong(): SongEntity {

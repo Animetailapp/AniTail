@@ -1,5 +1,10 @@
 package com.anitail.desktop.db.entities
 
+import com.anitail.innertube.YouTube
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import kotlin.random.Random
 
@@ -39,7 +44,15 @@ data class PlaylistEntity(
     val shareLink: String?
         get() = browseId?.let { "https://music.youtube.com/playlist?list=$it" }
 
-    fun toggleLike() = copy(
+    fun localToggleLike() = copy(
         bookmarkedAt = if (bookmarkedAt != null) null else LocalDateTime.now()
     )
+
+    fun toggleLike() = localToggleLike().also {
+        CoroutineScope(Dispatchers.IO).launch {
+            if (browseId != null)
+                YouTube.likePlaylist(browseId, bookmarkedAt == null)
+            this.cancel()
+        }
+    }
 }

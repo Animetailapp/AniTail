@@ -7,6 +7,7 @@ import com.anitail.desktop.db.entities.RelatedSongMap
 import com.anitail.desktop.db.entities.PlaylistEntity
 import com.anitail.desktop.db.entities.PlaylistSongMap
 import com.anitail.desktop.db.entities.SearchHistory
+import com.anitail.desktop.db.entities.SongArtistMap
 import com.anitail.desktop.db.entities.SongEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -40,6 +41,7 @@ class DesktopDatabase private constructor(
     private val _albums = MutableStateFlow<Map<String, AlbumEntity>>(emptyMap())
     private val _playlists = MutableStateFlow<Map<String, PlaylistEntity>>(emptyMap())
     private val _playlistSongMaps = MutableStateFlow<List<PlaylistSongMap>>(emptyList())
+    private val _songArtistMaps = MutableStateFlow<List<SongArtistMap>>(emptyList())
     private val _relatedSongMaps = MutableStateFlow<List<RelatedSongMap>>(emptyList())
     private val _events = MutableStateFlow<List<EventEntity>>(emptyList())
     private val _searchHistory = MutableStateFlow<List<SearchHistory>>(emptyList())
@@ -49,6 +51,7 @@ class DesktopDatabase private constructor(
     val albums: Flow<List<AlbumEntity>> = _albums.map { it.values.toList() }
     val playlists: Flow<List<PlaylistEntity>> = _playlists.map { it.values.toList() }
     val playlistSongMaps: Flow<List<PlaylistSongMap>> = _playlistSongMaps
+    val songArtistMaps: Flow<List<SongArtistMap>> = _songArtistMaps
     val relatedSongMaps: Flow<List<RelatedSongMap>> = _relatedSongMaps
     val events: Flow<List<EventEntity>> = _events
     val searchHistory: Flow<List<SearchHistory>> = _searchHistory
@@ -66,8 +69,15 @@ class DesktopDatabase private constructor(
     }
 
     suspend fun insertSong(song: SongEntity) = withContext(Dispatchers.IO) {
-        _songs.value = _songs.value + (song.id to song)
+        val existing = _songs.value[song.id]
+        val merged = if (existing != null) mergeSong(existing, song) else song
+        _songs.value = _songs.value + (song.id to merged)
         saveSongs()
+    }
+
+    suspend fun insertSong(song: SongEntity, artistMaps: List<SongArtistMap>) {
+        insertSong(song)
+        insertSongArtistMaps(artistMaps)
     }
 
     suspend fun updateSong(song: SongEntity) = withContext(Dispatchers.IO) {
@@ -77,7 +87,9 @@ class DesktopDatabase private constructor(
 
     suspend fun deleteSong(songId: String) = withContext(Dispatchers.IO) {
         _songs.value = _songs.value - songId
+        _songArtistMaps.value = _songArtistMaps.value.filterNot { it.songId == songId }
         saveSongs()
+        saveSongArtistMaps()
     }
 
     suspend fun toggleSongLike(songId: String) = withContext(Dispatchers.IO) {
@@ -92,6 +104,32 @@ class DesktopDatabase private constructor(
         val updated = song.toggleLibrary()
         _songs.value = _songs.value + (songId to updated)
         saveSongs()
+    }
+
+    internal fun mergeSong(existing: SongEntity, incoming: SongEntity): SongEntity {
+        val liked = existing.liked || incoming.liked
+        val likedDate = if (liked) incoming.likedDate ?: existing.likedDate else null
+        return incoming.copy(
+            liked = liked,
+            likedDate = likedDate,
+            inLibrary = incoming.inLibrary ?: existing.inLibrary,
+            totalPlayTime = maxOf(existing.totalPlayTime, incoming.totalPlayTime),
+            dateDownload = incoming.dateDownload ?: existing.dateDownload,
+            explicit = existing.explicit || incoming.explicit,
+            isLocal = existing.isLocal || incoming.isLocal,
+            romanizeLyrics = existing.romanizeLyrics,
+            mediaStoreUri = incoming.mediaStoreUri ?: existing.mediaStoreUri,
+        )
+    }
+
+    suspend fun insertSongArtistMaps(maps: List<SongArtistMap>) = withContext(Dispatchers.IO) {
+        if (maps.isEmpty()) return@withContext
+        val existing = _songArtistMaps.value
+        val existingPairs = existing.map { it.songId to it.artistId }.toSet()
+        val uniqueMaps = maps.filterNot { (it.songId to it.artistId) in existingPairs }
+        if (uniqueMaps.isEmpty()) return@withContext
+        _songArtistMaps.value = existing + uniqueMaps
+        saveSongArtistMaps()
     }
 
     // === Artist Operations ===
@@ -114,7 +152,9 @@ class DesktopDatabase private constructor(
 
     suspend fun deleteArtist(artistId: String) = withContext(Dispatchers.IO) {
         _artists.value = _artists.value - artistId
+        _songArtistMaps.value = _songArtistMaps.value.filterNot { it.artistId == artistId }
         saveArtists()
+        saveSongArtistMaps()
     }
 
     suspend fun toggleArtistBookmark(artistId: String) = withContext(Dispatchers.IO) {
@@ -171,7 +211,9 @@ class DesktopDatabase private constructor(
     }
 
     suspend fun insertPlaylist(playlist: PlaylistEntity) = withContext(Dispatchers.IO) {
-        _playlists.value = _playlists.value + (playlist.id to playlist)
+        val existing = _playlists.value[playlist.id]
+        val merged = if (existing != null) mergePlaylist(existing, playlist) else playlist
+        _playlists.value = _playlists.value + (playlist.id to merged)
         savePlaylists()
     }
 
@@ -194,6 +236,23 @@ class DesktopDatabase private constructor(
         savePlaylists()
     }
 
+    internal fun mergePlaylist(existing: PlaylistEntity, incoming: PlaylistEntity): PlaylistEntity {
+        return incoming.copy(
+            name = incoming.name.ifBlank { existing.name },
+            browseId = incoming.browseId ?: existing.browseId,
+            createdAt = incoming.createdAt ?: existing.createdAt,
+            lastUpdateTime = incoming.lastUpdateTime ?: existing.lastUpdateTime,
+            isEditable = existing.isEditable || incoming.isEditable,
+            bookmarkedAt = incoming.bookmarkedAt ?: existing.bookmarkedAt,
+            remoteSongCount = incoming.remoteSongCount ?: existing.remoteSongCount,
+            playEndpointParams = incoming.playEndpointParams ?: existing.playEndpointParams,
+            thumbnailUrl = incoming.thumbnailUrl ?: existing.thumbnailUrl,
+            shuffleEndpointParams = incoming.shuffleEndpointParams ?: existing.shuffleEndpointParams,
+            radioEndpointParams = incoming.radioEndpointParams ?: existing.radioEndpointParams,
+            backgroundImageUrl = incoming.backgroundImageUrl ?: existing.backgroundImageUrl,
+        )
+    }
+
     // === Playlist Song Map Operations ===
 
     fun songsInPlaylist(playlistId: String): Flow<List<SongEntity>> =
@@ -208,7 +267,13 @@ class DesktopDatabase private constructor(
         withContext(Dispatchers.IO) {
             val existingMaps = _playlistSongMaps.value.filter { it.playlistId == playlistId }
             val maxPosition = existingMaps.maxOfOrNull { it.position } ?: -1
-            val newMap = PlaylistSongMap(playlistId, songId, maxPosition + 1)
+            val nextId = (_playlistSongMaps.value.maxOfOrNull { it.id } ?: 0) + 1
+            val newMap = PlaylistSongMap(
+                id = nextId,
+                playlistId = playlistId,
+                songId = songId,
+                position = maxPosition + 1,
+            )
             _playlistSongMaps.value = _playlistSongMaps.value + newMap
             savePlaylistSongMaps()
         }
@@ -281,7 +346,7 @@ class DesktopDatabase private constructor(
     // === Search History Operations ===
 
     fun recentSearches(limit: Int = 20): Flow<List<SearchHistory>> = _searchHistory.map { history ->
-        history.sortedByDescending { it.timestamp }.take(limit)
+        history.sortedByDescending { it.id }.take(limit)
     }
 
     suspend fun insertSearch(query: String) = withContext(Dispatchers.IO) {
@@ -318,6 +383,7 @@ class DesktopDatabase private constructor(
     suspend fun initialize() = withContext(Dispatchers.IO) {
         ensureDirectoryExists()
         loadSongs()
+        loadSongArtistMaps()
         loadArtists()
         loadAlbums()
         loadPlaylists()
@@ -359,7 +425,6 @@ class DesktopDatabase private constructor(
                     thumbnailUrl = obj.optString("thumbnailUrl").takeIf { it.isNotBlank() },
                     albumId = obj.optString("albumId").takeIf { it.isNotBlank() },
                     albumName = obj.optString("albumName").takeIf { it.isNotBlank() },
-                    artistId = obj.optString("artistId").takeIf { it.isNotBlank() },
                     artistName = obj.optString("artistName").takeIf { it.isNotBlank() },
                     explicit = obj.optBoolean("explicit", false),
                     year = obj.optInt("year", 0).takeIf { it > 0 },
@@ -371,6 +436,8 @@ class DesktopDatabase private constructor(
                     inLibrary = obj.optString("inLibrary").toLocalDateTime(),
                     dateDownload = obj.optString("dateDownload").toLocalDateTime(),
                     isLocal = obj.optBoolean("isLocal", false),
+                    romanizeLyrics = obj.optBoolean("romanizeLyrics", true),
+                    mediaStoreUri = obj.optString("mediaStoreUri").takeIf { it.isNotBlank() },
                 )
                 songs[song.id] = song
             }
@@ -389,7 +456,6 @@ class DesktopDatabase private constructor(
                 put("thumbnailUrl", song.thumbnailUrl ?: "")
                 put("albumId", song.albumId ?: "")
                 put("albumName", song.albumName ?: "")
-                put("artistId", song.artistId ?: "")
                 put("artistName", song.artistName ?: "")
                 put("explicit", song.explicit)
                 put("year", song.year ?: 0)
@@ -401,6 +467,8 @@ class DesktopDatabase private constructor(
                 put("inLibrary", song.inLibrary.toJsonString())
                 put("dateDownload", song.dateDownload.toJsonString())
                 put("isLocal", song.isLocal)
+                put("romanizeLyrics", song.romanizeLyrics)
+                put("mediaStoreUri", song.mediaStoreUri ?: "")
             })
         }
         Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)
@@ -574,13 +642,21 @@ class DesktopDatabase private constructor(
             if (raw.isBlank()) return
             val array = JSONArray(raw)
             val maps = mutableListOf<PlaylistSongMap>()
+            var nextId = 1
             for (i in 0 until array.length()) {
                 val obj = array.getJSONObject(i)
+                val storedId = obj.optInt("id", 0)
+                val id = if (storedId > 0) storedId else nextId++
+                if (storedId >= nextId) {
+                    nextId = storedId + 1
+                }
                 maps.add(
                     PlaylistSongMap(
+                        id = id,
                         playlistId = obj.getString("playlistId"),
                         songId = obj.getString("songId"),
-                        position = obj.getInt("position"),
+                        position = obj.optInt("position", 0),
+                        setVideoId = obj.optString("setVideoId").takeIf { it.isNotBlank() },
                     )
                 )
             }
@@ -593,12 +669,89 @@ class DesktopDatabase private constructor(
         val array = JSONArray()
         _playlistSongMaps.value.forEach { map ->
             array.put(JSONObject().apply {
+                put("id", map.id)
                 put("playlistId", map.playlistId)
                 put("songId", map.songId)
+                put("position", map.position)
+                put("setVideoId", map.setVideoId ?: "")
+            })
+        }
+        Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)
+    }
+
+    // === Song Artist Map Persistence ===
+
+    private fun loadSongArtistMaps() {
+        val file = basePath.resolve("song_artist_map.json")
+        if (!Files.exists(file)) {
+            val legacy = loadLegacySongArtistMapsFromSongs()
+            _songArtistMaps.value = legacy
+            if (legacy.isNotEmpty()) {
+                saveSongArtistMaps()
+            }
+            return
+        }
+        runCatching {
+            val raw = Files.readString(file, StandardCharsets.UTF_8)
+            if (raw.isBlank()) return
+            val array = JSONArray(raw)
+            val maps = mutableListOf<SongArtistMap>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                maps.add(
+                    SongArtistMap(
+                        songId = obj.getString("songId"),
+                        artistId = obj.getString("artistId"),
+                        position = obj.optInt("position", 0),
+                    )
+                )
+            }
+            if (maps.isEmpty()) {
+                val legacy = loadLegacySongArtistMapsFromSongs()
+                if (legacy.isNotEmpty()) {
+                    _songArtistMaps.value = legacy
+                    saveSongArtistMaps()
+                    return
+                }
+            }
+            _songArtistMaps.value = maps
+        }
+    }
+
+    private fun saveSongArtistMaps() {
+        val file = basePath.resolve("song_artist_map.json")
+        val array = JSONArray()
+        _songArtistMaps.value.forEach { map ->
+            array.put(JSONObject().apply {
+                put("songId", map.songId)
+                put("artistId", map.artistId)
                 put("position", map.position)
             })
         }
         Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)
+    }
+
+    private fun loadLegacySongArtistMapsFromSongs(): List<SongArtistMap> {
+        val file = basePath.resolve("songs.json")
+        if (!Files.exists(file)) return emptyList()
+        return runCatching {
+            val raw = Files.readString(file, StandardCharsets.UTF_8)
+            if (raw.isBlank()) return emptyList()
+            val array = JSONArray(raw)
+            val maps = mutableListOf<SongArtistMap>()
+            val seen = mutableSetOf<Pair<String, String>>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val songId = obj.optString("id")
+                val artistId = obj.optString("artistId")
+                if (songId.isBlank() || artistId.isBlank()) continue
+                val key = songId to artistId
+                if (seen.add(key)) {
+                    maps.add(SongArtistMap(songId = songId, artistId = artistId, position = 0))
+                }
+            }
+            maps
+        }.getOrDefault(emptyList())
     }
 
     // === Related Song Map Persistence ===
@@ -688,14 +841,18 @@ class DesktopDatabase private constructor(
             if (raw.isBlank()) return
             val array = JSONArray(raw)
             val history = mutableListOf<SearchHistory>()
+            var nextId = 1L
             for (i in 0 until array.length()) {
                 val obj = array.getJSONObject(i)
+                val storedId = obj.optLong("id", 0L)
+                val id = if (storedId > 0) storedId else nextId++
+                if (storedId >= nextId) {
+                    nextId = storedId + 1
+                }
                 history.add(
                     SearchHistory(
-                        id = obj.getLong("id"),
+                        id = id,
                         query = obj.getString("query"),
-                        timestamp = obj.optString("timestamp").toLocalDateTime()
-                            ?: LocalDateTime.now(),
                     )
                 )
             }
@@ -710,7 +867,6 @@ class DesktopDatabase private constructor(
             array.put(JSONObject().apply {
                 put("id", entry.id)
                 put("query", entry.query)
-                put("timestamp", entry.timestamp.toJsonString())
             })
         }
         Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)

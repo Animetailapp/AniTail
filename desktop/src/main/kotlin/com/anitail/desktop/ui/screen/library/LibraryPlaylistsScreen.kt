@@ -96,9 +96,12 @@ fun LibraryPlaylistsScreen(
     val showLiked by preferences.showLikedPlaylist.collectAsState()
     val showDownloaded by preferences.showDownloadedPlaylist.collectAsState()
     val showTop by preferences.showTopPlaylist.collectAsState()
+    val showCached by preferences.showCachedPlaylist.collectAsState()
 
     val songsById = remember(songs) { songs.associateBy { it.id } }
-    val visiblePlaylists = remember(playlists) { playlists.filterNot { isCachedName(it.name) } }
+    val visiblePlaylists = remember(playlists, showCached) {
+        filterLibraryPlaylists(playlists, showCached)
+    }
     val libraryPlaylists = remember(visiblePlaylists, playlistSongMaps, songsById) {
         buildLibraryPlaylists(
             playlists = visiblePlaylists,
@@ -621,11 +624,6 @@ private fun playlistSortLabel(strings: StringResolver, sortType: PlaylistSortTyp
         PlaylistSortType.SONG_COUNT -> strings.get("sort_by_song_count")
         PlaylistSortType.LAST_UPDATED -> strings.get("sort_by_last_updated")
     }
-}
-
-private fun isCachedName(name: String): Boolean {
-    val normalized = name.trim().lowercase()
-    return normalized == "en caché" || normalized == "en cache" || normalized == "cached"
 }
 
 private fun DownloadedSong.toFallbackSong(): SongEntity {
