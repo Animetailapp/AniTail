@@ -3,6 +3,7 @@ package com.anitail.desktop.ui.screen
 import com.anitail.desktop.download.DownloadState
 import com.anitail.desktop.download.DownloadStatus
 import com.anitail.desktop.download.DownloadedSong
+import com.anitail.desktop.i18n.testStringResolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -11,6 +12,7 @@ class CollectionDownloadMenuStateTest {
     @Test
     fun returnsNullWhenEmptyAndHidden() {
         val result = resolveCollectionDownloadMenuState(
+            strings = testStringResolver(),
             songIds = emptyList(),
             downloadStates = emptyMap(),
             downloadedSongs = emptyList(),
@@ -23,6 +25,7 @@ class CollectionDownloadMenuStateTest {
     @Test
     fun returnsDownloadWhenEmptyAndShown() {
         val result = resolveCollectionDownloadMenuState(
+            strings = testStringResolver(),
             songIds = emptyList(),
             downloadStates = emptyMap(),
             downloadedSongs = emptyList(),
@@ -37,6 +40,7 @@ class CollectionDownloadMenuStateTest {
     fun returnsRemoveWhenAllDownloaded() {
         val songIds = listOf("a", "b")
         val result = resolveCollectionDownloadMenuState(
+            strings = testStringResolver(),
             songIds = songIds,
             downloadStates = emptyMap(),
             downloadedSongs = songIds.map { id ->
@@ -79,6 +83,7 @@ class CollectionDownloadMenuStateTest {
         )
 
         val result = resolveCollectionDownloadMenuState(
+            strings = testStringResolver(),
             songIds = songIds,
             downloadStates = downloadStates,
             downloadedSongs = emptyList(),
@@ -89,4 +94,3 @@ class CollectionDownloadMenuStateTest {
         assertEquals(CollectionDownloadAction.CANCEL, result?.action)
     }
 }
-

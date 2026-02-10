@@ -1,5 +1,6 @@
 package com.anitail.desktop.ui.screen
 
+import com.anitail.desktop.i18n.testStringResolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -9,6 +10,7 @@ class ExploreMenuActionsTest {
         val calls = mutableListOf<String>()
 
         val actions = buildExploreAlbumMenuActions(
+            strings = testStringResolver(),
             hasArtists = true,
             downloadLabel = "Descargar",
             downloadEnabled = true,

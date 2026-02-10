@@ -62,9 +62,12 @@ class LibrarySyncServiceTest {
             ),
         )
 
-        val result = collectPlaylistSongs(initial) { token ->
-            continuations[token] ?: PlaylistContinuationPage(emptyList(), null)
-        }
+        val result = collectPlaylistSongs(
+            initial = initial,
+            fetchContinuation = { token ->
+                continuations[token] ?: PlaylistContinuationPage(emptyList(), null)
+            },
+        )
 
         assertEquals(listOf("s1", "s2", "s3"), result.map { it.id })
     }

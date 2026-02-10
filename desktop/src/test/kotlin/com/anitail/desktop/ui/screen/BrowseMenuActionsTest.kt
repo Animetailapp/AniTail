@@ -1,5 +1,6 @@
 package com.anitail.desktop.ui.screen
 
+import com.anitail.desktop.i18n.testStringResolver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -9,6 +10,7 @@ class BrowseMenuActionsTest {
         val calls = mutableListOf<String>()
 
         val actions = buildBrowseAlbumMenuActions(
+            strings = testStringResolver(),
             hasArtists = true,
             downloadLabel = "Descargar",
             downloadEnabled = true,
@@ -44,6 +46,7 @@ class BrowseMenuActionsTest {
     @Test
     fun buildBrowseAlbumMenuActionsOmitsArtistWhenMissing() {
         val actions = buildBrowseAlbumMenuActions(
+            strings = testStringResolver(),
             hasArtists = false,
             downloadLabel = "Descargar",
             downloadEnabled = true,
@@ -74,6 +77,7 @@ class BrowseMenuActionsTest {
         val calls = mutableListOf<String>()
 
         val actions = buildBrowsePlaylistMenuActions(
+            strings = testStringResolver(),
             canPlay = true,
             canShuffle = true,
             canRadio = true,
@@ -114,6 +118,7 @@ class BrowseMenuActionsTest {
     @Test
     fun buildBrowsePlaylistMenuActionsOmitsDownloadWhenDisabled() {
         val actions = buildBrowsePlaylistMenuActions(
+            strings = testStringResolver(),
             canPlay = true,
             canShuffle = true,
             canRadio = true,
@@ -149,6 +154,7 @@ class BrowseMenuActionsTest {
         val calls = mutableListOf<String>()
 
         val actions = buildBrowseArtistMenuActions(
+            strings = testStringResolver(),
             isSubscribed = false,
             onToggleSubscribe = { calls.add("subscribe") },
         )
