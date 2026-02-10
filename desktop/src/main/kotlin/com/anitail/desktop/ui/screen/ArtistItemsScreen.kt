@@ -56,6 +56,7 @@ import com.anitail.desktop.db.mapper.toArtistEntity
 import com.anitail.desktop.db.mapper.toPlaylistEntity
 import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.download.DesktopDownloadService
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.player.buildRadioQueuePlan
 import com.anitail.desktop.ui.IconAssets
@@ -284,7 +285,7 @@ fun ArtistItemsScreen(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = IconAssets.arrowBack(),
-                        contentDescription = "Volver",
+                        contentDescription = stringResource("back"),
                     )
                 }
             },
@@ -453,7 +454,7 @@ fun ArtistItemsScreen(
                                     downloadedSongs = downloadedSongs,
                                     showWhenEmpty = true,
                                 ) ?: CollectionDownloadMenuState(
-                                    label = "Descargar",
+                                    label = stringResource("download"),
                                     action = CollectionDownloadAction.DOWNLOAD,
                                 )
                                 val artistCandidates = item.artists.orEmpty()
@@ -559,7 +560,7 @@ fun ArtistItemsScreen(
                                     canShuffle = item.shuffleEndpoint != null,
                                     canRadio = item.radioEndpoint != null,
                                     showDownload = downloadMenu != null,
-                                    downloadLabel = downloadMenu?.label ?: "Descargar",
+                                    downloadLabel = downloadMenu?.label ?: stringResource("download"),
                                     downloadEnabled = true,
                                     onPlay = {
                                         scope.launch {
@@ -893,7 +894,7 @@ private fun ArtistItemsSongRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (song.explicit) {
                     Text(
-                        text = "E ",
+                        text = stringResource("explicit_badge") + " ",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

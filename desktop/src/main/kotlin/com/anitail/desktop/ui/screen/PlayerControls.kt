@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.constants.PlayerHorizontalPadding
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.storage.SliderStyle
 import com.anitail.desktop.ui.IconAssets
@@ -232,7 +233,7 @@ fun PlayerControls(
                     }
                     Icon(
                         imageVector = repeatIcon,
-                        contentDescription = "Repeat",
+                        contentDescription = stringResource("repeat"),
                         tint = repeatTint,
                         modifier = Modifier.size(24.dp),
                     )
@@ -313,7 +314,7 @@ fun PlayerControls(
                 ) {
                     Icon(
                         imageVector = IconAssets.shuffle(),
-                        contentDescription = "Shuffle",
+                        contentDescription = stringResource("shuffle"),
                         tint = if (playerState.shuffleEnabled) textColor else mutedTextColor.copy(alpha = 0.4f),
                         modifier = Modifier.size(24.dp),
                     )

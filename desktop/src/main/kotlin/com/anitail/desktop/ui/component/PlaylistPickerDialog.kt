@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.db.entities.PlaylistEntity
 
 @Composable
@@ -35,13 +36,13 @@ fun PlaylistPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Agregar a playlist") },
+        title = { Text(stringResource("add_to_playlist")) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
                     value = newPlaylistName,
                     onValueChange = { newPlaylistName = it },
-                    label = { Text("Nueva playlist") },
+                    label = { Text(stringResource("playlist_name")) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -55,7 +56,7 @@ fun PlaylistPickerDialog(
                     },
                     modifier = Modifier.padding(top = 6.dp),
                 ) {
-                    Text("Crear")
+                    Text(stringResource("create_playlist"))
                 }
 
                 LazyColumn(
@@ -82,7 +83,7 @@ fun PlaylistPickerDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cerrar")
+                Text(stringResource("close"))
             }
         },
     )

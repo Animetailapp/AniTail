@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.ui.IconAssets
 import androidx.compose.ui.unit.sp
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.player.buildRadioQueuePlan
 import com.anitail.desktop.db.DesktopDatabase
@@ -117,6 +118,7 @@ fun ArtistDetailScreen(
     val transparentAppBar by remember {
         derivedStateOf { lazyListState.firstVisibleItemIndex <= 1 }
     }
+    val errorLoadingArtist = stringResource("error_loading_artist")
 
     LaunchedEffect(artistId) {
         isLoading = true
@@ -124,7 +126,7 @@ fun ArtistDetailScreen(
         YouTube.artist(artistId).onSuccess { page ->
             artistPage = page
         }.onFailure { e ->
-            error = e.message ?: "Error al cargar artista"
+            error = e.message ?: errorLoadingArtist
         }
         isLoading = false
     }
@@ -228,7 +230,7 @@ fun ArtistDetailScreen(
                                         modifier = Modifier.height(40.dp)
                                     ) {
                                         Text(
-                                            text = if (isSubscribed) "Suscrito" else "Suscribirse",
+                                            text = if (isSubscribed) stringResource("subscribed") else stringResource("subscribe"),
                                             fontSize = 14.sp,
                                             color = if (!isSubscribed)
                                                 MaterialTheme.colorScheme.error
@@ -265,7 +267,7 @@ fun ArtistDetailScreen(
                                                 )
                                                 Spacer(modifier = Modifier.width(8.dp))
                                                 Text(
-                                                    text = "Radio",
+                                                    text = stringResource("radio"),
                                                     fontSize = 14.sp
                                                 )
                                             }
@@ -294,7 +296,7 @@ fun ArtistDetailScreen(
                                             ) {
                                                 Icon(
                                                     IconAssets.shuffle(),
-                                                    contentDescription = "Shuffle",
+                                                    contentDescription = stringResource("shuffle"),
                                                     tint = MaterialTheme.colorScheme.onPrimary,
                                                     modifier = Modifier.size(20.dp)
                                                 )
@@ -441,7 +443,7 @@ fun ArtistDetailScreen(
                 .padding(8.dp)
         ) {
             IconButton(onClick = onBack) {
-                Icon(IconAssets.arrowBack(), contentDescription = "Volver")
+                Icon(IconAssets.arrowBack(), contentDescription = stringResource("back"))
             }
             if (!transparentAppBar) {
                 Text(
@@ -629,7 +631,7 @@ private fun YouTubeListItem(
                     contentAlignment = Alignment.Center
                 ) {
                     // Simple playing indicator
-                    Text("▶", color = Color.White)
+                    Text(stringResource("playing_indicator"), color = Color.White)
                 }
             }
         }
@@ -648,7 +650,7 @@ private fun YouTubeListItem(
             Row {
                 if (item.explicit) {
                     Text(
-                        text = "E ",
+                        text = stringResource("explicit_badge") + " ",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -727,7 +729,7 @@ private fun YouTubeGridItem(
                         .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("▶", color = Color.White, fontSize = 24.sp)
+                    Text(stringResource("playing_indicator"), color = Color.White, fontSize = 24.sp)
                 }
             }
         }
@@ -756,7 +758,7 @@ private fun YouTubeGridItem(
             }
             is ArtistItem -> {
                 Text(
-                    text = "Artista",
+                    text = stringResource("artist"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 4.dp)

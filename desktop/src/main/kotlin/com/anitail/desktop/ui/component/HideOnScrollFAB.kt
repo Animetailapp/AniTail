@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.ui.IconAssets
 
 /**
@@ -82,7 +83,7 @@ fun HideOnScrollFAB(
         ) {
             Icon(
                 imageVector = IconAssets.shuffle(),
-                contentDescription = "Reproducir aleatorio",
+                contentDescription = stringResource("shuffle_play"),
                 tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(24.dp),
             )

@@ -54,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
@@ -215,7 +216,7 @@ fun SearchScreen(
                 if (query.isEmpty() && searchHistory.isNotEmpty()) {
                     item {
                         Text(
-                            text = "Búsquedas recientes",
+                            text = stringResource("search_history"),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(16.dp)
@@ -367,13 +368,13 @@ private fun SearchBar(
             .padding(8.dp)
     ) {
         IconButton(onClick = onBack) {
-            Icon(IconAssets.arrowBack(), contentDescription = "Volver")
+            Icon(IconAssets.arrowBack(), contentDescription = stringResource("back"))
         }
 
         OutlinedTextField(
             value = query,
             onValueChange = onQueryChange,
-            placeholder = { Text("Buscar canciones, artistas, álbumes...") },
+            placeholder = { Text(stringResource("search_yt_music")) },
             leadingIcon = {
                 Icon(
                     IconAssets.search(),
@@ -384,7 +385,7 @@ private fun SearchBar(
             trailingIcon = {
                 if (query.isNotEmpty()) {
                     IconButton(onClick = { onQueryChange("") }) {
-                        Icon(IconAssets.close(), contentDescription = "Limpiar")
+                        Icon(IconAssets.close(), contentDescription = stringResource("clear"))
                     }
                 }
             },
@@ -411,12 +412,12 @@ private fun SearchBar(
     }
 }
 
-enum class SearchFilter(val value: String, val label: String) {
-    SONGS("EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D", "Canciones"),
-    VIDEOS("EgWKAQIQAWoKEAkQChAFEAMQBA%3D%3D", "Videos"),
-    ALBUMS("EgWKAQIYAWoKEAkQChAFEAMQBA%3D%3D", "Álbumes"),
-    ARTISTS("EgWKAQIgAWoKEAkQChAFEAMQBA%3D%3D", "Artistas"),
-    PLAYLISTS("EgeKAQQoADgBagwQDhAKEAMQBRAJEAQ%3D", "Playlists"),
+enum class SearchFilter(val value: String, val labelKey: String) {
+    SONGS("EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D", "songs"),
+    VIDEOS("EgWKAQIQAWoKEAkQChAFEAMQBA%3D%3D", "filter_videos"),
+    ALBUMS("EgWKAQIYAWoKEAkQChAFEAMQBA%3D%3D", "albums"),
+    ARTISTS("EgWKAQIgAWoKEAkQChAFEAMQBA%3D%3D", "artists"),
+    PLAYLISTS("EgeKAQQoADgBagwQDhAKEAMQBRAJEAQ%3D", "playlists"),
 }
 
 @Composable
@@ -435,7 +436,7 @@ private fun ChipsRow(
             FilterChip(
                 selected = currentFilter == null,
                 onClick = { onFilterChange(null) },
-                label = { Text("Todo") },
+                label = { Text(stringResource("all")) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -446,7 +447,7 @@ private fun ChipsRow(
             FilterChip(
                 selected = currentFilter == filter,
                 onClick = { onFilterChange(filter) },
-                label = { Text(filter.label) },
+                label = { Text(stringResource(filter.labelKey)) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -492,7 +493,7 @@ private fun SuggestionItem(
                 onClick = onDelete,
                 modifier = Modifier.alpha(0.5f)
             ) {
-                Icon(IconAssets.close(), contentDescription = "Eliminar")
+                Icon(IconAssets.close(), contentDescription = stringResource("delete"))
             }
         }
 
@@ -500,7 +501,7 @@ private fun SuggestionItem(
             onClick = onFillTextField,
             modifier = Modifier.alpha(0.5f)
         ) {
-            Icon(IconAssets.arrowTopLeft(), contentDescription = "Usar sugerencia")
+            Icon(IconAssets.arrowTopLeft(), contentDescription = stringResource("use_suggestion"))
         }
     }
 }
@@ -543,7 +544,7 @@ private fun SearchResultItem(
                         .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(6.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("▶", color = Color.White)
+                    Text(stringResource("playing_indicator"), color = Color.White)
                 }
             }
         }
@@ -562,19 +563,22 @@ private fun SearchResultItem(
 
             val subtitle = when (item) {
                 is SongItem -> {
+                    val songLabel = stringResource("song")
                     val artistsText = item.artists.joinToString { it.name }
                     val albumText = item.album?.name?.let { " • $it" } ?: ""
-                    "Canción • $artistsText$albumText"
+                    "$songLabel • $artistsText$albumText"
                 }
                 is AlbumItem -> {
+                    val albumLabel = stringResource("album")
                     val artistsText = item.artists?.joinToString { it.name } ?: ""
                     val yearText = item.year?.let { " • $it" } ?: ""
-                    "Álbum • $artistsText$yearText"
+                    "$albumLabel • $artistsText$yearText"
                 }
-                is ArtistItem -> "Artista"
+                is ArtistItem -> stringResource("artist")
                 is PlaylistItem -> {
+                    val playlistLabel = stringResource("playlist")
                     val authorText = item.author?.name ?: ""
-                    "Playlist • $authorText"
+                    "$playlistLabel • $authorText"
                 }
                 else -> ""
             }
@@ -616,7 +620,7 @@ private fun EmptySearchResults() {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "No se encontraron resultados",
+            text = stringResource("no_results_found"),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

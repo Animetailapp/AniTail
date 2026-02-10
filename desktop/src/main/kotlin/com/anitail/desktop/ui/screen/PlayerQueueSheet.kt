@@ -62,6 +62,9 @@ import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.db.entities.PlaylistEntity
 import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.download.DesktopDownloadService
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.pluralStringResource
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
@@ -107,6 +110,7 @@ fun PlayerQueueSheet(
     } else {
         MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.9f)
     }
+    val strings = LocalStrings.current
     val clipboard = LocalClipboardManager.current
     val preferences = remember { DesktopPreferences.getInstance() }
     val queueEditLocked by preferences.queueEditLocked.collectAsState()
@@ -244,7 +248,7 @@ fun PlayerQueueSheet(
             ) {
                 QueueActionButton(
                     icon = IconAssets.share(),
-                    contentDescription = "Compartir",
+                    contentDescription = stringResource("share"),
                     shape = RoundedCornerShape(
                         topStart = 50.dp,
                         bottomStart = 50.dp,
@@ -258,7 +262,7 @@ fun PlayerQueueSheet(
 
                 QueueActionButton(
                     icon = IconAssets.queueMusic(),
-                    contentDescription = "Cola",
+                    contentDescription = stringResource("queue"),
                     shape = RoundedCornerShape(5.dp),
                     borderColor = borderColor,
                     iconTint = textColor,
@@ -267,7 +271,7 @@ fun PlayerQueueSheet(
 
                 QueueActionButton(
                     icon = IconAssets.lyrics(),
-                    contentDescription = "Letras",
+                    contentDescription = stringResource("lyrics"),
                     shape = RoundedCornerShape(
                         topStart = 5.dp,
                         bottomStart = 5.dp,
@@ -291,7 +295,7 @@ fun PlayerQueueSheet(
                     ) {
                         Icon(
                             imageVector = IconAssets.moreVert(),
-                            contentDescription = "Menu",
+                            contentDescription = stringResource("more_options"),
                             tint = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface,
                             modifier = Modifier.size(24.dp),
                         )
@@ -308,7 +312,7 @@ fun PlayerQueueSheet(
                         ) {
                             PlayerMenuQuickAction(
                                 icon = IconAssets.radio(),
-                                label = "Iniciar radio",
+                                label = stringResource("start_radio"),
                                 onClick = {
                                     onStartRadio()
                                     showMenu = false
@@ -317,7 +321,7 @@ fun PlayerQueueSheet(
                             )
                             PlayerMenuQuickAction(
                                 icon = IconAssets.playlistAdd(),
-                                label = "Agregar a playlist",
+                                label = stringResource("add_to_playlist"),
                                 onClick = {
                                     playlistTargetItems = listOf(currentItem)
                                     showPlaylistDialog = true
@@ -327,7 +331,7 @@ fun PlayerQueueSheet(
                             )
                             PlayerMenuQuickAction(
                                 icon = IconAssets.link(),
-                                label = "Copiar enlace",
+                                label = stringResource("copy_link"),
                                 onClick = {
                                     copyLink(shareUrl)
                                     showMenu = false
@@ -345,7 +349,7 @@ fun PlayerQueueSheet(
 
                         if (artistsWithId.isNotEmpty()) {
                             DropdownMenuItem(
-                                text = { Text("Ver artista") },
+                                text = { Text(stringResource("view_artist")) },
                                 onClick = {
                                     if (artistsWithId.size == 1) {
                                         val artist = artistsWithId.first()
@@ -365,7 +369,7 @@ fun PlayerQueueSheet(
                         }
                         albumInfo?.let { album ->
                             DropdownMenuItem(
-                                text = { Text("Ver album") },
+                                text = { Text(stringResource("view_album")) },
                                 onClick = {
                                     onOpenAlbum(album.first, album.second)
                                     showMenu = false
@@ -382,7 +386,7 @@ fun PlayerQueueSheet(
                             SelectionDownloadState.NONE -> Unit
                             SelectionDownloadState.COMPLETED -> {
                                 DropdownMenuItem(
-                                    text = { Text("Eliminar descarga") },
+                                    text = { Text(stringResource("remove_download")) },
                                     onClick = {
                                         removeDownloads(listOf(currentItem))
                                         showMenu = false
@@ -397,7 +401,7 @@ fun PlayerQueueSheet(
                             }
                             SelectionDownloadState.DOWNLOADING -> {
                                 DropdownMenuItem(
-                                    text = { Text("Descargando") },
+                                    text = { Text(stringResource("downloading")) },
                                     onClick = {
                                         removeDownloads(listOf(currentItem))
                                         showMenu = false
@@ -412,7 +416,7 @@ fun PlayerQueueSheet(
                             }
                             SelectionDownloadState.NOT_DOWNLOADED -> {
                                 DropdownMenuItem(
-                                    text = { Text("Descargar") },
+                                    text = { Text(stringResource("download")) },
                                     onClick = {
                                         downloadItems(listOf(currentItem))
                                         showMenu = false
@@ -427,7 +431,7 @@ fun PlayerQueueSheet(
                             }
                         }
                         DropdownMenuItem(
-                            text = { Text("Compartir") },
+                            text = { Text(stringResource("share")) },
                             onClick = {
                                 copyLink(shareUrl)
                                 showMenu = false
@@ -440,7 +444,7 @@ fun PlayerQueueSheet(
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Detalles") },
+                            text = { Text(stringResource("details")) },
                             onClick = {
                                 onShowDetailsDialog()
                                 showMenu = false
@@ -454,11 +458,12 @@ fun PlayerQueueSheet(
                         )
                         DropdownMenuItem(
                             text = {
-                                if (playerState.isSleepTimerActive) {
-                                    Text("Temporizador (${formatTime(playerState.sleepTimerTimeLeftMs)})")
+                                val timerLabel = if (playerState.isSleepTimerActive) {
+                                    strings.get("sleep_timer") + " (" + formatTime(playerState.sleepTimerTimeLeftMs) + ")"
                                 } else {
-                                    Text("Temporizador")
+                                    strings.get("sleep_timer")
                                 }
+                                Text(text = timerLabel)
                             },
                             onClick = {
                                 onShowSleepTimerDialog()
@@ -472,7 +477,7 @@ fun PlayerQueueSheet(
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Ecualizador") },
+                            text = { Text(stringResource("equalizer")) },
                             onClick = {
                                 onShowAudioSettingsDialog()
                                 showMenu = false
@@ -485,7 +490,7 @@ fun PlayerQueueSheet(
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Avanzado") },
+                            text = { Text(stringResource("advanced")) },
                             onClick = {
                                 onShowAdvancedDialog()
                                 showMenu = false
@@ -533,14 +538,10 @@ fun PlayerQueueSheet(
             clearSelection()
 
             coroutineScope.launch {
-                val message = if (removedItems.size == 1) {
-                    "Cancion eliminada"
-                } else {
-                    "${removedItems.size} canciones eliminadas"
-                }
+                val message = strings.plural("queue_items_removed", removedItems.size, removedItems.size)
                 val result = snackbarHostState.showSnackbar(
                     message = message,
-                    actionLabel = "Deshacer",
+                    actionLabel = strings.get("undo"),
                     duration = SnackbarDuration.Short,
                 )
                 if (result == SnackbarResult.ActionPerformed) {
@@ -580,7 +581,7 @@ fun PlayerQueueSheet(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "La cola esta vacia",
+                            text = stringResource("queue_empty"),
                             style = MaterialTheme.typography.bodyMedium,
                             color = mutedTextColor,
                         )
@@ -715,7 +716,7 @@ fun PlayerQueueSheet(
             )
 
             QueueHeader(
-                title = "Cola actual",
+                title = stringResource("queue"),
                 count = queue.size,
                 totalDurationMs = queue.sumOf { it.durationMs ?: 0L },
                 locked = queueEditLocked,
@@ -837,8 +838,8 @@ fun PlayerQueueSheet(
             if (downloadTargetItems.isNotEmpty()) downloadTargetItems else selectedItemsInQueue(queue)
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showRemoveDownloadDialog = false },
-            title = { Text("Eliminar descargas") },
-            text = { Text("Se eliminaran las descargas seleccionadas.") },
+            title = { Text(stringResource("remove_downloads")) },
+            text = { Text(stringResource("remove_downloads_confirmation")) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -847,12 +848,12 @@ fun PlayerQueueSheet(
                         showRemoveDownloadDialog = false
                     },
                 ) {
-                    Text("Eliminar")
+                    Text(stringResource("delete"))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showRemoveDownloadDialog = false }) {
-                    Text("Cancelar")
+                    Text(stringResource("cancel"))
                 }
             },
         )
@@ -969,7 +970,7 @@ private fun QueueHeader(
                 horizontalAlignment = Alignment.End,
             ) {
                 Text(
-                    text = if (count == 1) "1 cancion" else "$count canciones",
+                    text = pluralStringResource("n_song", count, count),
                     style = MaterialTheme.typography.bodyMedium,
                     color = mutedTextColor,
                 )
@@ -1014,7 +1015,7 @@ private fun QueueSelectionBar(
     modifier: Modifier = Modifier,
 ) {
     var showMenu by remember { mutableStateOf(false) }
-    val likeLabel = if (allLiked) "Quitar me gusta" else "Me gusta"
+    val likeLabel = if (allLiked) stringResource("action_remove_like") else stringResource("action_like")
     val likeIcon = if (allLiked) IconAssets.favorite() else IconAssets.favoriteBorder()
 
     Row(
@@ -1028,14 +1029,14 @@ private fun QueueSelectionBar(
         IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
             Icon(
                 imageVector = IconAssets.close(),
-                contentDescription = "Cerrar seleccion",
+                contentDescription = stringResource("close_selection"),
                 tint = mutedTextColor,
                 modifier = Modifier.size(20.dp),
             )
         }
 
         Text(
-            text = "$selectedCount seleccionados",
+            text = stringResource("elements_selected", selectedCount),
             style = MaterialTheme.typography.bodyMedium,
             color = textColor,
             modifier = Modifier.weight(1f),
@@ -1046,7 +1047,7 @@ private fun QueueSelectionBar(
         IconButton(onClick = onToggleSelectAll, modifier = Modifier.size(36.dp)) {
             Icon(
                 imageVector = if (allSelected) IconAssets.deselect() else IconAssets.selectAll(),
-                contentDescription = if (allSelected) "Deseleccionar todo" else "Seleccionar todo",
+                contentDescription = if (allSelected) stringResource("deselect_all") else stringResource("select_all"),
                 tint = mutedTextColor,
                 modifier = Modifier.size(20.dp),
             )
@@ -1056,7 +1057,7 @@ private fun QueueSelectionBar(
             IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
                 Icon(
                     imageVector = IconAssets.moreVert(),
-                    contentDescription = "Menu seleccion",
+                    contentDescription = stringResource("more_options"),
                     tint = mutedTextColor,
                     modifier = Modifier.size(20.dp),
                 )
@@ -1066,7 +1067,7 @@ private fun QueueSelectionBar(
                 onDismissRequest = { showMenu = false },
             ) {
                 DropdownMenuItem(
-                    text = { Text("Quitar de la cola") },
+                    text = { Text(stringResource("remove_from_queue")) },
                     onClick = {
                         onRemoveFromQueue()
                         showMenu = false
@@ -1080,7 +1081,7 @@ private fun QueueSelectionBar(
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Reproducir") },
+                    text = { Text(stringResource("play")) },
                     onClick = {
                         onPlay()
                         showMenu = false
@@ -1094,7 +1095,7 @@ private fun QueueSelectionBar(
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Aleatorio") },
+                    text = { Text(stringResource("shuffle")) },
                     onClick = {
                         onShuffle()
                         showMenu = false
@@ -1108,7 +1109,7 @@ private fun QueueSelectionBar(
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Agregar a la cola") },
+                    text = { Text(stringResource("add_to_queue")) },
                     onClick = {
                         onAddToQueue()
                         showMenu = false
@@ -1122,7 +1123,7 @@ private fun QueueSelectionBar(
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Agregar a playlist") },
+                    text = { Text(stringResource("add_to_playlist")) },
                     onClick = {
                         onAddToPlaylist()
                         showMenu = false
@@ -1153,7 +1154,7 @@ private fun QueueSelectionBar(
                     SelectionDownloadState.NONE -> Unit
                     SelectionDownloadState.COMPLETED -> {
                         DropdownMenuItem(
-                            text = { Text("Eliminar descarga") },
+                            text = { Text(stringResource("remove_download")) },
                             onClick = {
                                 onRemoveDownload()
                                 showMenu = false
@@ -1169,7 +1170,7 @@ private fun QueueSelectionBar(
                     }
                     SelectionDownloadState.DOWNLOADING -> {
                         DropdownMenuItem(
-                            text = { Text("Descargando") },
+                            text = { Text(stringResource("downloading")) },
                             onClick = {
                                 onRemoveDownload()
                                 showMenu = false
@@ -1185,7 +1186,7 @@ private fun QueueSelectionBar(
                     }
                     SelectionDownloadState.NOT_DOWNLOADED -> {
                         DropdownMenuItem(
-                            text = { Text("Descargar") },
+                            text = { Text(stringResource("download")) },
                             onClick = {
                                 onDownload()
                                 showMenu = false
@@ -1336,7 +1337,7 @@ private fun QueueItemRow(
                 ) {
                     Icon(
                         imageVector = IconAssets.moreVert(),
-                        contentDescription = "Menu",
+                        contentDescription = stringResource("more_options"),
                         tint = mutedTextColor,
                         modifier = Modifier.size(18.dp),
                     )
@@ -1347,7 +1348,7 @@ private fun QueueItemRow(
                     onDismissRequest = { itemMenuExpanded = false },
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Reproducir siguiente") },
+                        text = { Text(stringResource("play_next")) },
                         onClick = {
                             onPlayNext()
                             itemMenuExpanded = false
@@ -1361,7 +1362,7 @@ private fun QueueItemRow(
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Agregar a playlist") },
+                        text = { Text(stringResource("add_to_playlist")) },
                         onClick = {
                             onAddToPlaylist()
                             itemMenuExpanded = false
@@ -1374,7 +1375,9 @@ private fun QueueItemRow(
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text(if (isLiked) "Quitar me gusta" else "Me gusta") },
+                        text = {
+                            Text(if (isLiked) stringResource("action_remove_like") else stringResource("action_like"))
+                        },
                         onClick = {
                             onToggleLike()
                             itemMenuExpanded = false
@@ -1390,7 +1393,7 @@ private fun QueueItemRow(
                         SelectionDownloadState.NONE -> Unit
                         SelectionDownloadState.COMPLETED -> {
                             DropdownMenuItem(
-                                text = { Text("Eliminar descarga") },
+                                text = { Text(stringResource("remove_download")) },
                                 onClick = {
                                     onRemoveDownload()
                                     itemMenuExpanded = false
@@ -1405,7 +1408,7 @@ private fun QueueItemRow(
                         }
                         SelectionDownloadState.DOWNLOADING -> {
                             DropdownMenuItem(
-                                text = { Text("Descargando") },
+                                text = { Text(stringResource("downloading")) },
                                 onClick = {
                                     onRemoveDownload()
                                     itemMenuExpanded = false
@@ -1420,7 +1423,7 @@ private fun QueueItemRow(
                         }
                         SelectionDownloadState.NOT_DOWNLOADED -> {
                             DropdownMenuItem(
-                                text = { Text("Descargar") },
+                                text = { Text(stringResource("download")) },
                                 onClick = {
                                     onDownload()
                                     itemMenuExpanded = false
@@ -1435,7 +1438,7 @@ private fun QueueItemRow(
                         }
                     }
                     DropdownMenuItem(
-                        text = { Text("Copiar enlace") },
+                        text = { Text(stringResource("copy_link")) },
                         onClick = {
                             onCopyLink()
                             itemMenuExpanded = false
@@ -1448,7 +1451,7 @@ private fun QueueItemRow(
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Abrir en navegador") },
+                        text = { Text(stringResource("open_in_browser")) },
                         onClick = {
                             onOpenInBrowser()
                             itemMenuExpanded = false
@@ -1461,7 +1464,7 @@ private fun QueueItemRow(
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Eliminar de la cola") },
+                        text = { Text(stringResource("remove_from_queue")) },
                         onClick = {
                             onRemove()
                             itemMenuExpanded = false

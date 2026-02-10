@@ -981,6 +981,9 @@ private data class AboutTeamMember(
     val url: String,
 )
 
+private const val PulseLabel = "pulse"
+private const val ShimmerLabel = "shimmer"
+
 @Composable
 private fun AboutScreen(
     onBack: () -> Unit,
@@ -1173,7 +1176,7 @@ private fun AboutHeaderCard(buildInfo: AboutBuildInfo) {
                     .align(Alignment.TopCenter)
                     .padding(top = 16.dp),
             ) {
-                val infiniteTransition = rememberInfiniteTransition("pulse")
+                val infiniteTransition = rememberInfiniteTransition(PulseLabel)
                 val pulseScale by infiniteTransition.animateFloat(
                     initialValue = 1f,
                     targetValue = 1.05f,
@@ -1181,7 +1184,7 @@ private fun AboutHeaderCard(buildInfo: AboutBuildInfo) {
                         animation = tween(2000, easing = FastOutSlowInEasing),
                         repeatMode = RepeatMode.Reverse,
                     ),
-                    label = "pulse",
+                    label = PulseLabel,
                 )
 
                 Surface(
@@ -1234,7 +1237,7 @@ private fun AboutShimmerOverlay() {
         Color.White.copy(alpha = 0.3f),
         Color.White.copy(alpha = 0f),
     )
-    val transition = rememberInfiniteTransition("shimmer")
+    val transition = rememberInfiniteTransition(ShimmerLabel)
     val translate by transition.animateFloat(
         initialValue = -1f,
         targetValue = 2f,
@@ -1242,7 +1245,7 @@ private fun AboutShimmerOverlay() {
             tween(2000, easing = FastOutSlowInEasing),
             RepeatMode.Restart,
         ),
-        label = "shimmer",
+        label = ShimmerLabel,
     )
 
     Canvas(modifier = Modifier.fillMaxSize()) {
@@ -1267,7 +1270,7 @@ private fun AboutBuildInfoRow(icon: ImageVector, label: String, value: String) {
         Icon(icon, contentDescription = label, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(8.dp))
         Text(
-            text = "$label:",
+            text = label + ":",
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium,
         )
@@ -1424,7 +1427,7 @@ private fun AboutTeamGrid(
                     color = MaterialTheme.colorScheme.tertiaryContainer,
                 ) {
                     Text(
-                        text = "${members.size}",
+                        text = members.size.toString(),
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,

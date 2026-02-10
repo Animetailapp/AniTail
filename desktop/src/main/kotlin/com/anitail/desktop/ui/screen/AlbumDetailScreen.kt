@@ -44,6 +44,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.ui.IconAssets
 import androidx.compose.ui.unit.sp
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.component.ShimmerBox
@@ -69,6 +71,7 @@ fun AlbumDetailScreen(
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var isLiked by remember { mutableStateOf(false) }
+    val strings = LocalStrings.current
 
     LaunchedEffect(albumId) {
         isLoading = true
@@ -76,7 +79,7 @@ fun AlbumDetailScreen(
         YouTube.album(albumId).onSuccess { page ->
             albumPage = page
         }.onFailure { e ->
-            error = e.message ?: "Error al cargar álbum"
+            error = e.message ?: strings.get("error_loading_album")
         }
         isLoading = false
     }
@@ -91,7 +94,7 @@ fun AlbumDetailScreen(
                 modifier = Modifier.fillMaxWidth().padding(8.dp),
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(IconAssets.arrowBack(), contentDescription = "Volver")
+                    Icon(IconAssets.arrowBack(), contentDescription = stringResource("back"))
                 }
                 Text(
                     text = albumPage?.album?.title ?: albumName,
@@ -149,7 +152,7 @@ fun AlbumDetailScreen(
                                         )
                                         if (index != artists.lastIndex) {
                                             Text(
-                                                text = ", ",
+                                                text = stringResource("list_separator"),
                                                 style = MaterialTheme.typography.titleMedium,
                                             )
                                         }
@@ -221,7 +224,7 @@ fun AlbumDetailScreen(
                                 modifier = Modifier.size(ButtonDefaults.IconSize),
                             )
                             Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                            Text("Reproducir")
+                            Text(stringResource("play"))
                         }
 
                         OutlinedButton(
@@ -241,7 +244,7 @@ fun AlbumDetailScreen(
                                 modifier = Modifier.size(ButtonDefaults.IconSize),
                             )
                             Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                            Text("Aleatorio")
+                            Text(stringResource("shuffle"))
                         }
                     }
                 }
@@ -269,7 +272,7 @@ fun AlbumDetailScreen(
             if (page.otherVersions.isNotEmpty()) {
                 item {
                     Text(
-                        text = "Otras versiones",
+                        text = stringResource("other_versions"),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)

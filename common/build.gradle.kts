@@ -18,8 +18,7 @@ kotlin {
                 implementation(compose.foundation)
                 implementation(compose.material3)
                 implementation(compose.ui)
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:3.4.0")
+                api(libs.ktor.serialization.json)
             }
         }
         val commonTest by getting

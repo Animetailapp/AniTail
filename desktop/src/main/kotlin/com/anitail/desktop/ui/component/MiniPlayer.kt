@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.anitail.desktop.constants.MiniPlayerHeight
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.player.RepeatMode
 import com.anitail.desktop.ui.IconAssets
@@ -51,6 +52,12 @@ fun MiniPlayer(
     modifier: Modifier = Modifier,
 ) {
     val currentItem = playerState.currentItem ?: return
+    val playLabel = stringResource("play")
+    val pauseLabel = stringResource("pause")
+    val previousLabel = stringResource("previous")
+    val nextLabel = stringResource("next")
+    val shuffleLabel = stringResource("shuffle")
+    val repeatLabel = stringResource("repeat")
 
     Surface(
         tonalElevation = 2.dp,
@@ -96,7 +103,7 @@ fun MiniPlayer(
                     ) {
                         Icon(
                             imageVector = if (playerState.isPlaying) IconAssets.pause() else IconAssets.play(),
-                            contentDescription = if (playerState.isPlaying) "Pausar" else "Reproducir",
+                            contentDescription = if (playerState.isPlaying) pauseLabel else playLabel,
                             tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(20.dp),
                         )
@@ -122,7 +129,7 @@ fun MiniPlayer(
                     AnimatedContent(
                         targetState = currentItem.title,
                         transitionSpec = { fadeIn() togetherWith fadeOut() },
-                        label = "title",
+                        label = MiniPlayerTitleLabel,
                     ) { title ->
                         Text(
                             text = title,
@@ -137,7 +144,7 @@ fun MiniPlayer(
                     AnimatedContent(
                         targetState = currentItem.artist,
                         transitionSpec = { fadeIn() togetherWith fadeOut() },
-                        label = "artist",
+                        label = MiniPlayerArtistLabel,
                     ) { artist ->
                         Text(
                             text = artist,
@@ -159,7 +166,7 @@ fun MiniPlayer(
                 ) {
                     Icon(
                         imageVector = IconAssets.previous(),
-                        contentDescription = "Anterior",
+                        contentDescription = previousLabel,
                         tint = if (playerState.canSkipPrevious || playerState.position > 3000L)
                             MaterialTheme.colorScheme.onSurface
                         else
@@ -176,7 +183,7 @@ fun MiniPlayer(
                 ) {
                     Icon(
                         imageVector = IconAssets.next(),
-                        contentDescription = "Siguiente",
+                        contentDescription = nextLabel,
                         tint = if (playerState.canSkipNext)
                             MaterialTheme.colorScheme.onSurface
                         else
@@ -194,7 +201,7 @@ fun MiniPlayer(
                 ) {
                     Icon(
                         imageVector = IconAssets.shuffle(),
-                        contentDescription = "Aleatorio",
+                        contentDescription = shuffleLabel,
                         tint = if (playerState.shuffleEnabled)
                             MaterialTheme.colorScheme.primary
                         else
@@ -213,7 +220,7 @@ fun MiniPlayer(
                             RepeatMode.ONE -> IconAssets.repeatOne()
                             else -> IconAssets.repeat()
                         },
-                        contentDescription = "Repetir",
+                        contentDescription = repeatLabel,
                         tint = if (playerState.repeatMode != RepeatMode.OFF)
                             MaterialTheme.colorScheme.primary
                         else
@@ -234,3 +241,6 @@ fun formatDuration(ms: Long): String {
     val minutes = (ms / 1000) / 60
     return "%d:%02d".format(minutes, seconds)
 }
+
+private const val MiniPlayerTitleLabel = "mini_player_title"
+private const val MiniPlayerArtistLabel = "mini_player_artist"

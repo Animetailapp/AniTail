@@ -44,7 +44,7 @@ fun shimmerBrush(): Brush {
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
     )
 
-    val transition = rememberInfiniteTransition(label = "shimmer")
+    val transition = rememberInfiniteTransition(label = ShimmerAnimationLabel)
     val translateAnim by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1000f,
@@ -52,7 +52,7 @@ fun shimmerBrush(): Brush {
             animation = tween(durationMillis = 1200, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
-        label = "shimmer_translate",
+        label = ShimmerTranslateLabel,
     )
 
     return Brush.linearGradient(
@@ -218,3 +218,6 @@ fun ShimmerChipsRow(
         }
     }
 }
+
+private const val ShimmerAnimationLabel = "shimmer"
+private const val ShimmerTranslateLabel = "shimmer_translate"

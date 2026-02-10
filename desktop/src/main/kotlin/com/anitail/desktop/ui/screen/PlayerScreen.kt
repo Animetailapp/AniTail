@@ -43,6 +43,7 @@ import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.db.entities.PlaylistEntity
 import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.download.DesktopDownloadService
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.buildRadioQueuePlan
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.storage.DesktopPreferences
@@ -490,7 +491,7 @@ private fun EmptyPlayerState(modifier: Modifier) {
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "No hay nada reproduciendose",
+                text = stringResource("nothing_playing"),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

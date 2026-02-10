@@ -23,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.i18n.pluralStringResource
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.ui.screen.formatTime
 import com.anitail.innertube.models.Artist
 import com.anitail.shared.model.LibraryItem
@@ -41,21 +43,22 @@ fun SleepTimerDialog(
     if (!visible) return
 
     var minutes by remember { mutableStateOf(30f) }
+    val minutesInt = minutes.roundToInt()
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Temporizador") },
+        title = { Text(stringResource("sleep_timer")) },
         text = {
             Column {
                 if (isActive) {
                     Text(
-                        text = "Restante: ${formatTime(timeLeftMs)}",
+                        text = stringResource("time_remaining", formatTime(timeLeftMs)),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
                 Text(
-                    text = "${minutes.roundToInt()} min",
+                    text = pluralStringResource("minute", minutesInt, minutesInt),
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -73,7 +76,7 @@ fun SleepTimerDialog(
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Al final de la canción")
+                    Text(stringResource("end_of_song"))
                 }
             }
         },
@@ -84,7 +87,7 @@ fun SleepTimerDialog(
                     onDismiss()
                 },
             ) {
-                Text(if (isActive) "Actualizar" else "Iniciar")
+                Text(if (isActive) stringResource("update") else stringResource("start"))
             }
         },
         dismissButton = {
@@ -96,12 +99,12 @@ fun SleepTimerDialog(
                             onDismiss()
                         },
                     ) {
-                        Text("Cancelar")
+                        Text(stringResource("cancel"))
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 TextButton(onClick = onDismiss) {
-                    Text("Cerrar")
+                    Text(stringResource("close"))
                 }
             }
         },
@@ -121,11 +124,11 @@ fun AudioSettingsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Ecualizador") },
+        title = { Text(stringResource("equalizer")) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Volumen: $volumePercent%",
+                    text = stringResource("volume_percent", volumePercent),
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -138,7 +141,7 @@ fun AudioSettingsDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cerrar")
+                Text(stringResource("close"))
             }
         },
     )
@@ -158,11 +161,12 @@ fun TempoPitchDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Avanzado") },
+        title = { Text(stringResource("tempo_and_pitch")) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
+                val tempoFormatted = "%.2f".format(tempo)
                 Text(
-                    text = "Tempo: ${"%.2f".format(tempo)}x",
+                    text = stringResource("tempo_value", tempoFormatted),
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -175,7 +179,7 @@ fun TempoPitchDialog(
                 Spacer(modifier = Modifier.height(16.dp))
                 val pitchLabel = if (pitchSemitone > 0) "+$pitchSemitone" else pitchSemitone.toString()
                 Text(
-                    text = "Tono: $pitchLabel",
+                    text = stringResource("pitch_value", pitchLabel),
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -189,12 +193,12 @@ fun TempoPitchDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cerrar")
+                Text(stringResource("close"))
             }
         },
         dismissButton = {
             TextButton(onClick = onReset) {
-                Text("Reiniciar")
+                Text(stringResource("reset"))
             }
         },
     )
@@ -211,7 +215,7 @@ fun ArtistPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Selecciona artista") },
+        title = { Text(stringResource("select_artist")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 artists.forEach { artist ->
@@ -230,7 +234,7 @@ fun ArtistPickerDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cerrar")
+                Text(stringResource("close"))
             }
         },
     )
@@ -248,30 +252,30 @@ fun MediaDetailsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Detalles") },
+        title = { Text(stringResource("details")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                DetailRow("Título", item.title)
-                DetailRow("Artista", item.artist)
-                DetailRow("Duración", formatTime(item.durationMs ?: 0L))
-                DetailRow("ID", item.id)
-                DetailRow("URL", item.playbackUrl)
+                DetailRow(stringResource("song_title"), item.title)
+                DetailRow(stringResource("artist"), item.artist)
+                DetailRow(stringResource("duration"), formatTime(item.durationMs ?: 0L))
+                DetailRow(stringResource("id"), item.id)
+                DetailRow(stringResource("url"), item.playbackUrl)
             }
         },
         confirmButton = {
             Row {
                 TextButton(onClick = onCopyLink) {
-                    Text("Copiar enlace")
+                    Text(stringResource("copy_link"))
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 TextButton(onClick = onOpenInBrowser) {
-                    Text("Abrir")
+                    Text(stringResource("open_in_browser"))
                 }
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cerrar")
+                Text(stringResource("close"))
             }
         },
     )
@@ -281,7 +285,7 @@ fun MediaDetailsDialog(
 private fun DetailRow(label: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = "$label:",
+            text = label + ":",
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.width(90.dp),

@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.NavigationTitle
@@ -92,11 +93,11 @@ fun ChartsScreen(
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = IconAssets.arrowBack(),
-                    contentDescription = "Volver",
+                    contentDescription = stringResource("back"),
                 )
             }
             Text(
-                text = "Charts",
+                text = stringResource("charts"),
                 style = MaterialTheme.typography.headlineMedium,
             )
         }
@@ -130,10 +131,10 @@ fun ChartsScreen(
                         item {
                             NavigationTitle(
                                 title = when (section.title) {
-                                    "Trending" -> "Tendencias"
-                                    "Top songs" -> "Canciones populares"
-                                    "Top artists" -> "Artistas populares"
-                                    else -> section.title ?: "Charts"
+                                    "Trending" -> stringResource("trending")
+                                    "Top songs" -> stringResource("top_songs")
+                                    "Top artists" -> stringResource("top_artists")
+                                    else -> section.title ?: stringResource("charts")
                                 }
                             )
                         }
@@ -175,7 +176,7 @@ fun ChartsScreen(
                 // Top music videos section
                 chartsPage?.sections?.find { it.title == "Top music videos" }?.let { section ->
                     item {
-                        NavigationTitle(title = "Videos musicales populares")
+                        NavigationTitle(title = stringResource("top_music_videos"))
                     }
 
                     item {

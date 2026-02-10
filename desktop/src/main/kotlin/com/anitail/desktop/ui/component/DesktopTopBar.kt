@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowState
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.loadBitmapResource
 import com.sun.jna.CallbackReference
@@ -121,17 +122,18 @@ private fun TitleContent(
     logoBitmap: ImageBitmap?,
     titleColor: Color,
 ) {
+    val appName = stringResource("app_name")
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (logoBitmap != null) {
             Image(
                 bitmap = logoBitmap,
-                contentDescription = "AniTail",
+                contentDescription = appName,
                 modifier = Modifier.size(22.dp),
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "AniTail",
+            text = appName,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = titleColor,
@@ -149,24 +151,29 @@ private fun ActionButtons(
     showUpdateBadge: Boolean,
     colors: IconButtonColors,
 ) {
+    val refreshLabel = stringResource("refresh")
+    val historyLabel = stringResource("history")
+    val statsLabel = stringResource("stats")
+    val searchLabel = stringResource("search")
+    val settingsLabel = stringResource("settings")
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (onRefreshHome != null) {
             IconButton(onClick = onRefreshHome, colors = colors) {
-                Icon(IconAssets.refresh(), contentDescription = "Actualizar")
+                Icon(IconAssets.refresh(), contentDescription = refreshLabel)
             }
         }
         IconButton(onClick = onHistory, colors = colors) {
-            Icon(IconAssets.history(), contentDescription = "Historial")
+            Icon(IconAssets.history(), contentDescription = historyLabel)
         }
         IconButton(onClick = onStats, colors = colors) {
-            Icon(IconAssets.stats(), contentDescription = "Estadisticas")
+            Icon(IconAssets.stats(), contentDescription = statsLabel)
         }
         IconButton(onClick = onSearch, colors = colors) {
-            Icon(IconAssets.search(), contentDescription = "Buscar")
+            Icon(IconAssets.search(), contentDescription = searchLabel)
         }
         IconButton(onClick = onSettings, colors = colors) {
             BadgedBox(badge = { if (showUpdateBadge) Badge() }) {
-                Icon(IconAssets.settings(), contentDescription = "Ajustes")
+                Icon(IconAssets.settings(), contentDescription = settingsLabel)
             }
         }
     }
@@ -180,23 +187,27 @@ private fun WindowControls(
     onWindowClose: () -> Unit,
     colors: IconButtonColors,
 ) {
+    val minimizeLabel = stringResource("minimize")
+    val restoreLabel = stringResource("restore")
+    val maximizeLabel = stringResource("maximize")
+    val closeLabel = stringResource("close")
     Row(verticalAlignment = Alignment.CenterVertically) {
         IconButton(
             onClick = { windowState.isMinimized = true },
             colors = colors,
         ) {
-            Icon(IconAssets.windowMinimize(), contentDescription = "Minimizar")
+            Icon(IconAssets.windowMinimize(), contentDescription = minimizeLabel)
         }
         IconButton(
             onClick = onToggleMaximize,
             colors = colors,
         ) {
             val icon = if (isMaximized) IconAssets.windowRestore() else IconAssets.windowMaximize()
-            val description = if (isMaximized) "Restaurar" else "Maximizar"
+            val description = if (isMaximized) restoreLabel else maximizeLabel
             Icon(icon, contentDescription = description)
         }
         IconButton(onClick = onWindowClose, colors = colors) {
-            Icon(IconAssets.close(), contentDescription = "Cerrar")
+            Icon(IconAssets.close(), contentDescription = closeLabel)
         }
     }
 }

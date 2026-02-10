@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.shared.model.LibraryItem
 
@@ -23,7 +24,7 @@ fun StatsScreen(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        NavigationTitle(title = "Estadisticas")
+        NavigationTitle(title = stringResource("stats"))
         Surface(
             tonalElevation = 2.dp,
             shape = RoundedCornerShape(12.dp),
@@ -32,7 +33,7 @@ fun StatsScreen(
                 .padding(horizontal = 12.dp),
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Canciones en biblioteca", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource("stats_songs_in_library"), style = MaterialTheme.typography.titleMedium)
                 Text(items.size.toString(), style = MaterialTheme.typography.headlineMedium)
             }
         }
@@ -44,12 +45,12 @@ fun StatsScreen(
                 .padding(horizontal = 12.dp),
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Reproducciones recientes", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource("stats_recent_plays"), style = MaterialTheme.typography.titleMedium)
                 Text(items.take(5).size.toString(), style = MaterialTheme.typography.headlineMedium)
             }
         }
         Text(
-            text = "Mas estadisticas llegaran pronto en Desktop.",
+            text = stringResource("stats_more_soon"),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 12.dp),
         )

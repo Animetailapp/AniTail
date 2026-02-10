@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.lyrics.DesktopLyricsService
 import com.anitail.desktop.lyrics.LyricLine
 import com.anitail.desktop.lyrics.LyricsResult
@@ -60,6 +61,12 @@ fun LyricsPanel(
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+    val lyricsLabel = stringResource("lyrics")
+    val syncedLabel = stringResource("lyrics_synced")
+    val plainLabel = stringResource("lyrics_plain")
+    val retryLabel = stringResource("retry")
+    val lyricsNotFoundLabel = stringResource("lyrics_not_found")
+    val lyricsEmptyLabel = stringResource("lyrics_start_playing")
 
     // Cargar letras cuando cambia la canción
     LaunchedEffect(title, artist) {
@@ -116,7 +123,7 @@ fun LyricsPanel(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Letras",
+                    text = lyricsLabel,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
@@ -133,7 +140,7 @@ fun LyricsPanel(
                         shape = RoundedCornerShape(8.dp),
                     ) {
                         Text(
-                            text = if (lyricsResult?.hasSyncedLyrics == true) "Sincronizadas" else "Texto",
+                            text = if (lyricsResult?.hasSyncedLyrics == true) syncedLabel else plainLabel,
                             style = MaterialTheme.typography.labelSmall,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         )
@@ -154,7 +161,7 @@ fun LyricsPanel(
                             }
                         }
                     ) {
-                        Icon(IconAssets.refresh(), contentDescription = "Reintentar")
+                        Icon(IconAssets.refresh(), contentDescription = retryLabel)
                     }
                 }
             }
@@ -187,7 +194,7 @@ fun LyricsPanel(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "No se encontraron letras",
+                                text = lyricsNotFoundLabel,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -242,7 +249,7 @@ fun LyricsPanel(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Reproduce una canción para ver las letras",
+                                text = lyricsEmptyLabel,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
@@ -267,7 +274,7 @@ private fun LyricLineItem(
         } else {
             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
         },
-        label = "lyric_color"
+        label = LyricColorLabel
     )
 
     val backgroundColor by animateColorAsState(
@@ -276,7 +283,7 @@ private fun LyricLineItem(
         } else {
             MaterialTheme.colorScheme.surface.copy(alpha = 0f)
         },
-        label = "lyric_bg"
+        label = LyricBackgroundLabel
     )
 
     Box(
@@ -298,3 +305,6 @@ private fun LyricLineItem(
         )
     }
 }
+
+private const val LyricColorLabel = "lyric_color"
+private const val LyricBackgroundLabel = "lyric_bg"

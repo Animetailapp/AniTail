@@ -43,6 +43,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.ui.IconAssets
 import androidx.compose.ui.unit.sp
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.pluralStringResource
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.component.ShimmerBox
@@ -70,6 +73,7 @@ fun PlaylistDetailScreen(
     var isLiked by remember { mutableStateOf(false) }
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    val strings = LocalStrings.current
 
     val topBarHeight = 56.dp
     val lazyListState = rememberLazyListState()
@@ -83,7 +87,7 @@ fun PlaylistDetailScreen(
         YouTube.playlist(playlistId).onSuccess { page ->
             playlistPage = page
         }.onFailure { e ->
-            error = e.message ?: "Error al cargar playlist"
+            error = e.message ?: strings.get("error_loading_playlist")
         }
         isLoading = false
     }
@@ -172,7 +176,7 @@ fun PlaylistDetailScreen(
                                             fontWeight = FontWeight.Normal,
                                         )
                                     } ?: Text(
-                                        text = "${page.songs.size} canciones",
+                                        text = pluralStringResource("n_song", page.songs.size, page.songs.size),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Normal,
                                     )
@@ -232,7 +236,7 @@ fun PlaylistDetailScreen(
                                             modifier = Modifier.size(ButtonDefaults.IconSize)
                                         )
                                         Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                                        Text("Aleatorio")
+                                        Text(stringResource("shuffle"))
                                     }
                                 }
 
@@ -251,7 +255,7 @@ fun PlaylistDetailScreen(
                                             modifier = Modifier.size(ButtonDefaults.IconSize),
                                         )
                                         Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                                        Text("Radio")
+                                        Text(stringResource("radio"))
                                     }
                                 }
                             }
@@ -314,14 +318,14 @@ fun PlaylistDetailScreen(
                     }
                 }
             ) {
-                Icon(IconAssets.arrowBack(), contentDescription = "Volver")
+                Icon(IconAssets.arrowBack(), contentDescription = stringResource("back"))
             }
 
             if (isSearching) {
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Buscar...") },
+                    placeholder = { Text(stringResource("search") + "...") },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                 )
@@ -340,7 +344,7 @@ fun PlaylistDetailScreen(
             // Botón buscar
             if (!isSearching) {
                 IconButton(onClick = { isSearching = true }) {
-                    Icon(IconAssets.search(), contentDescription = "Buscar")
+                    Icon(IconAssets.search(), contentDescription = stringResource("search"))
                 }
             }
         }
@@ -383,7 +387,7 @@ private fun YouTubeListItem(
                         .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(6.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("▶", color = Color.White)
+                    Text(stringResource("playing_indicator"), color = Color.White)
                 }
             }
         }
@@ -403,7 +407,7 @@ private fun YouTubeListItem(
             Row {
                 if (item.explicit) {
                     Text(
-                        text = "E ",
+                        text = stringResource("explicit_badge") + " ",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -422,7 +426,7 @@ private fun YouTubeListItem(
                     )
                     if (index < item.artists.lastIndex) {
                         Text(
-                            text = ", ",
+                            text = stringResource("list_separator"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

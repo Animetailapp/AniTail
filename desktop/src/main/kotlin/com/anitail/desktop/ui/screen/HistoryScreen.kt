@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.shared.model.LibraryItem
 
@@ -18,15 +19,15 @@ fun HistoryScreen(
     onPlay: (LibraryItem) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        NavigationTitle(title = "Historial")
+        NavigationTitle(title = stringResource("history"))
         Spacer(modifier = Modifier.height(12.dp))
         if (items.isEmpty()) {
             Text(
-                text = "No hay reproducciones recientes.",
+                text = stringResource("history_empty"),
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
         } else {
-            ItemList(items = items, primaryAction = "Reproducir", onPrimaryAction = onPlay)
+            ItemList(items = items, primaryAction = stringResource("play"), onPrimaryAction = onPlay)
         }
     }
 }

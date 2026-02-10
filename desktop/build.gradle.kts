@@ -46,8 +46,6 @@ dependencies {
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.4.0") // Forzar inclusión explícita
 
     implementation("org.openjfx:javafx-base:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-graphics:$javafxVersion:$javafxPlatform")

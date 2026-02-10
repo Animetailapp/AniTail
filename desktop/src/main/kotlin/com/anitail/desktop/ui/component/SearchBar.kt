@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.util.lerp
+import com.anitail.desktop.i18n.stringResource
 import kotlin.math.max
 
 @ExperimentalMaterial3Api
@@ -94,7 +95,7 @@ fun TopSearch(
     val animationProgress: Float by animateFloatAsState(
         targetValue = if (active) 1f else 0f,
         animationSpec = tween(durationMillis = AnimationDurationMillis),
-        label = "SearchBarAnimation",
+        label = SearchBarAnimationLabel,
     )
 
     val defaultInputFieldShape = SearchBarDefaults.inputFieldShape
@@ -237,6 +238,8 @@ private fun SearchBarInputField(
     val textColor = LocalTextStyle.current.color.takeOrElse {
         if (focused) colors.focusedTextColor else colors.unfocusedTextColor
     }
+    val searchLabel = stringResource("search")
+    val suggestionsLabel = stringResource("search_suggestions_available")
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -265,9 +268,9 @@ private fun SearchBarInputField(
                     }
                 }
                 .semantics {
-                    contentDescription = "Search"
+                    contentDescription = searchLabel
                     if (active) {
-                        stateDescription = "Suggestions available"
+                        stateDescription = suggestionsLabel
                     }
                 }
                 .onKeyEvent {
@@ -314,3 +317,4 @@ internal val SearchBarVerticalPadding: Dp = 8.dp
 internal val SearchBarHorizontalPadding: Dp = 12.dp
 val SearchBarIconOffsetX: Dp = 4.dp
 private const val AnimationDurationMillis: Int = 300
+private const val SearchBarAnimationLabel = "search_bar_animation"

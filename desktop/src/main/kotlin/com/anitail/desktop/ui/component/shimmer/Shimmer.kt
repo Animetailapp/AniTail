@@ -40,7 +40,7 @@ fun ShimmerHost(
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
     )
 
-    val transition = rememberInfiniteTransition(label = "shimmer")
+    val transition = rememberInfiniteTransition(label = ShimmerAnimationLabel)
     val translateAnimation = transition.animateFloat(
         initialValue = 0f,
         targetValue = 1000f,
@@ -51,7 +51,7 @@ fun ShimmerHost(
             ),
             repeatMode = RepeatMode.Restart,
         ),
-        label = "shimmer_translate",
+        label = ShimmerTranslateLabel,
     )
 
     Brush.linearGradient(
@@ -165,3 +165,6 @@ fun TextPlaceholder(
             .background(MaterialTheme.colorScheme.surfaceVariant),
     )
 }
+
+private const val ShimmerAnimationLabel = "shimmer"
+private const val ShimmerTranslateLabel = "shimmer_translate"

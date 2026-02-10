@@ -17,6 +17,7 @@ import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadState
 import com.anitail.desktop.download.DownloadStatus
 import com.anitail.desktop.download.DownloadedSong
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
 
@@ -43,16 +44,16 @@ fun DownloadsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Descargas") },
+                title = { Text(stringResource("downloads")) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(IconAssets.arrowBack(), contentDescription = "Volver")
+                        Icon(IconAssets.arrowBack(), contentDescription = stringResource("back"))
                     }
                 },
                 actions = {
                     if (downloadedSongs.isNotEmpty()) {
                         IconButton(onClick = { showDeleteAllDialog = true }) {
-                            Icon(IconAssets.deleteHistory(), contentDescription = "Eliminar todo")
+                            Icon(IconAssets.deleteHistory(), contentDescription = stringResource("clear_all_downloads"))
                         }
                     }
                 },
@@ -69,12 +70,12 @@ fun DownloadsScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Activas (${activeDownloads.size})") },
+                    text = { Text(stringResource("downloads_active", activeDownloads.size)) },
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("Completadas (${downloadedSongs.size})") },
+                    text = { Text(stringResource("downloads_completed", downloadedSongs.size)) },
                 )
             }
             
@@ -100,8 +101,8 @@ fun DownloadsScreen(
     if (showDeleteAllDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteAllDialog = false },
-            title = { Text("Eliminar todas las descargas") },
-            text = { Text("¿Estás seguro de que deseas eliminar todas las canciones descargadas? Esta acción no se puede deshacer.") },
+            title = { Text(stringResource("clear_all_downloads")) },
+            text = { Text(stringResource("clear_downloads_confirmation")) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -112,12 +113,12 @@ fun DownloadsScreen(
                         contentColor = MaterialTheme.colorScheme.error,
                     ),
                 ) {
-                    Text("Eliminar todo")
+                    Text(stringResource("clear_all_downloads"))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteAllDialog = false }) {
-                    Text("Cancelar")
+                    Text(stringResource("cancel"))
                 }
             },
         )
@@ -147,7 +148,7 @@ private fun ActiveDownloadsTab(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "No hay descargas activas",
+                    text = stringResource("downloads_no_active"),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -173,7 +174,7 @@ private fun ActiveDownloadsTab(
             if (failedDownloads.isNotEmpty()) {
                 item {
                     Text(
-                        text = "Fallidas",
+                        text = stringResource("downloads_failed"),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(vertical = 8.dp),
                     )
@@ -259,7 +260,7 @@ private fun DownloadProgressItem(
                 
                 // Status text
                 val statusText = when (download.status) {
-                    DownloadStatus.QUEUED -> "En cola..."
+                    DownloadStatus.QUEUED -> stringResource("download_queued")
                     DownloadStatus.DOWNLOADING -> {
                         val mb = download.downloadedBytes / (1024 * 1024f)
                         val totalMb = download.totalBytes / (1024 * 1024f)
@@ -269,7 +270,7 @@ private fun DownloadProgressItem(
                             String.format("%.1f MB descargados", mb)
                         }
                     }
-                    DownloadStatus.PAUSED -> "Pausada"
+                    DownloadStatus.PAUSED -> stringResource("download_paused")
                     else -> ""
                 }
                 Text(
@@ -282,16 +283,16 @@ private fun DownloadProgressItem(
             // Actions
             if (download.status == DownloadStatus.PAUSED) {
                 IconButton(onClick = onResume) {
-                    Icon(IconAssets.play(), contentDescription = "Reanudar")
+                    Icon(IconAssets.play(), contentDescription = stringResource("resume"))
                 }
             } else if (download.status == DownloadStatus.DOWNLOADING) {
                 IconButton(onClick = onPause) {
-                    Icon(IconAssets.pause(), contentDescription = "Pausar")
+                    Icon(IconAssets.pause(), contentDescription = stringResource("pause"))
                 }
             }
             
             IconButton(onClick = onCancel) {
-                Icon(IconAssets.close(), contentDescription = "Cancelar")
+                Icon(IconAssets.close(), contentDescription = stringResource("cancel"))
             }
         }
     }
@@ -342,11 +343,11 @@ private fun FailedDownloadItem(
             }
             
             IconButton(onClick = onRetry) {
-                Icon(IconAssets.refresh(), contentDescription = "Reintentar")
+                Icon(IconAssets.refresh(), contentDescription = stringResource("retry_download"))
             }
             
             IconButton(onClick = onCancel) {
-                Icon(IconAssets.close(), contentDescription = "Eliminar")
+                Icon(IconAssets.close(), contentDescription = stringResource("delete"))
             }
         }
     }
@@ -372,13 +373,13 @@ private fun CompletedDownloadsTab(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "No hay canciones descargadas",
+                    text = stringResource("library_downloads_empty_title"),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Las canciones descargadas se mostrarán aquí",
+                    text = stringResource("library_downloads_empty_subtitle"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 )
@@ -395,7 +396,7 @@ private fun CompletedDownloadsTab(
                 val totalSize = songs.sumOf { it.fileSize }
                 val totalMb = totalSize / (1024 * 1024f)
                 Text(
-                    text = String.format("%.1f MB usados • %d canciones", totalMb, songs.size),
+                    text = stringResource("downloads_storage_usage", totalMb, songs.size),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp),
@@ -486,7 +487,7 @@ private fun DownloadedSongItem(
             // Offline indicator
             Icon(
                 IconAssets.offline(),
-                contentDescription = "Disponible sin conexión",
+                contentDescription = stringResource("downloaded_to_device"),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp),
             )
@@ -497,7 +498,7 @@ private fun DownloadedSongItem(
             IconButton(onClick = { showDeleteDialog = true }) {
                 Icon(
                     IconAssets.delete(),
-                    contentDescription = "Eliminar",
+                    contentDescription = stringResource("delete"),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -508,8 +509,8 @@ private fun DownloadedSongItem(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Eliminar descarga") },
-            text = { Text("¿Eliminar \"${song.title}\" de las descargas?") },
+            title = { Text(stringResource("remove_download")) },
+            text = { Text(stringResource("remove_download_confirm", song.title)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -520,12 +521,12 @@ private fun DownloadedSongItem(
                         contentColor = MaterialTheme.colorScheme.error,
                     ),
                 ) {
-                    Text("Eliminar")
+                    Text(stringResource("delete"))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancelar")
+                    Text(stringResource("cancel"))
                 }
             },
         )

@@ -29,6 +29,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.i18n.pluralStringResource
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.shared.model.LibraryItem
@@ -45,6 +47,17 @@ fun QueuePanel(
 ) {
     val queue = playerState.queue
     val currentIndex = playerState.currentQueueIndex
+    val queueTitle = stringResource("queue")
+    val queueCount = pluralStringResource("n_song", queue.size, queue.size)
+    val shuffleLabel = stringResource("shuffle")
+    val repeatLabel = stringResource("repeat")
+    val repeatAllLabel = stringResource("repeat_all")
+    val repeatOneLabel = stringResource("repeat_one")
+    val queueEmptyLabel = stringResource("queue_empty")
+    val nowPlayingLabel = stringResource("now_playing")
+    val upNextLabel = stringResource("up_next")
+    val previouslyPlayedLabel = stringResource("previously_played")
+    val removeFromQueueLabel = stringResource("remove_from_queue")
 
     Surface(
         modifier = modifier,
@@ -67,7 +80,7 @@ fun QueuePanel(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Cola de reproducción",
+                    text = queueTitle,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
@@ -79,7 +92,7 @@ fun QueuePanel(
                     shape = RoundedCornerShape(8.dp),
                 ) {
                     Text(
-                        text = "${queue.size} canciones",
+                        text = queueCount,
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     )
@@ -97,7 +110,7 @@ fun QueuePanel(
                 FilterChip(
                     selected = playerState.shuffleEnabled,
                     onClick = { playerState.toggleShuffle() },
-                    label = { Text("Aleatorio") },
+                    label = { Text(shuffleLabel) },
                     leadingIcon = {
                         Icon(
                             IconAssets.shuffle(),
@@ -114,9 +127,9 @@ fun QueuePanel(
                     label = {
                         Text(
                             when (playerState.repeatMode) {
-                                com.anitail.desktop.player.RepeatMode.OFF -> "Repetir"
-                                com.anitail.desktop.player.RepeatMode.ALL -> "Todo"
-                                com.anitail.desktop.player.RepeatMode.ONE -> "Uno"
+                                com.anitail.desktop.player.RepeatMode.OFF -> repeatLabel
+                                com.anitail.desktop.player.RepeatMode.ALL -> repeatAllLabel
+                                com.anitail.desktop.player.RepeatMode.ONE -> repeatOneLabel
                             }
                         )
                     },
@@ -153,7 +166,7 @@ fun QueuePanel(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "La cola está vacía",
+                            text = queueEmptyLabel,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -168,7 +181,7 @@ fun QueuePanel(
                     if (currentIndex >= 0 && currentIndex < queue.size) {
                         item {
                             Text(
-                                text = "Reproduciendo ahora",
+                                text = nowPlayingLabel,
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(bottom = 4.dp),
@@ -181,6 +194,7 @@ fun QueuePanel(
                                 isPlaying = true,
                                 onClick = { },
                                 onRemove = { },
+                                removeFromQueueLabel = removeFromQueueLabel,
                             )
                         }
                     }
@@ -191,7 +205,7 @@ fun QueuePanel(
                         item {
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "A continuación",
+                                text = upNextLabel,
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(bottom = 4.dp),
@@ -205,6 +219,7 @@ fun QueuePanel(
                                 isPlaying = false,
                                 onClick = { onItemClick(absoluteIndex) },
                                 onRemove = { onRemoveItem(absoluteIndex) },
+                                removeFromQueueLabel = removeFromQueueLabel,
                             )
                         }
                     }
@@ -214,7 +229,7 @@ fun QueuePanel(
                         item {
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = "Reproducido anteriormente",
+                                text = previouslyPlayedLabel,
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                 modifier = Modifier.padding(bottom = 4.dp),
@@ -228,6 +243,7 @@ fun QueuePanel(
                                 isPrevious = true,
                                 onClick = { onItemClick(index) },
                                 onRemove = { onRemoveItem(index) },
+                                removeFromQueueLabel = removeFromQueueLabel,
                             )
                         }
                     }
@@ -245,6 +261,7 @@ private fun QueueItem(
     isPrevious: Boolean = false,
     onClick: () -> Unit,
     onRemove: () -> Unit,
+    removeFromQueueLabel: String,
 ) {
     val backgroundColor = when {
         isPlaying -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
@@ -340,7 +357,7 @@ private fun QueueItem(
             ) {
                 Icon(
                     imageVector = IconAssets.close(),
-                    contentDescription = "Eliminar de la cola",
+                    contentDescription = removeFromQueueLabel,
                     modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
                 )

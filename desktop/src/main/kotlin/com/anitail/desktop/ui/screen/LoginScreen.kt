@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import com.anitail.desktop.auth.AccountInfo
 import com.anitail.desktop.auth.AuthCredentials
 import com.anitail.desktop.auth.DesktopAuthService
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.util.JavaFxManager
 import com.anitail.innertube.YouTube
@@ -69,10 +70,10 @@ fun LoginScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Iniciar sesión") },
+                title = { Text(stringResource("login")) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(IconAssets.arrowBack(), contentDescription = "Volver")
+                        Icon(IconAssets.arrowBack(), contentDescription = stringResource("back"))
                     }
                 },
             )
@@ -175,10 +176,10 @@ fun AccountScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Cuenta") },
+                title = { Text(stringResource("account")) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(IconAssets.arrowBack(), contentDescription = "Volver")
+                        Icon(IconAssets.arrowBack(), contentDescription = stringResource("back"))
                     }
                 },
             )
@@ -227,7 +228,7 @@ fun AccountScreen(
                         }
                     } ?: run {
                         Text(
-                            text = authService.credentials?.accountName ?: "Usuario conectado",
+                            text = authService.credentials?.accountName ?: stringResource("connected_user"),
                             style = MaterialTheme.typography.headlineSmall,
                         )
                     }
@@ -248,7 +249,7 @@ fun AccountScreen(
                 ) {
                     Icon(IconAssets.logout(), contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Cerrar sesión")
+                    Text(stringResource("logout"))
                 }
             } else {
                 // No hay sesión iniciada
@@ -262,14 +263,14 @@ fun AccountScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "No has iniciado sesión",
+                    text = stringResource("not_logged_in"),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
-                    text = "Inicia sesión para acceder a tu biblioteca, playlists y recomendaciones personalizadas.",
+                    text = stringResource("login_prompt_details"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -277,7 +278,7 @@ fun AccountScreen(
                 Spacer(modifier = Modifier.height(24.dp))
                 
                 Button(onClick = onLoginClick) {
-                    Text("Iniciar sesión con Google")
+                    Text(stringResource("sign_in_with_google"))
                 }
             }
         }

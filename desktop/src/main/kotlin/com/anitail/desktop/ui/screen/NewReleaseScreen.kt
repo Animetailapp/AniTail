@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
@@ -87,11 +88,11 @@ fun NewReleaseScreen(
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = IconAssets.arrowBack(),
-                    contentDescription = "Volver",
+                    contentDescription = stringResource("back"),
                 )
             }
             Text(
-                text = "Nuevos lanzamientos",
+                text = stringResource("new_release_albums"),
                 style = MaterialTheme.typography.headlineMedium,
             )
         }
@@ -215,7 +216,7 @@ private fun NewReleaseAlbumItem(
                         shape = RoundedCornerShape(4.dp),
                     ) {
                         Text(
-                            text = "E",
+                            text = stringResource("explicit_badge"),
                             style = MaterialTheme.typography.labelSmall,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                             color = MaterialTheme.colorScheme.onErrorContainer,

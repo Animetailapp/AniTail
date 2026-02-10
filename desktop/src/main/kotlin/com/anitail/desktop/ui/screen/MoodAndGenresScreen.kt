@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.shimmer.ShimmerHost
@@ -80,11 +81,11 @@ fun MoodAndGenresScreen(
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = IconAssets.arrowBack(),
-                    contentDescription = "Volver",
+                    contentDescription = stringResource("back"),
                 )
             }
             Text(
-                text = "Estados de ánimo y géneros",
+                text = stringResource("mood_and_genres"),
                 style = MaterialTheme.typography.headlineMedium,
             )
         }
