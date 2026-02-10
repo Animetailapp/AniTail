@@ -13,7 +13,7 @@ dependencies {
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.android)
     implementation(libs.ktor.client.content.negotiation)
-    // Dependencia gestionada por root
+    implementation(libs.ktor.serialization.json)
     implementation(libs.ktor.client.encoding)    
     testImplementation(libs.junit)
 }
