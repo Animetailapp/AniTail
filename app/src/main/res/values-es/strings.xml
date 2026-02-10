@@ -353,7 +353,6 @@
     <string name="content_country">País de contenido predeterminado</string>
     <string name="hide_explicit">Ocultar contenido explícito</string>
     <string name="hide_explicit_desc">Filtra canciones con contenido explícito</string>
-    <string name="explicit_badge">E</string>
     <string name="system_default">Predeterminado del sistema</string>
     <string name="proxy">Proxy</string>
     <string name="enable_proxy">Activar proxy</string>
@@ -801,7 +800,6 @@
     <string name="error_loading_playlist">Error al cargar playlist</string>
     <string name="error_loading_album">Error al cargar álbum</string>
     <string name="error_loading_artist">Error al cargar artista</string>
-    <string name="other_versions">Otras versiones</string>
     <string name="song">Canción</string>
     <string name="album">Álbum</string>
     <string name="playlist">Playlist</string>
