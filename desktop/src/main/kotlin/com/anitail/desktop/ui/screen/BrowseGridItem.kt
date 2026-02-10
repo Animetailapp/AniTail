@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.download.DownloadState
 import com.anitail.desktop.ui.IconAssets
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.ui.component.ContextMenuAction
 import com.anitail.desktop.ui.component.ItemContextMenu
 import com.anitail.desktop.ui.component.PlayingIndicatorBox
@@ -196,7 +197,7 @@ private fun BrowseBadgesRow(
         }
         if (isExplicit) {
             Text(
-                text = "E",
+                text = stringResource("explicit_badge"),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

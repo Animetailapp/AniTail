@@ -37,6 +37,8 @@ import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.mapper.toLibraryItem
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadedSong
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.StringResolver
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
@@ -74,6 +76,7 @@ fun LibraryMixScreen(
     val sortType by preferences.mixSortType.collectAsState()
     val sortDescending by preferences.mixSortDescending.collectAsState()
     val gridItemSize by preferences.gridItemSize.collectAsState()
+    val strings = LocalStrings.current
 
     val showLiked by preferences.showLikedPlaylist.collectAsState()
     val showDownloaded by preferences.showDownloadedPlaylist.collectAsState()
@@ -103,11 +106,14 @@ fun LibraryMixScreen(
         songs.sortedByDescending { it.totalPlayTime }.take(50)
     }
 
-    val autoPlaylists = remember(likedSongs, downloadedSongEntities, topSongs) {
+    val likedSongsTitle = strings.get("liked_songs")
+    val offlineTitle = strings.get("offline")
+    val myTopTitle = strings.get("my_top")
+    val autoPlaylists = remember(likedSongs, downloadedSongEntities, topSongs, likedSongsTitle, offlineTitle, myTopTitle) {
         listOf(
-            buildAutoPlaylist("liked", "Me gusta", likedSongs),
-            buildAutoPlaylist("downloaded", "Sin conexión", downloadedSongEntities),
-            buildAutoPlaylist("top", "Mi Top 50", topSongs),
+            buildAutoPlaylist("liked", likedSongsTitle, likedSongs),
+            buildAutoPlaylist("downloaded", offlineTitle, downloadedSongEntities),
+            buildAutoPlaylist("top", myTopTitle, topSongs),
         )
     }
 
@@ -148,7 +154,7 @@ fun LibraryMixScreen(
                 sortDescending = sortDescending,
                 onSortTypeChange = { preferences.setMixSortType(it) },
                 onSortDescendingChange = { preferences.setMixSortDescending(it) },
-                sortTypeText = { mixSortLabel(it) },
+                sortTypeText = { mixSortLabel(strings, it) },
                 showDescending = true,
             )
 
@@ -347,17 +353,17 @@ fun LibraryMixScreen(
     }
 }
 
-private fun mixSortLabel(sortType: MixSortType): String {
+private fun mixSortLabel(strings: StringResolver, sortType: MixSortType): String {
     return when (sortType) {
-        MixSortType.CREATE_DATE -> "Fecha de agregado"
-        MixSortType.LAST_UPDATED -> "Última actualización"
-        MixSortType.NAME -> "Nombre"
+        MixSortType.CREATE_DATE -> strings.get("sort_by_create_date")
+        MixSortType.LAST_UPDATED -> strings.get("sort_by_last_updated")
+        MixSortType.NAME -> strings.get("sort_by_name")
     }
 }
 
 private fun isCachedName(name: String): Boolean {
     val normalized = name.trim().lowercase()
-    return normalized == "en caché" || normalized == "en cache"
+    return normalized == "en caché" || normalized == "en cache" || normalized == "cached"
 }
 
 private fun DownloadedSong.toFallbackSong(): SongEntity {

@@ -42,6 +42,10 @@ import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.mapper.toLibraryItem
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadedSong
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.StringResolver
+import com.anitail.desktop.i18n.pluralStringResource
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.player.buildRadioQueuePlan
 import com.anitail.desktop.storage.DesktopPreferences
@@ -88,6 +92,7 @@ fun LibraryAlbumsScreen(
     val sortDescending by preferences.albumSortDescending.collectAsState()
     val viewType by preferences.albumViewType.collectAsState()
     val gridItemSize by preferences.gridItemSize.collectAsState()
+    val strings = LocalStrings.current
 
     val songsByAlbumId = remember(songs) {
         songs.filter { !it.albumId.isNullOrBlank() }.groupBy { it.albumId.orEmpty() }
@@ -170,6 +175,7 @@ fun LibraryAlbumsScreen(
                 }
                 item(key = "header") {
                     AlbumHeaderRow(
+                        strings = strings,
                         albumCount = sortedAlbums.size,
                         sortType = sortType,
                         sortDescending = sortDescending,
@@ -186,8 +192,9 @@ fun LibraryAlbumsScreen(
                     items(sortedAlbums, key = { it.id }) { album ->
                         val menuExpanded = remember(album.id) { mutableStateOf(false) }
                         val albumSongs = songsByAlbumId[album.id].orEmpty()
-                        val menuActions = remember(albumSongs, downloadStates, downloadedSongs) {
+                        val menuActions = remember(albumSongs, downloadStates, downloadedSongs, strings) {
                             buildAlbumMenuActions(
+                                strings = strings,
                                 album = album,
                                 albumSongs = albumSongs,
                                 downloadStates = downloadStates,
@@ -267,6 +274,7 @@ fun LibraryAlbumsScreen(
                 }
                 item(key = "header", span = { GridItemSpan(maxLineSpan) }) {
                     AlbumHeaderRow(
+                        strings = strings,
                         albumCount = sortedAlbums.size,
                         sortType = sortType,
                         sortDescending = sortDescending,
@@ -283,8 +291,9 @@ fun LibraryAlbumsScreen(
                     items(sortedAlbums, key = { it.id }) { album ->
                         val menuExpanded = remember(album.id) { mutableStateOf(false) }
                         val albumSongs = songsByAlbumId[album.id].orEmpty()
-                        val menuActions = remember(albumSongs, downloadStates, downloadedSongs) {
+                        val menuActions = remember(albumSongs, downloadStates, downloadedSongs, strings) {
                             buildAlbumMenuActions(
+                                strings = strings,
                                 album = album,
                                 albumSongs = albumSongs,
                                 downloadStates = downloadStates,
@@ -341,6 +350,7 @@ private data class AlbumSongTarget(
 )
 
 private fun buildAlbumMenuActions(
+    strings: StringResolver,
     album: AlbumEntity,
     albumSongs: List<SongEntity>,
     downloadStates: Map<String, com.anitail.desktop.download.DownloadState>,
@@ -353,15 +363,17 @@ private fun buildAlbumMenuActions(
     scope: kotlinx.coroutines.CoroutineScope,
 ): List<ContextMenuAction> {
     val downloadMenu = resolveCollectionDownloadMenuState(
+        strings = strings,
         songIds = albumSongs.map { it.id },
         downloadStates = downloadStates,
         downloadedSongs = downloadedSongs,
         showWhenEmpty = true,
-    ) ?: CollectionDownloadMenuState(label = "Descargar", action = CollectionDownloadAction.DOWNLOAD)
+    ) ?: CollectionDownloadMenuState(label = strings.get("download"), action = CollectionDownloadAction.DOWNLOAD)
     val artistId = albumSongs.firstOrNull { !it.artistId.isNullOrBlank() }?.artistId
     val artistName = albumSongs.firstOrNull { !it.artistName.isNullOrBlank() }?.artistName
 
     return buildBrowseAlbumMenuActions(
+        strings = strings,
         hasArtists = !artistId.isNullOrBlank(),
         downloadLabel = downloadMenu.label,
         downloadEnabled = true,
@@ -432,7 +444,7 @@ private fun AlbumFilterRow(
     ) {
         Spacer(Modifier.width(12.dp))
         FilterChip(
-            label = { Text("Álbumes") },
+            label = { Text(stringResource("albums")) },
             selected = true,
             colors = FilterChipDefaults.filterChipColors(
                 containerColor = MaterialTheme.colorScheme.surface,
@@ -443,8 +455,8 @@ private fun AlbumFilterRow(
         )
         ChipsRow(
             chips = listOf(
-                AlbumFilter.LIKED to "Me gusta",
-                AlbumFilter.LIBRARY to "Biblioteca",
+                AlbumFilter.LIKED to stringResource("liked"),
+                AlbumFilter.LIBRARY to stringResource("in_library"),
             ),
             currentValue = filter,
             onValueUpdate = onFilterChange,
@@ -455,6 +467,7 @@ private fun AlbumFilterRow(
 
 @Composable
 private fun AlbumHeaderRow(
+    strings: StringResolver,
     albumCount: Int,
     sortType: AlbumSortType,
     sortDescending: Boolean,
@@ -472,13 +485,13 @@ private fun AlbumHeaderRow(
             sortDescending = sortDescending,
             onSortTypeChange = onSortTypeChange,
             onSortDescendingChange = onSortDescendingChange,
-            sortTypeText = ::albumSortLabel,
+            sortTypeText = { albumSortLabel(strings, it) },
         )
 
         Spacer(modifier = Modifier.weight(1f))
 
         Text(
-            text = if (albumCount == 1) "1 álbum" else "$albumCount álbumes",
+            text = pluralStringResource("n_album", albumCount, albumCount),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.secondary,
         )
@@ -501,22 +514,22 @@ private fun EmptyAlbumsPlaceholder() {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "No hay álbumes",
+            text = stringResource("library_albums_empty_title"),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
-private fun albumSortLabel(sortType: AlbumSortType): String {
+private fun albumSortLabel(strings: StringResolver, sortType: AlbumSortType): String {
     return when (sortType) {
-        AlbumSortType.CREATE_DATE -> "Fecha de agregado"
-        AlbumSortType.NAME -> "Nombre"
-        AlbumSortType.ARTIST -> "Artista"
-        AlbumSortType.YEAR -> "Año"
-        AlbumSortType.SONG_COUNT -> "Cantidad de canciones"
-        AlbumSortType.LENGTH -> "Duración"
-        AlbumSortType.PLAY_TIME -> "Tiempo de reproducción"
+        AlbumSortType.CREATE_DATE -> strings.get("sort_by_create_date")
+        AlbumSortType.NAME -> strings.get("sort_by_name")
+        AlbumSortType.ARTIST -> strings.get("sort_by_artist")
+        AlbumSortType.YEAR -> strings.get("sort_by_year")
+        AlbumSortType.SONG_COUNT -> strings.get("sort_by_song_count")
+        AlbumSortType.LENGTH -> strings.get("sort_by_length")
+        AlbumSortType.PLAY_TIME -> strings.get("sort_by_play_time")
     }
 }
 
@@ -531,5 +544,5 @@ private fun joinByBullet(left: String?, right: String?): String? {
 
 private fun isCachedName(name: String): Boolean {
     val normalized = name.trim().lowercase()
-    return normalized == "en caché" || normalized == "en cache"
+    return normalized == "en caché" || normalized == "en cache" || normalized == "cached"
 }

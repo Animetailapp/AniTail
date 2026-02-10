@@ -684,12 +684,12 @@ enum class AudioQuality {
         }
     }
 
-    val displayName: String
+    val labelKey: String
         get() = when (this) {
-            LOW -> "Baja (128 kbps)"
-            MEDIUM -> "Media (192 kbps)"
-            HIGH -> "Alta (320 kbps)"
-            AUTO -> "Automática"
+            LOW -> "audio_quality_low"
+            MEDIUM -> "audio_quality_medium"
+            HIGH -> "audio_quality_high"
+            AUTO -> "audio_quality_auto"
         }
 }
 
@@ -706,11 +706,11 @@ enum class PlayerBackgroundStyle {
         }
     }
 
-    val displayName: String
+    val labelKey: String
         get() = when (this) {
-            DEFAULT -> "Seguir tema"
-            GRADIENT -> "Gradiente"
-            BLUR -> "Desenfoque"
+            DEFAULT -> "follow_theme"
+            GRADIENT -> "gradient"
+            BLUR -> "player_background_blur"
         }
 }
 
@@ -725,10 +725,10 @@ enum class PlayerButtonsStyle {
         }
     }
 
-    val displayName: String
+    val labelKey: String
         get() = when (this) {
-            DEFAULT -> "Predeterminado"
-            SECONDARY -> "Color secundario"
+            DEFAULT -> "default_style"
+            SECONDARY -> "secondary_color_style"
         }
 }
 
@@ -745,10 +745,10 @@ enum class SliderStyle {
         }
     }
 
-    val displayName: String
+    val labelKey: String
         get() = when (this) {
-            DEFAULT -> "Predeterminado"
-            SQUIGGLY -> "Ondulado"
-            SLIM -> "Fino"
+            DEFAULT -> "default_"
+            SQUIGGLY -> "squiggly"
+            SLIM -> "slim"
         }
 }

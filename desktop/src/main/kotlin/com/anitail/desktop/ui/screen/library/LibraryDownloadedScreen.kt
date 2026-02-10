@@ -36,6 +36,9 @@ import com.anitail.desktop.db.mapper.toLibraryItem
 import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadedSong
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.pluralStringResource
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
@@ -74,6 +77,7 @@ fun LibraryDownloadedScreen(
     val songs by database.songs.collectAsState(initial = emptyList())
     val downloadStates by downloadService.downloadStates.collectAsState()
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
+    val strings = LocalStrings.current
 
     val songsById = remember(songs) { songs.associateBy { it.id } }
     val entries = remember(downloadedSongs, songsById) {
@@ -165,7 +169,7 @@ fun LibraryDownloadedScreen(
                 ) {
                     Spacer(Modifier.width(12.dp))
                     FilterChip(
-                        label = { Text("Descargas") },
+                        label = { Text(stringResource("filter_downloaded")) },
                         selected = true,
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = MaterialTheme.colorScheme.surface,
@@ -183,7 +187,7 @@ fun LibraryDownloadedScreen(
                     modifier = Modifier.padding(horizontal = 16.dp),
                 ) {
                     Text(
-                        text = if (entries.size == 1) "1 canción" else "${entries.size} canciones",
+                        text = pluralStringResource("n_song", entries.size, entries.size),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.secondary,
                     )
@@ -199,7 +203,7 @@ fun LibraryDownloadedScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = "No hay descargas",
+                            text = stringResource("library_downloads_empty_title"),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -208,8 +212,9 @@ fun LibraryDownloadedScreen(
             } else {
                 itemsIndexed(entries, key = { _, entry -> entry.song.id }) { index, entry ->
                     val menuExpanded = remember(entry.song.id) { mutableStateOf(false) }
-                    val menuActions = remember(entry.song.id, downloadStates, downloadedSongs) {
+                    val menuActions = remember(entry.song.id, downloadStates, downloadedSongs, strings) {
                         val base = buildBrowseSongMenuActions(
+                            strings = strings,
                             libraryItem = entry.libraryItem,
                             songItem = null,
                             songsById = songsById,
@@ -227,7 +232,7 @@ fun LibraryDownloadedScreen(
                             copyToClipboard = ::copyToClipboard,
                         )
                         base + ContextMenuAction(
-                            label = "Eliminar descarga",
+                            label = strings.get("remove_download"),
                             icon = IconAssets.delete(),
                             onClick = { downloadService.deleteDownload(entry.downloaded.songId) },
                         )
@@ -311,7 +316,7 @@ private fun joinByBullet(left: String?, right: String?): String? {
 
 private fun isCachedName(name: String): Boolean {
     val normalized = name.trim().lowercase()
-    return normalized == "en caché" || normalized == "en cache"
+    return normalized == "en caché" || normalized == "en cache" || normalized == "cached"
 }
 
 private fun DownloadedSong.toFallbackSong(): SongEntity {

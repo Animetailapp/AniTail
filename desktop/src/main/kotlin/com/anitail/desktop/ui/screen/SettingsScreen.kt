@@ -331,7 +331,7 @@ private fun AccountSettingsScreen(
         title = stringResource("account"),
         onBack = onBack,
     ) {
-        SettingsSectionTitle(title = "Google")
+        SettingsSectionTitle(title = stringResource("google"))
 
         Surface(
             modifier = Modifier
@@ -553,30 +553,45 @@ private fun AppearanceSettingsScreen(
 
         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
+        val backgroundStyleOptions = mutableListOf<String>()
+        for (style in PlayerBackgroundStyle.entries) {
+            backgroundStyleOptions.add(stringResource(style.labelKey))
+        }
+        val backgroundStyleSubtitle = stringResource(playerBackgroundStyle.labelKey)
         SettingsDropdown(
             title = stringResource("player_background_style"),
-            subtitle = playerBackgroundStyle.displayName,
-            options = PlayerBackgroundStyle.entries.map { it.displayName },
+            subtitle = backgroundStyleSubtitle,
+            options = backgroundStyleOptions,
             selectedIndex = PlayerBackgroundStyle.entries.indexOf(playerBackgroundStyle),
             onSelect = { index ->
                 preferences.setPlayerBackgroundStyle(PlayerBackgroundStyle.entries[index])
             },
         )
 
+        val buttonStyleOptions = mutableListOf<String>()
+        for (style in PlayerButtonsStyle.entries) {
+            buttonStyleOptions.add(stringResource(style.labelKey))
+        }
+        val buttonStyleSubtitle = stringResource(playerButtonsStyle.labelKey)
         SettingsDropdown(
             title = stringResource("player_buttons_style"),
-            subtitle = playerButtonsStyle.displayName,
-            options = PlayerButtonsStyle.entries.map { it.displayName },
+            subtitle = buttonStyleSubtitle,
+            options = buttonStyleOptions,
             selectedIndex = PlayerButtonsStyle.entries.indexOf(playerButtonsStyle),
             onSelect = { index ->
                 preferences.setPlayerButtonsStyle(PlayerButtonsStyle.entries[index])
             },
         )
 
+        val sliderStyleOptions = mutableListOf<String>()
+        for (style in SliderStyle.entries) {
+            sliderStyleOptions.add(stringResource(style.labelKey))
+        }
+        val sliderStyleSubtitle = stringResource(sliderStyle.labelKey)
         SettingsDropdown(
             title = stringResource("player_slider_style"),
-            subtitle = sliderStyle.displayName,
-            options = SliderStyle.entries.map { it.displayName },
+            subtitle = sliderStyleSubtitle,
+            options = sliderStyleOptions,
             selectedIndex = SliderStyle.entries.indexOf(sliderStyle),
             onSelect = { index ->
                 preferences.setSliderStyle(SliderStyle.entries[index])
@@ -604,21 +619,17 @@ private fun PlayerSettingsScreen(
         title = stringResource("player_and_audio"),
         onBack = onBack,
     ) {
-        val audioQualityLabels = mapOf(
-            AudioQuality.LOW to stringResource("audio_quality_low"),
-            AudioQuality.MEDIUM to stringResource("audio_quality_medium"),
-            AudioQuality.HIGH to stringResource("audio_quality_high"),
-            AudioQuality.AUTO to stringResource("audio_quality_auto"),
-        )
-        val audioQualityLabel: (AudioQuality) -> String = { quality ->
-            audioQualityLabels[quality] ?: quality.name.lowercase()
+        val audioQualityOptions = mutableListOf<String>()
+        for (quality in AudioQuality.entries) {
+            audioQualityOptions.add(stringResource(quality.labelKey))
         }
+        val audioQualitySubtitle = stringResource(audioQuality.labelKey)
 
         // Audio Quality
         SettingsDropdown(
             title = stringResource("audio_quality"),
-            subtitle = audioQualityLabel(audioQuality),
-            options = AudioQuality.entries.map(audioQualityLabel),
+            subtitle = audioQualitySubtitle,
+            options = audioQualityOptions,
             selectedIndex = AudioQuality.entries.indexOf(audioQuality),
             onSelect = { index ->
                 preferences.setAudioQuality(AudioQuality.entries[index])
@@ -678,8 +689,8 @@ private fun PlayerSettingsScreen(
 
         // Auto Start Radio
         SettingsSwitch(
-            title = stringResource("auto_load_more"),
-            subtitle = stringResource("auto_load_more_desc"),
+            title = stringResource("auto_start_radio"),
+            subtitle = stringResource("auto_start_radio_desc"),
             checked = autoStartRadio,
             onCheckedChange = { preferences.setAutoStartRadio(it) },
         )
@@ -927,14 +938,14 @@ private fun StorageSettingsScreen(
         if (showClearCacheDialog) {
             AlertDialog(
                 onDismissRequest = { showClearCacheDialog = false },
-                title = { Text("¿Limpiar caché?") },
+                title = { Text(stringResource("clear_cache_confirm_title")) },
                 text = { Text(stringResource("clear_cache_confirm_desc")) },
                 confirmButton = {
                     TextButton(onClick = {
                         // TODO: Clear cache
                         showClearCacheDialog = false
                     }) {
-                        Text(stringResource("clear"))
+                        Text(stringResource("clear_cache"))
                     }
                 },
                 dismissButton = {
@@ -1208,9 +1219,9 @@ private fun AboutHeaderCard(buildInfo: AboutBuildInfo) {
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                AboutBuildInfoRow(IconAssets.buildIcon(), "Build", buildInfo.buildType)
-                AboutBuildInfoRow(IconAssets.verified(), "Version", buildInfo.versionName)
-                AboutBuildInfoRow(IconAssets.devices(), "Device", buildInfo.deviceInfo)
+                AboutBuildInfoRow(IconAssets.buildIcon(), stringResource("about_build"), buildInfo.buildType)
+                AboutBuildInfoRow(IconAssets.verified(), stringResource("about_version_title"), buildInfo.versionName)
+                AboutBuildInfoRow(IconAssets.devices(), stringResource("about_device"), buildInfo.deviceInfo)
             }
         }
     }
@@ -1369,7 +1380,7 @@ private fun AboutLinkCardItem(
             }
             Icon(
                 imageVector = IconAssets.openInNew(),
-                contentDescription = "Open link",
+                contentDescription = stringResource("open_link"),
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )

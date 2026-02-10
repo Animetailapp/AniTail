@@ -49,6 +49,10 @@ import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.db.entities.ArtistEntity
 import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.mapper.toLibraryItem
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.StringResolver
+import com.anitail.desktop.i18n.pluralStringResource
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
@@ -81,6 +85,7 @@ fun LibraryArtistsScreen(
     val sortDescending by preferences.artistSortDescending.collectAsState()
     val viewType by preferences.artistViewType.collectAsState()
     val gridItemSize by preferences.gridItemSize.collectAsState()
+    val strings = LocalStrings.current
 
     val stats = remember(songs) { buildArtistSongStats(songs) }
     val songCountByArtist = remember(artists, stats) {
@@ -126,6 +131,7 @@ fun LibraryArtistsScreen(
 
                 item(key = "header") {
                     ArtistHeaderRow(
+                        strings = strings,
                         artistCount = sortedArtists.size,
                         sortType = sortType,
                         sortDescending = sortDescending,
@@ -148,6 +154,7 @@ fun LibraryArtistsScreen(
                         val menuExpanded = remember(artist.id) { mutableStateOf(false) }
                         val songCount = songCountByArtist[artist.id] ?: 0
                         val menuActions = buildArtistMenuActions(
+                            strings = strings,
                             artist = artist,
                             database = database,
                             scope = scope,
@@ -237,6 +244,7 @@ fun LibraryArtistsScreen(
                     span = { GridItemSpan(maxLineSpan) },
                 ) {
                     ArtistHeaderRow(
+                        strings = strings,
                         artistCount = sortedArtists.size,
                         sortType = sortType,
                         sortDescending = sortDescending,
@@ -262,6 +270,7 @@ fun LibraryArtistsScreen(
                         val menuExpanded = remember(artist.id) { mutableStateOf(false) }
                         val songCount = songCountByArtist[artist.id] ?: 0
                         val menuActions = buildArtistMenuActions(
+                            strings = strings,
                             artist = artist,
                             database = database,
                             scope = scope,
@@ -331,7 +340,7 @@ private fun ArtistFilterRow(
     ) {
         Spacer(Modifier.width(12.dp))
         FilterChip(
-            label = { Text("Artistas") },
+            label = { Text(stringResource("artists")) },
             selected = true,
             colors = FilterChipDefaults.filterChipColors(
                 containerColor = MaterialTheme.colorScheme.surface,
@@ -344,8 +353,8 @@ private fun ArtistFilterRow(
         )
         ChipsRow(
             chips = listOf(
-                ArtistFilter.LIKED to "Me gusta",
-                ArtistFilter.LIBRARY to "Biblioteca",
+                ArtistFilter.LIKED to stringResource("liked"),
+                ArtistFilter.LIBRARY to stringResource("in_library"),
             ),
             currentValue = filter,
             onValueUpdate = onFilterChange,
@@ -356,6 +365,7 @@ private fun ArtistFilterRow(
 
 @Composable
 private fun ArtistHeaderRow(
+    strings: StringResolver,
     artistCount: Int,
     sortType: ArtistSortType,
     sortDescending: Boolean,
@@ -373,13 +383,13 @@ private fun ArtistHeaderRow(
             sortDescending = sortDescending,
             onSortTypeChange = onSortTypeChange,
             onSortDescendingChange = onSortDescendingChange,
-            sortTypeText = ::artistSortLabel,
+            sortTypeText = { artistSortLabel(strings, it) },
         )
 
         Spacer(modifier = Modifier.weight(1f))
 
         Text(
-            text = if (artistCount == 1) "1 artista" else "$artistCount artistas",
+            text = pluralStringResource("n_artist", artistCount, artistCount),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.secondary,
         )
@@ -464,7 +474,7 @@ private fun LibraryArtistMenuHeader(
             ) {
                 if (canPlay) {
                     MenuQuickActionButton(
-                        label = "Reproducir",
+                        label = stringResource("play"),
                         icon = IconAssets.play(),
                         onClick = {
                             onPlay()
@@ -472,7 +482,7 @@ private fun LibraryArtistMenuHeader(
                         },
                     )
                     MenuQuickActionButton(
-                        label = "Aleatorio",
+                        label = stringResource("shuffle"),
                         icon = IconAssets.shuffle(),
                         onClick = {
                             onShuffle()
@@ -482,7 +492,7 @@ private fun LibraryArtistMenuHeader(
                 }
                 if (canShare) {
                     MenuQuickActionButton(
-                        label = "Compartir",
+                        label = stringResource("share"),
                         icon = IconAssets.share(),
                         onClick = {
                             onShare()
@@ -544,12 +554,12 @@ private fun EmptyArtistsPlaceholder() {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             )
             Text(
-                text = "No hay artistas",
+                text = stringResource("library_artists_empty_title"),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "Los artistas que sigas aparecerán aquí",
+                text = stringResource("library_artist_empty"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             )
@@ -620,6 +630,7 @@ private fun buildArtistQueue(
 }
 
 private fun buildArtistMenuActions(
+    strings: StringResolver,
     artist: ArtistEntity,
     database: DesktopDatabase,
     scope: kotlinx.coroutines.CoroutineScope,
@@ -627,7 +638,7 @@ private fun buildArtistMenuActions(
     val isSubscribed = artist.bookmarkedAt != null
     return listOf(
         ContextMenuAction(
-            label = if (isSubscribed) "Suscrito" else "Suscribirse",
+            label = if (isSubscribed) strings.get("subscribed") else strings.get("subscribe"),
             icon = if (isSubscribed) IconAssets.subscribed() else IconAssets.subscribe(),
             onClick = {
                 scope.launch {
@@ -638,11 +649,11 @@ private fun buildArtistMenuActions(
     )
 }
 
-private fun artistSortLabel(sortType: ArtistSortType): String {
+private fun artistSortLabel(strings: StringResolver, sortType: ArtistSortType): String {
     return when (sortType) {
-        ArtistSortType.CREATE_DATE -> "Fecha de agregado"
-        ArtistSortType.NAME -> "Nombre"
-        ArtistSortType.SONG_COUNT -> "Cantidad de canciones"
-        ArtistSortType.PLAY_TIME -> "Tiempo de reproducción"
+        ArtistSortType.CREATE_DATE -> strings.get("sort_by_create_date")
+        ArtistSortType.NAME -> strings.get("sort_by_name")
+        ArtistSortType.SONG_COUNT -> strings.get("sort_by_song_count")
+        ArtistSortType.PLAY_TIME -> strings.get("sort_by_play_time")
     }
 }

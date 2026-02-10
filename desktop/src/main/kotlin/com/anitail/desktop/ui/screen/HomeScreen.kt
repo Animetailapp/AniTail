@@ -83,6 +83,9 @@ import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.component.ShimmerQuickPicksGrid
 import com.anitail.desktop.ui.component.ShimmerSectionRow
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.StringResolver
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.home.localItemToYtItem
 import com.anitail.desktop.model.SimilarRecommendation
 import com.anitail.desktop.ui.utils.SnapLayoutInfoProvider
@@ -150,6 +153,7 @@ fun HomeScreen(
     var pendingPlaylistItem by remember { mutableStateOf<HomeSongTarget?>(null) }
     var detailsItem by remember { mutableStateOf<LibraryItem?>(null) }
     var pendingArtists by remember { mutableStateOf<List<Artist>>(emptyList()) }
+    val strings = LocalStrings.current
 
     fun copyToClipboard(text: String) {
         Toolkit.getDefaultToolkit()
@@ -194,6 +198,7 @@ fun HomeScreen(
         )
         val order = buildHomeSongMenuOrder(availability)
         val downloadState = resolveDownloadMenuState(
+            strings = strings,
             songId = libraryItem.id,
             downloadStates = downloadStates,
             downloadedSongs = downloadedSongs,
@@ -202,6 +207,7 @@ fun HomeScreen(
         val shareUrl = songItem?.shareLink ?: libraryItem.playbackUrl
 
         return buildHomeSongMenuActions(
+            strings = strings,
             order = order,
             downloadState = downloadState,
             isInLibrary = isInLibrary,
@@ -348,7 +354,7 @@ fun HomeScreen(
 
             // 1. Quick Picks (Grid of List Items)
             if (quickPicks.isNotEmpty()) {
-                item { NavigationTitle(title = "Quick picks") }
+                item { NavigationTitle(title = stringResource("quick_picks")) }
                 item {
                     QuickPicksGrid(
                         items = quickPicks,
@@ -362,13 +368,13 @@ fun HomeScreen(
                     )
                 }
             } else if (isLoading && homePage == null) {
-                 item { NavigationTitle(title = "Quick picks") }
+                 item { NavigationTitle(title = stringResource("quick_picks")) }
                  item { ShimmerQuickPicksGrid() }
             }
 
             // 2. Keep Listening (Grid of Cards)
             if (keepListening.isNotEmpty()) {
-                item { NavigationTitle(title = "Keep listening") }
+                item { NavigationTitle(title = stringResource("keep_listening")) }
                 item {
                     KeepListeningRow(
                         items = keepListening,
@@ -378,7 +384,7 @@ fun HomeScreen(
                     )
                 }
             } else if (isLoading && homePage == null) {
-                item { NavigationTitle(title = "Keep listening") }
+                item { NavigationTitle(title = stringResource("keep_listening")) }
                 item { ShimmerSectionRow() }
             }
 
@@ -386,8 +392,8 @@ fun HomeScreen(
             if (accountPlaylists.isNotEmpty()) {
                 item {
                     NavigationTitle(
-                        title = accountName ?: "YouTube",
-                        label = "Your YouTube playlists",
+                        title = accountName ?: stringResource("avatar_source_youtube"),
+                        label = stringResource("your_ytb_playlists"),
                         thumbnail = accountThumbnailUrl?.let { url ->
                             {
                                 RemoteImage(
@@ -411,7 +417,7 @@ fun HomeScreen(
 
             // 4. Forgotten Favorites (Grid of List Items)
             if (forgottenFavorites.isNotEmpty()) {
-                item { NavigationTitle(title = "Forgotten favorites") }
+                item { NavigationTitle(title = stringResource("forgotten_favorites")) }
                 item {
                     val rows = minOf(4, forgottenFavorites.size)
                     QuickPicksGrid(
@@ -433,7 +439,7 @@ fun HomeScreen(
                     val shape = if (recommendation.isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
                     NavigationTitle(
                         title = recommendation.title,
-                        label = "Similar to",
+                        label = stringResource("similar_to"),
                         thumbnail = if (recommendation.thumbnailUrl != null) {
                             {
                                 RemoteImage(
@@ -685,7 +691,7 @@ private fun HomeItemCard(
     val (title, subtitle) = when (item) {
         is SongItem -> item.title to item.artists?.joinToString { it.name }.orEmpty()
         is AlbumItem -> item.title to item.artists?.joinToString { it.name }.orEmpty()
-        is ArtistItem -> item.title to "Artista"
+        is ArtistItem -> item.title to stringResource("artist")
         is PlaylistItem -> item.title to item.author?.name.orEmpty()
         else -> "" to ""
     }
@@ -695,7 +701,7 @@ private fun HomeItemCard(
         is SongItem -> toContextMenuItems(menuActionsForSong(item))
         else -> {
             if (libraryItem != null) {
-                listOf(ContextMenuItem("Abrir") { onPrimary() })
+                listOf(ContextMenuItem(stringResource("open")) { onPrimary() })
             } else {
                 emptyList()
             }
@@ -842,7 +848,7 @@ private fun QuickPickRowItem(
         }
         Box {
             IconButton(onClick = { menuExpanded.value = true }) {
-                Icon(IconAssets.moreVert(), contentDescription = "Menu")
+                Icon(IconAssets.moreVert(), contentDescription = stringResource("more_options"))
             }
             ItemContextMenu(
                 expanded = menuExpanded.value,
@@ -978,6 +984,7 @@ private data class HomeSongTarget(
 )
 
 fun resolveDownloadMenuState(
+    strings: StringResolver,
     songId: String,
     downloadStates: Map<String, DownloadState>,
     downloadedSongs: List<DownloadedSong>,
@@ -986,15 +993,16 @@ fun resolveDownloadMenuState(
     val status = downloadStates[songId]?.status
     val isDownloading = status == DownloadStatus.DOWNLOADING || status == DownloadStatus.QUEUED
     val label = when {
-        isDownloaded -> "Descargado"
-        isDownloading -> "Descargando"
-        else -> "Descargar"
+        isDownloaded -> strings.get("downloaded_to_device")
+        isDownloading -> strings.get("downloading_to_device")
+        else -> strings.get("download")
     }
     val enabled = !isDownloaded && !isDownloading
     return DownloadMenuState(label = label, enabled = enabled)
 }
 
 fun buildHomeSongMenuActions(
+    strings: StringResolver,
     order: List<HomeSongMenuActionId>,
     downloadState: DownloadMenuState,
     isInLibrary: Boolean,
@@ -1012,22 +1020,22 @@ fun buildHomeSongMenuActions(
     return order.map { actionId ->
         when (actionId) {
             HomeSongMenuActionId.START_RADIO -> ContextMenuAction(
-                label = "Iniciar radio",
+                label = strings.get("start_radio"),
                 icon = IconAssets.radio(),
                 onClick = onStartRadio,
             )
             HomeSongMenuActionId.PLAY_NEXT -> ContextMenuAction(
-                label = "Reproducir siguiente",
+                label = strings.get("play_next"),
                 icon = IconAssets.queueMusic(),
                 onClick = onPlayNext,
             )
             HomeSongMenuActionId.ADD_TO_QUEUE -> ContextMenuAction(
-                label = "Agregar a la cola",
+                label = strings.get("add_to_queue"),
                 icon = IconAssets.playlistAdd(),
                 onClick = onAddToQueue,
             )
             HomeSongMenuActionId.ADD_TO_PLAYLIST -> ContextMenuAction(
-                label = "Agregar a playlist",
+                label = strings.get("add_to_playlist"),
                 icon = IconAssets.playlistAdd(),
                 onClick = onAddToPlaylist,
             )
@@ -1038,27 +1046,27 @@ fun buildHomeSongMenuActions(
                 enabled = downloadState.enabled,
             )
             HomeSongMenuActionId.TOGGLE_LIBRARY -> ContextMenuAction(
-                label = if (isInLibrary) "Quitar de biblioteca" else "Agregar a biblioteca",
+                label = if (isInLibrary) strings.get("remove_from_library") else strings.get("add_to_library"),
                 icon = IconAssets.add(),
                 onClick = onToggleLibrary,
             )
             HomeSongMenuActionId.VIEW_ARTIST -> ContextMenuAction(
-                label = "Ir al artista",
+                label = strings.get("view_artist"),
                 icon = IconAssets.artist(),
                 onClick = onOpenArtist,
             )
             HomeSongMenuActionId.VIEW_ALBUM -> ContextMenuAction(
-                label = "Ir al álbum",
+                label = strings.get("view_album"),
                 icon = IconAssets.album(),
                 onClick = onOpenAlbum,
             )
             HomeSongMenuActionId.SHARE -> ContextMenuAction(
-                label = "Compartir",
+                label = strings.get("share"),
                 icon = IconAssets.share(),
                 onClick = onShare,
             )
             HomeSongMenuActionId.DETAILS -> ContextMenuAction(
-                label = "Detalles",
+                label = strings.get("details"),
                 icon = IconAssets.info(),
                 onClick = onDetails,
             )

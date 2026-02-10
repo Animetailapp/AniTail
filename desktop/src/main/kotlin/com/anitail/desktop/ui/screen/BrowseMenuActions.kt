@@ -1,5 +1,6 @@
 package com.anitail.desktop.ui.screen
 
+import androidx.compose.runtime.Composable
 import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.mapper.extractVideoId
@@ -8,6 +9,8 @@ import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadState
 import com.anitail.desktop.download.DownloadStatus
 import com.anitail.desktop.download.DownloadedSong
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.StringResolver
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.player.buildRadioQueuePlan
 import com.anitail.desktop.ui.IconAssets
@@ -26,7 +29,44 @@ data class BrowseSongTarget(
     val songItem: SongItem?,
 )
 
+@Composable
 fun buildBrowseSongMenuActions(
+    libraryItem: LibraryItem,
+    songItem: SongItem?,
+    songsById: Map<String, SongEntity>,
+    downloadStates: Map<String, DownloadState>,
+    downloadedSongs: List<DownloadedSong>,
+    database: DesktopDatabase,
+    downloadService: DesktopDownloadService,
+    playerState: PlayerState,
+    coroutineScope: CoroutineScope,
+    onOpenArtist: (String, String?) -> Unit,
+    onOpenAlbum: (String, String?) -> Unit,
+    onRequestPlaylist: (BrowseSongTarget) -> Unit,
+    onRequestArtists: (List<Artist>) -> Unit,
+    onShowDetails: (LibraryItem) -> Unit,
+    copyToClipboard: (String) -> Unit,
+): List<ContextMenuAction> = buildBrowseSongMenuActions(
+    strings = LocalStrings.current,
+    libraryItem = libraryItem,
+    songItem = songItem,
+    songsById = songsById,
+    downloadStates = downloadStates,
+    downloadedSongs = downloadedSongs,
+    database = database,
+    downloadService = downloadService,
+    playerState = playerState,
+    coroutineScope = coroutineScope,
+    onOpenArtist = onOpenArtist,
+    onOpenAlbum = onOpenAlbum,
+    onRequestPlaylist = onRequestPlaylist,
+    onRequestArtists = onRequestArtists,
+    onShowDetails = onShowDetails,
+    copyToClipboard = copyToClipboard,
+)
+
+fun buildBrowseSongMenuActions(
+    strings: StringResolver,
     libraryItem: LibraryItem,
     songItem: SongItem?,
     songsById: Map<String, SongEntity>,
@@ -66,6 +106,7 @@ fun buildBrowseSongMenuActions(
     )
     val order = buildHomeSongMenuOrder(availability)
     val downloadState = resolveDownloadMenuState(
+        strings = strings,
         songId = libraryItem.id,
         downloadStates = downloadStates,
         downloadedSongs = downloadedSongs,
@@ -74,6 +115,7 @@ fun buildBrowseSongMenuActions(
     val shareUrl = songItem?.shareLink ?: libraryItem.playbackUrl
 
     return buildHomeSongMenuActions(
+        strings = strings,
         order = order,
         downloadState = downloadState,
         isInLibrary = isInLibrary,
@@ -144,6 +186,7 @@ fun buildBrowseSongMenuActions(
 }
 
 fun buildBrowseAlbumMenuActions(
+    strings: StringResolver,
     hasArtists: Boolean,
     downloadLabel: String,
     downloadEnabled: Boolean,
@@ -157,22 +200,22 @@ fun buildBrowseAlbumMenuActions(
 ): List<ContextMenuAction> {
     val actions = mutableListOf(
         ContextMenuAction(
-            label = "Iniciar radio",
+            label = strings.get("start_radio"),
             icon = IconAssets.radio(),
             onClick = onStartRadio,
         ),
         ContextMenuAction(
-            label = "Reproducir siguiente",
+            label = strings.get("play_next"),
             icon = IconAssets.playlistPlay(),
             onClick = onPlayNext,
         ),
         ContextMenuAction(
-            label = "Agregar a la cola",
+            label = strings.get("add_to_queue"),
             icon = IconAssets.queueMusic(),
             onClick = onAddToQueue,
         ),
         ContextMenuAction(
-            label = "Agregar a playlist",
+            label = strings.get("add_to_playlist"),
             icon = IconAssets.playlistAdd(),
             onClick = onAddToPlaylist,
         ),
@@ -187,7 +230,7 @@ fun buildBrowseAlbumMenuActions(
     if (hasArtists) {
         actions.add(
             ContextMenuAction(
-                label = "Ir al artista",
+                label = strings.get("view_artist"),
                 icon = IconAssets.artist(),
                 onClick = onOpenArtist,
             ),
@@ -196,7 +239,7 @@ fun buildBrowseAlbumMenuActions(
 
     actions.add(
         ContextMenuAction(
-            label = "Compartir",
+            label = strings.get("share"),
             icon = IconAssets.share(),
             onClick = onShare,
         ),
@@ -205,7 +248,34 @@ fun buildBrowseAlbumMenuActions(
     return actions
 }
 
+@Composable
+fun buildBrowseAlbumMenuActions(
+    hasArtists: Boolean,
+    downloadLabel: String,
+    downloadEnabled: Boolean,
+    onStartRadio: () -> Unit,
+    onPlayNext: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onDownload: () -> Unit,
+    onOpenArtist: () -> Unit,
+    onShare: () -> Unit,
+): List<ContextMenuAction> = buildBrowseAlbumMenuActions(
+    strings = LocalStrings.current,
+    hasArtists = hasArtists,
+    downloadLabel = downloadLabel,
+    downloadEnabled = downloadEnabled,
+    onStartRadio = onStartRadio,
+    onPlayNext = onPlayNext,
+    onAddToQueue = onAddToQueue,
+    onAddToPlaylist = onAddToPlaylist,
+    onDownload = onDownload,
+    onOpenArtist = onOpenArtist,
+    onShare = onShare,
+)
+
 fun buildBrowsePlaylistMenuActions(
+    strings: StringResolver,
     canPlay: Boolean,
     canShuffle: Boolean,
     canRadio: Boolean,
@@ -226,7 +296,7 @@ fun buildBrowsePlaylistMenuActions(
     if (canPlay) {
         actions.add(
             ContextMenuAction(
-                label = "Reproducir",
+                label = strings.get("play"),
                 icon = IconAssets.play(),
                 onClick = onPlay,
             ),
@@ -235,7 +305,7 @@ fun buildBrowsePlaylistMenuActions(
     if (canShuffle) {
         actions.add(
             ContextMenuAction(
-                label = "Aleatorio",
+                label = strings.get("shuffle"),
                 icon = IconAssets.shuffle(),
                 onClick = onShuffle,
             ),
@@ -244,7 +314,7 @@ fun buildBrowsePlaylistMenuActions(
     if (canRadio) {
         actions.add(
             ContextMenuAction(
-                label = "Iniciar radio",
+                label = strings.get("start_radio"),
                 icon = IconAssets.radio(),
                 onClick = onStartRadio,
             ),
@@ -253,21 +323,21 @@ fun buildBrowsePlaylistMenuActions(
 
     actions.add(
         ContextMenuAction(
-            label = "Reproducir siguiente",
+            label = strings.get("play_next"),
             icon = IconAssets.playlistPlay(),
             onClick = onPlayNext,
         ),
     )
     actions.add(
         ContextMenuAction(
-            label = "Agregar a la cola",
+            label = strings.get("add_to_queue"),
             icon = IconAssets.queueMusic(),
             onClick = onAddToQueue,
         ),
     )
     actions.add(
         ContextMenuAction(
-            label = "Agregar a playlist",
+            label = strings.get("add_to_playlist"),
             icon = IconAssets.playlistAdd(),
             onClick = onAddToPlaylist,
         ),
@@ -284,7 +354,7 @@ fun buildBrowsePlaylistMenuActions(
     }
     actions.add(
         ContextMenuAction(
-            label = "Compartir",
+            label = strings.get("share"),
             icon = IconAssets.share(),
             onClick = onShare,
         ),
@@ -293,18 +363,63 @@ fun buildBrowsePlaylistMenuActions(
     return actions
 }
 
+@Composable
+fun buildBrowsePlaylistMenuActions(
+    canPlay: Boolean,
+    canShuffle: Boolean,
+    canRadio: Boolean,
+    showDownload: Boolean,
+    downloadLabel: String,
+    downloadEnabled: Boolean,
+    onPlay: () -> Unit,
+    onShuffle: () -> Unit,
+    onStartRadio: () -> Unit,
+    onPlayNext: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onDownload: () -> Unit,
+    onShare: () -> Unit,
+): List<ContextMenuAction> = buildBrowsePlaylistMenuActions(
+    strings = LocalStrings.current,
+    canPlay = canPlay,
+    canShuffle = canShuffle,
+    canRadio = canRadio,
+    showDownload = showDownload,
+    downloadLabel = downloadLabel,
+    downloadEnabled = downloadEnabled,
+    onPlay = onPlay,
+    onShuffle = onShuffle,
+    onStartRadio = onStartRadio,
+    onPlayNext = onPlayNext,
+    onAddToQueue = onAddToQueue,
+    onAddToPlaylist = onAddToPlaylist,
+    onDownload = onDownload,
+    onShare = onShare,
+)
+
 fun buildBrowseArtistMenuActions(
+    strings: StringResolver,
     isSubscribed: Boolean,
     onToggleSubscribe: () -> Unit,
 ): List<ContextMenuAction> {
     return listOf(
         ContextMenuAction(
-            label = if (isSubscribed) "Suscrito" else "Suscribirse",
+            label = if (isSubscribed) strings.get("subscribed") else strings.get("subscribe"),
             icon = if (isSubscribed) IconAssets.subscribed() else IconAssets.subscribe(),
             onClick = onToggleSubscribe,
         ),
     )
 }
+
+@Composable
+fun buildBrowseArtistMenuActions(
+    isSubscribed: Boolean,
+    onToggleSubscribe: () -> Unit,
+): List<ContextMenuAction> = buildBrowseArtistMenuActions(
+    strings = LocalStrings.current,
+    isSubscribed = isSubscribed,
+    onToggleSubscribe = onToggleSubscribe,
+)
 
 fun shouldShowDownloadIcon(
     downloadState: DownloadState?,

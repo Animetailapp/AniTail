@@ -82,6 +82,9 @@ import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.component.shimmer.GridItemPlaceholder
 import com.anitail.desktop.ui.component.shimmer.ShimmerHost
 import com.anitail.desktop.ui.component.shimmer.TextPlaceholder
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.StringResolver
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.ui.utils.SnapLayoutInfoProvider
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.AlbumItem
@@ -109,6 +112,8 @@ private val MoodAndGenresButtonHeight = 48.dp
 private const val ActiveBoxAlpha = 0.6f
 private val OverlayButtonSize = 36.dp
 private val OverlayIconSize = 20.dp
+private const val TopMusicVideosTitle = "Top music videos"
+private const val QuickPicksTitle = "Quick picks"
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -136,6 +141,7 @@ fun ExploreScreen(
     var pendingAlbumPlaylist by remember { mutableStateOf<AlbumItem?>(null) }
     var detailsItem by remember { mutableStateOf<LibraryItem?>(null) }
     var pendingArtists by remember { mutableStateOf<List<Artist>>(emptyList()) }
+    val strings = LocalStrings.current
     val albumMenuStates = remember { mutableStateMapOf<String, AlbumMenuState>() }
 
     fun copyToClipboard(text: String) {
@@ -191,7 +197,7 @@ fun ExploreScreen(
     fun resolveAlbumDownloadMenuState(albumSongs: List<SongItem>): AlbumDownloadMenuState {
         if (albumSongs.isEmpty()) {
             return AlbumDownloadMenuState(
-                label = "Descargar",
+                label = strings.get("download"),
                 action = AlbumDownloadAction.DOWNLOAD,
             )
         }
@@ -203,15 +209,15 @@ fun ExploreScreen(
         }
         return when {
             allDownloaded -> AlbumDownloadMenuState(
-                label = "Eliminar descarga",
+                label = strings.get("remove_download"),
                 action = AlbumDownloadAction.REMOVE,
             )
             anyActive -> AlbumDownloadMenuState(
-                label = "Descargando",
+                label = strings.get("downloading_to_device"),
                 action = AlbumDownloadAction.CANCEL,
             )
             else -> AlbumDownloadMenuState(
-                label = "Descargar",
+                label = strings.get("download"),
                 action = AlbumDownloadAction.DOWNLOAD,
             )
         }
@@ -224,6 +230,7 @@ fun ExploreScreen(
         val downloadMenu = resolveAlbumDownloadMenuState(albumSongs)
         val artistCandidates = album.artists.orEmpty()
         return buildExploreAlbumMenuActions(
+            strings = strings,
             hasArtists = artistCandidates.isNotEmpty(),
             downloadLabel = downloadMenu.label,
             downloadEnabled = true,
@@ -339,6 +346,7 @@ fun ExploreScreen(
         )
         val order = buildHomeSongMenuOrder(availability)
         val downloadState = resolveDownloadMenuState(
+            strings = strings,
             songId = libraryItem.id,
             downloadStates = downloadStates,
             downloadedSongs = downloadedSongs,
@@ -347,6 +355,7 @@ fun ExploreScreen(
         val shareUrl = songItem?.shareLink ?: libraryItem.playbackUrl
 
         return buildHomeSongMenuActions(
+            strings = strings,
             order = order,
             downloadState = downloadState,
             isInLibrary = isInLibrary,
@@ -427,9 +436,9 @@ fun ExploreScreen(
         if (isLoading || chartsPage == null || explorePage == null) {
             ExploreShimmer()
         } else {
-            chartsPage.sections.filter { it.title != "Top music videos" }.forEach { section ->
+            chartsPage.sections.filter { it.title != TopMusicVideosTitle }.forEach { section ->
                 NavigationTitle(
-                    title = mapExploreChartsTitle(section.title),
+                    title = mapExploreChartsTitle(section.title, strings),
                 )
                 BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                     val horizontalLazyGridItemWidthFactor =
@@ -519,7 +528,7 @@ fun ExploreScreen(
 
             explorePage.newReleaseAlbums.takeIf { it.isNotEmpty() }?.let { newReleaseAlbums ->
                 NavigationTitle(
-                    title = "New releases",
+                    title = stringResource("new_release_albums"),
                     onClick = onNewReleaseClick,
                 )
                 LazyRow(
@@ -573,8 +582,8 @@ fun ExploreScreen(
                     }
                 }
             }
-            chartsPage.sections.find { it.title == "Top music videos" }?.let { topVideos ->
-                NavigationTitle(title = "Top Music Videos")
+            chartsPage.sections.find { it.title == TopMusicVideosTitle }?.let { topVideos ->
+                NavigationTitle(title = stringResource("top_music_videos"))
                 LazyRow(
                     contentPadding = WindowInsets.systemBars
                         .only(WindowInsetsSides.Horizontal)
@@ -641,7 +650,7 @@ fun ExploreScreen(
 
             explorePage.moodAndGenres.takeIf { it.isNotEmpty() }?.let { moodAndGenres ->
                 NavigationTitle(
-                    title = "Mood and Genres",
+                    title = stringResource("mood_and_genres"),
                     onClick = onMoodGreClick,
                 )
                 LazyHorizontalGrid(
@@ -813,7 +822,7 @@ private fun ExploreChartListItem(
             ) {
                 if (song.explicit) {
                     Text(
-                        text = "E",
+                        text = stringResource("explicit_badge"),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1117,7 +1126,7 @@ private fun ExploreBadgesRow(
         }
         if (isExplicit) {
             Text(
-                text = "E",
+                text = stringResource("explicit_badge"),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1303,10 +1312,10 @@ private data class AlbumDownloadMenuState(
     val action: AlbumDownloadAction,
 )
 
-private fun mapExploreChartsTitle(title: String?): String {
+private fun mapExploreChartsTitle(title: String?, strings: StringResolver): String {
     return when (title) {
-        "Trending" -> "Trending"
-        else -> title ?: "Charts"
+        "Trending" -> strings.get("trending")
+        else -> title ?: strings.get("charts")
     }
 }
 

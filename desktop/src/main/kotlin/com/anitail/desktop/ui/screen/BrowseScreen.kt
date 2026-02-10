@@ -44,6 +44,8 @@ import com.anitail.desktop.ui.component.MediaDetailsDialog
 import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.component.shimmer.GridItemPlaceholder
 import com.anitail.desktop.ui.component.shimmer.ShimmerHost
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.Artist
@@ -78,6 +80,7 @@ fun BrowseScreen(
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val strings = LocalStrings.current
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
     val downloadStates by downloadService.downloadStates.collectAsState()
     var browseResult by remember { mutableStateOf<BrowseResult?>(null) }
@@ -216,10 +219,10 @@ fun BrowseScreen(
             title = { Text(text = browseResult?.title.orEmpty()) },
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = IconAssets.arrowBack(),
-                        contentDescription = "Volver",
-                    )
+                        Icon(
+                            imageVector = IconAssets.arrowBack(),
+                            contentDescription = stringResource("back"),
+                        )
                 }
             },
         )
@@ -258,6 +261,7 @@ fun BrowseScreen(
                         is SongItem -> {
                             val songEntity = songsById[item.id]
                             menuActions = buildBrowseSongMenuActions(
+                                strings = strings,
                                 libraryItem = libraryItem,
                                 songItem = item,
                                 songsById = songsById,
@@ -308,11 +312,12 @@ fun BrowseScreen(
                                 downloadedSongs = downloadedSongs,
                                 showWhenEmpty = true,
                             ) ?: CollectionDownloadMenuState(
-                                label = "Descargar",
+                                label = strings.get("download"),
                                 action = CollectionDownloadAction.DOWNLOAD,
                             )
                             val artistCandidates = item.artists.orEmpty()
                             menuActions = buildBrowseAlbumMenuActions(
+                                strings = strings,
                                 hasArtists = artistCandidates.isNotEmpty(),
                                 downloadLabel = downloadMenu.label,
                                 downloadEnabled = true,
@@ -410,11 +415,12 @@ fun BrowseScreen(
                             )
                             val canLike = item.id != "LM" && !item.isEditable
                             menuActions = buildBrowsePlaylistMenuActions(
+                                strings = strings,
                                 canPlay = item.playEndpoint != null,
                                 canShuffle = item.shuffleEndpoint != null,
                                 canRadio = item.radioEndpoint != null,
                                 showDownload = downloadMenu != null,
-                                downloadLabel = downloadMenu?.label ?: "Descargar",
+                                downloadLabel = downloadMenu?.label ?: strings.get("download"),
                                 downloadEnabled = true,
                                 onPlay = {
                                     scope.launch {
@@ -516,6 +522,7 @@ fun BrowseScreen(
                         is ArtistItem -> {
                             val artistEntity by database.artist(item.id).collectAsState(initial = null)
                             menuActions = buildBrowseArtistMenuActions(
+                                strings = strings,
                                 isSubscribed = artistEntity?.bookmarkedAt != null,
                                 onToggleSubscribe = {
                                     scope.launch {

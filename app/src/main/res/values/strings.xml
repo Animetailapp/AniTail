@@ -3,6 +3,7 @@
     <string name="home">Home</string>
     <string name="songs">Songs</string>
     <string name="artists">Artists</string>
+    <string name="artist">Artist</string>
     <string name="albums">Albums</string>
     <string name="playlists">Playlists</string>
     <string name="explore">Explore</string>
@@ -61,6 +62,19 @@
     <string name="filter_playlists">Playlists</string>
     <string name="filter_community_playlists">Community playlists</string>
     <string name="filter_featured_playlists">Featured playlists</string>
+    <string name="mixes">Mixes</string>
+    <string name="library_empty_title">Your library is empty</string>
+    <string name="library_empty_subtitle">Search for music and add it to your library</string>
+    <string name="library_songs_empty_title">No songs</string>
+    <string name="library_songs_empty_subtitle">Saved songs will appear here</string>
+    <string name="library_albums_empty_title">No albums</string>
+    <string name="library_albums_empty_subtitle">Saved albums will appear here</string>
+    <string name="library_downloads_empty_title">No downloads</string>
+    <string name="library_downloads_empty_subtitle">Downloads will be available on Desktop soon</string>
+    <string name="library_playlists_empty_title">No playlists saved</string>
+    <string name="library_artists_empty_title">No artists saved</string>
+    <string name="library_albums_unavailable">Albums will appear here when available on Desktop</string>
+    <string name="library_downloads_unavailable">Local downloads are not available on Desktop yet</string>
     <string name="no_results_found">No results found</string>
 
     <!-- Artist screen -->
@@ -70,6 +84,7 @@
 
     <!-- Library -->
     <string name="liked">Liked</string>
+    <string name="in_library">In library</string>
     <string name="offline">Downloaded</string>
     <string name="my_top">My Top</string>
     <string name="cached_playlist">Cached</string>
@@ -94,6 +109,7 @@
 
     <!-- Menu -->
     <string name="details">Details</string>
+    <string name="open">Open</string>
     <string name="edit">Edit</string>
     <string name="start_radio">Start radio</string>
     <string name="play">Play</string>
@@ -288,6 +304,7 @@
     <string name="appearance">Appearance</string>
     <string name="theme">Theme</string>
     <string name="enable_dynamic_theme">Enable dynamic theme</string>
+    <string name="enable_dynamic_theme_desc">Use colors from the current cover art</string>
     <string name="dark_theme">Dark theme</string>
     <string name="dark_theme_on">On</string>
     <string name="dark_theme_off">Off</string>
@@ -303,6 +320,7 @@
     <string name="enable_swipe_thumbnail">Enable swipe to change song</string>
     <string name="swipe_song_to_add">Swipe song to right for play next or left for adding to queue</string>
     <string name="pure_black">Pure black</string>
+    <string name="pure_black_desc">Use pure black in dark mode (OLED)</string>
     <string name="player">Player</string>
     <string name="lyrics_text_position">Lyrics text position</string>
     <string name="left">Left</string>
@@ -356,10 +374,15 @@
     <string name="token_hidden">Tap to show token</string>
     <string name="token_shown">Tap again to copy or edit</string>
     <string name="token_adv_login_description">This is an ADVANCED login method. As an alternative to the web portal, you may directly enter or update your login token here. For example, this can speed up logging in on multiple devices. Please note that any invalid token formats the app fails to parse will not be accepted</string>
+    <string name="login_requires_cookie">YouTube cookie missing. Paste the full advanced token.</string>
+    <string name="login_not_available_desktop">Not available on desktop. Use advanced login.</string>
     <string name="ytm_sync">Automatically sync with your YouTube Music account</string>
     <string name="general">General</string>
     <string name="content_language">Default content language</string>
     <string name="content_country">Default content country</string>
+    <string name="hide_explicit">Hide explicit content</string>
+    <string name="hide_explicit_desc">Filter songs with explicit content</string>
+    <string name="explicit_badge">E</string>
     <string name="system_default">System default</string>
     <string name="proxy">Proxy</string>
     <string name="enable_proxy">Enable proxy</string>
@@ -386,11 +409,15 @@
     <string name="audio_quality_auto">Auto</string>
     <string name="audio_quality_high">High</string>
     <string name="audio_quality_low">Low</string>
+    <string name="audio_quality_medium">Medium</string>
+    <string name="crossfade">Crossfade</string>
     <string name="queue">Queue</string>
     <string name="persistent_queue">Persistent queue</string>
     <string name="persistent_queue_desc">Restore your last queue when the app starts</string>
     <string name="auto_load_more">Auto load more songs</string>
     <string name="auto_load_more_desc">Automatically add more songs when the end of the queue is reached, if possible</string>
+    <string name="auto_start_radio">Auto start radio</string>
+    <string name="auto_start_radio_desc">Start radio when the queue ends</string>
     <string name="enable_similar_content">Enable Similar Content</string>
     <string name="similar_content_desc">Automatically add more similar songs when the end of the queue is reached</string>
     <string name="skip_silence">Skip silence</string>
@@ -405,11 +432,17 @@
     <string name="auto_download_lyrics_desc">Automatically download lyrics for downloaded songs</string>
 
     <string name="storage">Storage</string>
+    <string name="download_as_mp3">Download as MP3</string>
+    <string name="download_as_mp3_desc">Requires FFmpeg installed on the system</string>
     <string name="image_cache">Image Cache</string>
     <string name="song_cache">Song Cache</string>
     <string name="max_cache_size">Max cache size</string>
     <string name="unlimited">Unlimited</string>
     <string name="clear_all_downloads">Clear all downloads</string>
+    <string name="clear_cache">Clear cache</string>
+    <string name="clear_cache_desc">Free space by removing temporary files</string>
+    <string name="clear_cache_confirm_title">Clear cache?</string>
+    <string name="clear_cache_confirm_desc">Images and cached data will be removed. Downloaded songs will not be affected.</string>
     <string name="clear_image_cache">Clear image cache</string>
     <string name="clear_song_cache">Clear song cache</string>
     <string name="size_used">%s used</string>
@@ -417,6 +450,7 @@
 
 
     <string name="privacy">Privacy</string>
+    <string name="back">Back</string>
     <string name="listen_history">Listen History</string>
     <string name="search_history">Search History</string>
     <string name="pause_listen_history">Pause listen history</string>
@@ -438,6 +472,18 @@
     <string name="discord_integration">Discord Integration</string>
     <string name="discord_information">AniTail uses the KizzyRPC library to set your Discord account\'s status. This involves using the Discord Gateway connection, which may be considered a violation of Discord\'s TOS. However, there are no known cases of user accounts being suspended for this reason. Use at your own risk.\n\nAnitail will only extract your token, and everything else is stored locally.</string>
     <string name="dismiss">Dismiss</string>
+    <string name="open_link">Open link</string>
+
+    <string name="desktop_edition">Desktop Edition</string>
+    <string name="about_build">Build</string>
+    <string name="about_version_title">Version</string>
+    <string name="about_device">Device</string>
+    <string name="about_kotlin">Kotlin</string>
+    <string name="about_compose_desktop">Compose Desktop</string>
+    <string name="about_source_code">Source code</string>
+    <string name="about_source_code_desc">View on GitHub</string>
+    <string name="about_licenses">Licenses</string>
+    <string name="about_licenses_desc">Open-source libraries</string>
     <string name="options">Options</string>
     <string name="preview">Preview</string>
     <string name="not_logged_in_youtube">Not logged in to YouTube</string>

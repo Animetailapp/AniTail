@@ -25,15 +25,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.ui.component.ChipsRow
 import com.anitail.desktop.ui.component.NavigationTitle
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.shared.model.LibraryItem
 
-enum class LibraryFilter(val label: String) {
-    TODOS("Todo"),
-    CANCIONES("Canciones"),
-    ALBUMES("Albumes"),
-    ARTISTAS("Artistas"),
-    PLAYLISTS("Playlists"),
-    DESCARGAS("Descargas"),
+enum class LibraryFilter(val labelKey: String) {
+    TODOS("filter_all"),
+    CANCIONES("filter_songs"),
+    ALBUMES("filter_albums"),
+    ARTISTAS("filter_artists"),
+    PLAYLISTS("filter_playlists"),
+    DESCARGAS("filter_downloaded"),
 }
 
 @Composable
@@ -43,9 +44,9 @@ fun LibraryScreen(
     onPlay: (LibraryItem) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        NavigationTitle(title = "Biblioteca")
+        NavigationTitle(title = stringResource("filter_library"))
         ChipsRow(
-            chips = LibraryFilter.values().map { it to it.label },
+            chips = LibraryFilter.values().map { it to stringResource(it.labelKey) },
             currentValue = filterState.value,
             onValueUpdate = { value -> filterState.value = value },
         )
@@ -58,38 +59,38 @@ fun LibraryScreen(
         when (filterState.value) {
             LibraryFilter.TODOS -> {
                 if (playlists.isNotEmpty()) {
-                    NavigationTitle(title = "Playlists")
+                    NavigationTitle(title = stringResource("playlists"))
                     HorizontalItemRow(items = playlists, onPlay = onPlay)
                     Spacer(modifier = Modifier.height(16.dp))
                 }
                 if (artists.isNotEmpty()) {
-                    NavigationTitle(title = "Artistas")
+                    NavigationTitle(title = stringResource("artists"))
                     HorizontalItemRow(items = artists, onPlay = onPlay)
                     Spacer(modifier = Modifier.height(16.dp))
                 }
                 if (songs.isNotEmpty()) {
-                    NavigationTitle(title = "Canciones")
-                    ItemList(items = songs, primaryAction = "Reproducir", onPrimaryAction = onPlay)
+                    NavigationTitle(title = stringResource("songs"))
+                    ItemList(items = songs, primaryAction = stringResource("play"), onPrimaryAction = onPlay)
                 } else if (playlists.isEmpty() && artists.isEmpty()) {
-                    Text("Aun no hay elementos en tu biblioteca.")
+                    Text(stringResource("library_empty_title"))
                 }
             }
 
             LibraryFilter.CANCIONES -> {
                 if (songs.isEmpty()) {
-                    Text("No hay canciones guardadas.")
+                    Text(stringResource("library_songs_empty_title"))
                 } else {
-                    ItemList(items = songs, primaryAction = "Reproducir", onPrimaryAction = onPlay)
+                    ItemList(items = songs, primaryAction = stringResource("play"), onPrimaryAction = onPlay)
                 }
             }
 
             LibraryFilter.ALBUMES -> {
-                Text("Los albumes apareceran aqui cuando esten disponibles en Desktop.")
+                Text(stringResource("library_albums_unavailable"))
             }
 
             LibraryFilter.ARTISTAS -> {
                 if (artists.isEmpty()) {
-                    Text("No hay artistas guardados.")
+                    Text(stringResource("library_artists_empty_title"))
                 } else {
                     HorizontalItemRow(items = artists, onPlay = onPlay)
                 }
@@ -97,14 +98,14 @@ fun LibraryScreen(
 
             LibraryFilter.PLAYLISTS -> {
                 if (playlists.isEmpty()) {
-                    Text("No hay playlists guardadas.")
+                    Text(stringResource("library_playlists_empty_title"))
                 } else {
                     HorizontalItemRow(items = playlists, onPlay = onPlay)
                 }
             }
 
             LibraryFilter.DESCARGAS -> {
-                Text("Descargas locales no disponibles en Desktop por ahora.")
+                Text(stringResource("library_downloads_unavailable"))
             }
         }
     }

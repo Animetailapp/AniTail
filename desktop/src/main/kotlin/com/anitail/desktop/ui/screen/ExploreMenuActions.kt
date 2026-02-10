@@ -2,8 +2,10 @@ package com.anitail.desktop.ui.screen
 
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.ContextMenuAction
+import com.anitail.desktop.i18n.StringResolver
 
 fun buildExploreAlbumMenuActions(
+    strings: StringResolver,
     hasArtists: Boolean,
     downloadLabel: String,
     downloadEnabled: Boolean,
@@ -17,22 +19,22 @@ fun buildExploreAlbumMenuActions(
 ): List<ContextMenuAction> {
     val actions = mutableListOf(
         ContextMenuAction(
-            label = "Iniciar radio",
+            label = strings.get("start_radio"),
             icon = IconAssets.radio(),
             onClick = onStartRadio,
         ),
         ContextMenuAction(
-            label = "Reproducir siguiente",
+            label = strings.get("play_next"),
             icon = IconAssets.queueMusic(),
             onClick = onPlayNext,
         ),
         ContextMenuAction(
-            label = "Agregar a la cola",
+            label = strings.get("add_to_queue"),
             icon = IconAssets.playlistAdd(),
             onClick = onAddToQueue,
         ),
         ContextMenuAction(
-            label = "Agregar a playlist",
+            label = strings.get("add_to_playlist"),
             icon = IconAssets.playlistAdd(),
             onClick = onAddToPlaylist,
         ),
@@ -47,7 +49,7 @@ fun buildExploreAlbumMenuActions(
     if (hasArtists) {
         actions.add(
             ContextMenuAction(
-                label = "Ir al artista",
+                label = strings.get("view_artist"),
                 icon = IconAssets.artist(),
                 onClick = onOpenArtist,
             ),
@@ -56,7 +58,7 @@ fun buildExploreAlbumMenuActions(
 
     actions.add(
         ContextMenuAction(
-            label = "Compartir",
+            label = strings.get("share"),
             icon = IconAssets.share(),
             onClick = onShare,
         ),

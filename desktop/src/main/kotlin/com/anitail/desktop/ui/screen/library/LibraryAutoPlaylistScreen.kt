@@ -46,6 +46,10 @@ import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadedSong
 import com.anitail.desktop.download.DownloadStatus
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.StringResolver
+import com.anitail.desktop.i18n.pluralStringResource
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
@@ -86,6 +90,7 @@ fun LibraryAutoPlaylistScreen(
     val playlists by database.playlists.collectAsState(initial = emptyList())
     val downloadStates by downloadService.downloadStates.collectAsState()
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
+    val strings = LocalStrings.current
 
     val sortType by preferences.songSortType.collectAsState()
     val sortDescending by preferences.songSortDescending.collectAsState()
@@ -268,13 +273,13 @@ fun LibraryAutoPlaylistScreen(
                             onBack()
                         }
                     }) {
-                        Icon(IconAssets.arrowBack(), contentDescription = "Volver")
+                        Icon(IconAssets.arrowBack(), contentDescription = stringResource("back"))
                     }
                     if (isSearching) {
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            placeholder = { Text("Buscar...") },
+                            placeholder = { Text(stringResource("search")) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
@@ -287,7 +292,7 @@ fun LibraryAutoPlaylistScreen(
                             modifier = Modifier.weight(1f),
                         )
                         IconButton(onClick = { isSearching = true }) {
-                            Icon(IconAssets.search(), contentDescription = "Buscar")
+                            Icon(IconAssets.search(), contentDescription = stringResource("search"))
                         }
                     }
                 }
@@ -339,7 +344,7 @@ fun LibraryAutoPlaylistScreen(
                                     fontSize = 22.sp,
                                 )
                                 Text(
-                                    text = if (entries.size == 1) "1 canción" else "${entries.size} canciones",
+                                    text = pluralStringResource("n_song", entries.size, entries.size),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Normal,
                                 )
@@ -364,7 +369,7 @@ fun LibraryAutoPlaylistScreen(
                                             PlaylistDownloadState.COMPLETED -> {
                                                 Icon(
                                                     imageVector = IconAssets.offline(),
-                                                    contentDescription = "Descargado",
+                                                    contentDescription = stringResource("downloaded_to_device"),
                                                 )
                                             }
                                             PlaylistDownloadState.DOWNLOADING -> {
@@ -376,7 +381,7 @@ fun LibraryAutoPlaylistScreen(
                                             PlaylistDownloadState.STOPPED -> {
                                                 Icon(
                                                     imageVector = IconAssets.download(),
-                                                    contentDescription = "Descargar",
+                                                    contentDescription = stringResource("download"),
                                                 )
                                             }
                                         }
@@ -385,7 +390,7 @@ fun LibraryAutoPlaylistScreen(
                                     IconButton(onClick = ::queueAllSongs) {
                                         Icon(
                                             imageVector = IconAssets.queueMusic(),
-                                            contentDescription = "Agregar a cola",
+                                            contentDescription = stringResource("add_to_queue"),
                                         )
                                     }
                                 }
@@ -409,7 +414,7 @@ fun LibraryAutoPlaylistScreen(
                                     modifier = Modifier.size(ButtonDefaults.IconSize),
                                 )
                                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                                Text("Reproducir")
+                                Text(stringResource("play"))
                             }
 
                             OutlinedButton(
@@ -429,7 +434,7 @@ fun LibraryAutoPlaylistScreen(
                                     modifier = Modifier.size(ButtonDefaults.IconSize),
                                 )
                                 Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-                                Text("Aleatorio")
+                                Text(stringResource("shuffle"))
                             }
                         }
                     }
@@ -447,7 +452,7 @@ fun LibraryAutoPlaylistScreen(
                             sortDescending = sortDescending,
                             onSortTypeChange = { preferences.setSongSortType(it) },
                             onSortDescendingChange = { preferences.setSongSortDescending(it) },
-                            sortTypeText = ::songSortLabel,
+                            sortTypeText = { songSortLabel(strings, it) },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -456,8 +461,9 @@ fun LibraryAutoPlaylistScreen(
 
             itemsIndexed(filteredEntries, key = { _, entry -> entry.song.id }) { index, entry ->
                 val menuExpanded = remember(entry.song.id) { mutableStateOf(false) }
-                val menuActions = remember(entry.song.id, downloadStates, downloadedSongs) {
+                val menuActions = remember(entry.song.id, downloadStates, downloadedSongs, strings) {
                     buildBrowseSongMenuActions(
+                        strings = strings,
                         libraryItem = entry.libraryItem,
                         songItem = null,
                         songsById = songsById,
@@ -547,20 +553,21 @@ private enum class PlaylistDownloadState {
     STOPPED,
 }
 
+@Composable
 private fun autoPlaylistTitle(type: AutoPlaylistType): String {
     return when (type) {
-        AutoPlaylistType.LIKED -> "Me gusta"
-        AutoPlaylistType.DOWNLOADED -> "Sin conexión"
-        AutoPlaylistType.TOP -> "Mi Top 50"
+        AutoPlaylistType.LIKED -> stringResource("liked_songs")
+        AutoPlaylistType.DOWNLOADED -> stringResource("offline")
+        AutoPlaylistType.TOP -> stringResource("my_top")
     }
 }
 
-private fun songSortLabel(sortType: SongSortType): String {
+private fun songSortLabel(strings: StringResolver, sortType: SongSortType): String {
     return when (sortType) {
-        SongSortType.CREATE_DATE -> "Fecha de agregado"
-        SongSortType.NAME -> "Nombre"
-        SongSortType.ARTIST -> "Artista"
-        SongSortType.PLAY_TIME -> "Tiempo de reproducción"
+        SongSortType.CREATE_DATE -> strings.get("sort_by_create_date")
+        SongSortType.NAME -> strings.get("sort_by_name")
+        SongSortType.ARTIST -> strings.get("sort_by_artist")
+        SongSortType.PLAY_TIME -> strings.get("sort_by_play_time")
     }
 }
 
@@ -575,7 +582,7 @@ private fun joinByBullet(left: String?, right: String?): String? {
 
 private fun isCachedName(name: String): Boolean {
     val normalized = name.trim().lowercase()
-    return normalized == "en caché" || normalized == "en cache"
+    return normalized == "en caché" || normalized == "en cache" || normalized == "cached"
 }
 
 private fun DownloadedSong.toFallbackSong(): SongEntity {

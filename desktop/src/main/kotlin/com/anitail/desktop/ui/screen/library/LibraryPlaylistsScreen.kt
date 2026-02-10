@@ -42,6 +42,10 @@ import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.mapper.toLibraryItem
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadedSong
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.StringResolver
+import com.anitail.desktop.i18n.pluralStringResource
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.player.buildRadioQueuePlan
 import com.anitail.desktop.storage.DesktopPreferences
@@ -88,6 +92,7 @@ fun LibraryPlaylistsScreen(
     val sortType by preferences.playlistSortType.collectAsState()
     val sortDescending by preferences.playlistSortDescending.collectAsState()
     val gridItemSize by preferences.gridItemSize.collectAsState()
+    val strings = LocalStrings.current
     val showLiked by preferences.showLikedPlaylist.collectAsState()
     val showDownloaded by preferences.showDownloadedPlaylist.collectAsState()
     val showTop by preferences.showTopPlaylist.collectAsState()
@@ -135,11 +140,14 @@ fun LibraryPlaylistsScreen(
     val topSongs = remember(songs) {
         songs.sortedByDescending { it.totalPlayTime }.take(50)
     }
-    val autoPlaylists = remember(likedSongs, downloadedSongEntities, topSongs) {
+    val likedSongsTitle = stringResource("liked_songs")
+    val offlineTitle = stringResource("offline")
+    val myTopTitle = stringResource("my_top")
+    val autoPlaylists = remember(likedSongs, downloadedSongEntities, topSongs, likedSongsTitle, offlineTitle, myTopTitle) {
         listOf(
-            buildAutoPlaylist("liked", "Me gusta", likedSongs),
-            buildAutoPlaylist("downloaded", "Sin conexión", downloadedSongEntities),
-            buildAutoPlaylist("top", "Mi Top 50", topSongs),
+            buildAutoPlaylist("liked", likedSongsTitle, likedSongs),
+            buildAutoPlaylist("downloaded", offlineTitle, downloadedSongEntities),
+            buildAutoPlaylist("top", myTopTitle, topSongs),
         )
     }
 
@@ -194,13 +202,13 @@ fun LibraryPlaylistsScreen(
                 sortDescending = sortDescending,
                 onSortTypeChange = { preferences.setPlaylistSortType(it) },
                 onSortDescendingChange = { preferences.setPlaylistSortDescending(it) },
-                sortTypeText = ::playlistSortLabel,
+                sortTypeText = { playlistSortLabel(strings, it) },
             )
 
             Spacer(modifier = Modifier.weight(1f))
 
             Text(
-                text = if (sortedLibraryPlaylists.size == 1) "1 playlist" else "${sortedLibraryPlaylists.size} playlists",
+                text = pluralStringResource("n_playlist", sortedLibraryPlaylists.size, sortedLibraryPlaylists.size),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.secondary,
             )
@@ -275,8 +283,10 @@ fun LibraryPlaylistsScreen(
                                 playlistSongs,
                                 downloadStates,
                                 downloadedSongs,
+                                strings,
                             ) {
                                 buildPlaylistMenuActions(
+                                    strings = strings,
                                     playlist = playlist,
                                     playlistSongs = playlistSongs,
                                     downloadStates = downloadStates,
@@ -393,8 +403,10 @@ fun LibraryPlaylistsScreen(
                                 playlistSongs,
                                 downloadStates,
                                 downloadedSongs,
+                                strings,
                             ) {
                                 buildPlaylistMenuActions(
+                                    strings = strings,
                                     playlist = playlist,
                                     playlistSongs = playlistSongs,
                                     downloadStates = downloadStates,
@@ -452,7 +464,7 @@ fun LibraryPlaylistsScreen(
                 .align(Alignment.BottomEnd)
                 .padding(24.dp),
         ) {
-            Icon(imageVector = IconAssets.add(), contentDescription = "Crear playlist")
+            Icon(imageVector = IconAssets.add(), contentDescription = stringResource("create_playlist"))
         }
     }
 }
@@ -463,6 +475,7 @@ private data class PlaylistSongTarget(
 )
 
 private fun buildPlaylistMenuActions(
+    strings: StringResolver,
     playlist: LibraryPlaylist,
     playlistSongs: List<SongEntity>,
     downloadStates: Map<String, com.anitail.desktop.download.DownloadState>,
@@ -474,17 +487,19 @@ private fun buildPlaylistMenuActions(
     scope: kotlinx.coroutines.CoroutineScope,
 ): List<ContextMenuAction> {
     val downloadMenu = resolveCollectionDownloadMenuState(
+        strings = strings,
         songIds = playlistSongs.map { it.id },
         downloadStates = downloadStates,
         downloadedSongs = downloadedSongs,
         showWhenEmpty = false,
     )
     return buildBrowsePlaylistMenuActions(
+        strings = strings,
         canPlay = playlistSongs.isNotEmpty(),
         canShuffle = playlistSongs.isNotEmpty(),
         canRadio = playlistSongs.isNotEmpty(),
         showDownload = downloadMenu != null,
-        downloadLabel = downloadMenu?.label ?: "Descargar",
+        downloadLabel = downloadMenu?.label ?: strings.get("download"),
         downloadEnabled = true,
         onPlay = {
             val items = playlistSongs.map { it.toLibraryItem() }
@@ -551,12 +566,12 @@ private fun CreatePlaylistDialog(
     var playlistName by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Nueva playlist") },
+        title = { Text(stringResource("create_playlist")) },
         text = {
             OutlinedTextField(
                 value = playlistName,
                 onValueChange = { playlistName = it },
-                label = { Text("Nombre") },
+                label = { Text(stringResource("playlist_name")) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -572,12 +587,12 @@ private fun CreatePlaylistDialog(
                     }
                 },
             ) {
-                Text("Crear")
+                Text(stringResource("create_playlist"))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text(stringResource("cancel"))
             }
         },
     )
@@ -592,25 +607,25 @@ private fun EmptyPlaylistsPlaceholder() {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "No hay playlists",
+            text = stringResource("library_playlists_empty_title"),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
-private fun playlistSortLabel(sortType: PlaylistSortType): String {
+private fun playlistSortLabel(strings: StringResolver, sortType: PlaylistSortType): String {
     return when (sortType) {
-        PlaylistSortType.CREATE_DATE -> "Fecha de agregado"
-        PlaylistSortType.NAME -> "Nombre"
-        PlaylistSortType.SONG_COUNT -> "Cantidad de canciones"
-        PlaylistSortType.LAST_UPDATED -> "Última actualización"
+        PlaylistSortType.CREATE_DATE -> strings.get("sort_by_create_date")
+        PlaylistSortType.NAME -> strings.get("sort_by_name")
+        PlaylistSortType.SONG_COUNT -> strings.get("sort_by_song_count")
+        PlaylistSortType.LAST_UPDATED -> strings.get("sort_by_last_updated")
     }
 }
 
 private fun isCachedName(name: String): Boolean {
     val normalized = name.trim().lowercase()
-    return normalized == "en caché" || normalized == "en cache"
+    return normalized == "en caché" || normalized == "en cache" || normalized == "cached"
 }
 
 private fun DownloadedSong.toFallbackSong(): SongEntity {

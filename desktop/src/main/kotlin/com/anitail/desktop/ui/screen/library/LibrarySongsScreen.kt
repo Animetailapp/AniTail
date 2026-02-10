@@ -35,6 +35,10 @@ import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.mapper.toLibraryItem
 import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.download.DesktopDownloadService
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.StringResolver
+import com.anitail.desktop.i18n.pluralStringResource
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
@@ -74,6 +78,7 @@ fun LibrarySongsScreen(
     val playlists by database.playlists.collectAsState(initial = emptyList())
     val downloadStates by downloadService.downloadStates.collectAsState()
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
+    val strings = LocalStrings.current
 
     val filter by preferences.songFilter.collectAsState()
     val sortType by preferences.songSortType.collectAsState()
@@ -161,6 +166,7 @@ fun LibrarySongsScreen(
 
             item(key = "header") {
                 SongHeaderRow(
+                    strings = strings,
                     songCount = sortedSongs.size,
                     sortType = sortType,
                     sortDescending = sortDescending,
@@ -172,8 +178,9 @@ fun LibrarySongsScreen(
             itemsIndexed(sortedSongs, key = { _, song -> song.id }) { index, song ->
                 val menuExpanded = remember(song.id) { mutableStateOf(false) }
                 val libraryItem = song.toLibraryItem()
-                val menuActions = remember(song.id, downloadStates, downloadedSongs) {
+                val menuActions = remember(song.id, downloadStates, downloadedSongs, strings) {
                     buildBrowseSongMenuActions(
+                        strings = strings,
                         libraryItem = libraryItem,
                         songItem = null,
                         songsById = songsById,
@@ -266,7 +273,7 @@ private fun SongFilterRow(
     ) {
         Spacer(Modifier.width(12.dp))
         FilterChip(
-            label = { Text("Canciones") },
+            label = { Text(stringResource("songs")) },
             selected = true,
             colors = FilterChipDefaults.filterChipColors(
                 containerColor = MaterialTheme.colorScheme.surface,
@@ -277,9 +284,9 @@ private fun SongFilterRow(
         )
         ChipsRow(
             chips = listOf(
-                SongFilter.LIKED to "Me gusta",
-                SongFilter.LIBRARY to "Biblioteca",
-                SongFilter.DOWNLOADED to "Descargas",
+                SongFilter.LIKED to stringResource("liked"),
+                SongFilter.LIBRARY to stringResource("in_library"),
+                SongFilter.DOWNLOADED to stringResource("filter_downloaded"),
             ),
             currentValue = filter,
             onValueUpdate = onFilterChange,
@@ -290,6 +297,7 @@ private fun SongFilterRow(
 
 @Composable
 private fun SongHeaderRow(
+    strings: StringResolver,
     songCount: Int,
     sortType: SongSortType,
     sortDescending: Boolean,
@@ -305,25 +313,25 @@ private fun SongHeaderRow(
             sortDescending = sortDescending,
             onSortTypeChange = onSortTypeChange,
             onSortDescendingChange = onSortDescendingChange,
-            sortTypeText = ::songSortLabel,
+            sortTypeText = { songSortLabel(strings, it) },
         )
 
         Spacer(modifier = Modifier.weight(1f))
 
         Text(
-            text = if (songCount == 1) "1 canción" else "$songCount canciones",
+            text = pluralStringResource("n_song", songCount, songCount),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.secondary,
         )
     }
 }
 
-private fun songSortLabel(sortType: SongSortType): String {
+private fun songSortLabel(strings: StringResolver, sortType: SongSortType): String {
     return when (sortType) {
-        SongSortType.CREATE_DATE -> "Fecha de agregado"
-        SongSortType.NAME -> "Nombre"
-        SongSortType.ARTIST -> "Artista"
-        SongSortType.PLAY_TIME -> "Tiempo de reproducción"
+        SongSortType.CREATE_DATE -> strings.get("sort_by_create_date")
+        SongSortType.NAME -> strings.get("sort_by_name")
+        SongSortType.ARTIST -> strings.get("sort_by_artist")
+        SongSortType.PLAY_TIME -> strings.get("sort_by_play_time")
     }
 }
 
@@ -338,5 +346,5 @@ private fun joinByBullet(left: String?, right: String?): String? {
 
 private fun isCachedName(name: String): Boolean {
     val normalized = name.trim().lowercase()
-    return normalized == "en caché" || normalized == "en cache"
+    return normalized == "en caché" || normalized == "en cache" || normalized == "cached"
 }

@@ -56,17 +56,19 @@ import com.anitail.desktop.ui.screen.library.LibraryArtistsScreen
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.i18n.pluralStringResource
 import com.anitail.shared.model.LibraryItem
+import java.text.Normalizer
+import java.util.Locale
 
 /**
  * Filtros para la biblioteca - replica Android LibraryFilter
  */
-enum class LibraryFilterType(val label: String) {
-    MIXES("Mixes"),
-    PLAYLISTS("Playlists"),
-    CANCIONES("Canciones"),
-    ALBUMES("Álbumes"),
-    ARTISTAS("Artistas"),
-    DESCARGAS("Descargas"),
+enum class LibraryFilterType(val labelKey: String) {
+    MIXES("mixes"),
+    PLAYLISTS("playlists"),
+    CANCIONES("songs"),
+    ALBUMES("albums"),
+    ARTISTAS("artists"),
+    DESCARGAS("filter_downloaded"),
 }
 
 /**
@@ -105,6 +107,10 @@ fun LibraryScreenEnhanced(
     val likedLabel = stringResource("liked_songs")
     val offlineLabel = stringResource("offline")
     val topLabel = stringResource("my_top")
+    val cachedPlaylistLabel = stringResource("cached_playlist")
+    val cachedPlaylistNormalized = remember(cachedPlaylistLabel) {
+        normalizePlaylistName(cachedPlaylistLabel)
+    }
     val specialPlaylists = remember(likedLabel, offlineLabel, topLabel) {
         listOf(
             SpecialPlaylist(
@@ -132,8 +138,8 @@ fun LibraryScreenEnhanced(
     }
 
     // Categorizar items
-    val filteredItems = remember(items) {
-        items.filterNot { isCachedPlaylistItem(it) }
+    val filteredItems = remember(items, cachedPlaylistNormalized) {
+        items.filterNot { isCachedPlaylistItem(it, cachedPlaylistNormalized) }
     }
     val libraryPlaylists = remember(filteredItems) {
         filteredItems.filter { isPlaylistItem(it) }
@@ -192,14 +198,9 @@ fun LibraryScreenEnhanced(
     Column(modifier = Modifier.fillMaxSize()) {
         NavigationTitle(title = stringResource("filter_library"))
         ChipsRow(
-            chips = listOf(
-                LibraryFilterType.MIXES to stringResource("filter_library"),
-                LibraryFilterType.PLAYLISTS to stringResource("filter_playlists"),
-                LibraryFilterType.CANCIONES to stringResource("filter_songs"),
-                LibraryFilterType.ALBUMES to stringResource("filter_albums"),
-                LibraryFilterType.ARTISTAS to stringResource("filter_artists"),
-                LibraryFilterType.DESCARGAS to stringResource("filter_downloaded"),
-            ),
+            chips = LibraryFilterType.entries.map { filter ->
+                filter to stringResource(filter.labelKey)
+            },
             currentValue = currentFilter,
             onValueUpdate = { filter ->
                 currentFilter = filter
@@ -480,8 +481,8 @@ private fun LibrarySongsContent(
     if (songs.isEmpty()) {
         EmptyStateMessage(
             icon = IconAssets.musicNote(),
-            title = "No hay canciones",
-            subtitle = "Las canciones que guardes aparecerán aquí",
+            title = stringResource("library_songs_empty_title"),
+            subtitle = stringResource("library_songs_empty_subtitle"),
         )
     } else {
         LazyColumn(
@@ -506,8 +507,8 @@ private fun LibraryAlbumsContent(
     if (albums.isEmpty()) {
         EmptyStateMessage(
             icon = IconAssets.album(),
-            title = "No hay álbumes",
-            subtitle = "Los álbumes que guardes aparecerán aquí",
+            title = stringResource("library_albums_empty_title"),
+            subtitle = stringResource("library_albums_empty_subtitle"),
         )
     } else {
         LazyVerticalGrid(
@@ -536,8 +537,8 @@ private fun LibraryAlbumsContent(
 private fun LibraryDownloadsContent() {
     EmptyStateMessage(
         icon = IconAssets.download(),
-        title = "No hay descargas",
-        subtitle = "Las descargas estarán disponibles próximamente en Desktop",
+        title = stringResource("library_downloads_empty_title"),
+        subtitle = stringResource("library_downloads_empty_subtitle"),
     )
 }
 
@@ -824,12 +825,12 @@ private fun EmptyLibraryState() {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             )
             Text(
-                text = "Tu biblioteca está vacía",
+                text = stringResource("library_empty_title"),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "Busca música y añádela a tu biblioteca",
+                text = stringResource("library_empty_subtitle"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             )
@@ -904,11 +905,13 @@ private fun isPlaylistItem(item: LibraryItem): Boolean {
     return url.contains("playlist?list=") || url.contains("/playlist/")
 }
 
-private fun isCachedPlaylistItem(item: LibraryItem): Boolean {
-    return isPlaylistItem(item) && isCachedPlaylist(item.title)
+private fun isCachedPlaylistItem(item: LibraryItem, cachedPlaylistNormalized: String): Boolean {
+    return isPlaylistItem(item) && normalizePlaylistName(item.title) == cachedPlaylistNormalized
 }
 
-private fun isCachedPlaylist(name: String): Boolean {
-    val normalized = name.trim().lowercase()
-    return normalized == "en caché" || normalized == "en cache"
+private fun normalizePlaylistName(name: String): String {
+    val trimmed = name.trim()
+    val decomposed = Normalizer.normalize(trimmed, Normalizer.Form.NFD)
+    val withoutDiacritics = decomposed.replace(Regex("\\p{Mn}+"), "")
+    return withoutDiacritics.lowercase(Locale.ROOT)
 }
