@@ -40,8 +40,11 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
     implementation(libs.json)
     implementation(libs.okhttp)
+    implementation(libs.lastfm.java)
+    implementation(libs.commons.codec)
     implementation(libs.jna)
     implementation(libs.jna.platform)
+    implementation(libs.kuromoji.ipadic)
 
     // Ktor for lyrics and API calls
     implementation(libs.ktor.client.core)

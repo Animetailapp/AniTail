@@ -112,6 +112,33 @@ class DesktopPreferences private constructor(
     private val _persistentQueue = MutableStateFlow(true)
     val persistentQueue: StateFlow<Boolean> = _persistentQueue.asStateFlow()
 
+    private val _audioOffload = MutableStateFlow(false)
+    val audioOffload: StateFlow<Boolean> = _audioOffload.asStateFlow()
+
+    private val _autoLoadMore = MutableStateFlow(true)
+    val autoLoadMore: StateFlow<Boolean> = _autoLoadMore.asStateFlow()
+
+    private val _similarContentEnabled = MutableStateFlow(true)
+    val similarContentEnabled: StateFlow<Boolean> = _similarContentEnabled.asStateFlow()
+
+    private val _autoSkipNextOnError = MutableStateFlow(false)
+    val autoSkipNextOnError: StateFlow<Boolean> = _autoSkipNextOnError.asStateFlow()
+
+    private val _stopMusicOnTaskClear = MutableStateFlow(false)
+    val stopMusicOnTaskClear: StateFlow<Boolean> = _stopMusicOnTaskClear.asStateFlow()
+
+    private val _autoDownloadOnLike = MutableStateFlow(false)
+    val autoDownloadOnLike: StateFlow<Boolean> = _autoDownloadOnLike.asStateFlow()
+
+    private val _autoDownloadLyrics = MutableStateFlow(false)
+    val autoDownloadLyrics: StateFlow<Boolean> = _autoDownloadLyrics.asStateFlow()
+
+    private val _enableCast = MutableStateFlow(false)
+    val enableCast: StateFlow<Boolean> = _enableCast.asStateFlow()
+
+    private val _notificationButtonType = MutableStateFlow(NotificationButtonTypePreference.CLOSE)
+    val notificationButtonType: StateFlow<NotificationButtonTypePreference> = _notificationButtonType.asStateFlow()
+
     private val _autoStartRadio = MutableStateFlow(true)
     val autoStartRadio: StateFlow<Boolean> = _autoStartRadio.asStateFlow()
 
@@ -134,6 +161,24 @@ class DesktopPreferences private constructor(
     private val _quickPicks = MutableStateFlow(QuickPicks.QUICK_PICKS)
     val quickPicks: StateFlow<QuickPicks> = _quickPicks.asStateFlow()
 
+    private val _topLength = MutableStateFlow("50")
+    val topLength: StateFlow<String> = _topLength.asStateFlow()
+
+    private val _proxyEnabled = MutableStateFlow(false)
+    val proxyEnabled: StateFlow<Boolean> = _proxyEnabled.asStateFlow()
+
+    private val _proxyType = MutableStateFlow(ProxyTypePreference.HTTP)
+    val proxyType: StateFlow<ProxyTypePreference> = _proxyType.asStateFlow()
+
+    private val _proxyUrl = MutableStateFlow("host:port")
+    val proxyUrl: StateFlow<String> = _proxyUrl.asStateFlow()
+
+    private val _proxyUsername = MutableStateFlow("")
+    val proxyUsername: StateFlow<String> = _proxyUsername.asStateFlow()
+
+    private val _proxyPassword = MutableStateFlow("")
+    val proxyPassword: StateFlow<String> = _proxyPassword.asStateFlow()
+
     private val _enableBetterLyrics = MutableStateFlow(true)
     val enableBetterLyrics: StateFlow<Boolean> = _enableBetterLyrics.asStateFlow()
 
@@ -148,6 +193,36 @@ class DesktopPreferences private constructor(
 
     private val _preferredLyricsProvider = MutableStateFlow(PreferredLyricsProvider.BETTER_LYRICS)
     val preferredLyricsProvider: StateFlow<PreferredLyricsProvider> = _preferredLyricsProvider.asStateFlow()
+
+    private val _lyricsGlowEffect = MutableStateFlow(false)
+    val lyricsGlowEffect: StateFlow<Boolean> = _lyricsGlowEffect.asStateFlow()
+
+    private val _lyricsRomanizeJapanese = MutableStateFlow(true)
+    val lyricsRomanizeJapanese: StateFlow<Boolean> = _lyricsRomanizeJapanese.asStateFlow()
+
+    private val _lyricsRomanizeKorean = MutableStateFlow(true)
+    val lyricsRomanizeKorean: StateFlow<Boolean> = _lyricsRomanizeKorean.asStateFlow()
+
+    private val _lyricsRomanizeRussian = MutableStateFlow(true)
+    val lyricsRomanizeRussian: StateFlow<Boolean> = _lyricsRomanizeRussian.asStateFlow()
+
+    private val _lyricsRomanizeUkrainian = MutableStateFlow(true)
+    val lyricsRomanizeUkrainian: StateFlow<Boolean> = _lyricsRomanizeUkrainian.asStateFlow()
+
+    private val _lyricsRomanizeSerbian = MutableStateFlow(true)
+    val lyricsRomanizeSerbian: StateFlow<Boolean> = _lyricsRomanizeSerbian.asStateFlow()
+
+    private val _lyricsRomanizeBulgarian = MutableStateFlow(true)
+    val lyricsRomanizeBulgarian: StateFlow<Boolean> = _lyricsRomanizeBulgarian.asStateFlow()
+
+    private val _lyricsRomanizeBelarusian = MutableStateFlow(true)
+    val lyricsRomanizeBelarusian: StateFlow<Boolean> = _lyricsRomanizeBelarusian.asStateFlow()
+
+    private val _lyricsRomanizeKyrgyz = MutableStateFlow(true)
+    val lyricsRomanizeKyrgyz: StateFlow<Boolean> = _lyricsRomanizeKyrgyz.asStateFlow()
+
+    private val _lyricsRomanizeCyrillicByLine = MutableStateFlow(false)
+    val lyricsRomanizeCyrillicByLine: StateFlow<Boolean> = _lyricsRomanizeCyrillicByLine.asStateFlow()
 
     // === Library Settings ===
     private val _libraryFilter = MutableStateFlow(LibraryFilter.LIBRARY)
@@ -229,14 +304,59 @@ class DesktopPreferences private constructor(
     private val _discordToken = MutableStateFlow("")
     val discordToken: StateFlow<String> = _discordToken.asStateFlow()
 
+    private val _discordName = MutableStateFlow("")
+    val discordName: StateFlow<String> = _discordName.asStateFlow()
+
     private val _discordUsername = MutableStateFlow("")
     val discordUsername: StateFlow<String> = _discordUsername.asStateFlow()
 
     private val _discordAvatarUrl = MutableStateFlow("")
     val discordAvatarUrl: StateFlow<String> = _discordAvatarUrl.asStateFlow()
 
+    private val _discordInfoDismissed = MutableStateFlow(false)
+    val discordInfoDismissed: StateFlow<Boolean> = _discordInfoDismissed.asStateFlow()
+
+    private val _enableDiscordRPC = MutableStateFlow(true)
+    val enableDiscordRPC: StateFlow<Boolean> = _enableDiscordRPC.asStateFlow()
+
+    private val _discordLastSyncEpochMillis = MutableStateFlow(0L)
+    val discordLastSyncEpochMillis: StateFlow<Long> = _discordLastSyncEpochMillis.asStateFlow()
+
+    private val _discordLastErrorMessage = MutableStateFlow("")
+    val discordLastErrorMessage: StateFlow<String> = _discordLastErrorMessage.asStateFlow()
+
+    private val _spotifyAccessToken = MutableStateFlow("")
+    val spotifyAccessToken: StateFlow<String> = _spotifyAccessToken.asStateFlow()
+
+    private val _spotifyRefreshToken = MutableStateFlow("")
+    val spotifyRefreshToken: StateFlow<String> = _spotifyRefreshToken.asStateFlow()
+
+    private val _spotifyUserName = MutableStateFlow("")
+    val spotifyUserName: StateFlow<String> = _spotifyUserName.asStateFlow()
+
+    private val _spotifyTokenExpiryEpochMillis = MutableStateFlow(0L)
+    val spotifyTokenExpiryEpochMillis: StateFlow<Long> = _spotifyTokenExpiryEpochMillis.asStateFlow()
+
     private val _preferredAvatarSource = MutableStateFlow(AvatarSourcePreference.YOUTUBE)
     val preferredAvatarSource: StateFlow<AvatarSourcePreference> = _preferredAvatarSource.asStateFlow()
+
+    private val _lastFmEnabled = MutableStateFlow(false)
+    val lastFmEnabled: StateFlow<Boolean> = _lastFmEnabled.asStateFlow()
+
+    private val _lastFmUsername = MutableStateFlow("")
+    val lastFmUsername: StateFlow<String> = _lastFmUsername.asStateFlow()
+
+    private val _lastFmSessionKey = MutableStateFlow("")
+    val lastFmSessionKey: StateFlow<String> = _lastFmSessionKey.asStateFlow()
+
+    private val _lastFmScrobbleEnabled = MutableStateFlow(true)
+    val lastFmScrobbleEnabled: StateFlow<Boolean> = _lastFmScrobbleEnabled.asStateFlow()
+
+    private val _lastFmLoveTracks = MutableStateFlow(false)
+    val lastFmLoveTracks: StateFlow<Boolean> = _lastFmLoveTracks.asStateFlow()
+
+    private val _lastFmShowAvatar = MutableStateFlow(false)
+    val lastFmShowAvatar: StateFlow<Boolean> = _lastFmShowAvatar.asStateFlow()
 
     // === Privacy Settings ===
     private val _pauseListenHistory = MutableStateFlow(false)
@@ -245,12 +365,18 @@ class DesktopPreferences private constructor(
     private val _pauseSearchHistory = MutableStateFlow(false)
     val pauseSearchHistory: StateFlow<Boolean> = _pauseSearchHistory.asStateFlow()
 
+    private val _disableScreenshot = MutableStateFlow(false)
+    val disableScreenshot: StateFlow<Boolean> = _disableScreenshot.asStateFlow()
+
     // === Storage Settings ===
-    private val _maxImageCacheSizeMB = MutableStateFlow(500)
+    private val _maxImageCacheSizeMB = MutableStateFlow(512)
     val maxImageCacheSizeMB: StateFlow<Int> = _maxImageCacheSizeMB.asStateFlow()
 
-    private val _maxSongCacheSizeMB = MutableStateFlow(1000)
+    private val _maxSongCacheSizeMB = MutableStateFlow(1024)
     val maxSongCacheSizeMB: StateFlow<Int> = _maxSongCacheSizeMB.asStateFlow()
+
+    private val _maxDownloadSizeMB = MutableStateFlow(-1)
+    val maxDownloadSizeMB: StateFlow<Int> = _maxDownloadSizeMB.asStateFlow()
 
     private val _downloadAsMp3 = MutableStateFlow(true)
     val downloadAsMp3: StateFlow<Boolean> = _downloadAsMp3.asStateFlow()
@@ -402,6 +528,51 @@ class DesktopPreferences private constructor(
         save()
     }
 
+    fun setAudioOffload(value: Boolean) {
+        _audioOffload.value = value
+        save()
+    }
+
+    fun setAutoLoadMore(value: Boolean) {
+        _autoLoadMore.value = value
+        save()
+    }
+
+    fun setSimilarContentEnabled(value: Boolean) {
+        _similarContentEnabled.value = value
+        save()
+    }
+
+    fun setAutoSkipNextOnError(value: Boolean) {
+        _autoSkipNextOnError.value = value
+        save()
+    }
+
+    fun setStopMusicOnTaskClear(value: Boolean) {
+        _stopMusicOnTaskClear.value = value
+        save()
+    }
+
+    fun setAutoDownloadOnLike(value: Boolean) {
+        _autoDownloadOnLike.value = value
+        save()
+    }
+
+    fun setAutoDownloadLyrics(value: Boolean) {
+        _autoDownloadLyrics.value = value
+        save()
+    }
+
+    fun setEnableCast(value: Boolean) {
+        _enableCast.value = value
+        save()
+    }
+
+    fun setNotificationButtonType(value: NotificationButtonTypePreference) {
+        _notificationButtonType.value = value
+        save()
+    }
+
     fun setAutoStartRadio(value: Boolean) {
         _autoStartRadio.value = value
         save()
@@ -437,6 +608,36 @@ class DesktopPreferences private constructor(
         save()
     }
 
+    fun setTopLength(value: String) {
+        _topLength.value = value
+        save()
+    }
+
+    fun setProxyEnabled(value: Boolean) {
+        _proxyEnabled.value = value
+        save()
+    }
+
+    fun setProxyType(value: ProxyTypePreference) {
+        _proxyType.value = value
+        save()
+    }
+
+    fun setProxyUrl(value: String) {
+        _proxyUrl.value = value
+        save()
+    }
+
+    fun setProxyUsername(value: String) {
+        _proxyUsername.value = value
+        save()
+    }
+
+    fun setProxyPassword(value: String) {
+        _proxyPassword.value = value
+        save()
+    }
+
     fun setEnableBetterLyrics(value: Boolean) {
         _enableBetterLyrics.value = value
         save()
@@ -459,6 +660,56 @@ class DesktopPreferences private constructor(
 
     fun setPreferredLyricsProvider(value: PreferredLyricsProvider) {
         _preferredLyricsProvider.value = value
+        save()
+    }
+
+    fun setLyricsGlowEffect(value: Boolean) {
+        _lyricsGlowEffect.value = value
+        save()
+    }
+
+    fun setLyricsRomanizeJapanese(value: Boolean) {
+        _lyricsRomanizeJapanese.value = value
+        save()
+    }
+
+    fun setLyricsRomanizeKorean(value: Boolean) {
+        _lyricsRomanizeKorean.value = value
+        save()
+    }
+
+    fun setLyricsRomanizeRussian(value: Boolean) {
+        _lyricsRomanizeRussian.value = value
+        save()
+    }
+
+    fun setLyricsRomanizeUkrainian(value: Boolean) {
+        _lyricsRomanizeUkrainian.value = value
+        save()
+    }
+
+    fun setLyricsRomanizeSerbian(value: Boolean) {
+        _lyricsRomanizeSerbian.value = value
+        save()
+    }
+
+    fun setLyricsRomanizeBulgarian(value: Boolean) {
+        _lyricsRomanizeBulgarian.value = value
+        save()
+    }
+
+    fun setLyricsRomanizeBelarusian(value: Boolean) {
+        _lyricsRomanizeBelarusian.value = value
+        save()
+    }
+
+    fun setLyricsRomanizeKyrgyz(value: Boolean) {
+        _lyricsRomanizeKyrgyz.value = value
+        save()
+    }
+
+    fun setLyricsRomanizeCyrillicByLine(value: Boolean) {
+        _lyricsRomanizeCyrillicByLine.value = value
         save()
     }
 
@@ -592,6 +843,11 @@ class DesktopPreferences private constructor(
         save()
     }
 
+    fun setDiscordName(value: String) {
+        _discordName.value = value
+        save()
+    }
+
     fun setDiscordUsername(value: String) {
         _discordUsername.value = value
         save()
@@ -607,6 +863,76 @@ class DesktopPreferences private constructor(
         save()
     }
 
+    fun setDiscordInfoDismissed(value: Boolean) {
+        _discordInfoDismissed.value = value
+        save()
+    }
+
+    fun setEnableDiscordRPC(value: Boolean) {
+        _enableDiscordRPC.value = value
+        save()
+    }
+
+    fun setDiscordLastSyncEpochMillis(value: Long) {
+        _discordLastSyncEpochMillis.value = value
+        save()
+    }
+
+    fun setDiscordLastErrorMessage(value: String) {
+        _discordLastErrorMessage.value = value
+        save()
+    }
+
+    fun setSpotifyAccessToken(value: String) {
+        _spotifyAccessToken.value = value
+        save()
+    }
+
+    fun setSpotifyRefreshToken(value: String) {
+        _spotifyRefreshToken.value = value
+        save()
+    }
+
+    fun setSpotifyUserName(value: String) {
+        _spotifyUserName.value = value
+        save()
+    }
+
+    fun setSpotifyTokenExpiryEpochMillis(value: Long) {
+        _spotifyTokenExpiryEpochMillis.value = value
+        save()
+    }
+
+    fun setLastFmEnabled(value: Boolean) {
+        _lastFmEnabled.value = value
+        save()
+    }
+
+    fun setLastFmUsername(value: String) {
+        _lastFmUsername.value = value
+        save()
+    }
+
+    fun setLastFmSessionKey(value: String) {
+        _lastFmSessionKey.value = value
+        save()
+    }
+
+    fun setLastFmScrobbleEnabled(value: Boolean) {
+        _lastFmScrobbleEnabled.value = value
+        save()
+    }
+
+    fun setLastFmLoveTracks(value: Boolean) {
+        _lastFmLoveTracks.value = value
+        save()
+    }
+
+    fun setLastFmShowAvatar(value: Boolean) {
+        _lastFmShowAvatar.value = value
+        save()
+    }
+
     fun setPauseListenHistory(value: Boolean) {
         _pauseListenHistory.value = value
         save()
@@ -617,13 +943,23 @@ class DesktopPreferences private constructor(
         save()
     }
 
+    fun setDisableScreenshot(value: Boolean) {
+        _disableScreenshot.value = value
+        save()
+    }
+
     fun setMaxImageCacheSizeMB(value: Int) {
-        _maxImageCacheSizeMB.value = value.coerceIn(100, 2000)
+        _maxImageCacheSizeMB.value = value.coerceIn(128, 8192)
         save()
     }
 
     fun setMaxSongCacheSizeMB(value: Int) {
-        _maxSongCacheSizeMB.value = value.coerceIn(500, 10000)
+        _maxSongCacheSizeMB.value = if (value == -1) -1 else value.coerceIn(128, 8192)
+        save()
+    }
+
+    fun setMaxDownloadSizeMB(value: Int) {
+        _maxDownloadSizeMB.value = if (value == -1) -1 else value.coerceIn(128, 8192)
         save()
     }
 
@@ -694,6 +1030,17 @@ class DesktopPreferences private constructor(
             _crossfadeDuration.value = json.optInt("crossfadeDuration", 0)
             _historyDuration.value = json.optDouble("historyDuration", 30.0).toFloat()
             _persistentQueue.value = json.optBoolean("persistentQueue", true)
+            _audioOffload.value = json.optBoolean("audioOffload", false)
+            _autoLoadMore.value = json.optBoolean("autoLoadMore", true)
+            _similarContentEnabled.value = json.optBoolean("similarContent", true)
+            _autoSkipNextOnError.value = json.optBoolean("autoSkipNextOnError", false)
+            _stopMusicOnTaskClear.value = json.optBoolean("stopMusicOnTaskClear", false)
+            _autoDownloadOnLike.value = json.optBoolean("autoDownloadOnLike", false)
+            _autoDownloadLyrics.value = json.optBoolean("autoDownloadLyrics", false)
+            _enableCast.value = json.optBoolean("enableCast", false)
+            _notificationButtonType.value = NotificationButtonTypePreference.fromString(
+                json.optString("notificationButtonType", "close")
+            )
             _autoStartRadio.value = json.optBoolean("autoStartRadio", true)
             _queueEditLocked.value = json.optBoolean("queueEditLocked", true)
 
@@ -702,6 +1049,12 @@ class DesktopPreferences private constructor(
             _appLanguage.value = json.optString("appLanguage", SYSTEM_DEFAULT)
             _hideExplicit.value = json.optBoolean("hideExplicit", false)
             _quickPicks.value = QuickPicks.fromString(json.optString("quickPicks", "quick_picks"))
+            _topLength.value = json.optString("topSize", "50")
+            _proxyEnabled.value = json.optBoolean("proxyEnabled", false)
+            _proxyType.value = ProxyTypePreference.fromString(json.optString("proxyType", "http"))
+            _proxyUrl.value = json.optString("proxyUrl", "host:port")
+            _proxyUsername.value = json.optString("proxyUsername", "")
+            _proxyPassword.value = json.optString("proxyPassword", "")
             _enableBetterLyrics.value = json.optBoolean("enableBetterLyrics", true)
             _enableSimpMusic.value = json.optBoolean("enableSimpMusic", true)
             _enableLrcLib.value = json.optBoolean("enableLrclib", true)
@@ -709,15 +1062,41 @@ class DesktopPreferences private constructor(
             _preferredLyricsProvider.value = PreferredLyricsProvider.fromString(
                 json.optString("lyricsProvider", "better_lyrics")
             )
+            _lyricsGlowEffect.value = json.optBoolean("lyricsGlowEffect", false)
+            _lyricsRomanizeJapanese.value = json.optBoolean("lyricsRomanizeJapanese", true)
+            _lyricsRomanizeKorean.value = json.optBoolean("lyricsRomanizeKorean", true)
+            _lyricsRomanizeRussian.value = json.optBoolean("lyricsRomanizeRussian", true)
+            _lyricsRomanizeUkrainian.value = json.optBoolean("lyricsRomanizeUkrainian", true)
+            _lyricsRomanizeSerbian.value = json.optBoolean("lyricsRomanizeSerbian", true)
+            _lyricsRomanizeBulgarian.value = json.optBoolean("lyricsRomanizeBulgarian", true)
+            _lyricsRomanizeBelarusian.value = json.optBoolean("lyricsRomanizeBelarusian", true)
+            _lyricsRomanizeKyrgyz.value = json.optBoolean("lyricsRomanizeKyrgyz", true)
+            _lyricsRomanizeCyrillicByLine.value = json.optBoolean("lyricsRomanizeCyrillicByLine", false)
             _useLoginForBrowse.value = json.optBoolean("useLoginForBrowse", true)
             _ytmSync.value = json.optBoolean("ytmSync", true)
             _discordToken.value = json.optString("discordToken", "")
+            _discordName.value = json.optString("discordName", "")
             _discordUsername.value = json.optString("discordUsername", "")
             _discordAvatarUrl.value =
                 json.optString("discordAvatarUrl", "").takeIf { it != "null" } ?: ""
+            _discordInfoDismissed.value = json.optBoolean("discordInfoDismissed", false)
+            _enableDiscordRPC.value = json.optBoolean("discordRPCEnable", true)
+            _discordLastSyncEpochMillis.value = json.optLong("discordLastSyncEpochMillis", 0L)
+            _discordLastErrorMessage.value =
+                json.optString("discordLastErrorMessage", "").takeIf { it != "null" } ?: ""
+            _spotifyAccessToken.value = json.optString("spotify_access_token", "")
+            _spotifyRefreshToken.value = json.optString("spotify_refresh_token", "")
+            _spotifyUserName.value = json.optString("spotifyUserName", "")
+            _spotifyTokenExpiryEpochMillis.value = json.optLong("spotifyTokenExpiryEpochMillis", 0L)
             _preferredAvatarSource.value = AvatarSourcePreference.fromString(
                 json.optString("preferredAvatarSource", "youtube")
             )
+            _lastFmEnabled.value = json.optBoolean("lastFmEnabled", false)
+            _lastFmUsername.value = json.optString("lastFmUsername", "").takeIf { it != "null" } ?: ""
+            _lastFmSessionKey.value = json.optString("lastFmSessionKey", "").takeIf { it != "null" } ?: ""
+            _lastFmScrobbleEnabled.value = json.optBoolean("lastFmScrobbleEnabled", true)
+            _lastFmLoveTracks.value = json.optBoolean("lastFmLoveTracks", false)
+            _lastFmShowAvatar.value = json.optBoolean("lastFmShowAvatar", false)
 
             _libraryFilter.value = json.optString("libraryFilter", "library")
                 .let { value -> runCatching { LibraryFilter.valueOf(value.uppercase()) }.getOrDefault(LibraryFilter.LIBRARY) }
@@ -761,9 +1140,21 @@ class DesktopPreferences private constructor(
 
             _pauseListenHistory.value = json.optBoolean("pauseListenHistory", false)
             _pauseSearchHistory.value = json.optBoolean("pauseSearchHistory", false)
+            _disableScreenshot.value = json.optBoolean("disableScreenshot", false)
 
-            _maxImageCacheSizeMB.value = json.optInt("maxImageCacheSizeMB", 500)
-            _maxSongCacheSizeMB.value = json.optInt("maxSongCacheSizeMB", 1000)
+            _maxImageCacheSizeMB.value = json.optInt("maxImageCacheSizeMB", 512).coerceIn(128, 8192)
+            _maxSongCacheSizeMB.value = json.optInt("maxSongCacheSizeMB", 1024).let {
+                if (it == -1) -1 else it.coerceIn(128, 8192)
+            }
+            _maxDownloadSizeMB.value = if (json.has("maxDownloadSize")) {
+                json.optInt("maxDownloadSize", -1).let { value ->
+                    if (value == -1) -1 else value.coerceIn(128, 8192)
+                }
+            } else {
+                json.optInt("maxDownloadSizeMB", -1).let { value ->
+                    if (value == -1) -1 else value.coerceIn(128, 8192)
+                }
+            }
             _downloadAsMp3.value = json.optBoolean("downloadAsMp3", true)
 
             _showLyrics.value = json.optBoolean("showLyrics", true)
@@ -804,6 +1195,15 @@ class DesktopPreferences private constructor(
                 put("crossfadeDuration", _crossfadeDuration.value)
                 put("historyDuration", _historyDuration.value)
                 put("persistentQueue", _persistentQueue.value)
+                put("audioOffload", _audioOffload.value)
+                put("autoLoadMore", _autoLoadMore.value)
+                put("similarContent", _similarContentEnabled.value)
+                put("autoSkipNextOnError", _autoSkipNextOnError.value)
+                put("stopMusicOnTaskClear", _stopMusicOnTaskClear.value)
+                put("autoDownloadOnLike", _autoDownloadOnLike.value)
+                put("autoDownloadLyrics", _autoDownloadLyrics.value)
+                put("enableCast", _enableCast.value)
+                put("notificationButtonType", _notificationButtonType.value.name.lowercase())
                 put("autoStartRadio", _autoStartRadio.value)
                 put("queueEditLocked", _queueEditLocked.value)
 
@@ -812,17 +1212,48 @@ class DesktopPreferences private constructor(
                 put("appLanguage", _appLanguage.value)
                 put("hideExplicit", _hideExplicit.value)
                 put("quickPicks", _quickPicks.value.name.lowercase())
+                put("topSize", _topLength.value)
+                put("proxyEnabled", _proxyEnabled.value)
+                put("proxyType", _proxyType.value.name.lowercase())
+                put("proxyUrl", _proxyUrl.value)
+                put("proxyUsername", _proxyUsername.value)
+                put("proxyPassword", _proxyPassword.value)
                 put("enableBetterLyrics", _enableBetterLyrics.value)
                 put("enableSimpMusic", _enableSimpMusic.value)
                 put("enableLrclib", _enableLrcLib.value)
                 put("enableKugou", _enableKuGou.value)
                 put("lyricsProvider", _preferredLyricsProvider.value.name.lowercase())
+                put("lyricsGlowEffect", _lyricsGlowEffect.value)
+                put("lyricsRomanizeJapanese", _lyricsRomanizeJapanese.value)
+                put("lyricsRomanizeKorean", _lyricsRomanizeKorean.value)
+                put("lyricsRomanizeRussian", _lyricsRomanizeRussian.value)
+                put("lyricsRomanizeUkrainian", _lyricsRomanizeUkrainian.value)
+                put("lyricsRomanizeSerbian", _lyricsRomanizeSerbian.value)
+                put("lyricsRomanizeBulgarian", _lyricsRomanizeBulgarian.value)
+                put("lyricsRomanizeBelarusian", _lyricsRomanizeBelarusian.value)
+                put("lyricsRomanizeKyrgyz", _lyricsRomanizeKyrgyz.value)
+                put("lyricsRomanizeCyrillicByLine", _lyricsRomanizeCyrillicByLine.value)
                 put("useLoginForBrowse", _useLoginForBrowse.value)
                 put("ytmSync", _ytmSync.value)
                 put("discordToken", _discordToken.value)
+                put("discordName", _discordName.value)
                 put("discordUsername", _discordUsername.value)
                 put("discordAvatarUrl", _discordAvatarUrl.value)
+                put("discordInfoDismissed", _discordInfoDismissed.value)
+                put("discordRPCEnable", _enableDiscordRPC.value)
+                put("discordLastSyncEpochMillis", _discordLastSyncEpochMillis.value)
+                put("discordLastErrorMessage", _discordLastErrorMessage.value)
+                put("spotify_access_token", _spotifyAccessToken.value)
+                put("spotify_refresh_token", _spotifyRefreshToken.value)
+                put("spotifyUserName", _spotifyUserName.value)
+                put("spotifyTokenExpiryEpochMillis", _spotifyTokenExpiryEpochMillis.value)
                 put("preferredAvatarSource", _preferredAvatarSource.value.name.lowercase())
+                put("lastFmEnabled", _lastFmEnabled.value)
+                put("lastFmUsername", _lastFmUsername.value)
+                put("lastFmSessionKey", _lastFmSessionKey.value)
+                put("lastFmScrobbleEnabled", _lastFmScrobbleEnabled.value)
+                put("lastFmLoveTracks", _lastFmLoveTracks.value)
+                put("lastFmShowAvatar", _lastFmShowAvatar.value)
 
                 put("libraryFilter", _libraryFilter.value.name.lowercase())
                 put("mixViewType", _mixViewType.value.name.lowercase())
@@ -850,9 +1281,11 @@ class DesktopPreferences private constructor(
 
                 put("pauseListenHistory", _pauseListenHistory.value)
                 put("pauseSearchHistory", _pauseSearchHistory.value)
+                put("disableScreenshot", _disableScreenshot.value)
 
                 put("maxImageCacheSizeMB", _maxImageCacheSizeMB.value)
                 put("maxSongCacheSizeMB", _maxSongCacheSizeMB.value)
+                put("maxDownloadSize", _maxDownloadSizeMB.value)
                 put("downloadAsMp3", _downloadAsMp3.value)
 
                 put("showLyrics", _showLyrics.value)
@@ -916,6 +1349,18 @@ enum class QuickPicks {
         fun fromString(value: String): QuickPicks = when (value.lowercase()) {
             "last_listen", "last_listened", "last" -> LAST_LISTEN
             else -> QUICK_PICKS
+        }
+    }
+}
+
+enum class ProxyTypePreference {
+    HTTP,
+    SOCKS;
+
+    companion object {
+        fun fromString(value: String): ProxyTypePreference = when (value.lowercase()) {
+            "socks" -> SOCKS
+            else -> HTTP
         }
     }
 }
@@ -1029,6 +1474,18 @@ enum class AudioQuality {
             HIGH -> "audio_quality_high"
             AUTO -> "audio_quality_auto"
         }
+}
+
+enum class NotificationButtonTypePreference {
+    CLOSE,
+    LIKE;
+
+    companion object {
+        fun fromString(value: String): NotificationButtonTypePreference = when (value.lowercase()) {
+            "like" -> LIKE
+            else -> CLOSE
+        }
+    }
 }
 
 enum class PlayerBackgroundStyle {

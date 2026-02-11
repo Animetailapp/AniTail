@@ -33,8 +33,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -54,8 +54,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.component.ShimmerListItem
@@ -76,6 +78,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun SearchScreen(
+    database: DesktopDatabase,
     playerState: PlayerState,
     onBack: () -> Unit,
     onArtistClick: (String, String) -> Unit,
@@ -94,8 +97,10 @@ fun SearchScreen(
     var currentFilter by remember { mutableStateOf<SearchFilter?>(null) }
     var filteredResults by remember { mutableStateOf<List<YTItem>>(emptyList()) }
 
-    // Historial de búsqueda (en memoria, puede persistirse después)
-    val searchHistory = remember { mutableStateListOf<String>() }
+    val preferences = remember { DesktopPreferences.getInstance() }
+    val pauseSearchHistory by preferences.pauseSearchHistory.collectAsState()
+    val searchHistoryEntries by database.recentSearches(limit = 20).collectAsState(initial = emptyList())
+    val searchHistory = remember(searchHistoryEntries) { searchHistoryEntries.map { it.query } }
 
     val focusRequester = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
@@ -125,11 +130,10 @@ fun SearchScreen(
     fun performSearch(searchQuery: String) {
         if (searchQuery.isBlank()) return
 
-        // Agregar al historial
-        searchHistory.remove(searchQuery)
-        searchHistory.add(0, searchQuery)
-        if (searchHistory.size > 10) {
-            searchHistory.removeAt(searchHistory.lastIndex)
+        if (!pauseSearchHistory) {
+            coroutineScope.launch {
+                database.insertSearch(searchQuery)
+            }
         }
 
         isSearching = true
@@ -231,7 +235,11 @@ fun SearchScreen(
                                 performSearch(historyItem)
                             },
                             onFillTextField = { query = historyItem },
-                            onDelete = { searchHistory.remove(historyItem) }
+                            onDelete = {
+                                coroutineScope.launch {
+                                    database.deleteSearch(historyItem)
+                                }
+                            },
                         )
                     }
                 }

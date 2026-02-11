@@ -23,6 +23,12 @@ internal fun SettingsMainScreen(
             destination = SettingsDestination.ACCOUNT,
         ),
         SettingsCategory(
+            title = stringResource("lastfm_settings"),
+            subtitle = stringResource("category_interface"),
+            icon = IconAssets.musicNote(),
+            destination = SettingsDestination.LASTFM,
+        ),
+        SettingsCategory(
             title = stringResource("appearance"),
             subtitle = stringResource("category_interface"),
             icon = IconAssets.palette(),

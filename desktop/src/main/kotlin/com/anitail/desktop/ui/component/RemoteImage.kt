@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.storage.DesktopPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
@@ -88,11 +89,60 @@ fun RemoteImage(
  * Caché en memoria para imágenes cargadas
  */
 internal object ImageCache {
-    private val cache = mutableMapOf<String, ImageBitmap>()
+    private data class CacheEntry(
+        val bitmap: ImageBitmap,
+        val approxBytes: Long,
+    )
 
-    fun get(url: String?): ImageBitmap? = if (url == null) null else cache[url]
+    private val cache = LinkedHashMap<String, CacheEntry>(64, 0.75f, true)
+    private var totalBytes = 0L
 
+    @Synchronized
+    fun get(url: String?): ImageBitmap? = if (url == null) null else cache[url]?.bitmap
+
+    @Synchronized
     fun put(url: String, bitmap: ImageBitmap) {
-        cache[url] = bitmap
+        val bytes = estimateBytes(bitmap)
+        val previous = cache.put(url, CacheEntry(bitmap = bitmap, approxBytes = bytes))
+        if (previous != null) {
+            totalBytes -= previous.approxBytes
+        }
+        totalBytes += bytes
+        trimToLimit(resolveMaxBytes())
+    }
+
+    @Synchronized
+    fun clear() {
+        cache.clear()
+        totalBytes = 0L
+    }
+
+    @Synchronized
+    fun estimatedSizeBytes(): Long = totalBytes
+
+    @Synchronized
+    fun enforceCurrentLimit() {
+        trimToLimit(resolveMaxBytes())
+    }
+
+    @Synchronized
+    private fun trimToLimit(maxBytes: Long) {
+        if (maxBytes <= 0L) return
+        val iterator = cache.entries.iterator()
+        while (totalBytes > maxBytes && iterator.hasNext()) {
+            val entry = iterator.next()
+            totalBytes -= entry.value.approxBytes
+            iterator.remove()
+        }
+    }
+
+    private fun resolveMaxBytes(): Long {
+        val maxMb = runCatching { DesktopPreferences.getInstance().maxImageCacheSizeMB.value }
+            .getOrDefault(500)
+        return maxMb.toLong() * 1024L * 1024L
+    }
+
+    private fun estimateBytes(bitmap: ImageBitmap): Long {
+        return bitmap.width.toLong() * bitmap.height.toLong() * 4L
     }
 }

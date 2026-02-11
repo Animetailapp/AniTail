@@ -424,6 +424,7 @@
     <string name="clear_search_history_confirm">¿Estás seguro de que quieres borrar todo el historial de búsqueda?</string>
     <string name="disable_screenshot">Desactivar capturas de pantalla</string>
     <string name="disable_screenshot_desc">Cuando esta opción está activada, las capturas de pantalla y la vista de la aplicación en Recientes están desactivadas.</string>
+    <string name="disable_screenshot_not_supported_desktop">No compatible en desktop.</string>
 
 
     <string name="backup_restore">Copia de seguridad y restauración</string>
@@ -540,6 +541,7 @@
     <string name="love_tracks_description">Automáticamente dar/quitar me gusta cuando des like/unlike</string>
     <string name="about_lastfm">Acerca de Last.fm</string>
     <string name="about_lastfm_description">Aprende más sobre descubrimiento musical y recomendaciones de Last.fm</string>
+    <string name="show_lastfm_avatar">Mostrar avatar de Last.fm</string>
     <string name="username">Nombre de usuario</string>
     <string name="password">Contraseña</string>
     
@@ -559,6 +561,7 @@
     <string name="no_top_artists_data">No hay datos de artistas principales. ¡Escucha más música para ver tus estadísticas!</string>
     <string name="retry_pending_scrobbles">Reintentar scrobbles pendientes</string>
     <string name="clear_pending_scrobbles">Limpiar scrobbles pendientes</string>
+    <string name="lastfm_api_keys_missing">Faltan las claves API de Last.fm.</string>
 
     <!-- Welcome -->
     <string name="good_morning">Buenos días</string>

@@ -51,6 +51,8 @@ class PlayerState {
         private set
 
     var onPlaybackEvent: ((LibraryItem, Long) -> Unit)? = null
+    var onQueueEnded: ((LibraryItem) -> Unit)? = null
+    var onPlaybackErrorEvent: ((LibraryItem, String) -> Unit)? = null
 
     private var lastReportedItemId: String? = null
     private var lastReportedPosition: Long = 0L
@@ -118,10 +120,7 @@ class PlayerState {
         }
 
         nativePlayer.onError = { error ->
-            errorMessage = error
-            isPlaying = false
-            isBuffering = false
-            stopPositionTracker()
+            handlePlaybackError(IllegalStateException(error))
         }
 
         nativePlayer.onBuffering = { buffering ->
@@ -144,6 +143,9 @@ class PlayerState {
                     skipToNext()
                 } else {
                     position = 0L
+                    currentItem?.let { endedItem ->
+                        onQueueEnded?.invoke(endedItem)
+                    }
                 }
             }
         }
@@ -199,6 +201,9 @@ class PlayerState {
         isPlaying = false
         isBuffering = false
         stopPositionTracker()
+        currentItem?.let { failedItem ->
+            onPlaybackErrorEvent?.invoke(failedItem, errorMessage.orEmpty())
+        }
         println("Anitail ERROR: Playback failed: ${error.message}")
     }
 

@@ -238,6 +238,11 @@ class DesktopDownloadService {
             resolvedFormat?.mimeType?.contains("mp4") == true -> "m4a"
             else -> "opus"
         }
+        val maxDownloadBytes = resolveMaxDownloadBytes()
+        val existingUsedBytes = getTotalDownloadSize()
+        if (maxDownloadBytes != null && totalBytes > 0L && (existingUsedBytes + totalBytes) > maxDownloadBytes) {
+            throw Exception("Se alcanzó el límite máximo de descargas configurado.")
+        }
         
         // Crear nombre de archivo seguro
         val safeTitle = title.replace(Regex("[\\\\/:*?\"<>|]"), "_")
@@ -254,32 +259,41 @@ class DesktopDownloadService {
         )
         
         // Descargar archivo
-        httpClient.prepareGet(streamUrl).execute { response ->
-            val channel = response.bodyAsChannel()
-            val file = RandomAccessFile(outputFile, "rw")
-            
-            try {
-                var downloadedBytes = 0L
-                val buffer = ByteArray(8192)
-                
-                while (!channel.isClosedForRead) {
-                    val bytesRead = channel.readAvailable(buffer)
-                    if (bytesRead <= 0) break
-                    
-                    file.write(buffer, 0, bytesRead)
-                    downloadedBytes += bytesRead
-                    
-                    val progress = if (totalBytes > 0) downloadedBytes.toFloat() / totalBytes else 0f
-                    updateDownloadState(
-                        _downloadStates.value[songId]?.copy(
-                            downloadedBytes = downloadedBytes,
-                            progress = progress.coerceIn(0f, 1f),
-                        ) ?: return@execute
-                    )
+        try {
+            httpClient.prepareGet(streamUrl).execute { response ->
+                val channel = response.bodyAsChannel()
+                val file = RandomAccessFile(outputFile, "rw")
+
+                try {
+                    var downloadedBytes = 0L
+                    val buffer = ByteArray(8192)
+
+                    while (!channel.isClosedForRead) {
+                        val bytesRead = channel.readAvailable(buffer)
+                        if (bytesRead <= 0) break
+
+                        file.write(buffer, 0, bytesRead)
+                        downloadedBytes += bytesRead
+
+                        if (maxDownloadBytes != null && (existingUsedBytes + downloadedBytes) > maxDownloadBytes) {
+                            throw Exception("Se alcanzó el límite máximo de descargas configurado.")
+                        }
+
+                        val progress = if (totalBytes > 0) downloadedBytes.toFloat() / totalBytes else 0f
+                        updateDownloadState(
+                            _downloadStates.value[songId]?.copy(
+                                downloadedBytes = downloadedBytes,
+                                progress = progress.coerceIn(0f, 1f),
+                            ) ?: return@execute
+                        )
+                    }
+                } finally {
+                    file.close()
                 }
-            } finally {
-                file.close()
             }
+        } catch (error: Exception) {
+            outputFile.delete()
+            throw error
         }
         
         val finalFile = if (downloadAsMp3) {
@@ -557,6 +571,11 @@ class DesktopDownloadService {
      */
     fun getTotalDownloadSize(): Long {
         return _downloadedSongs.value.sumOf { it.fileSize }
+    }
+
+    private fun resolveMaxDownloadBytes(): Long? {
+        val limitMb = preferences.maxDownloadSizeMB.value
+        return if (limitMb < 0) null else limitMb.toLong() * 1024L * 1024L
     }
     
     /**

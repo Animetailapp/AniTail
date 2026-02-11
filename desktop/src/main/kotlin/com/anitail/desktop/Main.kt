@@ -54,6 +54,7 @@ import com.anitail.desktop.constants.MiniPlayerHeight
 import com.anitail.desktop.constants.NavigationBarHeight
 import com.anitail.desktop.auth.AccountInfo
 import com.anitail.desktop.auth.DesktopAuthService
+import com.anitail.desktop.auth.DesktopLastFmService
 import com.anitail.desktop.auth.normalizeDataSyncId
 import com.anitail.desktop.home.HomeListenAlbum
 import com.anitail.desktop.home.HomeListenArtist
@@ -76,6 +77,7 @@ import com.anitail.desktop.sync.shouldStartSync
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.storage.AvatarSourcePreference
 import com.anitail.desktop.storage.NavigationTabPreference
+import com.anitail.desktop.storage.ProxyTypePreference
 import com.anitail.desktop.storage.QuickPicks
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -127,6 +129,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 import com.anitail.desktop.sync.LibrarySyncService
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.net.URL
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowState
@@ -139,6 +143,8 @@ import java.awt.event.ComponentEvent
 import java.awt.geom.Rectangle2D
 import java.awt.geom.RoundRectangle2D
 import java.util.Locale
+import java.util.Base64
+import java.nio.charset.StandardCharsets
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -407,17 +413,30 @@ private fun FrameWindowScope.AniTailDesktopApp(
     val historyDuration by preferences.historyDuration.collectAsState()
     val useLoginForBrowse by preferences.useLoginForBrowse.collectAsState()
     val ytmSync by preferences.ytmSync.collectAsState()
+    val proxyEnabled by preferences.proxyEnabled.collectAsState()
+    val proxyType by preferences.proxyType.collectAsState()
+    val proxyUrl by preferences.proxyUrl.collectAsState()
+    val proxyUsername by preferences.proxyUsername.collectAsState()
+    val proxyPassword by preferences.proxyPassword.collectAsState()
     val discordUsername by preferences.discordUsername.collectAsState()
     val discordAvatarUrl by preferences.discordAvatarUrl.collectAsState()
     val preferredAvatarSource by preferences.preferredAvatarSource.collectAsState()
     val defaultOpenTab by preferences.defaultOpenTab.collectAsState()
     val densityScale by preferences.densityScale.collectAsState()
     val slimNavBar by preferences.slimNavBar.collectAsState()
+    val autoLoadMore by preferences.autoLoadMore.collectAsState()
+    val similarContentEnabled by preferences.similarContentEnabled.collectAsState()
+    val autoSkipNextOnError by preferences.autoSkipNextOnError.collectAsState()
+    val autoStartRadio by preferences.autoStartRadio.collectAsState()
     val syncService = remember { LibrarySyncService(database) }
     val isSyncing by syncService.isSyncing.collectAsState()
     val lastSyncError by syncService.lastSyncError.collectAsState()
     var themeColor by remember { mutableStateOf(DefaultThemeColor) }
     var lastArtworkUrl by remember { mutableStateOf<String?>(null) }
+    var queueContinuationInFlight by remember { mutableStateOf(false) }
+    var trackedLastFmSongId by remember { mutableStateOf<String?>(null) }
+    var lastFmSongStartTimeMs by remember { mutableStateOf(0L) }
+    var hasScrobbledCurrentSong by remember { mutableStateOf(false) }
 
     var currentScreen by remember {
         mutableStateOf(
@@ -449,6 +468,42 @@ private fun FrameWindowScope.AniTailDesktopApp(
         if (authCredentials?.visitorData.isNullOrBlank() && authCredentials?.cookie?.isNotBlank() == true) {
             authService.ensureVisitorData()
             authCredentials = authService.credentials
+        }
+    }
+
+    LaunchedEffect(playerState.currentItem?.id) {
+        val currentItem = playerState.currentItem
+        trackedLastFmSongId = currentItem?.id
+        lastFmSongStartTimeMs = System.currentTimeMillis()
+        hasScrobbledCurrentSong = false
+        if (currentItem != null) {
+            DesktopLastFmService.updateNowPlaying(currentItem)
+            DesktopLastFmService.retryPendingScrobbles()
+        }
+    }
+
+    LaunchedEffect(playerState.isPlaying, playerState.currentItem?.id) {
+        val trackedId = playerState.currentItem?.id ?: return@LaunchedEffect
+        if (playerState.isPlaying) {
+            playerState.currentItem?.let { DesktopLastFmService.updateNowPlaying(it) }
+        }
+        while (
+            playerState.isPlaying &&
+            !hasScrobbledCurrentSong &&
+            playerState.currentItem?.id == trackedId &&
+            trackedLastFmSongId == trackedId
+        ) {
+            val realPlayedMs = System.currentTimeMillis() - lastFmSongStartTimeMs
+            if (realPlayedMs >= 30_000L && playerState.position >= 30_000L) {
+                val item = playerState.currentItem
+                if (item != null && item.id == trackedId) {
+                    hasScrobbledCurrentSong = true
+                    val timestampSec = (lastFmSongStartTimeMs / 1000L).coerceAtLeast(1L)
+                    DesktopLastFmService.scrobble(item, timestampSec)
+                }
+                break
+            }
+            delay(1_000L)
         }
     }
 
@@ -533,6 +588,73 @@ private fun FrameWindowScope.AniTailDesktopApp(
         }
         onDispose {
             playerState.onPlaybackEvent = null
+        }
+    }
+
+    DisposableEffect(
+        playerState,
+        autoLoadMore,
+        similarContentEnabled,
+        autoSkipNextOnError,
+        autoStartRadio,
+    ) {
+        val shouldLoadMore = autoLoadMore || similarContentEnabled
+
+        fun continueQueue(seedItem: LibraryItem, triggeredByError: Boolean) {
+            if (queueContinuationInFlight) return
+            if (playerState.currentItem?.id != seedItem.id) return
+            scope.launch {
+                queueContinuationInFlight = true
+                try {
+                    if (triggeredByError && autoSkipNextOnError && playerState.canSkipNext) {
+                        playerState.skipToNext()
+                        return@launch
+                    }
+                    if (!shouldLoadMore && !autoStartRadio) return@launch
+
+                    val videoId = seedItem.id.ifBlank { extractVideoId(seedItem.playbackUrl).orEmpty() }
+                    if (videoId.isBlank()) return@launch
+
+                    val result = YouTube.next(WatchEndpoint(videoId = videoId)).getOrNull() ?: return@launch
+                    val plan = buildRadioQueuePlan(seedItem, result)
+                    if (plan.items.isEmpty()) return@launch
+
+                    if (shouldLoadMore) {
+                        val existingIds = playerState.queue.mapTo(mutableSetOf()) { it.id }
+                        val additions = plan.items.filter { candidate ->
+                            candidate.id != seedItem.id && existingIds.add(candidate.id)
+                        }
+                        additions.forEach { playerState.addToQueue(it) }
+                    }
+
+                    if (playerState.currentItem?.id != seedItem.id) return@launch
+
+                    if (playerState.canSkipNext) {
+                        playerState.skipToNext()
+                        return@launch
+                    }
+
+                    if (autoStartRadio) {
+                        val startIndex = plan.items.indexOfFirst { it.id != seedItem.id }
+                            .takeIf { it >= 0 } ?: plan.startIndex
+                        playerState.playQueue(plan.items, startIndex = startIndex)
+                    }
+                } finally {
+                    queueContinuationInFlight = false
+                }
+            }
+        }
+
+        playerState.onQueueEnded = { endedItem ->
+            continueQueue(endedItem, triggeredByError = false)
+        }
+        playerState.onPlaybackErrorEvent = { failedItem, _ ->
+            continueQueue(failedItem, triggeredByError = true)
+        }
+
+        onDispose {
+            playerState.onQueueEnded = null
+            playerState.onPlaybackErrorEvent = null
         }
     }
 
@@ -638,11 +760,25 @@ private fun FrameWindowScope.AniTailDesktopApp(
         contentCountry,
         authCredentials,
         useLoginForBrowse,
+        proxyEnabled,
+        proxyType,
+        proxyUrl,
+        proxyUsername,
+        proxyPassword,
     ) {
         val credentials = authCredentials
+        val proxyConfig = buildProxyConfig(
+            enabled = proxyEnabled,
+            type = proxyType,
+            url = proxyUrl,
+            username = proxyUsername,
+            password = proxyPassword,
+        )
         YouTube.cookie = credentials?.cookie ?: youtubeCookie
         YouTube.visitorData = credentials?.visitorData
         YouTube.dataSyncId = normalizeDataSyncId(credentials?.dataSyncId)
+        YouTube.proxy = proxyConfig.proxy
+        YouTube.proxyAuth = proxyConfig.proxyAuth
         YouTube.useLoginForBrowse = useLoginForBrowse
         YouTube.locale = com.anitail.innertube.models.YouTubeLocale(
             hl = resolveContentLanguage(contentLanguage),
@@ -656,14 +792,28 @@ private fun FrameWindowScope.AniTailDesktopApp(
         authCredentials,
         useLoginForBrowse,
         contentLanguage,
-        contentCountry
+        contentCountry,
+        proxyEnabled,
+        proxyType,
+        proxyUrl,
+        proxyUsername,
+        proxyPassword,
     ) {
         // Wait for YouTube API to be updated by the other LaunchedEffect
         // or just update it here as well for safety
         val credentials = authCredentials
+        val proxyConfig = buildProxyConfig(
+            enabled = proxyEnabled,
+            type = proxyType,
+            url = proxyUrl,
+            username = proxyUsername,
+            password = proxyPassword,
+        )
         YouTube.cookie = credentials?.cookie ?: youtubeCookie
         YouTube.visitorData = credentials?.visitorData
         YouTube.dataSyncId = normalizeDataSyncId(credentials?.dataSyncId)
+        YouTube.proxy = proxyConfig.proxy
+        YouTube.proxyAuth = proxyConfig.proxyAuth
         YouTube.useLoginForBrowse = useLoginForBrowse
         YouTube.locale = com.anitail.innertube.models.YouTubeLocale(
             hl = resolveContentLanguage(contentLanguage),
@@ -1535,8 +1685,10 @@ private fun FrameWindowScope.AniTailDesktopApp(
                 DesktopScreen.Settings -> {
                     SettingsScreen(
                         preferences = preferences,
+                        downloadService = downloadService,
                         authService = authService,
                         authCredentials = authCredentials,
+                        playerState = playerState,
                         onOpenLogin = {},
                         onAuthChanged = { authCredentials = it },
                     )
@@ -1767,6 +1919,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
                 DesktopScreen.Search -> {
                     SearchScreen(
+                        database = database,
                         playerState = playerState,
                         onBack = {
                             currentScreen = navigationHistory.removeLastOrNull() ?: DesktopScreen.Home
@@ -1918,6 +2071,53 @@ private suspend fun fetchThemeColorFromUrl(url: String): Color? = withContext(Di
     val bitmap = runCatching { Image.makeFromEncoded(bytes).asImageBitmap() }.getOrNull()
         ?: return@withContext null
     runCatching { bitmap.extractThemeColor() }.getOrNull()
+}
+
+private data class DesktopProxyConfig(
+    val proxy: Proxy?,
+    val proxyAuth: String?,
+)
+
+private fun buildProxyConfig(
+    enabled: Boolean,
+    type: ProxyTypePreference,
+    url: String,
+    username: String,
+    password: String,
+): DesktopProxyConfig {
+    if (!enabled) return DesktopProxyConfig(proxy = null, proxyAuth = null)
+
+    val normalized = url.trim()
+    if (normalized.isBlank()) return DesktopProxyConfig(proxy = null, proxyAuth = null)
+
+    val parsed = runCatching {
+        val uri = if (normalized.contains("://")) {
+            java.net.URI(normalized)
+        } else {
+            java.net.URI("http://$normalized")
+        }
+        val host = uri.host?.trim().orEmpty()
+        val port = if (uri.port > 0) uri.port else 8080
+        if (host.isBlank()) return@runCatching null
+        host to port
+    }.getOrNull() ?: return DesktopProxyConfig(proxy = null, proxyAuth = null)
+
+    val proxyType = when (type) {
+        ProxyTypePreference.SOCKS -> Proxy.Type.SOCKS
+        ProxyTypePreference.HTTP -> Proxy.Type.HTTP
+    }
+    val proxy = Proxy(proxyType, InetSocketAddress(parsed.first, parsed.second))
+
+    val hasAuth = username.isNotBlank() || password.isNotBlank()
+    val proxyAuth = if (hasAuth) {
+        val raw = "${username.trim()}:${password.trim()}"
+        val encoded = Base64.getEncoder().encodeToString(raw.toByteArray(StandardCharsets.UTF_8))
+        "Basic $encoded"
+    } else {
+        null
+    }
+
+    return DesktopProxyConfig(proxy = proxy, proxyAuth = proxyAuth)
 }
 
 private suspend fun loadHomePage(

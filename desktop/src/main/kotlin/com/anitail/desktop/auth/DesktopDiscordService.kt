@@ -5,6 +5,7 @@ import okhttp3.Request
 import org.json.JSONObject
 
 data class DiscordProfile(
+    val name: String,
     val username: String,
     val avatarUrl: String?,
 )
@@ -31,11 +32,13 @@ object DesktopDiscordService {
                 val id = json.optString("id")
                 val avatarHash = json.optString("avatar")
                 val discriminator = json.optString("discriminator")
+                val username = json.optString("username").takeIf { it.isNotBlank() } ?: ""
                 val globalName = json.optString("global_name").takeIf { it.isNotBlank() }
-                val username = globalName ?: json.optString("username").takeIf { it.isNotBlank() } ?: "Discord"
+                val displayName = globalName ?: username.ifBlank { "Discord" }
 
                 DiscordProfile(
-                    username = username,
+                    name = displayName,
+                    username = username.ifBlank { displayName },
                     avatarUrl = buildAvatarUrl(id = id, avatarHash = avatarHash, discriminator = discriminator),
                 )
             }

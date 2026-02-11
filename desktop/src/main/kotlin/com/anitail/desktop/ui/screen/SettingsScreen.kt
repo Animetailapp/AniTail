@@ -75,6 +75,7 @@ import com.anitail.desktop.auth.AuthCredentials
 import com.anitail.desktop.auth.DesktopAccountTokenParser
 import com.anitail.desktop.auth.DesktopAuthService
 import com.anitail.desktop.auth.DesktopDiscordService
+import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.storage.AudioQuality
 import com.anitail.desktop.storage.AvatarSourcePreference
 import com.anitail.desktop.storage.DarkModePreference
@@ -96,6 +97,7 @@ import com.anitail.desktop.i18n.SYSTEM_DEFAULT
 import com.anitail.desktop.i18n.appLanguageOptions
 import com.anitail.desktop.i18n.pluralStringResource
 import com.anitail.desktop.i18n.stringResource
+import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.screen.library.GridItemSize
 import com.anitail.desktop.ui.screen.library.LibraryFilter
 import kotlinx.coroutines.Dispatchers
@@ -109,9 +111,13 @@ import kotlin.math.abs
 enum class SettingsDestination {
     MAIN,
     ACCOUNT,
+    LASTFM,
+    DISCORD,
+    SPOTIFY_IMPORT,
     APPEARANCE,
     PLAYER,
     CONTENT,
+    CONTENT_ROMANIZATION,
     PRIVACY,
     STORAGE,
     ABOUT,
@@ -124,8 +130,10 @@ enum class SettingsDestination {
 @Composable
 fun SettingsScreen(
     preferences: DesktopPreferences = DesktopPreferences.getInstance(),
+    downloadService: DesktopDownloadService,
     authService: DesktopAuthService,
     authCredentials: AuthCredentials?,
+    playerState: PlayerState? = null,
     onOpenLogin: () -> Unit,
     onAuthChanged: (AuthCredentials?) -> Unit,
 ) {
@@ -143,7 +151,27 @@ fun SettingsScreen(
                 authCredentials = authCredentials,
                 onBack = { currentDestination = SettingsDestination.MAIN },
                 onOpenLogin = onOpenLogin,
+                onOpenSpotifyImport = { currentDestination = SettingsDestination.SPOTIFY_IMPORT },
+                onOpenDiscordSettings = { currentDestination = SettingsDestination.DISCORD },
                 onAuthChanged = onAuthChanged,
+            )
+
+            SettingsDestination.LASTFM -> LastFmSettingsScreen(
+                preferences = preferences,
+                onBack = { currentDestination = SettingsDestination.MAIN },
+            )
+
+            SettingsDestination.DISCORD -> DiscordSettingsScreen(
+                preferences = preferences,
+                previewItem = playerState?.currentItem,
+                previewPositionMs = playerState?.position ?: 0L,
+                isPreviewPlaying = playerState?.isPlaying == true,
+                onBack = { currentDestination = SettingsDestination.ACCOUNT },
+            )
+
+            SettingsDestination.SPOTIFY_IMPORT -> SpotifyImportSettingsScreen(
+                preferences = preferences,
+                onBack = { currentDestination = SettingsDestination.ACCOUNT },
             )
 
             SettingsDestination.APPEARANCE -> AppearanceSettingsScreen(
@@ -159,6 +187,12 @@ fun SettingsScreen(
             SettingsDestination.CONTENT -> ContentSettingsScreen(
                 preferences = preferences,
                 onBack = { currentDestination = SettingsDestination.MAIN },
+                onOpenRomanization = { currentDestination = SettingsDestination.CONTENT_ROMANIZATION },
+            )
+
+            SettingsDestination.CONTENT_ROMANIZATION -> RomanizationSettingsScreen(
+                preferences = preferences,
+                onBack = { currentDestination = SettingsDestination.CONTENT },
             )
 
             SettingsDestination.PRIVACY -> PrivacySettingsScreen(
@@ -168,6 +202,7 @@ fun SettingsScreen(
 
             SettingsDestination.STORAGE -> StorageSettingsScreen(
                 preferences = preferences,
+                downloadService = downloadService,
                 onBack = { currentDestination = SettingsDestination.MAIN },
             )
 
@@ -188,6 +223,12 @@ internal fun LegacySettingsMainScreen(
             subtitle = stringResource("category_interface"),
             icon = IconAssets.account(),
             destination = SettingsDestination.ACCOUNT,
+        ),
+        SettingsCategory(
+            title = stringResource("lastfm_settings"),
+            subtitle = stringResource("category_interface"),
+            icon = IconAssets.musicNote(),
+            destination = SettingsDestination.LASTFM,
         ),
         SettingsCategory(
             title = stringResource("appearance"),

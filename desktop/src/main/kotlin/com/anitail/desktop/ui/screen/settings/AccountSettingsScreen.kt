@@ -35,15 +35,12 @@ import androidx.compose.ui.unit.dp
 import com.anitail.desktop.auth.AuthCredentials
 import com.anitail.desktop.auth.DesktopAccountTokenParser
 import com.anitail.desktop.auth.DesktopAuthService
-import com.anitail.desktop.auth.DesktopDiscordService
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.storage.AvatarSourcePreference
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @Composable
 internal fun AccountSettingsScreen(
@@ -52,13 +49,14 @@ internal fun AccountSettingsScreen(
     authCredentials: AuthCredentials?,
     onBack: () -> Unit,
     onOpenLogin: () -> Unit,
+    onOpenSpotifyImport: () -> Unit,
+    onOpenDiscordSettings: () -> Unit,
     onAuthChanged: (AuthCredentials?) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val useLoginForBrowse by preferences.useLoginForBrowse.collectAsState()
     val ytmSync by preferences.ytmSync.collectAsState()
     val discordToken by preferences.discordToken.collectAsState()
-    val discordUsername by preferences.discordUsername.collectAsState()
     val preferredAvatarSource by preferences.preferredAvatarSource.collectAsState()
     val hasCookie = authCredentials?.cookie?.isNotBlank() == true
     val hasDataSyncId = authCredentials?.dataSyncId?.isNotBlank() == true
@@ -67,43 +65,11 @@ internal fun AccountSettingsScreen(
     var isRefreshing by remember { mutableStateOf(false) }
     var showToken by remember { mutableStateOf(false) }
     var showTokenEditor by remember { mutableStateOf(false) }
-    var showDiscordEditor by remember { mutableStateOf(false) }
     var showAvatarSourceDialog by remember { mutableStateOf(false) }
-    var discordSyncError by remember { mutableStateOf<String?>(null) }
-    var isRefreshingDiscordProfile by remember { mutableStateOf(false) }
     val loginEnabled = false
     val loginDisabled = !loginEnabled && !isLoggedIn
     val loginEntryAlpha = if (loginDisabled) 0.5f else 1f
     val canUseDiscordAvatar = isLoggedIn || discordToken.isNotBlank()
-    val discordStatusErrorText = stringResource("discord_status_error")
-    val openUrl: (String) -> Unit = { url ->
-        runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url.trim())) }
-    }
-
-    fun refreshDiscordProfile(token: String) {
-        val sanitizedToken = token.trim()
-        if (sanitizedToken.isBlank()) {
-            preferences.setDiscordUsername("")
-            preferences.setDiscordAvatarUrl("")
-            discordSyncError = null
-            return
-        }
-
-        scope.launch {
-            isRefreshingDiscordProfile = true
-            val profile = withContext(Dispatchers.IO) {
-                DesktopDiscordService.fetchProfile(sanitizedToken)
-            }
-            if (profile != null) {
-                preferences.setDiscordUsername(profile.username)
-                preferences.setDiscordAvatarUrl(profile.avatarUrl.orEmpty())
-                discordSyncError = null
-            } else {
-                discordSyncError = discordStatusErrorText
-            }
-            isRefreshingDiscordProfile = false
-        }
-    }
 
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
@@ -173,62 +139,6 @@ internal fun AccountSettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showTokenEditor = false }) { Text(stringResource("cancel")) }
-            },
-        )
-    }
-
-    if (showDiscordEditor) {
-        var discordTokenInput by remember(discordToken, showDiscordEditor) { mutableStateOf(discordToken) }
-        AlertDialog(
-            onDismissRequest = { showDiscordEditor = false },
-            title = { Text(stringResource("discord_integration")) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = discordTokenInput,
-                        onValueChange = { discordTokenInput = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                        maxLines = 3,
-                        textStyle = MaterialTheme.typography.bodySmall,
-                        placeholder = { Text("Discord token") },
-                    )
-                    Text(
-                        text = stringResource("discord_information"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (discordSyncError != null) {
-                        Text(
-                            text = discordSyncError ?: "",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    } else if (discordUsername.isNotBlank()) {
-                        Text(
-                            text = discordUsername,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    TextButton(onClick = { openUrl("https://discord.com/channels/@me") }) {
-                        Text(stringResource("open_in_browser"))
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = !isRefreshingDiscordProfile,
-                    onClick = {
-                        val token = discordTokenInput.trim()
-                        preferences.setDiscordToken(token)
-                        refreshDiscordProfile(token)
-                        showDiscordEditor = false
-                    },
-                ) { Text(stringResource("save")) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDiscordEditor = false }) { Text(stringResource("cancel")) }
             },
         )
     }
@@ -337,7 +247,9 @@ internal fun AccountSettingsScreen(
                         } else {
                             stringResource("login_not_available_desktop")
                         }
-                    } else null
+                    } else {
+                        null
+                    }
                     if (!subtitle.isNullOrBlank()) {
                         Text(
                             text = subtitle,
@@ -404,14 +316,14 @@ internal fun AccountSettingsScreen(
         AndroidPreferenceEntry(
             title = stringResource("import_from_spotify"),
             icon = IconAssets.spotify(),
-            onClick = { openUrl("https://developer.spotify.com/dashboard/") },
+            onClick = onOpenSpotifyImport,
         )
 
         AndroidPreferenceGroupTitle(title = stringResource("discord"))
         AndroidPreferenceEntry(
             title = stringResource("discord_integration"),
             icon = IconAssets.discord(),
-            onClick = { showDiscordEditor = true },
+            onClick = onOpenDiscordSettings,
         )
 
         AndroidPreferenceGroupTitle(title = stringResource("avatar"))
