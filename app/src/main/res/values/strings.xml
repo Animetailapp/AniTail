@@ -1,4 +1,7 @@
 <resources>
+    <!-- App -->
+    <string name="app_name">AniTail Music</string>
+
     <!-- Bottom navigation -->
     <string name="home">Home</string>
     <string name="songs">Songs</string>
