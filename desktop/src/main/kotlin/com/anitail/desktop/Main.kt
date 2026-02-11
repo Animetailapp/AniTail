@@ -1426,10 +1426,27 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
                 DesktopScreen.History -> {
                     HistoryScreen(
-                        items = libraryItems,
-                        onPlay = { item ->
-                            playerState.play(item)
-                            playerBottomSheetState.collapseSoft()
+                        database = database,
+                        downloadService = downloadService,
+                        playerState = playerState,
+                        onOpenArtist = { artistId, artistName ->
+                            navigationHistory.add(DesktopScreen.History)
+                            detailNavigation = detailNavigation.copy(
+                                artistId = artistId,
+                                artistName = artistName,
+                            )
+                            currentScreen = DesktopScreen.ArtistDetail
+                        },
+                        onOpenAlbum = { albumId, albumName ->
+                            navigationHistory.add(DesktopScreen.History)
+                            detailNavigation = detailNavigation.copy(
+                                albumId = albumId,
+                                albumName = albumName,
+                            )
+                            currentScreen = DesktopScreen.AlbumDetail
+                        },
+                        onBack = {
+                            currentScreen = navigationHistory.removeLastOrNull() ?: DesktopScreen.Home
                         },
                     )
                 }

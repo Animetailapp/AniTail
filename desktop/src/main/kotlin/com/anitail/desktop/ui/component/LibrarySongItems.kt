@@ -2,6 +2,7 @@ package com.anitail.desktop.ui.component
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ fun LibrarySongListItem(
     isSelected: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     onMenuClick: () -> Unit,
 ) {
     val background = when {
@@ -45,13 +47,19 @@ fun LibrarySongListItem(
         else -> Color.Transparent
     }
 
+    val clickModifier = if (onLongClick != null) {
+        Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+    } else {
+        Modifier.clickable { onClick() }
+    }
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .height(ListItemHeight)
             .fillMaxWidth()
             .background(background)
-            .clickable { onClick() }
+            .then(clickModifier)
             .padding(horizontal = 8.dp),
     ) {
         Box(

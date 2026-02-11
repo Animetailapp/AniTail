@@ -343,6 +343,11 @@ class DesktopDatabase private constructor(
         saveEvents()
     }
 
+    suspend fun deleteEvent(eventId: Long) = withContext(Dispatchers.IO) {
+        _events.value = _events.value.filterNot { it.id == eventId }
+        saveEvents()
+    }
+
     // === Search History Operations ===
 
     fun recentSearches(limit: Int = 20): Flow<List<SearchHistory>> = _searchHistory.map { history ->
@@ -881,6 +886,8 @@ class DesktopDatabase private constructor(
                 INSTANCE ?: DesktopDatabase().also { INSTANCE = it }
             }
         }
+
+        internal fun createForTests(basePath: Path): DesktopDatabase = DesktopDatabase(basePath)
 
         private fun defaultDatabasePath(): Path {
             val home = System.getProperty("user.home") ?: "."
