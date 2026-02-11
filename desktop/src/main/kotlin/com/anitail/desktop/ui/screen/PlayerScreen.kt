@@ -335,6 +335,7 @@ fun PlayerScreen(
                         title = item.title,
                         artist = item.artist,
                         videoId = item.id,
+                        artworkUrl = item.artworkUrl,
                         durationSec = ((item.durationMs ?: 0L) / 1000L).toInt(),
                         currentPositionMs = playerState.position,
                         isPlaying = playerState.isPlaying,
