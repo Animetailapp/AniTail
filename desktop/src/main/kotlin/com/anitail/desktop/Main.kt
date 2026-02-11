@@ -1053,6 +1053,20 @@ private fun FrameWindowScope.AniTailDesktopApp(
             val isSnapped = snapMode != WindowSnapMode.FLOATING || isMaximizedByBounds
             val showMaximizedState = isSnapped
             val lastFloatingBounds = remember { mutableStateOf(window.bounds) }
+            val youtubeAccountName = accountInfo?.name
+                ?.takeUnless { it.isBlank() }
+                ?: authCredentials?.accountName?.takeUnless { it.isBlank() }
+            val youtubeAccountAvatar = accountInfo?.thumbnailUrl?.takeUnless { it.isBlank() }
+            val discordAccountName = discordUsername.takeUnless { it.isBlank() }
+            val discordAccountAvatar = discordAvatarUrl.takeUnless { it.isBlank() }
+            val topBarAccountName = when (preferredAvatarSource) {
+                AvatarSourcePreference.YOUTUBE -> youtubeAccountName ?: discordAccountName
+                AvatarSourcePreference.DISCORD -> discordAccountName ?: youtubeAccountName
+            }
+            val topBarAccountAvatar = when (preferredAvatarSource) {
+                AvatarSourcePreference.YOUTUBE -> youtubeAccountAvatar ?: discordAccountAvatar
+                AvatarSourcePreference.DISCORD -> discordAccountAvatar ?: youtubeAccountAvatar
+            }
             val windowShape: Shape = if (isSnapped) {
                 RoundedCornerShape(0.dp)
             } else {
@@ -1220,6 +1234,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             onSettings = {
                                 currentScreen = DesktopScreen.Settings
                             },
+                            accountDisplayName = topBarAccountName,
+                            accountAvatarUrl = topBarAccountAvatar,
                             pureBlack = pureBlackEnabled,
                             isMaximized = showMaximizedState,
                             window = window,
@@ -1688,6 +1704,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                         downloadService = downloadService,
                         authService = authService,
                         authCredentials = authCredentials,
+                        accountInfo = accountInfo,
                         playerState = playerState,
                         onOpenLogin = {},
                         onAuthChanged = { authCredentials = it },

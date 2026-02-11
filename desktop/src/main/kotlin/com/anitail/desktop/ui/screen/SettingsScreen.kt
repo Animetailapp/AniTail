@@ -72,6 +72,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.auth.AuthCredentials
+import com.anitail.desktop.auth.AccountInfo
 import com.anitail.desktop.auth.DesktopAccountTokenParser
 import com.anitail.desktop.auth.DesktopAuthService
 import com.anitail.desktop.auth.DesktopDiscordService
@@ -133,16 +134,25 @@ fun SettingsScreen(
     downloadService: DesktopDownloadService,
     authService: DesktopAuthService,
     authCredentials: AuthCredentials?,
+    accountInfo: AccountInfo? = null,
     playerState: PlayerState? = null,
     onOpenLogin: () -> Unit,
     onAuthChanged: (AuthCredentials?) -> Unit,
 ) {
     var currentDestination by remember { mutableStateOf(SettingsDestination.MAIN) }
+    val preferredAvatarSource by preferences.preferredAvatarSource.collectAsState()
+    val discordUsername by preferences.discordUsername.collectAsState()
+    val discordAvatarUrl by preferences.discordAvatarUrl.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
         when (currentDestination) {
             SettingsDestination.MAIN -> SettingsMainScreen(
                 onNavigate = { currentDestination = it },
+                preferredAvatarSource = preferredAvatarSource,
+                googleAccountName = accountInfo?.name ?: authCredentials?.accountName,
+                googleAvatarUrl = accountInfo?.thumbnailUrl,
+                discordUsername = discordUsername,
+                discordAvatarUrl = discordAvatarUrl,
             )
 
             SettingsDestination.ACCOUNT -> AccountSettingsScreen(

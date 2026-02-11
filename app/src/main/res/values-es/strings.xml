@@ -413,6 +413,8 @@
 
 
     <string name="privacy">Privacidad</string>
+    <string name="search_settings_placeholder">Buscar ajustes...</string>
+    <string name="no_settings_found">No se encontraron ajustes</string>
     <string name="back">Volver</string>
     <string name="listen_history">Historial de escucha</string>
     <string name="search_history">Historial de búsqueda</string>

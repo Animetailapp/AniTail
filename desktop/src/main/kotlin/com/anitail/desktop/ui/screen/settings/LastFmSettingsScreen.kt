@@ -63,6 +63,7 @@ internal fun LastFmSettingsScreen(
     var uiError by remember { mutableStateOf<String?>(null) }
     var showLoginDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
+    val lastFmConfigured = remember { DesktopLastFmService.isConfigured() }
 
     fun clearUiState() {
         profile = null
@@ -115,14 +116,18 @@ internal fun LastFmSettingsScreen(
         title = stringResource("lastfm_settings"),
         onBack = onBack,
     ) {
-        val lastFmConfigured = remember { DesktopLastFmService.isConfigured() }
-
         SettingsSectionTitle(title = stringResource("account"))
 
         if (!lastFmConfigured) {
             SettingsInfoItem(
                 title = stringResource("lastfm_settings"),
                 value = stringResource("lastfm_api_keys_missing"),
+            )
+            SettingsButton(
+                title = stringResource("login_to_lastfm"),
+                subtitle = stringResource("lastfm_login_description"),
+                onClick = { showLoginDialog = true },
+                icon = IconAssets.account(),
             )
         } else if (lastFmEnabled && lastFmSessionKey.isNotBlank() && lastFmUsername.isNotBlank()) {
             if (showLastFmAvatar && !profile?.imageUrl.isNullOrBlank()) {
@@ -366,11 +371,21 @@ internal fun LastFmSettingsScreen(
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
+                    if (!lastFmConfigured) {
+                        Text(
+                            text = stringResource("lastfm_api_keys_missing"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
-                    enabled = !isLoginLoading && usernameInput.isNotBlank() && passwordInput.isNotBlank(),
+                    enabled = lastFmConfigured &&
+                        !isLoginLoading &&
+                        usernameInput.isNotBlank() &&
+                        passwordInput.isNotBlank(),
                     onClick = {
                         scope.launch {
                             isLoginLoading = true

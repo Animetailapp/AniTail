@@ -452,6 +452,8 @@
 
 
     <string name="privacy">Privacy</string>
+    <string name="search_settings_placeholder">Search settings...</string>
+    <string name="no_settings_found">No settings found</string>
     <string name="back">Back</string>
     <string name="listen_history">Listen History</string>
     <string name="search_history">Search History</string>
