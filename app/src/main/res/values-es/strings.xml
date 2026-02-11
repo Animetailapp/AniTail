@@ -422,6 +422,13 @@
     <string name="pause_search_history">Pausar historial de búsqueda</string>
     <string name="clear_search_history">Borrar historial de búsqueda</string>
     <string name="clear_search_history_confirm">¿Estás seguro de que quieres borrar todo el historial de búsqueda?</string>
+    <string name="security">Seguridad</string>
+    <string name="clear_sensitive_data">Borrar datos sensibles</string>
+    <string name="clear_sensitive_data_description">Elimina tokens, cookies y credenciales privadas de este dispositivo.</string>
+    <string name="clear_sensitive_data_confirm">Se eliminarán las credenciales y tokens guardados. ¿Deseas continuar?</string>
+    <string name="reset_app_keep_downloads">Restablecer app (mantener descargas)</string>
+    <string name="reset_app_keep_downloads_description">Restablece datos locales y ajustes sin borrar canciones descargadas.</string>
+    <string name="reset_app_keep_downloads_confirm">Se restablecerán todos los datos locales de la app. Las canciones descargadas se conservarán.</string>
     <string name="disable_screenshot">Desactivar capturas de pantalla</string>
     <string name="disable_screenshot_desc">Cuando esta opción está activada, las capturas de pantalla y la vista de la aplicación en Recientes están desactivadas.</string>
     <string name="disable_screenshot_not_supported_desktop">No compatible en desktop.</string>

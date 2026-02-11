@@ -197,6 +197,7 @@ fun SettingsScreen(
 
             SettingsDestination.PRIVACY -> PrivacySettingsScreen(
                 preferences = preferences,
+                authService = authService,
                 onBack = { currentDestination = SettingsDestination.MAIN },
             )
 

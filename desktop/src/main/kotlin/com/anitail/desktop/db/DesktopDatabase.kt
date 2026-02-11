@@ -373,6 +373,28 @@ class DesktopDatabase private constructor(
         saveSearchHistory()
     }
 
+    suspend fun clearAllData() = withContext(Dispatchers.IO) {
+        _songs.value = emptyMap()
+        _artists.value = emptyMap()
+        _albums.value = emptyMap()
+        _playlists.value = emptyMap()
+        _playlistSongMaps.value = emptyList()
+        _songArtistMaps.value = emptyList()
+        _relatedSongMaps.value = emptyList()
+        _events.value = emptyList()
+        _searchHistory.value = emptyList()
+
+        saveSongs()
+        saveArtists()
+        saveAlbums()
+        savePlaylists()
+        savePlaylistSongMaps()
+        saveSongArtistMaps()
+        saveRelatedSongMaps()
+        saveEvents()
+        saveSearchHistory()
+    }
+
     // === Stats Queries ===
 
     fun mostPlayedSongs(limit: Int = 50): Flow<List<SongEntity>> = _songs.map { songs ->

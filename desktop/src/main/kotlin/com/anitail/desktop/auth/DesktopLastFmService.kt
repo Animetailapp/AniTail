@@ -1,5 +1,6 @@
 package com.anitail.desktop.auth
 
+import com.anitail.desktop.security.DesktopPaths
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.shared.model.LibraryItem
 import de.umass.lastfm.Artist
@@ -17,7 +18,6 @@ import org.json.JSONObject
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
-import java.nio.file.Paths
 import java.util.Properties
 
 sealed class LastFmServiceResult<out T> {
@@ -47,11 +47,7 @@ object DesktopLastFmService {
     private const val USER_AGENT = "AniTail Desktop"
     private const val DUPLICATE_WINDOW_MS = 30_000L
     private val preferences = DesktopPreferences.getInstance()
-    private val pendingFile = Paths.get(
-        System.getProperty("user.home") ?: ".",
-        ".anitail",
-        "lastfm_pending_scrobbles.json",
-    ).toFile()
+    private val pendingFile = DesktopPaths.lastFmPendingFile().toFile()
 
     private data class ApiConfig(
         val apiKey: String,

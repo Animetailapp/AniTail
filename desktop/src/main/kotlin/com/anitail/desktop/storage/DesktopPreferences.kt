@@ -7,7 +7,10 @@ import org.json.JSONObject
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
+import com.anitail.desktop.security.DesktopSecureStore
+import com.anitail.desktop.security.DesktopPaths
+import com.anitail.desktop.security.SecureSecretsStore
+import com.anitail.desktop.security.SensitiveKeys
 import com.anitail.desktop.ui.screen.library.AlbumFilter
 import com.anitail.desktop.ui.screen.library.AlbumSortType
 import com.anitail.desktop.ui.screen.library.ArtistFilter
@@ -28,6 +31,7 @@ import com.anitail.desktop.i18n.SYSTEM_DEFAULT
  */
 class DesktopPreferences private constructor(
     private val filePath: Path = defaultPreferencesPath(),
+    private val secureStore: SecureSecretsStore = DesktopSecureStore.instance,
 ) {
     // === Appearance Settings ===
     private val _darkMode = MutableStateFlow(DarkModePreference.AUTO)
@@ -391,6 +395,9 @@ class DesktopPreferences private constructor(
     private val _youtubeCookie = MutableStateFlow<String?>(null)
     val youtubeCookie: StateFlow<String?> = _youtubeCookie.asStateFlow()
 
+    @Volatile
+    private var migratedSensitiveValues = false
+
     // === Setters ===
 
     fun setDarkMode(value: DarkModePreference) {
@@ -635,6 +642,7 @@ class DesktopPreferences private constructor(
 
     fun setProxyPassword(value: String) {
         _proxyPassword.value = value
+        persistSensitiveValue(SensitiveKeys.PROXY_PASSWORD, value)
         save()
     }
 
@@ -840,6 +848,7 @@ class DesktopPreferences private constructor(
 
     fun setDiscordToken(value: String) {
         _discordToken.value = value
+        persistSensitiveValue(SensitiveKeys.DISCORD_TOKEN, value)
         save()
     }
 
@@ -885,11 +894,13 @@ class DesktopPreferences private constructor(
 
     fun setSpotifyAccessToken(value: String) {
         _spotifyAccessToken.value = value
+        persistSensitiveValue(SensitiveKeys.SPOTIFY_ACCESS_TOKEN, value)
         save()
     }
 
     fun setSpotifyRefreshToken(value: String) {
         _spotifyRefreshToken.value = value
+        persistSensitiveValue(SensitiveKeys.SPOTIFY_REFRESH_TOKEN, value)
         save()
     }
 
@@ -915,6 +926,7 @@ class DesktopPreferences private constructor(
 
     fun setLastFmSessionKey(value: String) {
         _lastFmSessionKey.value = value
+        persistSensitiveValue(SensitiveKeys.LASTFM_SESSION_KEY, value)
         save()
     }
 
@@ -980,17 +992,46 @@ class DesktopPreferences private constructor(
 
     fun setYoutubeCookie(value: String?) {
         _youtubeCookie.value = value
+        persistSensitiveValue(SensitiveKeys.YOUTUBE_COOKIE, value)
+        save()
+    }
+
+    fun clearSensitiveData() {
+        _proxyPassword.value = ""
+        _discordToken.value = ""
+        _spotifyAccessToken.value = ""
+        _spotifyRefreshToken.value = ""
+        _spotifyTokenExpiryEpochMillis.value = 0L
+        _lastFmSessionKey.value = ""
+        _youtubeCookie.value = null
+
+        clearSensitiveStoreEntries()
+        save()
+    }
+
+    fun resetToDefaults(clearSensitive: Boolean = false) {
+        if (clearSensitive) {
+            clearSensitiveData()
+        }
+        runCatching {
+            ensureParent()
+            Files.writeString(filePath, "{}", StandardCharsets.UTF_8)
+        }
+        load()
         save()
     }
 
     // === Persistence ===
 
     fun load() {
-        if (!Files.exists(filePath)) return
+        migratedSensitiveValues = false
         runCatching {
-            val raw = Files.readString(filePath, StandardCharsets.UTF_8)
-            if (raw.isBlank()) return
-            val json = JSONObject(raw)
+            val json = if (Files.exists(filePath)) {
+                val raw = Files.readString(filePath, StandardCharsets.UTF_8)
+                if (raw.isBlank()) JSONObject() else JSONObject(raw)
+            } else {
+                JSONObject()
+            }
 
             _darkMode.value = DarkModePreference.fromString(json.optString("darkMode", "auto"))
             _pureBlack.value = json.optBoolean("pureBlack", false)
@@ -1054,7 +1095,11 @@ class DesktopPreferences private constructor(
             _proxyType.value = ProxyTypePreference.fromString(json.optString("proxyType", "http"))
             _proxyUrl.value = json.optString("proxyUrl", "host:port")
             _proxyUsername.value = json.optString("proxyUsername", "")
-            _proxyPassword.value = json.optString("proxyPassword", "")
+            _proxyPassword.value = readSensitiveValue(
+                json = json,
+                legacyJsonKey = "proxyPassword",
+                secureKey = SensitiveKeys.PROXY_PASSWORD,
+            )
             _enableBetterLyrics.value = json.optBoolean("enableBetterLyrics", true)
             _enableSimpMusic.value = json.optBoolean("enableSimpMusic", true)
             _enableLrcLib.value = json.optBoolean("enableLrclib", true)
@@ -1074,7 +1119,11 @@ class DesktopPreferences private constructor(
             _lyricsRomanizeCyrillicByLine.value = json.optBoolean("lyricsRomanizeCyrillicByLine", false)
             _useLoginForBrowse.value = json.optBoolean("useLoginForBrowse", true)
             _ytmSync.value = json.optBoolean("ytmSync", true)
-            _discordToken.value = json.optString("discordToken", "")
+            _discordToken.value = readSensitiveValue(
+                json = json,
+                legacyJsonKey = "discordToken",
+                secureKey = SensitiveKeys.DISCORD_TOKEN,
+            )
             _discordName.value = json.optString("discordName", "")
             _discordUsername.value = json.optString("discordUsername", "")
             _discordAvatarUrl.value =
@@ -1084,8 +1133,16 @@ class DesktopPreferences private constructor(
             _discordLastSyncEpochMillis.value = json.optLong("discordLastSyncEpochMillis", 0L)
             _discordLastErrorMessage.value =
                 json.optString("discordLastErrorMessage", "").takeIf { it != "null" } ?: ""
-            _spotifyAccessToken.value = json.optString("spotify_access_token", "")
-            _spotifyRefreshToken.value = json.optString("spotify_refresh_token", "")
+            _spotifyAccessToken.value = readSensitiveValue(
+                json = json,
+                legacyJsonKey = "spotify_access_token",
+                secureKey = SensitiveKeys.SPOTIFY_ACCESS_TOKEN,
+            )
+            _spotifyRefreshToken.value = readSensitiveValue(
+                json = json,
+                legacyJsonKey = "spotify_refresh_token",
+                secureKey = SensitiveKeys.SPOTIFY_REFRESH_TOKEN,
+            )
             _spotifyUserName.value = json.optString("spotifyUserName", "")
             _spotifyTokenExpiryEpochMillis.value = json.optLong("spotifyTokenExpiryEpochMillis", 0L)
             _preferredAvatarSource.value = AvatarSourcePreference.fromString(
@@ -1093,7 +1150,11 @@ class DesktopPreferences private constructor(
             )
             _lastFmEnabled.value = json.optBoolean("lastFmEnabled", false)
             _lastFmUsername.value = json.optString("lastFmUsername", "").takeIf { it != "null" } ?: ""
-            _lastFmSessionKey.value = json.optString("lastFmSessionKey", "").takeIf { it != "null" } ?: ""
+            _lastFmSessionKey.value = readSensitiveValue(
+                json = json,
+                legacyJsonKey = "lastFmSessionKey",
+                secureKey = SensitiveKeys.LASTFM_SESSION_KEY,
+            )
             _lastFmScrobbleEnabled.value = json.optBoolean("lastFmScrobbleEnabled", true)
             _lastFmLoveTracks.value = json.optBoolean("lastFmLoveTracks", false)
             _lastFmShowAvatar.value = json.optBoolean("lastFmShowAvatar", false)
@@ -1159,8 +1220,69 @@ class DesktopPreferences private constructor(
 
             _showLyrics.value = json.optBoolean("showLyrics", true)
             _romanizeLyrics.value = json.optBoolean("romanizeLyrics", false)
-            _youtubeCookie.value = json.optString("youtubeCookie", null).takeIf { it != "null" }
+            _youtubeCookie.value = readNullableSensitiveValue(
+                json = json,
+                legacyJsonKey = "youtubeCookie",
+                secureKey = SensitiveKeys.YOUTUBE_COOKIE,
+            )
+
+            if (migratedSensitiveValues) {
+                migratedSensitiveValues = false
+                save()
+            }
         }
+    }
+
+    private fun readSensitiveValue(
+        json: JSONObject,
+        legacyJsonKey: String,
+        secureKey: String,
+    ): String {
+        val fromStore = secureStore.get(secureKey).orEmpty()
+        if (fromStore.isNotBlank()) {
+            return fromStore
+        }
+        val legacy = json.optString(legacyJsonKey, "").takeIf { it.isNotBlank() && it != "null" }.orEmpty()
+        if (legacy.isNotBlank()) {
+            secureStore.put(secureKey, legacy)
+            migratedSensitiveValues = true
+        }
+        return legacy
+    }
+
+    private fun readNullableSensitiveValue(
+        json: JSONObject,
+        legacyJsonKey: String,
+        secureKey: String,
+    ): String? {
+        val fromStore = secureStore.get(secureKey)?.takeIf { it.isNotBlank() }
+        if (fromStore != null) {
+            return fromStore
+        }
+        val legacy = json.optString(legacyJsonKey, "").takeIf { it.isNotBlank() && it != "null" }
+        if (legacy != null) {
+            secureStore.put(secureKey, legacy)
+            migratedSensitiveValues = true
+        }
+        return legacy
+    }
+
+    private fun persistSensitiveValue(secureKey: String, value: String?) {
+        val safeValue = value.orEmpty()
+        if (safeValue.isEmpty()) {
+            secureStore.remove(secureKey)
+        } else {
+            secureStore.put(secureKey, safeValue)
+        }
+    }
+
+    private fun clearSensitiveStoreEntries() {
+        secureStore.remove(SensitiveKeys.PROXY_PASSWORD)
+        secureStore.remove(SensitiveKeys.DISCORD_TOKEN)
+        secureStore.remove(SensitiveKeys.SPOTIFY_ACCESS_TOKEN)
+        secureStore.remove(SensitiveKeys.SPOTIFY_REFRESH_TOKEN)
+        secureStore.remove(SensitiveKeys.LASTFM_SESSION_KEY)
+        secureStore.remove(SensitiveKeys.YOUTUBE_COOKIE)
     }
 
     private fun save() {
@@ -1217,7 +1339,6 @@ class DesktopPreferences private constructor(
                 put("proxyType", _proxyType.value.name.lowercase())
                 put("proxyUrl", _proxyUrl.value)
                 put("proxyUsername", _proxyUsername.value)
-                put("proxyPassword", _proxyPassword.value)
                 put("enableBetterLyrics", _enableBetterLyrics.value)
                 put("enableSimpMusic", _enableSimpMusic.value)
                 put("enableLrclib", _enableLrcLib.value)
@@ -1235,7 +1356,6 @@ class DesktopPreferences private constructor(
                 put("lyricsRomanizeCyrillicByLine", _lyricsRomanizeCyrillicByLine.value)
                 put("useLoginForBrowse", _useLoginForBrowse.value)
                 put("ytmSync", _ytmSync.value)
-                put("discordToken", _discordToken.value)
                 put("discordName", _discordName.value)
                 put("discordUsername", _discordUsername.value)
                 put("discordAvatarUrl", _discordAvatarUrl.value)
@@ -1243,14 +1363,11 @@ class DesktopPreferences private constructor(
                 put("discordRPCEnable", _enableDiscordRPC.value)
                 put("discordLastSyncEpochMillis", _discordLastSyncEpochMillis.value)
                 put("discordLastErrorMessage", _discordLastErrorMessage.value)
-                put("spotify_access_token", _spotifyAccessToken.value)
-                put("spotify_refresh_token", _spotifyRefreshToken.value)
                 put("spotifyUserName", _spotifyUserName.value)
                 put("spotifyTokenExpiryEpochMillis", _spotifyTokenExpiryEpochMillis.value)
                 put("preferredAvatarSource", _preferredAvatarSource.value.name.lowercase())
                 put("lastFmEnabled", _lastFmEnabled.value)
                 put("lastFmUsername", _lastFmUsername.value)
-                put("lastFmSessionKey", _lastFmSessionKey.value)
                 put("lastFmScrobbleEnabled", _lastFmScrobbleEnabled.value)
                 put("lastFmLoveTracks", _lastFmLoveTracks.value)
                 put("lastFmShowAvatar", _lastFmShowAvatar.value)
@@ -1290,7 +1407,6 @@ class DesktopPreferences private constructor(
 
                 put("showLyrics", _showLyrics.value)
                 put("romanizeLyrics", _romanizeLyrics.value)
-                put("youtubeCookie", _youtubeCookie.value)
             }
             Files.writeString(filePath, json.toString(2), StandardCharsets.UTF_8)
         }
@@ -1318,8 +1434,7 @@ class DesktopPreferences private constructor(
         }
 
         private fun defaultPreferencesPath(): Path {
-            val home = System.getProperty("user.home") ?: "."
-            return Paths.get(home, ".anitail", "preferences.json")
+            return DesktopPaths.preferencesFile()
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.anitail.desktop.lyrics
 
+import com.anitail.desktop.security.DesktopPaths
 import com.anitail.desktop.storage.DesktopPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -8,7 +9,6 @@ import org.json.JSONObject
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.Paths
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -201,6 +201,16 @@ object DesktopLyricsService {
                 persistOverridesLocked()
             }
             removed
+        }
+    }
+
+    suspend fun clearAllOverrides() = withContext(Dispatchers.IO) {
+        synchronized(overridesLock) {
+            overrides.clear()
+            overridesLoaded = true
+            if (Files.exists(overridesFile)) {
+                Files.delete(overridesFile)
+            }
         }
     }
 
@@ -408,8 +418,7 @@ object DesktopLyricsService {
     @Volatile
     private var overridesLoaded = false
     private val overridesFile: Path by lazy {
-        val home = System.getProperty("user.home") ?: "."
-        Paths.get(home, ".anitail", "lyrics_overrides.json")
+        DesktopPaths.lyricsOverridesFile()
     }
 
     private const val DefaultLineDurationMs = 2_500L
