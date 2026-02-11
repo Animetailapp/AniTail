@@ -163,6 +163,8 @@ object IconAssets {
 
     fun discord(): ImageVector = VectorResource.load("discord.xml")
 
+    fun spotify(): ImageVector = VectorResource.load("spotify.xml")
+
     fun patreon(): ImageVector = VectorResource.load("patreon.xml")
 
     fun babelSoftwareApps(): ImageVector = VectorResource.load("babel_software_apps.xml")

@@ -226,6 +226,18 @@ class DesktopPreferences private constructor(
     private val _ytmSync = MutableStateFlow(true)
     val ytmSync: StateFlow<Boolean> = _ytmSync.asStateFlow()
 
+    private val _discordToken = MutableStateFlow("")
+    val discordToken: StateFlow<String> = _discordToken.asStateFlow()
+
+    private val _discordUsername = MutableStateFlow("")
+    val discordUsername: StateFlow<String> = _discordUsername.asStateFlow()
+
+    private val _discordAvatarUrl = MutableStateFlow("")
+    val discordAvatarUrl: StateFlow<String> = _discordAvatarUrl.asStateFlow()
+
+    private val _preferredAvatarSource = MutableStateFlow(AvatarSourcePreference.YOUTUBE)
+    val preferredAvatarSource: StateFlow<AvatarSourcePreference> = _preferredAvatarSource.asStateFlow()
+
     // === Privacy Settings ===
     private val _pauseListenHistory = MutableStateFlow(false)
     val pauseListenHistory: StateFlow<Boolean> = _pauseListenHistory.asStateFlow()
@@ -575,6 +587,26 @@ class DesktopPreferences private constructor(
         save()
     }
 
+    fun setDiscordToken(value: String) {
+        _discordToken.value = value
+        save()
+    }
+
+    fun setDiscordUsername(value: String) {
+        _discordUsername.value = value
+        save()
+    }
+
+    fun setDiscordAvatarUrl(value: String) {
+        _discordAvatarUrl.value = value
+        save()
+    }
+
+    fun setPreferredAvatarSource(value: AvatarSourcePreference) {
+        _preferredAvatarSource.value = value
+        save()
+    }
+
     fun setPauseListenHistory(value: Boolean) {
         _pauseListenHistory.value = value
         save()
@@ -679,6 +711,13 @@ class DesktopPreferences private constructor(
             )
             _useLoginForBrowse.value = json.optBoolean("useLoginForBrowse", true)
             _ytmSync.value = json.optBoolean("ytmSync", true)
+            _discordToken.value = json.optString("discordToken", "")
+            _discordUsername.value = json.optString("discordUsername", "")
+            _discordAvatarUrl.value =
+                json.optString("discordAvatarUrl", "").takeIf { it != "null" } ?: ""
+            _preferredAvatarSource.value = AvatarSourcePreference.fromString(
+                json.optString("preferredAvatarSource", "youtube")
+            )
 
             _libraryFilter.value = json.optString("libraryFilter", "library")
                 .let { value -> runCatching { LibraryFilter.valueOf(value.uppercase()) }.getOrDefault(LibraryFilter.LIBRARY) }
@@ -780,6 +819,10 @@ class DesktopPreferences private constructor(
                 put("lyricsProvider", _preferredLyricsProvider.value.name.lowercase())
                 put("useLoginForBrowse", _useLoginForBrowse.value)
                 put("ytmSync", _ytmSync.value)
+                put("discordToken", _discordToken.value)
+                put("discordUsername", _discordUsername.value)
+                put("discordAvatarUrl", _discordAvatarUrl.value)
+                put("preferredAvatarSource", _preferredAvatarSource.value.name.lowercase())
 
                 put("libraryFilter", _libraryFilter.value.name.lowercase())
                 put("mixViewType", _mixViewType.value.name.lowercase())
@@ -890,6 +933,18 @@ enum class PreferredLyricsProvider {
             "simpmusic" -> SIMPMUSIC
             "better_lyrics", "betterlyrics", "better" -> BETTER_LYRICS
             else -> BETTER_LYRICS
+        }
+    }
+}
+
+enum class AvatarSourcePreference {
+    YOUTUBE,
+    DISCORD;
+
+    companion object {
+        fun fromString(value: String): AvatarSourcePreference = when (value.lowercase()) {
+            "discord" -> DISCORD
+            else -> YOUTUBE
         }
     }
 }

@@ -44,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -73,7 +74,9 @@ import androidx.compose.ui.unit.dp
 import com.anitail.desktop.auth.AuthCredentials
 import com.anitail.desktop.auth.DesktopAccountTokenParser
 import com.anitail.desktop.auth.DesktopAuthService
+import com.anitail.desktop.auth.DesktopDiscordService
 import com.anitail.desktop.storage.AudioQuality
+import com.anitail.desktop.storage.AvatarSourcePreference
 import com.anitail.desktop.storage.DarkModePreference
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.storage.LyricsAnimationStylePreference
@@ -95,7 +98,9 @@ import com.anitail.desktop.i18n.pluralStringResource
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.ui.screen.library.GridItemSize
 import com.anitail.desktop.ui.screen.library.LibraryFilter
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 /**
@@ -174,7 +179,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SettingsMainScreen(
+internal fun LegacySettingsMainScreen(
     onNavigate: (SettingsDestination) -> Unit,
 ) {
     val settingsCategories = listOf(
@@ -240,7 +245,7 @@ private fun SettingsMainScreen(
 }
 
 @Composable
-private fun AccountSettingsScreen(
+internal fun LegacyAccountSettingsScreen(
     preferences: DesktopPreferences,
     authService: DesktopAuthService,
     authCredentials: AuthCredentials?,
@@ -251,6 +256,9 @@ private fun AccountSettingsScreen(
     val scope = rememberCoroutineScope()
     val useLoginForBrowse by preferences.useLoginForBrowse.collectAsState()
     val ytmSync by preferences.ytmSync.collectAsState()
+    val discordToken by preferences.discordToken.collectAsState()
+    val discordUsername by preferences.discordUsername.collectAsState()
+    val preferredAvatarSource by preferences.preferredAvatarSource.collectAsState()
     val hasCookie = authCredentials?.cookie?.isNotBlank() == true
     val hasDataSyncId = authCredentials?.dataSyncId?.isNotBlank() == true
     val isLoggedIn = hasCookie
@@ -258,9 +266,43 @@ private fun AccountSettingsScreen(
     var isRefreshing by remember { mutableStateOf(false) }
     var showToken by remember { mutableStateOf(false) }
     var showTokenEditor by remember { mutableStateOf(false) }
+    var showDiscordEditor by remember { mutableStateOf(false) }
+    var showAvatarSourceDialog by remember { mutableStateOf(false) }
+    var discordSyncError by remember { mutableStateOf<String?>(null) }
+    var isRefreshingDiscordProfile by remember { mutableStateOf(false) }
     val loginEnabled = false
     val loginDisabled = !loginEnabled && !isLoggedIn
     val loginEntryAlpha = if (loginDisabled) 0.5f else 1f
+    val canUseDiscordAvatar = isLoggedIn || discordToken.isNotBlank()
+    val discordStatusErrorText = stringResource("discord_status_error")
+    val openUrl: (String) -> Unit = { url ->
+        runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url.trim())) }
+    }
+
+    fun refreshDiscordProfile(token: String) {
+        val sanitizedToken = token.trim()
+        if (sanitizedToken.isBlank()) {
+            preferences.setDiscordUsername("")
+            preferences.setDiscordAvatarUrl("")
+            discordSyncError = null
+            return
+        }
+
+        scope.launch {
+            isRefreshingDiscordProfile = true
+            val profile = withContext(Dispatchers.IO) {
+                DesktopDiscordService.fetchProfile(sanitizedToken)
+            }
+            if (profile != null) {
+                preferences.setDiscordUsername(profile.username)
+                preferences.setDiscordAvatarUrl(profile.avatarUrl.orEmpty())
+                discordSyncError = null
+            } else {
+                discordSyncError = discordStatusErrorText
+            }
+            isRefreshingDiscordProfile = false
+        }
+    }
 
     androidx.compose.runtime.LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
@@ -330,6 +372,108 @@ private fun AccountSettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showTokenEditor = false }) { Text(stringResource("cancel")) }
+            },
+        )
+    }
+
+    if (showDiscordEditor) {
+        var discordTokenInput by remember(discordToken, showDiscordEditor) { mutableStateOf(discordToken) }
+        AlertDialog(
+            onDismissRequest = { showDiscordEditor = false },
+            title = { Text(stringResource("discord_integration")) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = discordTokenInput,
+                        onValueChange = { discordTokenInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 3,
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        placeholder = { Text("Discord token") },
+                    )
+                    Text(
+                        text = stringResource("discord_information"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (discordSyncError != null) {
+                        Text(
+                            text = discordSyncError ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    } else if (discordUsername.isNotBlank()) {
+                        Text(
+                            text = discordUsername,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    TextButton(onClick = { openUrl("https://discord.com/channels/@me") }) {
+                        Text(stringResource("open_in_browser"))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !isRefreshingDiscordProfile,
+                    onClick = {
+                        val token = discordTokenInput.trim()
+                        preferences.setDiscordToken(token)
+                        refreshDiscordProfile(token)
+                        showDiscordEditor = false
+                    },
+                ) { Text(stringResource("save")) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscordEditor = false }) { Text(stringResource("cancel")) }
+            },
+        )
+    }
+
+    if (showAvatarSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showAvatarSourceDialog = false },
+            title = { Text(stringResource("avatar_source")) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    AvatarSourcePreference.entries.forEach { source ->
+                        val selected = source == preferredAvatarSource
+                        val label = when (source) {
+                            AvatarSourcePreference.YOUTUBE -> stringResource("avatar_source_youtube")
+                            AvatarSourcePreference.DISCORD -> stringResource("avatar_source_discord")
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    preferences.setPreferredAvatarSource(source)
+                                    showAvatarSourceDialog = false
+                                }
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = selected,
+                                onClick = {
+                                    preferences.setPreferredAvatarSource(source)
+                                    showAvatarSourceDialog = false
+                                },
+                            )
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAvatarSourceDialog = false }) {
+                    Text(stringResource("cancel"))
+                }
             },
         )
     }
@@ -454,11 +598,41 @@ private fun AccountSettingsScreen(
                 onCheckedChange = { preferences.setYtmSync(it) },
             )
         }
+
+        AndroidPreferenceGroupTitle(title = stringResource("title_spotify"))
+        AndroidPreferenceEntry(
+            title = stringResource("import_from_spotify"),
+            icon = IconAssets.spotify(),
+            onClick = { openUrl("https://developer.spotify.com/dashboard/") },
+        )
+
+        AndroidPreferenceGroupTitle(title = stringResource("discord"))
+        AndroidPreferenceEntry(
+            title = stringResource("discord_integration"),
+            icon = IconAssets.discord(),
+            onClick = { showDiscordEditor = true },
+        )
+
+        AndroidPreferenceGroupTitle(title = stringResource("avatar"))
+        AndroidPreferenceEntry(
+            title = stringResource("avatar_source"),
+            subtitle = when (preferredAvatarSource) {
+                AvatarSourcePreference.YOUTUBE -> stringResource("avatar_source_youtube")
+                AvatarSourcePreference.DISCORD -> stringResource("avatar_source_discord")
+            },
+            icon = IconAssets.person(),
+            onClick = {
+                if (canUseDiscordAvatar) {
+                    showAvatarSourceDialog = true
+                }
+            },
+            enabled = canUseDiscordAvatar,
+        )
     }
 }
 
 @Composable
-private fun SettingsCategoryItem(
+internal fun SettingsCategoryItem(
     category: SettingsCategory,
     onClick: () -> Unit,
 ) {
@@ -504,7 +678,7 @@ private fun SettingsCategoryItem(
 // === Sub-screens ===
 
 @Composable
-private fun AppearanceSettingsScreen(
+internal fun LegacyAppearanceSettingsScreen(
     preferences: DesktopPreferences,
     onBack: () -> Unit,
 ) {
@@ -883,7 +1057,7 @@ private fun AppearanceSettingsScreen(
 }
 
 @Composable
-private fun PlayerSettingsScreen(
+internal fun LegacyPlayerSettingsScreen(
     preferences: DesktopPreferences,
     onBack: () -> Unit,
 ) {
@@ -999,7 +1173,7 @@ private fun PlayerSettingsScreen(
 }
 
 @Composable
-private fun ContentSettingsScreen(
+internal fun LegacyContentSettingsScreen(
     preferences: DesktopPreferences,
     onBack: () -> Unit,
 ) {
@@ -1142,7 +1316,7 @@ private fun ContentSettingsScreen(
 }
 
 @Composable
-private fun PrivacySettingsScreen(
+internal fun LegacyPrivacySettingsScreen(
     preferences: DesktopPreferences,
     onBack: () -> Unit,
 ) {
@@ -1230,7 +1404,7 @@ private fun PrivacySettingsScreen(
 }
 
 @Composable
-private fun StorageSettingsScreen(
+internal fun LegacyStorageSettingsScreen(
     preferences: DesktopPreferences,
     onBack: () -> Unit,
 ) {
@@ -1329,7 +1503,7 @@ private const val PulseLabel = "pulse"
 private const val ShimmerLabel = "shimmer"
 
 @Composable
-private fun AboutScreen(
+internal fun LegacyAboutScreen(
     onBack: () -> Unit,
 ) {
     // ==================== DATA ====================
@@ -1909,7 +2083,7 @@ private fun AboutTeamMemberCard(
 // === Helper Components ===
 
 @Composable
-private fun SettingsSubScreen(
+internal fun SettingsSubScreen(
     title: String,
     onBack: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
@@ -1949,7 +2123,7 @@ private fun SettingsSubScreen(
 }
 
 @Composable
-private fun SettingsSectionTitle(title: String) {
+internal fun SettingsSectionTitle(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleSmall,
@@ -1959,7 +2133,64 @@ private fun SettingsSectionTitle(title: String) {
 }
 
 @Composable
-private fun SettingsSwitch(
+internal fun AndroidPreferenceGroupTitle(title: String) {
+    Text(
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(16.dp),
+    )
+}
+
+@Composable
+internal fun AndroidPreferenceEntry(
+    title: String,
+    subtitle: String? = null,
+    icon: ImageVector? = null,
+    onClick: (() -> Unit)? = null,
+    enabled: Boolean = true,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled && onClick != null, onClick = onClick ?: {})
+            .alpha(if (enabled) 1f else 0.5f)
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+    ) {
+        if (icon != null) {
+            Box(modifier = Modifier.padding(horizontal = 4.dp)) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+        }
+
+        Column(
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.weight(1f),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun SettingsSwitch(
     title: String,
     subtitle: String,
     checked: Boolean,
@@ -2002,12 +2233,13 @@ private fun SettingsSwitch(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsDropdown(
+internal fun SettingsDropdown(
     title: String,
     subtitle: String,
     options: List<String>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
+    enabled: Boolean = true,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -2019,7 +2251,7 @@ private fun SettingsDropdown(
         Column {
             Row(
                 modifier = Modifier
-                    .clickable { expanded = true }
+                    .clickable(enabled = enabled) { expanded = true }
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -2027,17 +2259,30 @@ private fun SettingsDropdown(
                     Text(
                         text = title,
                         style = MaterialTheme.typography.bodyLarge,
+                        color = if (enabled) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        },
                     )
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = if (enabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        },
                     )
                 }
                 Icon(
                     imageVector = if (expanded) IconAssets.expandLess() else IconAssets.expandMore(),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (enabled) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    },
                 )
             }
 
@@ -2063,7 +2308,7 @@ private fun SettingsDropdown(
 }
 
 @Composable
-private fun SettingsSlider(
+internal fun SettingsSlider(
     title: String,
     subtitle: String,
     value: Float,
@@ -2105,7 +2350,7 @@ private fun SettingsSlider(
 }
 
 @Composable
-private fun SettingsButton(
+internal fun SettingsButton(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
@@ -2143,7 +2388,7 @@ private fun SettingsButton(
 }
 
 @Composable
-private fun SettingsTextField(
+internal fun SettingsTextField(
     title: String,
     subtitle: String,
     value: String,
@@ -2189,7 +2434,7 @@ private fun SettingsTextField(
 }
 
 @Composable
-private fun SettingsInfoItem(
+internal fun SettingsInfoItem(
     title: String,
     value: String,
 ) {
@@ -2215,7 +2460,7 @@ private fun SettingsInfoItem(
     }
 }
 
-private data class SettingsCategory(
+internal data class SettingsCategory(
     val title: String,
     val subtitle: String,
     val icon: ImageVector,

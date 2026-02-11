@@ -74,6 +74,7 @@ import com.anitail.desktop.player.buildRadioQueuePlan
 import com.anitail.desktop.player.rememberPlayerState
 import com.anitail.desktop.sync.shouldStartSync
 import com.anitail.desktop.storage.DesktopPreferences
+import com.anitail.desktop.storage.AvatarSourcePreference
 import com.anitail.desktop.storage.NavigationTabPreference
 import com.anitail.desktop.storage.QuickPicks
 import androidx.compose.ui.graphics.Color
@@ -406,6 +407,9 @@ private fun FrameWindowScope.AniTailDesktopApp(
     val historyDuration by preferences.historyDuration.collectAsState()
     val useLoginForBrowse by preferences.useLoginForBrowse.collectAsState()
     val ytmSync by preferences.ytmSync.collectAsState()
+    val discordUsername by preferences.discordUsername.collectAsState()
+    val discordAvatarUrl by preferences.discordAvatarUrl.collectAsState()
+    val preferredAvatarSource by preferences.preferredAvatarSource.collectAsState()
     val defaultOpenTab by preferences.defaultOpenTab.collectAsState()
     val densityScale by preferences.densityScale.collectAsState()
     val slimNavBar by preferences.slimNavBar.collectAsState()
@@ -1140,8 +1144,19 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             accountPlaylists = accountPlaylists,
                             similarRecommendations = similarRecommendations,
                             playerState = playerState,
-                            accountName = accountInfo?.name ?: authCredentials?.accountName,
-                            accountThumbnailUrl = accountInfo?.thumbnailUrl,
+                            accountName = when (preferredAvatarSource) {
+                                AvatarSourcePreference.YOUTUBE -> accountInfo?.name ?: authCredentials?.accountName
+                                AvatarSourcePreference.DISCORD -> discordUsername
+                                    .takeUnless { it.isBlank() }
+                                    ?: accountInfo?.name
+                                    ?: authCredentials?.accountName
+                            },
+                            accountThumbnailUrl = when (preferredAvatarSource) {
+                                AvatarSourcePreference.YOUTUBE -> accountInfo?.thumbnailUrl
+                                AvatarSourcePreference.DISCORD -> discordAvatarUrl
+                                    .takeUnless { it.isBlank() }
+                                    ?: accountInfo?.thumbnailUrl
+                            },
                             database = database,
                             downloadService = downloadService,
                             playlists = playlists,
