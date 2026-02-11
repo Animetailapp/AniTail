@@ -89,6 +89,21 @@ class DesktopPreferences private constructor(
     private val _quickPicks = MutableStateFlow(QuickPicks.QUICK_PICKS)
     val quickPicks: StateFlow<QuickPicks> = _quickPicks.asStateFlow()
 
+    private val _enableBetterLyrics = MutableStateFlow(true)
+    val enableBetterLyrics: StateFlow<Boolean> = _enableBetterLyrics.asStateFlow()
+
+    private val _enableSimpMusic = MutableStateFlow(true)
+    val enableSimpMusic: StateFlow<Boolean> = _enableSimpMusic.asStateFlow()
+
+    private val _enableLrcLib = MutableStateFlow(true)
+    val enableLrcLib: StateFlow<Boolean> = _enableLrcLib.asStateFlow()
+
+    private val _enableKuGou = MutableStateFlow(true)
+    val enableKuGou: StateFlow<Boolean> = _enableKuGou.asStateFlow()
+
+    private val _preferredLyricsProvider = MutableStateFlow(PreferredLyricsProvider.BETTER_LYRICS)
+    val preferredLyricsProvider: StateFlow<PreferredLyricsProvider> = _preferredLyricsProvider.asStateFlow()
+
     // === Library Settings ===
     private val _libraryFilter = MutableStateFlow(LibraryFilter.LIBRARY)
     val libraryFilter: StateFlow<LibraryFilter> = _libraryFilter.asStateFlow()
@@ -287,6 +302,31 @@ class DesktopPreferences private constructor(
 
     fun setQuickPicks(value: QuickPicks) {
         _quickPicks.value = value
+        save()
+    }
+
+    fun setEnableBetterLyrics(value: Boolean) {
+        _enableBetterLyrics.value = value
+        save()
+    }
+
+    fun setEnableSimpMusic(value: Boolean) {
+        _enableSimpMusic.value = value
+        save()
+    }
+
+    fun setEnableLrcLib(value: Boolean) {
+        _enableLrcLib.value = value
+        save()
+    }
+
+    fun setEnableKuGou(value: Boolean) {
+        _enableKuGou.value = value
+        save()
+    }
+
+    fun setPreferredLyricsProvider(value: PreferredLyricsProvider) {
+        _preferredLyricsProvider.value = value
         save()
     }
 
@@ -489,6 +529,13 @@ class DesktopPreferences private constructor(
             _appLanguage.value = json.optString("appLanguage", SYSTEM_DEFAULT)
             _hideExplicit.value = json.optBoolean("hideExplicit", false)
             _quickPicks.value = QuickPicks.fromString(json.optString("quickPicks", "quick_picks"))
+            _enableBetterLyrics.value = json.optBoolean("enableBetterLyrics", true)
+            _enableSimpMusic.value = json.optBoolean("enableSimpMusic", true)
+            _enableLrcLib.value = json.optBoolean("enableLrclib", true)
+            _enableKuGou.value = json.optBoolean("enableKugou", true)
+            _preferredLyricsProvider.value = PreferredLyricsProvider.fromString(
+                json.optString("lyricsProvider", "better_lyrics")
+            )
             _useLoginForBrowse.value = json.optBoolean("useLoginForBrowse", true)
             _ytmSync.value = json.optBoolean("ytmSync", true)
 
@@ -570,6 +617,11 @@ class DesktopPreferences private constructor(
                 put("appLanguage", _appLanguage.value)
                 put("hideExplicit", _hideExplicit.value)
                 put("quickPicks", _quickPicks.value.name.lowercase())
+                put("enableBetterLyrics", _enableBetterLyrics.value)
+                put("enableSimpMusic", _enableSimpMusic.value)
+                put("enableLrclib", _enableLrcLib.value)
+                put("enableKugou", _enableKuGou.value)
+                put("lyricsProvider", _preferredLyricsProvider.value.name.lowercase())
                 put("useLoginForBrowse", _useLoginForBrowse.value)
                 put("ytmSync", _ytmSync.value)
 
@@ -665,6 +717,23 @@ enum class QuickPicks {
         fun fromString(value: String): QuickPicks = when (value.lowercase()) {
             "last_listen", "last_listened", "last" -> LAST_LISTEN
             else -> QUICK_PICKS
+        }
+    }
+}
+
+enum class PreferredLyricsProvider {
+    LRCLIB,
+    KUGOU,
+    BETTER_LYRICS,
+    SIMPMUSIC;
+
+    companion object {
+        fun fromString(value: String): PreferredLyricsProvider = when (value.lowercase()) {
+            "lrclib" -> LRCLIB
+            "kugou" -> KUGOU
+            "simpmusic" -> SIMPMUSIC
+            "better_lyrics", "betterlyrics", "better" -> BETTER_LYRICS
+            else -> BETTER_LYRICS
         }
     }
 }

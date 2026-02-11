@@ -28,6 +28,8 @@ val javafxPlatform = when {
 dependencies {
     implementation(projects.common)
     implementation(projects.innertube)
+    implementation(projects.betterlyrics)
+    implementation(projects.simpmusic)
 
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
@@ -46,6 +48,7 @@ dependencies {
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.client.encoding)
 
     implementation("org.openjfx:javafx-base:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-graphics:$javafxVersion:$javafxPlatform")

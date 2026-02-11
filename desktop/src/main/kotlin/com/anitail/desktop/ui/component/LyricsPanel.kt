@@ -51,6 +51,7 @@ import kotlinx.coroutines.launch
 fun LyricsPanel(
     title: String,
     artist: String,
+    videoId: String? = null,
     durationSec: Int,
     currentPositionMs: Long,
     onSeek: (Long) -> Unit,
@@ -69,8 +70,8 @@ fun LyricsPanel(
     val lyricsEmptyLabel = stringResource("lyrics_start_playing")
 
     // Cargar letras cuando cambia la canción
-    LaunchedEffect(title, artist) {
-        if (title.isBlank() || artist.isBlank()) {
+    LaunchedEffect(title, artist, videoId, durationSec) {
+        if (title.isBlank()) {
             lyricsResult = null
             return@LaunchedEffect
         }
@@ -79,7 +80,12 @@ fun LyricsPanel(
         error = null
         lyricsResult = null
 
-        DesktopLyricsService.getLyrics(title, artist, durationSec)
+        DesktopLyricsService.getLyrics(
+            title = title,
+            artist = artist,
+            durationSec = durationSec,
+            videoId = videoId,
+        )
             .onSuccess { result ->
                 lyricsResult = result
             }
@@ -154,7 +160,12 @@ fun LyricsPanel(
                             scope.launch {
                                 isLoading = true
                                 error = null
-                                DesktopLyricsService.getLyrics(title, artist, durationSec)
+                                DesktopLyricsService.getLyrics(
+                                    title = title,
+                                    artist = artist,
+                                    durationSec = durationSec,
+                                    videoId = videoId,
+                                )
                                     .onSuccess { lyricsResult = it }
                                     .onFailure { error = it.message }
                                 isLoading = false

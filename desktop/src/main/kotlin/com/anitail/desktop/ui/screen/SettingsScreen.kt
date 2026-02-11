@@ -78,6 +78,7 @@ import com.anitail.desktop.storage.DarkModePreference
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.storage.PlayerBackgroundStyle
 import com.anitail.desktop.storage.PlayerButtonsStyle
+import com.anitail.desktop.storage.PreferredLyricsProvider
 import com.anitail.desktop.storage.QuickPicks
 import com.anitail.desktop.storage.SliderStyle
 import com.anitail.desktop.ui.IconAssets
@@ -726,6 +727,11 @@ private fun ContentSettingsScreen(
     val appLanguage by preferences.appLanguage.collectAsState()
     val hideExplicit by preferences.hideExplicit.collectAsState()
     val quickPicks by preferences.quickPicks.collectAsState()
+    val enableBetterLyrics by preferences.enableBetterLyrics.collectAsState()
+    val enableSimpMusic by preferences.enableSimpMusic.collectAsState()
+    val enableLrcLib by preferences.enableLrcLib.collectAsState()
+    val enableKuGou by preferences.enableKuGou.collectAsState()
+    val preferredLyricsProvider by preferences.preferredLyricsProvider.collectAsState()
 
     val languageCodes = appLanguageOptions()
     val countryCodes = listOf(SYSTEM_DEFAULT) + CountryCodeToName.keys.toList()
@@ -779,6 +785,63 @@ private fun ContentSettingsScreen(
             subtitle = stringResource("hide_explicit_desc"),
             checked = hideExplicit,
             onCheckedChange = { preferences.setHideExplicit(it) },
+        )
+
+        SettingsSectionTitle(title = stringResource("lyrics"))
+
+        SettingsSwitch(
+            title = stringResource("enable_betterlyrics"),
+            subtitle = "",
+            checked = enableBetterLyrics,
+            onCheckedChange = { preferences.setEnableBetterLyrics(it) },
+        )
+
+        SettingsSwitch(
+            title = stringResource("enable_simpmusic"),
+            subtitle = "",
+            checked = enableSimpMusic,
+            onCheckedChange = { preferences.setEnableSimpMusic(it) },
+        )
+
+        SettingsSwitch(
+            title = stringResource("enable_lrclib"),
+            subtitle = "",
+            checked = enableLrcLib,
+            onCheckedChange = { preferences.setEnableLrcLib(it) },
+        )
+
+        SettingsSwitch(
+            title = stringResource("enable_kugou"),
+            subtitle = "",
+            checked = enableKuGou,
+            onCheckedChange = { preferences.setEnableKuGou(it) },
+        )
+
+        val providerOptions = listOf(
+            PreferredLyricsProvider.LRCLIB,
+            PreferredLyricsProvider.KUGOU,
+            PreferredLyricsProvider.BETTER_LYRICS,
+            PreferredLyricsProvider.SIMPMUSIC,
+        )
+        val betterLyricsLabel = stringResource("lyrics_provider_betterlyrics")
+        val simpMusicLabel = stringResource("lyrics_provider_simpmusic")
+        val providerLabel: (PreferredLyricsProvider) -> String = { provider ->
+            when (provider) {
+                PreferredLyricsProvider.LRCLIB -> "LrcLib"
+                PreferredLyricsProvider.KUGOU -> "KuGou"
+                PreferredLyricsProvider.BETTER_LYRICS -> betterLyricsLabel
+                PreferredLyricsProvider.SIMPMUSIC -> simpMusicLabel
+            }
+        }
+
+        SettingsDropdown(
+            title = stringResource("set_first_lyrics_provider"),
+            subtitle = providerLabel(preferredLyricsProvider),
+            options = providerOptions.map(providerLabel),
+            selectedIndex = providerOptions.indexOf(preferredLyricsProvider).coerceAtLeast(0),
+            onSelect = { index ->
+                preferences.setPreferredLyricsProvider(providerOptions[index])
+            },
         )
 
         // Quick Picks mode

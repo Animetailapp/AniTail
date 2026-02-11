@@ -31,6 +31,7 @@ import kotlin.math.max
 @Composable
 fun PlayerBackgroundLayer(
     artworkUrl: String?,
+    artworkFallbackUrls: List<String> = emptyList(),
     style: PlayerBackgroundStyle,
     pureBlack: Boolean,
     showLyrics: Boolean,
@@ -47,7 +48,7 @@ fun PlayerBackgroundLayer(
 
     val useBlackBackground = pureBlack
 
-    LaunchedEffect(artworkUrl, style, pureBlack) {
+    LaunchedEffect(artworkUrl, artworkFallbackUrls, style, pureBlack) {
         if (style != PlayerBackgroundStyle.GRADIENT) return@LaunchedEffect
         if (useBlackBackground) {
             gradientColors = listOf(Color.Black, Color.Black)
@@ -59,7 +60,7 @@ fun PlayerBackgroundLayer(
             gradientColors = cached
             return@LaunchedEffect
         }
-        val bitmap = loadArtworkBitmap(url)
+        val bitmap = loadArtworkBitmap(url, artworkFallbackUrls)
         if (bitmap != null) {
             val colors = extractGradientColors(bitmap).ifEmpty { defaultGradient }
             gradientCache[url] = colors
@@ -77,6 +78,7 @@ fun PlayerBackgroundLayer(
                 }
                 RemoteImage(
                     url = artworkUrl,
+                    fallbackUrls = artworkFallbackUrls,
                     modifier = Modifier.fillMaxSize().blur(150.dp),
                     contentScale = ContentScale.FillBounds,
                 )
@@ -98,16 +100,27 @@ fun PlayerBackgroundLayer(
     }
 }
 
-private suspend fun loadArtworkBitmap(url: String): ImageBitmap? {
-    ImageCache.get(url)?.let { return it }
-    val bytes = withContext(Dispatchers.IO) {
-        runCatching { URL(url).readBytes() }.getOrNull()
-    } ?: return null
-    val bitmap = runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
-    if (bitmap != null) {
-        ImageCache.put(url, bitmap)
+private suspend fun loadArtworkBitmap(url: String, fallbackUrls: List<String> = emptyList()): ImageBitmap? {
+    val candidates = buildList {
+        if (url.isNotBlank()) add(url)
+        fallbackUrls.forEach { candidate ->
+            if (candidate.isNotBlank()) add(candidate)
+        }
+    }.distinct()
+
+    for (candidate in candidates) {
+        ImageCache.get(candidate)?.let { return it }
+        val bytes = withContext(Dispatchers.IO) {
+            runCatching { URL(candidate).readBytes() }.getOrNull()
+        } ?: continue
+        val bitmap = runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
+        if (bitmap != null) {
+            ImageCache.put(candidate, bitmap)
+            return bitmap
+        }
     }
-    return bitmap
+
+    return null
 }
 
 private fun extractGradientColors(bitmap: ImageBitmap): List<Color> {

@@ -233,6 +233,14 @@ fun PlayerScreen(
 
     val backgroundColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface
     val hiResArtworkUrl = remember(item.artworkUrl) { toHighResArtworkUrl(item.artworkUrl) }
+    val artworkFallbackUrls = remember(item.artworkUrl, hiResArtworkUrl) {
+        val original = item.artworkUrl
+        if (original.isNullOrBlank() || original == hiResArtworkUrl) {
+            emptyList()
+        } else {
+            listOf(original)
+        }
+    }
     val textBackgroundColor = when (playerBackgroundStyle) {
         PlayerBackgroundStyle.DEFAULT -> if (pureBlack) Color.White else MaterialTheme.colorScheme.onBackground
         PlayerBackgroundStyle.GRADIENT, PlayerBackgroundStyle.BLUR -> Color.White
@@ -261,6 +269,7 @@ fun PlayerScreen(
     ) {
         PlayerBackgroundLayer(
             artworkUrl = hiResArtworkUrl,
+            artworkFallbackUrls = artworkFallbackUrls,
             style = playerBackgroundStyle,
             pureBlack = pureBlack,
             showLyrics = showLyrics,
@@ -297,6 +306,7 @@ fun PlayerScreen(
                     LyricsPanel(
                         title = item.title,
                         artist = item.artist,
+                        videoId = item.id,
                         durationSec = ((item.durationMs ?: 0L) / 1000L).toInt(),
                         currentPositionMs = playerState.position,
                         onSeek = { playerState.seekTo(it) },
@@ -304,8 +314,9 @@ fun PlayerScreen(
                     )
                 } else {
                     RemoteImage(
-                        url = hiResArtworkUrl ?: "",
+                        url = hiResArtworkUrl,
                         contentDescription = item.title,
+                        fallbackUrls = artworkFallbackUrls,
                         modifier = Modifier
                             .fillMaxHeight(0.82f)
                             .aspectRatio(1f)

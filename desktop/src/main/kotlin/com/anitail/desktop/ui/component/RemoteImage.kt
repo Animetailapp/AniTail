@@ -33,19 +33,38 @@ fun RemoteImage(
     modifier: Modifier,
     shape: Shape = RoundedCornerShape(0.dp),
     contentScale: ContentScale = ContentScale.Crop,
+    fallbackUrls: List<String> = emptyList(),
 ) {
-    val cached = remember(url) { ImageCache.get(url) }
-    var image by remember(url) { mutableStateOf<ImageBitmap?>(cached) }
+    val candidates = remember(url, fallbackUrls) {
+        buildList {
+            if (!url.isNullOrBlank()) add(url)
+            fallbackUrls.forEach { candidate ->
+                if (candidate.isNotBlank()) add(candidate)
+            }
+        }.distinct()
+    }
+    var candidateIndex by remember(candidates) { mutableStateOf(0) }
+    val activeUrl = candidates.getOrNull(candidateIndex)
 
-    LaunchedEffect(url) {
-        if (image != null || url.isNullOrBlank()) return@LaunchedEffect
+    val cached = remember(activeUrl) { ImageCache.get(activeUrl) }
+    var image by remember(activeUrl) { mutableStateOf<ImageBitmap?>(cached) }
+
+    LaunchedEffect(activeUrl, candidateIndex, candidates) {
+        if (image != null || activeUrl.isNullOrBlank()) return@LaunchedEffect
         val bytes = withContext(Dispatchers.IO) {
-            runCatching { URL(url).readBytes() }.getOrNull()
-        } ?: return@LaunchedEffect
+            runCatching { URL(activeUrl).readBytes() }.getOrNull()
+        } ?: run {
+            if (candidateIndex < candidates.lastIndex) {
+                candidateIndex += 1
+            }
+            return@LaunchedEffect
+        }
         val bitmap = runCatching { Image.makeFromEncoded(bytes).asImageBitmap() }.getOrNull()
         if (bitmap != null) {
-            ImageCache.put(url, bitmap)
+            ImageCache.put(activeUrl, bitmap)
             image = bitmap
+        } else if (candidateIndex < candidates.lastIndex) {
+            candidateIndex += 1
         }
     }
 
