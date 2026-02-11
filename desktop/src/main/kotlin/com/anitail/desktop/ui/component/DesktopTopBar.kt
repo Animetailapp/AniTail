@@ -159,7 +159,7 @@ private fun ActionButtons(
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (onRefreshHome != null) {
             IconButton(onClick = onRefreshHome, colors = colors) {
-                Icon(IconAssets.refresh(), contentDescription = refreshLabel)
+                Icon(IconAssets.cached(), contentDescription = refreshLabel)
             }
         }
         IconButton(onClick = onHistory, colors = colors) {

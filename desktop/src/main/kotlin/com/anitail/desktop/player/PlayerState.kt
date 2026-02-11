@@ -223,12 +223,20 @@ class PlayerState {
         return null
     }
 
-    fun playQueue(items: List<LibraryItem>, startIndex: Int = 0) {
+    fun playQueue(
+        items: List<LibraryItem>,
+        startIndex: Int = 0,
+        preserveCurrentPlayback: Boolean = false,
+    ) {
         _queue.clear()
         _queue.addAll(items)
         if (items.isNotEmpty() && startIndex in items.indices) {
             currentQueueIndex = startIndex
-            play(items[startIndex])
+            val startItem = items[startIndex]
+            val keepCurrent = preserveCurrentPlayback && currentItem?.id == startItem.id
+            if (!keepCurrent) {
+                play(startItem)
+            }
         }
     }
 

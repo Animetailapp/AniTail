@@ -534,66 +534,68 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
     LaunchedEffect(playerState.currentItem?.id) {
         val item = playerState.currentItem ?: return@LaunchedEffect
-        val existing = database.song(item.id).first()
-        val base = existing ?: item.toSongEntity(inLibrary = false)
-        if (existing == null) {
-            database.updateSong(base)
-        }
-
-        suspend fun ensureArtist(artistId: String) {
-            if (artistId.isBlank()) return
-            if (database.artist(artistId).first() != null) return
-            YouTube.artist(artistId).onSuccess { page ->
-                database.insertArtist(page.artist.toArtistEntity())
+        withContext(Dispatchers.IO) {
+            val existing = database.song(item.id).first()
+            val base = existing ?: item.toSongEntity(inLibrary = false)
+            if (existing == null) {
+                database.updateSong(base)
             }
-        }
 
-        suspend fun ensureAlbum(albumId: String) {
-            if (albumId.isBlank()) return
-            if (database.album(albumId).first() != null) return
-            YouTube.album(albumId).onSuccess { page ->
-                database.insertAlbum(page.album.toAlbumEntity())
+            suspend fun ensureArtist(artistId: String) {
+                if (artistId.isBlank()) return
+                if (database.artist(artistId).first() != null) return
+                YouTube.artist(artistId).onSuccess { page ->
+                    database.insertArtist(page.artist.toArtistEntity())
+                }
             }
-        }
 
-        val nextResult = YouTube.next(WatchEndpoint(videoId = item.id)).getOrNull()
-        val songDetails = nextResult?.let { result ->
-            result.currentIndex?.let { index -> result.items.getOrNull(index) }
-                ?: result.items.firstOrNull { it.id == item.id }
-                ?: result.items.firstOrNull()
-        }
-
-        if (songDetails != null) {
-            val updated = base.copy(
-                title = songDetails.title.ifBlank { base.title },
-                duration = if (base.duration > 0) base.duration else (songDetails.duration ?: base.duration),
-                thumbnailUrl = songDetails.thumbnail.ifBlank { base.thumbnailUrl.orEmpty() }
-                    .takeIf { it.isNotBlank() } ?: base.thumbnailUrl,
-                albumId = songDetails.album?.id ?: base.albumId,
-                albumName = songDetails.album?.name ?: base.albumName,
-                artistName = if (songDetails.artists.isNotEmpty()) {
-                    songDetails.artists.joinToString(", ") { it.name }
-                } else {
-                    base.artistName
-                },
-                explicit = base.explicit || songDetails.explicit,
-                dateModified = LocalDateTime.now(),
-            )
-            database.updateSong(updated)
-            database.insertSongArtistMaps(songDetails.toSongArtistMaps())
-
-            songDetails.artists.mapNotNull { it.id }.forEach { ensureArtist(it) }
-            songDetails.album?.id?.let { ensureAlbum(it) }
-        }
-
-        if (!database.hasRelatedSongs(item.id)) {
-            val relatedEndpoint = nextResult?.relatedEndpoint ?: return@LaunchedEffect
-            val relatedPage = YouTube.related(relatedEndpoint).getOrNull() ?: return@LaunchedEffect
-            val relatedSongs = relatedPage.songs
-            relatedSongs.forEach { song ->
-                database.insertSong(song.toSongEntity(), song.toSongArtistMaps())
+            suspend fun ensureAlbum(albumId: String) {
+                if (albumId.isBlank()) return
+                if (database.album(albumId).first() != null) return
+                YouTube.album(albumId).onSuccess { page ->
+                    database.insertAlbum(page.album.toAlbumEntity())
+                }
             }
-            database.insertRelatedSongs(item.id, relatedSongs.map { it.id })
+
+            val nextResult = YouTube.next(WatchEndpoint(videoId = item.id)).getOrNull()
+            val songDetails = nextResult?.let { result ->
+                result.currentIndex?.let { index -> result.items.getOrNull(index) }
+                    ?: result.items.firstOrNull { it.id == item.id }
+                    ?: result.items.firstOrNull()
+            }
+
+            if (songDetails != null) {
+                val updated = base.copy(
+                    title = songDetails.title.ifBlank { base.title },
+                    duration = if (base.duration > 0) base.duration else (songDetails.duration ?: base.duration),
+                    thumbnailUrl = songDetails.thumbnail.ifBlank { base.thumbnailUrl.orEmpty() }
+                        .takeIf { it.isNotBlank() } ?: base.thumbnailUrl,
+                    albumId = songDetails.album?.id ?: base.albumId,
+                    albumName = songDetails.album?.name ?: base.albumName,
+                    artistName = if (songDetails.artists.isNotEmpty()) {
+                        songDetails.artists.joinToString(", ") { it.name }
+                    } else {
+                        base.artistName
+                    },
+                    explicit = base.explicit || songDetails.explicit,
+                    dateModified = LocalDateTime.now(),
+                )
+                database.updateSong(updated)
+                database.insertSongArtistMaps(songDetails.toSongArtistMaps())
+
+                songDetails.artists.mapNotNull { it.id }.forEach { ensureArtist(it) }
+                songDetails.album?.id?.let { ensureAlbum(it) }
+            }
+
+            if (!database.hasRelatedSongs(item.id)) {
+                val relatedEndpoint = nextResult?.relatedEndpoint ?: return@withContext
+                val relatedPage = YouTube.related(relatedEndpoint).getOrNull() ?: return@withContext
+                val relatedSongs = relatedPage.songs
+                relatedSongs.forEach { song ->
+                    database.insertSong(song.toSongEntity(), song.toSongArtistMaps())
+                }
+                database.insertRelatedSongs(item.id, relatedSongs.map { it.id })
+            }
         }
     }
 
@@ -1200,14 +1202,21 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             onLocalItemSelected = { item ->
                                 when (resolveLocalItemType(item)) {
                                     LocalItemType.SONG -> {
+                                        playerState.play(item)
+                                        playerBottomSheetState.collapseSoft()
                                         scope.launch {
                                             val videoId = extractVideoId(item.playbackUrl) ?: return@launch
                                             val result = YouTube.next(
                                                 WatchEndpoint(videoId = videoId)
                                             ).getOrNull() ?: return@launch
                                             val plan = buildRadioQueuePlan(item, result)
-                                            playerState.playQueue(plan.items, plan.startIndex)
-                                            playerBottomSheetState.collapseSoft()
+                                            if (playerState.currentItem?.id == item.id) {
+                                                playerState.playQueue(
+                                                    plan.items,
+                                                    plan.startIndex,
+                                                    preserveCurrentPlayback = true,
+                                                )
+                                            }
                                         }
                                     }
                                     LocalItemType.ALBUM -> {

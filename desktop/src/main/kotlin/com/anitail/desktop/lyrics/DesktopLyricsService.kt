@@ -1,6 +1,14 @@
 package com.anitail.desktop.lyrics
 
 import com.anitail.desktop.storage.DesktopPreferences
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -23,6 +31,19 @@ object DesktopLyricsService {
             durationSec = durationSec,
             album = album,
         )
+
+        getOverride(query)?.let { localOverride ->
+            return Result.success(
+                buildLyricsResult(
+                    title = title,
+                    artist = artist,
+                    album = album,
+                    durationSec = durationSec,
+                    rawLyrics = localOverride.lyrics,
+                    provider = localOverride.provider,
+                ),
+            )
+        }
 
         val providers = DesktopLyricsProviders.ordered(preferences.preferredLyricsProvider.value)
         var firstError: Throwable? = null
@@ -66,6 +87,7 @@ object DesktopLyricsService {
         durationSec: Int = -1,
         videoId: String? = null,
         album: String? = null,
+        includeOverride: Boolean = true,
         preferences: DesktopPreferences = DesktopPreferences.getInstance(),
     ): List<LyricsResult> {
         val query = LyricsQuery(
@@ -77,6 +99,20 @@ object DesktopLyricsService {
         )
         val providers = DesktopLyricsProviders.ordered(preferences.preferredLyricsProvider.value)
         val results = mutableListOf<LyricsResult>()
+
+        if (includeOverride) {
+            getOverride(query)?.let { localOverride ->
+                results += buildLyricsResult(
+                    title = title,
+                    artist = artist,
+                    album = album,
+                    durationSec = durationSec,
+                    rawLyrics = localOverride.lyrics,
+                    provider = localOverride.provider,
+                )
+            }
+        }
+
         for (provider in providers) {
             if (!provider.isEnabled(preferences)) {
                 continue
@@ -99,6 +135,73 @@ object DesktopLyricsService {
             }
         }
         return results
+    }
+
+    suspend fun saveOverrideLyrics(
+        title: String,
+        artist: String,
+        durationSec: Int,
+        rawLyrics: String,
+        videoId: String? = null,
+        album: String? = null,
+        provider: String = "Manual",
+    ): LyricsResult = withContext(Dispatchers.IO) {
+        val query = LyricsQuery(
+            videoId = resolveVideoId(videoId),
+            title = title,
+            artist = artist,
+            durationSec = durationSec,
+            album = album,
+        )
+        val trimmedLyrics = rawLyrics.trim()
+        val trackKey = buildTrackKey(query.videoId, query.title, query.artist)
+        synchronized(overridesLock) {
+            ensureOverridesLoadedLocked()
+            if (trimmedLyrics.isEmpty()) {
+                overrides.remove(trackKey)
+            } else {
+                overrides[trackKey] = LyricsOverride(
+                    provider = provider,
+                    lyrics = trimmedLyrics,
+                )
+            }
+            persistOverridesLocked()
+        }
+        if (trimmedLyrics.isEmpty()) {
+            buildLyricsResult(
+                title = title,
+                artist = artist,
+                album = album,
+                durationSec = durationSec,
+                rawLyrics = "",
+                provider = provider,
+            )
+        } else {
+            buildLyricsResult(
+                title = title,
+                artist = artist,
+                album = album,
+                durationSec = durationSec,
+                rawLyrics = trimmedLyrics,
+                provider = provider,
+            )
+        }
+    }
+
+    suspend fun clearOverrideLyrics(
+        title: String,
+        artist: String,
+        videoId: String? = null,
+    ): Boolean = withContext(Dispatchers.IO) {
+        val trackKey = buildTrackKey(resolveVideoId(videoId), title, artist)
+        synchronized(overridesLock) {
+            ensureOverridesLoadedLocked()
+            val removed = overrides.remove(trackKey) != null
+            if (removed) {
+                persistOverridesLocked()
+            }
+            removed
+        }
     }
 
     /**
@@ -236,7 +339,79 @@ object DesktopLyricsService {
         }
         return trimmed.takeIf { it.matches(Regex("^[a-zA-Z0-9_-]{11}$")) }
     }
-    
+
+    private fun getOverride(query: LyricsQuery): LyricsOverride? {
+        val trackKey = buildTrackKey(query.videoId, query.title, query.artist)
+        return synchronized(overridesLock) {
+            ensureOverridesLoadedLocked()
+            overrides[trackKey]
+        }
+    }
+
+    private fun buildTrackKey(videoId: String?, title: String, artist: String): String {
+        val normalizedVideoId = resolveVideoId(videoId)
+        if (!normalizedVideoId.isNullOrBlank()) {
+            return "id:$normalizedVideoId"
+        }
+        return "meta:${title.trim().lowercase()}::${artist.trim().lowercase()}"
+    }
+
+    private fun ensureOverridesLoadedLocked() {
+        if (overridesLoaded) return
+        overridesLoaded = true
+        if (!Files.exists(overridesFile)) return
+        runCatching {
+            val raw = Files.readString(overridesFile, StandardCharsets.UTF_8)
+            if (raw.isBlank()) return@runCatching
+            val json = JSONArray(raw)
+            for (index in 0 until json.length()) {
+                val entry = json.optJSONObject(index) ?: continue
+                val key = entry.optString("key")
+                val provider = entry.optString("provider")
+                val lyrics = entry.optString("lyrics")
+                if (key.isBlank() || lyrics.isBlank()) continue
+                overrides[key] = LyricsOverride(
+                    provider = provider.ifBlank { "Manual" },
+                    lyrics = lyrics,
+                )
+            }
+        }
+    }
+
+    private fun persistOverridesLocked() {
+        runCatching {
+            val parent = overridesFile.parent
+            if (parent != null && !Files.exists(parent)) {
+                Files.createDirectories(parent)
+            }
+            val array = JSONArray()
+            overrides.forEach { (key, entry) ->
+                array.put(
+                    JSONObject().apply {
+                        put("key", key)
+                        put("provider", entry.provider)
+                        put("lyrics", entry.lyrics)
+                    },
+                )
+            }
+            Files.writeString(overridesFile, array.toString(2), StandardCharsets.UTF_8)
+        }
+    }
+
+    private data class LyricsOverride(
+        val provider: String,
+        val lyrics: String,
+    )
+
+    private val overridesLock = Any()
+    private val overrides = mutableMapOf<String, LyricsOverride>()
+    @Volatile
+    private var overridesLoaded = false
+    private val overridesFile: Path by lazy {
+        val home = System.getProperty("user.home") ?: "."
+        Paths.get(home, ".anitail", "lyrics_overrides.json")
+    }
+
     private const val DefaultLineDurationMs = 2_500L
     private const val MinWordDurationMs = 80L
 }

@@ -882,18 +882,21 @@ private fun KeepListeningRow(
     menuActions: (LibraryItem) -> List<ContextMenuAction>,
 ) {
     val rows = if (items.size > 6) 2 else 1
+    val itemSpacing = 12.dp
     val itemHeight = GridThumbnailHeight + with(androidx.compose.ui.platform.LocalDensity.current) {
         MaterialTheme.typography.bodyLarge.lineHeight.toDp() * 2 +
             MaterialTheme.typography.bodyMedium.lineHeight.toDp() * 2
     }
+    val gridHeight = itemHeight * rows + itemSpacing * (rows - 1)
 
     LazyHorizontalGrid(
         rows = GridCells.Fixed(rows),
         modifier = Modifier
             .fillMaxWidth()
-            .height(itemHeight * rows),
-        horizontalArrangement = Arrangement.spacedBy(0.dp),
-        verticalArrangement = Arrangement.spacedBy(0.dp),
+            .height(gridHeight),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+        verticalArrangement = Arrangement.spacedBy(itemSpacing),
     ) {
         items(items) { item ->
             val isArtist = item.playbackUrl.contains("/channel/")

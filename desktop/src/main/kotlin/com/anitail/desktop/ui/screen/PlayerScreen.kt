@@ -131,6 +131,7 @@ fun PlayerScreen(
     var songDetails by remember(item.id) { mutableStateOf<SongItem?>(null) }
 
     val isLiked = songsById[item.id]?.liked == true
+    val currentTrackRomanizeLyrics = songsById[item.id]?.romanizeLyrics ?: true
     val downloadState = computeSelectionDownloadState(
         selectedIds = listOf(item.id),
         downloadStates = downloadStates,
@@ -337,6 +338,17 @@ fun PlayerScreen(
                         durationSec = ((item.durationMs ?: 0L) / 1000L).toInt(),
                         currentPositionMs = playerState.position,
                         isPlaying = playerState.isPlaying,
+                        songRomanizeLyrics = currentTrackRomanizeLyrics,
+                        onSetSongRomanizeLyrics = { enabled ->
+                            coroutineScope.launch {
+                                val existing = songsById[item.id]
+                                if (existing == null) {
+                                    database.insertSong(item.toSongEntity().copy(romanizeLyrics = enabled))
+                                } else {
+                                    database.updateSong(existing.copy(romanizeLyrics = enabled))
+                                }
+                            }
+                        },
                         onSeek = { playerState.seekTo(it) },
                         modifier = Modifier.fillMaxSize().padding(horizontal = PlayerHorizontalPadding),
                     )
