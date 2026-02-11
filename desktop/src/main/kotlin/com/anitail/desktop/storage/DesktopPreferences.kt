@@ -48,6 +48,51 @@ class DesktopPreferences private constructor(
     private val _sliderStyle = MutableStateFlow(SliderStyle.DEFAULT)
     val sliderStyle: StateFlow<SliderStyle> = _sliderStyle.asStateFlow()
 
+    private val _densityScale = MutableStateFlow(1.0f)
+    val densityScale: StateFlow<Float> = _densityScale.asStateFlow()
+
+    private val _customDensityValue = MutableStateFlow(0.85f)
+    val customDensityValue: StateFlow<Float> = _customDensityValue.asStateFlow()
+
+    private val _defaultOpenTab = MutableStateFlow(NavigationTabPreference.HOME)
+    val defaultOpenTab: StateFlow<NavigationTabPreference> = _defaultOpenTab.asStateFlow()
+
+    private val _defaultLibChip = MutableStateFlow(LibraryFilter.LIBRARY)
+    val defaultLibChip: StateFlow<LibraryFilter> = _defaultLibChip.asStateFlow()
+
+    private val _slimNavBar = MutableStateFlow(false)
+    val slimNavBar: StateFlow<Boolean> = _slimNavBar.asStateFlow()
+
+    private val _swipeToSong = MutableStateFlow(false)
+    val swipeToSong: StateFlow<Boolean> = _swipeToSong.asStateFlow()
+
+    private val _swipeThumbnail = MutableStateFlow(true)
+    val swipeThumbnail: StateFlow<Boolean> = _swipeThumbnail.asStateFlow()
+
+    private val _swipeSensitivity = MutableStateFlow(0.73f)
+    val swipeSensitivity: StateFlow<Float> = _swipeSensitivity.asStateFlow()
+
+    private val _lyricsTextPosition = MutableStateFlow(LyricsPositionPreference.CENTER)
+    val lyricsTextPosition: StateFlow<LyricsPositionPreference> = _lyricsTextPosition.asStateFlow()
+
+    private val _lyricsClick = MutableStateFlow(true)
+    val lyricsClick: StateFlow<Boolean> = _lyricsClick.asStateFlow()
+
+    private val _lyricsScroll = MutableStateFlow(true)
+    val lyricsScroll: StateFlow<Boolean> = _lyricsScroll.asStateFlow()
+
+    private val _lyricsFontSize = MutableStateFlow(20f)
+    val lyricsFontSize: StateFlow<Float> = _lyricsFontSize.asStateFlow()
+
+    private val _lyricsCustomFontPath = MutableStateFlow("")
+    val lyricsCustomFontPath: StateFlow<String> = _lyricsCustomFontPath.asStateFlow()
+
+    private val _lyricsSmoothScroll = MutableStateFlow(true)
+    val lyricsSmoothScroll: StateFlow<Boolean> = _lyricsSmoothScroll.asStateFlow()
+
+    private val _lyricsAnimationStyle = MutableStateFlow(LyricsAnimationStylePreference.APPLE)
+    val lyricsAnimationStyle: StateFlow<LyricsAnimationStylePreference> = _lyricsAnimationStyle.asStateFlow()
+
     // === Player Settings ===
     private val _audioQuality = MutableStateFlow(AudioQuality.AUTO)
     val audioQuality: StateFlow<AudioQuality> = _audioQuality.asStateFlow()
@@ -237,6 +282,81 @@ class DesktopPreferences private constructor(
 
     fun setSliderStyle(value: SliderStyle) {
         _sliderStyle.value = value
+        save()
+    }
+
+    fun setDensityScale(value: Float) {
+        _densityScale.value = value.coerceIn(0.5f, 1.2f)
+        save()
+    }
+
+    fun setCustomDensityValue(value: Float) {
+        _customDensityValue.value = value.coerceIn(0.5f, 1.2f)
+        save()
+    }
+
+    fun setDefaultOpenTab(value: NavigationTabPreference) {
+        _defaultOpenTab.value = value
+        save()
+    }
+
+    fun setDefaultLibChip(value: LibraryFilter) {
+        _defaultLibChip.value = value
+        save()
+    }
+
+    fun setSlimNavBar(value: Boolean) {
+        _slimNavBar.value = value
+        save()
+    }
+
+    fun setSwipeToSong(value: Boolean) {
+        _swipeToSong.value = value
+        save()
+    }
+
+    fun setSwipeThumbnail(value: Boolean) {
+        _swipeThumbnail.value = value
+        save()
+    }
+
+    fun setSwipeSensitivity(value: Float) {
+        _swipeSensitivity.value = value.coerceIn(0f, 1f)
+        save()
+    }
+
+    fun setLyricsTextPosition(value: LyricsPositionPreference) {
+        _lyricsTextPosition.value = value
+        save()
+    }
+
+    fun setLyricsClick(value: Boolean) {
+        _lyricsClick.value = value
+        save()
+    }
+
+    fun setLyricsScroll(value: Boolean) {
+        _lyricsScroll.value = value
+        save()
+    }
+
+    fun setLyricsFontSize(value: Float) {
+        _lyricsFontSize.value = value.coerceIn(12f, 36f)
+        save()
+    }
+
+    fun setLyricsCustomFontPath(value: String) {
+        _lyricsCustomFontPath.value = value
+        save()
+    }
+
+    fun setLyricsSmoothScroll(value: Boolean) {
+        _lyricsSmoothScroll.value = value
+        save()
+    }
+
+    fun setLyricsAnimationStyle(value: LyricsAnimationStylePreference) {
+        _lyricsAnimationStyle.value = value
         save()
     }
 
@@ -514,6 +634,27 @@ class DesktopPreferences private constructor(
                 json.optString("playerButtonsStyle", "default")
             )
             _sliderStyle.value = SliderStyle.fromString(json.optString("sliderStyle", "default"))
+            _densityScale.value = json.optDouble("density_scale_factor", 1.0).toFloat().coerceIn(0.5f, 1.2f)
+            _customDensityValue.value = json.optDouble("custom_density_scale_value", 0.85).toFloat().coerceIn(0.5f, 1.2f)
+            _defaultOpenTab.value = NavigationTabPreference.fromString(json.optString("defaultOpenTab", "home"))
+            _defaultLibChip.value = json.optString("chipSortType", "library")
+                .let { value -> runCatching { LibraryFilter.valueOf(value.uppercase()) }.getOrDefault(LibraryFilter.LIBRARY) }
+            _slimNavBar.value = json.optBoolean("slimNavBar", false)
+            _swipeToSong.value = json.optBoolean("SwipeToSong", false)
+            _swipeThumbnail.value = json.optBoolean("swipeThumbnail", true)
+            _swipeSensitivity.value = json.optDouble("swipeSensitivity", 0.73).toFloat().coerceIn(0f, 1f)
+            _lyricsTextPosition.value = LyricsPositionPreference.fromString(
+                json.optString("lyricsTextPosition", "center")
+            )
+            _lyricsClick.value = json.optBoolean("lyricsClick", true)
+            _lyricsScroll.value = json.optBoolean("lyricsScrollKey", json.optBoolean("lyricsScroll", true))
+            _lyricsFontSize.value = json.optDouble("lyricsFontSize", 20.0).toFloat().coerceIn(12f, 36f)
+            _lyricsCustomFontPath.value =
+                json.optString("lyricsCustomFontPath", "").takeIf { it != "null" } ?: ""
+            _lyricsSmoothScroll.value = json.optBoolean("lyricsSmoothScroll", true)
+            _lyricsAnimationStyle.value = LyricsAnimationStylePreference.fromString(
+                json.optString("lyricsAnimationStyle", "apple")
+            )
 
             _audioQuality.value = AudioQuality.fromString(json.optString("audioQuality", "auto"))
             _normalizeAudio.value = json.optBoolean("normalizeAudio", true)
@@ -602,6 +743,21 @@ class DesktopPreferences private constructor(
                 put("playerBackgroundStyle", _playerBackgroundStyle.value.name.lowercase())
                 put("playerButtonsStyle", _playerButtonsStyle.value.name.lowercase())
                 put("sliderStyle", _sliderStyle.value.name.lowercase())
+                put("density_scale_factor", _densityScale.value)
+                put("custom_density_scale_value", _customDensityValue.value)
+                put("defaultOpenTab", _defaultOpenTab.value.name.lowercase())
+                put("chipSortType", _defaultLibChip.value.name.lowercase())
+                put("slimNavBar", _slimNavBar.value)
+                put("SwipeToSong", _swipeToSong.value)
+                put("swipeThumbnail", _swipeThumbnail.value)
+                put("swipeSensitivity", _swipeSensitivity.value)
+                put("lyricsTextPosition", _lyricsTextPosition.value.name.lowercase())
+                put("lyricsClick", _lyricsClick.value)
+                put("lyricsScrollKey", _lyricsScroll.value)
+                put("lyricsFontSize", _lyricsFontSize.value)
+                put("lyricsCustomFontPath", _lyricsCustomFontPath.value)
+                put("lyricsSmoothScroll", _lyricsSmoothScroll.value)
+                put("lyricsAnimationStyle", _lyricsAnimationStyle.value.name.lowercase())
 
                 put("audioQuality", _audioQuality.value.name.lowercase())
                 put("normalizeAudio", _normalizeAudio.value)
@@ -736,6 +892,64 @@ enum class PreferredLyricsProvider {
             else -> BETTER_LYRICS
         }
     }
+}
+
+enum class NavigationTabPreference {
+    HOME,
+    EXPLORE,
+    LIBRARY;
+
+    companion object {
+        fun fromString(value: String): NavigationTabPreference = when (value.lowercase()) {
+            "explore" -> EXPLORE
+            "library" -> LIBRARY
+            else -> HOME
+        }
+    }
+}
+
+enum class LyricsPositionPreference {
+    LEFT,
+    CENTER,
+    RIGHT;
+
+    companion object {
+        fun fromString(value: String): LyricsPositionPreference = when (value.lowercase()) {
+            "left" -> LEFT
+            "right" -> RIGHT
+            else -> CENTER
+        }
+    }
+}
+
+enum class LyricsAnimationStylePreference {
+    NONE,
+    FADE,
+    GLOW,
+    SLIDE,
+    KARAOKE,
+    APPLE;
+
+    companion object {
+        fun fromString(value: String): LyricsAnimationStylePreference = when (value.lowercase()) {
+            "none" -> NONE
+            "fade" -> FADE
+            "glow" -> GLOW
+            "slide" -> SLIDE
+            "karaoke" -> KARAOKE
+            else -> APPLE
+        }
+    }
+
+    val labelKey: String
+        get() = when (this) {
+            NONE -> "lyrics_animation_none"
+            FADE -> "lyrics_animation_fade"
+            GLOW -> "lyrics_animation_glow"
+            SLIDE -> "lyrics_animation_slide"
+            KARAOKE -> "lyrics_animation_karaoke"
+            APPLE -> "lyrics_animation_apple"
+        }
 }
 
 enum class AudioQuality {

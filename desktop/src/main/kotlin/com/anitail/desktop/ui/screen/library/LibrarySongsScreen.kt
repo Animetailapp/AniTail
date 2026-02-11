@@ -86,6 +86,7 @@ fun LibrarySongsScreen(
     val sortType by preferences.songSortType.collectAsState()
     val sortDescending by preferences.songSortDescending.collectAsState()
     val showCached by preferences.showCachedPlaylist.collectAsState()
+    val swipeToSong by preferences.swipeToSong.collectAsState()
 
     val visiblePlaylists = remember(playlists, showCached) {
         filterLibraryPlaylists(playlists, showCached)
@@ -237,6 +238,9 @@ fun LibrarySongsScreen(
                             }
                         },
                         onMenuClick = { menuExpanded.value = true },
+                        swipeEnabled = swipeToSong,
+                        onSwipePlayNext = { playerState.addToQueue(libraryItem, playNext = true) },
+                        onSwipeAddToQueue = { playerState.addToQueue(libraryItem) },
                         modifier = Modifier.fillMaxWidth(),
                     )
 

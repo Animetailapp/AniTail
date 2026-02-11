@@ -1,7 +1,11 @@
 package com.anitail.desktop.ui.screen
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -13,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,10 +38,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
 import com.anitail.desktop.constants.PlayerHorizontalPadding
 import com.anitail.desktop.constants.PlayerQueueCollapsedHeight
 import com.anitail.desktop.db.DesktopDatabase
@@ -69,6 +78,9 @@ import com.anitail.shared.model.LibraryItem
 import kotlinx.coroutines.launch
 import java.awt.Desktop
 import java.net.URI
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.roundToInt
 
 @Composable
 fun PlayerScreen(
@@ -88,12 +100,15 @@ fun PlayerScreen(
 
     val preferences = remember { DesktopPreferences.getInstance() }
     val showLyrics by preferences.showLyrics.collectAsState()
+    val swipeThumbnail by preferences.swipeThumbnail.collectAsState()
+    val swipeSensitivity by preferences.swipeSensitivity.collectAsState()
     val pureBlack by preferences.pureBlack.collectAsState()
     val playerBackgroundStyle by preferences.playerBackgroundStyle.collectAsState()
     val playerButtonsStyle by preferences.playerButtonsStyle.collectAsState()
     val sliderStyle by preferences.sliderStyle.collectAsState()
 
     val clipboard = LocalClipboardManager.current
+    val layoutDirection = LocalLayoutDirection.current
     val coroutineScope = rememberCoroutineScope()
     val songs by database.songs.collectAsState(initial = emptyList())
     val playlists by database.allPlaylists().collectAsState(initial = emptyList())
@@ -108,6 +123,9 @@ fun PlayerScreen(
     var showDetailsDialog by remember { mutableStateOf(false) }
     var showAdvancedDialog by remember { mutableStateOf(false) }
     var showArtistPickerDialog by remember { mutableStateOf(false) }
+    val thumbnailOffsetX = remember { Animatable(0f) }
+    var dragStartTime by remember { mutableStateOf(0L) }
+    var totalDragDistance by remember { mutableStateOf(0f) }
 
     var nextResult by remember(item.id) { mutableStateOf<NextResult?>(null) }
     var songDetails by remember(item.id) { mutableStateOf<SongItem?>(null) }
@@ -233,6 +251,15 @@ fun PlayerScreen(
 
     val backgroundColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface
     val hiResArtworkUrl = remember(item.artworkUrl) { toHighResArtworkUrl(item.artworkUrl) }
+    val swipeAnimationSpec = remember {
+        spring<Float>(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessLow,
+        )
+    }
+    val autoSwipeThreshold = remember(swipeSensitivity) {
+        600f / (1f + exp(-(-11.44748f * swipeSensitivity + 9.04945f)))
+    }
     val artworkFallbackUrls = remember(item.artworkUrl, hiResArtworkUrl) {
         val original = item.artworkUrl
         if (original.isNullOrBlank() || original == hiResArtworkUrl) {
@@ -309,20 +336,77 @@ fun PlayerScreen(
                         videoId = item.id,
                         durationSec = ((item.durationMs ?: 0L) / 1000L).toInt(),
                         currentPositionMs = playerState.position,
+                        isPlaying = playerState.isPlaying,
                         onSeek = { playerState.seekTo(it) },
                         modifier = Modifier.fillMaxSize().padding(horizontal = PlayerHorizontalPadding),
                     )
                 } else {
-                    RemoteImage(
-                        url = hiResArtworkUrl,
-                        contentDescription = item.title,
-                        fallbackUrls = artworkFallbackUrls,
+                    Box(
                         modifier = Modifier
                             .fillMaxHeight(0.82f)
                             .aspectRatio(1f)
-                            .shadow(16.dp, RoundedCornerShape(12.dp))
-                            .clip(RoundedCornerShape(12.dp)),
-                    )
+                            .pointerInput(swipeThumbnail, swipeSensitivity, layoutDirection, playerState.canSkipNext, playerState.canSkipPrevious) {
+                                if (!swipeThumbnail) return@pointerInput
+                                detectHorizontalDragGestures(
+                                    onDragStart = {
+                                        dragStartTime = System.currentTimeMillis()
+                                        totalDragDistance = 0f
+                                    },
+                                    onHorizontalDrag = { _, dragAmount ->
+                                        val adjustedDragAmount =
+                                            if (layoutDirection == LayoutDirection.Rtl) -dragAmount else dragAmount
+                                        val allowLeft = adjustedDragAmount < 0 && playerState.canSkipNext
+                                        val allowRight =
+                                            adjustedDragAmount > 0 && (playerState.canSkipPrevious || playerState.position > 3000L)
+                                        if (!allowLeft && !allowRight) return@detectHorizontalDragGestures
+                                        totalDragDistance += abs(adjustedDragAmount)
+                                        coroutineScope.launch {
+                                            thumbnailOffsetX.snapTo(thumbnailOffsetX.value + adjustedDragAmount)
+                                        }
+                                    },
+                                    onDragCancel = {
+                                        coroutineScope.launch {
+                                            thumbnailOffsetX.animateTo(0f, animationSpec = swipeAnimationSpec)
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        val dragDuration = System.currentTimeMillis() - dragStartTime
+                                        val velocity = if (dragDuration > 0) totalDragDistance / dragDuration else 0f
+                                        val currentOffset = thumbnailOffsetX.value
+                                        val minDistanceThreshold = 50f
+                                        val velocityThreshold = (swipeSensitivity * -8.25f) + 8.5f
+                                        val shouldChangeSong = (
+                                            abs(currentOffset) > minDistanceThreshold &&
+                                                velocity > velocityThreshold
+                                            ) || (abs(currentOffset) > autoSwipeThreshold)
+
+                                        if (shouldChangeSong) {
+                                            val isRightSwipe = currentOffset > 0f
+                                            if (isRightSwipe && (playerState.canSkipPrevious || playerState.position > 3000L)) {
+                                                playerState.skipToPrevious()
+                                            } else if (!isRightSwipe && playerState.canSkipNext) {
+                                                playerState.skipToNext()
+                                            }
+                                        }
+
+                                        coroutineScope.launch {
+                                            thumbnailOffsetX.animateTo(0f, animationSpec = swipeAnimationSpec)
+                                        }
+                                    },
+                                )
+                            },
+                    ) {
+                        RemoteImage(
+                            url = hiResArtworkUrl,
+                            contentDescription = item.title,
+                            fallbackUrls = artworkFallbackUrls,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .offset { IntOffset(thumbnailOffsetX.value.roundToInt(), 0) }
+                                .shadow(16.dp, RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(12.dp)),
+                        )
+                    }
                 }
             }
 

@@ -58,6 +58,7 @@ class PlayerState {
     private var sleepTimerState by mutableStateOf(inactiveSleepTimerState())
     private var sleepTimerJob: Job? = null
     private var sleepTimerTick by mutableStateOf(0L)
+    private var positionTrackerJob: Job? = null
 
     // Cola de reproducción
     private val _queue = mutableStateListOf<LibraryItem>()
@@ -82,23 +83,28 @@ class PlayerState {
                     isPlaying = true
                     isBuffering = false
                     errorMessage = null
+                    startPositionTracker()
                 }
                 NativeAudioPlayer.PlaybackStatus.PAUSED -> {
                     isPlaying = false
+                    stopPositionTracker()
                 }
                 NativeAudioPlayer.PlaybackStatus.BUFFERING -> {
                     isBuffering = true
                 }
                 NativeAudioPlayer.PlaybackStatus.ENDED -> {
                     isPlaying = false
+                    stopPositionTracker()
                     handlePlaybackEnded()
                 }
                 NativeAudioPlayer.PlaybackStatus.ERROR -> {
                     isPlaying = false
                     isBuffering = false
+                    stopPositionTracker()
                 }
                 NativeAudioPlayer.PlaybackStatus.STOPPED -> {
                     isPlaying = false
+                    stopPositionTracker()
                 }
                 else -> { /* Ignorar otros estados */ }
             }
@@ -115,6 +121,7 @@ class PlayerState {
             errorMessage = error
             isPlaying = false
             isBuffering = false
+            stopPositionTracker()
         }
 
         nativePlayer.onBuffering = { buffering ->
@@ -191,6 +198,7 @@ class PlayerState {
         errorMessage = error.message ?: "Error al reproducir"
         isPlaying = false
         isBuffering = false
+        stopPositionTracker()
         println("Anitail ERROR: Playback failed: ${error.message}")
     }
 
@@ -319,6 +327,7 @@ class PlayerState {
     fun stop() {
         reportPlaybackIfNeeded()
         isPlaying = false
+        stopPositionTracker()
         cancelSleepTimer()
         position = 0L
         currentItem = null
@@ -457,8 +466,33 @@ class PlayerState {
     }
 
     fun release() {
+        stopPositionTracker()
         cancelSleepTimer()
         nativePlayer.release()
+    }
+
+    private fun startPositionTracker() {
+        if (positionTrackerJob?.isActive == true) return
+        positionTrackerJob = scope.launch {
+            while (isActive) {
+                if (isPlaying) {
+                    val currentMs = nativePlayer.getCurrentPosition()
+                    if (currentMs >= 0L) {
+                        position = currentMs
+                    }
+                    val totalMs = nativePlayer.getDuration()
+                    if (totalMs > 0L) {
+                        duration = totalMs
+                    }
+                }
+                delay(PositionTrackerIntervalMs)
+            }
+        }
+    }
+
+    private fun stopPositionTracker() {
+        positionTrackerJob?.cancel()
+        positionTrackerJob = null
     }
 }
 
@@ -472,3 +506,5 @@ enum class RepeatMode {
 fun rememberPlayerState(): PlayerState {
     return remember { PlayerState() }
 }
+
+private const val PositionTrackerIntervalMs = 16L

@@ -35,6 +35,7 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -73,6 +74,7 @@ import com.anitail.desktop.player.buildRadioQueuePlan
 import com.anitail.desktop.player.rememberPlayerState
 import com.anitail.desktop.sync.shouldStartSync
 import com.anitail.desktop.storage.DesktopPreferences
+import com.anitail.desktop.storage.NavigationTabPreference
 import com.anitail.desktop.storage.QuickPicks
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -399,17 +401,29 @@ private fun FrameWindowScope.AniTailDesktopApp(
     val dynamicColorEnabled by preferences.dynamicColor.collectAsState()
     val hideExplicit by preferences.hideExplicit.collectAsState()
     val quickPicksMode by preferences.quickPicks.collectAsState()
+    val defaultLibChip by preferences.defaultLibChip.collectAsState()
     val pauseListenHistory by preferences.pauseListenHistory.collectAsState()
     val historyDuration by preferences.historyDuration.collectAsState()
     val useLoginForBrowse by preferences.useLoginForBrowse.collectAsState()
     val ytmSync by preferences.ytmSync.collectAsState()
+    val defaultOpenTab by preferences.defaultOpenTab.collectAsState()
+    val densityScale by preferences.densityScale.collectAsState()
+    val slimNavBar by preferences.slimNavBar.collectAsState()
     val syncService = remember { LibrarySyncService(database) }
     val isSyncing by syncService.isSyncing.collectAsState()
     val lastSyncError by syncService.lastSyncError.collectAsState()
     var themeColor by remember { mutableStateOf(DefaultThemeColor) }
     var lastArtworkUrl by remember { mutableStateOf<String?>(null) }
 
-    var currentScreen by remember { mutableStateOf(DesktopScreen.Home) }
+    var currentScreen by remember {
+        mutableStateOf(
+            when (defaultOpenTab) {
+                NavigationTabPreference.HOME -> DesktopScreen.Home
+                NavigationTabPreference.EXPLORE -> DesktopScreen.Explore
+                NavigationTabPreference.LIBRARY -> DesktopScreen.Library
+            },
+        )
+    }
     var authCredentials by remember { mutableStateOf(authService.credentials) }
     var accountInfo by remember { mutableStateOf<AccountInfo?>(null) }
     var syncStatus by remember { mutableStateOf<String?>(null) }
@@ -417,6 +431,10 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
     LaunchedEffect(strings.locale) {
         Locale.setDefault(strings.locale)
+    }
+
+    LaunchedEffect(defaultLibChip) {
+        preferences.setLibraryFilter(defaultLibChip)
     }
 
     LaunchedEffect(authCredentials?.cookie) {
@@ -852,7 +870,18 @@ private fun FrameWindowScope.AniTailDesktopApp(
         currentScreen = DesktopScreen.AlbumDetail
     }
 
-    CompositionLocalProvider(LocalStrings provides strings) {
+    val baseDensity = LocalDensity.current
+    val scaledDensity = remember(baseDensity, densityScale) {
+        Density(
+            density = (baseDensity.density * densityScale).coerceAtLeast(0.1f),
+            fontScale = (baseDensity.fontScale * densityScale).coerceAtLeast(0.1f),
+        )
+    }
+
+    CompositionLocalProvider(
+        LocalStrings provides strings,
+        LocalDensity provides scaledDensity,
+    ) {
         AnitailTheme(
             darkMode = darkMode,
             pureBlack = pureBlackEnabled,
@@ -993,11 +1022,12 @@ private fun FrameWindowScope.AniTailDesktopApp(
         BoxWithConstraints(
             modifier = windowModifier
         ) {
+            val navigationBarHeight = if (slimNavBar) 64.dp else NavigationBarHeight
             val contentHeight = maxHeight - topBarHeight
             val playerBottomSheetState =
                 rememberBottomSheetState(
                     dismissedBound = 0.dp,
-                    collapsedBound = NavigationBarHeight + MiniPlayerBottomSpacing + MiniPlayerHeight,
+                    collapsedBound = navigationBarHeight + MiniPlayerBottomSpacing + MiniPlayerHeight,
                     expandedBound = contentHeight,
                 )
             val playerBottomPadding = if (!playerBottomSheetState.isDismissed) {
@@ -1005,7 +1035,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
             } else {
                 0.dp
             }
-            val contentBottomPadding = NavigationBarHeight + playerBottomPadding
+            val contentBottomPadding = navigationBarHeight + playerBottomPadding
             val bottomSheetBackgroundColor =
                 if (pureBlackEnabled) Color.Black else MaterialTheme.colorScheme.surfaceContainer
 
@@ -1800,15 +1830,17 @@ private fun FrameWindowScope.AniTailDesktopApp(
                 NavigationBar(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .height(NavigationBarHeight)
-                        .offset(y = NavigationBarHeight * playerBottomSheetState.progress.coerceIn(0f, 1f)),
+                        .height(navigationBarHeight)
+                        .offset(y = navigationBarHeight * playerBottomSheetState.progress.coerceIn(0f, 1f)),
                     containerColor = if (pureBlackEnabled) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
                     contentColor = if (pureBlackEnabled) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                 ) {
                     NavigationBarItem(
                         selected = currentScreen == DesktopScreen.Home,
                         onClick = { currentScreen = DesktopScreen.Home },
-                        label = { Text(stringResource("home")) },
+                        label = if (slimNavBar) null else {
+                            { Text(stringResource("home")) }
+                        },
                         icon = {
                             val selected = currentScreen == DesktopScreen.Home
                             Icon(
@@ -1821,7 +1853,9 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     NavigationBarItem(
                         selected = currentScreen == DesktopScreen.Explore,
                         onClick = { currentScreen = DesktopScreen.Explore },
-                        label = { Text(stringResource("explore")) },
+                        label = if (slimNavBar) null else {
+                            { Text(stringResource("explore")) }
+                        },
                         icon = {
                             val selected = currentScreen == DesktopScreen.Explore
                             Icon(
@@ -1834,7 +1868,9 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     NavigationBarItem(
                         selected = currentScreen == DesktopScreen.Library,
                         onClick = { currentScreen = DesktopScreen.Library },
-                        label = { Text(stringResource("filter_library")) },
+                        label = if (slimNavBar) null else {
+                            { Text(stringResource("filter_library")) }
+                        },
                         icon = {
                             val selected = currentScreen == DesktopScreen.Library
                             Icon(

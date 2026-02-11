@@ -12,6 +12,7 @@ import io.ktor.client.request.parameter
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 
 object BetterLyrics {
     private val client by lazy {
@@ -74,6 +75,9 @@ object BetterLyrics {
             null
         }
     }.getOrElse { e ->
+        if (e is CancellationException) {
+            throw e
+        }
         println("[BetterLyrics] Exception in fetchTTML: ${e.message}")
         e.printStackTrace()
         null

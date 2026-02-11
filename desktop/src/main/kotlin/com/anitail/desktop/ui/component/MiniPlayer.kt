@@ -1,11 +1,15 @@
 package com.anitail.desktop.ui.component
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,20 +31,35 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.anitail.desktop.constants.MiniPlayerHeight
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.player.RepeatMode
+import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.roundToInt
 
 /**
  * MiniPlayer para Desktop - diseño inspirado en Android NewMiniPlayer.
@@ -51,13 +71,30 @@ fun MiniPlayer(
     onOpenFullPlayer: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val preferences = remember { DesktopPreferences.getInstance() }
+    val swipeSensitivity by preferences.swipeSensitivity.collectAsState()
+    val swipeThumbnail by preferences.swipeThumbnail.collectAsState()
     val currentItem = playerState.currentItem ?: return
+    val coroutineScope = rememberCoroutineScope()
+    val layoutDirection = LocalLayoutDirection.current
+    val swipeOffsetX = remember { Animatable(0f) }
+    var dragStartTime by remember { mutableStateOf(0L) }
+    var totalDragDistance by remember { mutableStateOf(0f) }
     val playLabel = stringResource("play")
     val pauseLabel = stringResource("pause")
     val previousLabel = stringResource("previous")
     val nextLabel = stringResource("next")
     val shuffleLabel = stringResource("shuffle")
     val repeatLabel = stringResource("repeat")
+    val swipeAnimationSpec = remember {
+        spring<Float>(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessLow,
+        )
+    }
+    val autoSwipeThreshold = remember(swipeSensitivity) {
+        600f / (1f + exp(-(-11.44748f * swipeSensitivity + 9.04945f)))
+    }
 
     Surface(
         tonalElevation = 2.dp,
@@ -70,12 +107,61 @@ fun MiniPlayer(
                 .padding(horizontal = 12.dp, vertical = 4.dp)
                 .clip(RoundedCornerShape(32.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainer)
+                .pointerInput(swipeThumbnail, swipeSensitivity, layoutDirection, playerState.canSkipNext, playerState.canSkipPrevious) {
+                    if (!swipeThumbnail) return@pointerInput
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            dragStartTime = System.currentTimeMillis()
+                            totalDragDistance = 0f
+                        },
+                        onHorizontalDrag = { _, dragAmount ->
+                            val adjustedDragAmount =
+                                if (layoutDirection == LayoutDirection.Rtl) -dragAmount else dragAmount
+                            val allowLeft = adjustedDragAmount < 0 && playerState.canSkipNext
+                            val allowRight =
+                                adjustedDragAmount > 0 && (playerState.canSkipPrevious || playerState.position > 3000L)
+                            if (!allowLeft && !allowRight) return@detectHorizontalDragGestures
+                            totalDragDistance += abs(adjustedDragAmount)
+                            coroutineScope.launch {
+                                swipeOffsetX.snapTo(swipeOffsetX.value + adjustedDragAmount)
+                            }
+                        },
+                        onDragCancel = {
+                            coroutineScope.launch {
+                                swipeOffsetX.animateTo(0f, animationSpec = swipeAnimationSpec)
+                            }
+                        },
+                        onDragEnd = {
+                            val dragDuration = System.currentTimeMillis() - dragStartTime
+                            val velocity = if (dragDuration > 0) totalDragDistance / dragDuration else 0f
+                            val currentOffset = swipeOffsetX.value
+                            val minDistanceThreshold = 50f
+                            val velocityThreshold = (swipeSensitivity * -8.25f) + 8.5f
+                            val shouldChangeSong = (
+                                abs(currentOffset) > minDistanceThreshold &&
+                                    velocity > velocityThreshold
+                                ) || (abs(currentOffset) > autoSwipeThreshold)
+                            if (shouldChangeSong) {
+                                val isRightSwipe = currentOffset > 0f
+                                if (isRightSwipe && (playerState.canSkipPrevious || playerState.position > 3000L)) {
+                                    playerState.skipToPrevious()
+                                } else if (!isRightSwipe && playerState.canSkipNext) {
+                                    playerState.skipToNext()
+                                }
+                            }
+                            coroutineScope.launch {
+                                swipeOffsetX.animateTo(0f, animationSpec = swipeAnimationSpec)
+                            }
+                        },
+                    )
+                }
                 .clickable { onOpenFullPlayer() },
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxSize()
+                    .offset { IntOffset(swipeOffsetX.value.roundToInt(), 0) }
                     .padding(horizontal = 8.dp),
             ) {
                 // Botón Play/Pause con indicador de progreso circular

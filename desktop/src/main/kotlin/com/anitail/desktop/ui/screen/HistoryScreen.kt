@@ -58,6 +58,7 @@ import com.anitail.desktop.i18n.pluralStringResource
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.player.buildRadioQueuePlan
+import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.ArtistPickerDialog
 import com.anitail.desktop.ui.component.ChipsRow
@@ -112,6 +113,7 @@ fun HistoryScreen(
     val coroutineScope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
+    val preferences = remember { DesktopPreferences.getInstance() }
 
     val songs by database.songs.collectAsState(initial = emptyList())
     val events by database.events.collectAsState(initial = emptyList())
@@ -122,6 +124,7 @@ fun HistoryScreen(
 
     val songsById = remember(songs) { songs.associateBy { it.id } }
     val downloadedIds = remember(downloadedSongs) { downloadedSongs.map { it.songId }.toSet() }
+    val swipeToSong by preferences.swipeToSong.collectAsState()
 
     var historySource by remember { mutableStateOf(HistorySource.LOCAL) }
     var isSearching by rememberSaveable { mutableStateOf(false) }
@@ -585,6 +588,9 @@ fun HistoryScreen(
                                             }
                                         },
                                         onMenuClick = { menuExpanded.value = true },
+                                        swipeEnabled = swipeToSong,
+                                        onSwipePlayNext = { playerState.addToQueue(libraryItem, playNext = true) },
+                                        onSwipeAddToQueue = { playerState.addToQueue(libraryItem) },
                                     )
                                     ItemContextMenu(
                                         expanded = menuExpanded.value,
@@ -704,6 +710,9 @@ fun HistoryScreen(
                                             }
                                         },
                                         onMenuClick = { if (!selectionMode) menuExpanded.value = true },
+                                        swipeEnabled = swipeToSong && !selectionMode,
+                                        onSwipePlayNext = { playerState.addToQueue(libraryItem, playNext = true) },
+                                        onSwipeAddToQueue = { playerState.addToQueue(libraryItem) },
                                     )
                                     ItemContextMenu(
                                         expanded = menuExpanded.value,
