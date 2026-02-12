@@ -105,11 +105,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y rpm
 
       - name: Inject Google OAuth client_secret.json (if secret available)
-        if: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON != '' }}
         shell: pwsh
         env:
           GOOGLE_CLIENT_SECRET_JSON: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:GOOGLE_CLIENT_SECRET_JSON)) {
+            Write-Host "GOOGLE_CLIENT_SECRET_JSON is not available in this PR run. Skipping OAuth secret injection."
+            exit 0
+          }
           New-Item -ItemType Directory -Force "desktop/src/main/resources/oauth" | Out-Null
           [System.IO.File]::WriteAllText(
             "desktop/src/main/resources/oauth/client_secret.json",
