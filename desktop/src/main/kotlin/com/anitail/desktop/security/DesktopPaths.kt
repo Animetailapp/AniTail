@@ -14,9 +14,17 @@ object DesktopPaths {
 
     fun preferencesFile(): Path = appDataDir().resolve("preferences.json")
 
+    fun androidSettingsPreferencesFile(): Path = appDataDir().resolve("settings.preferences_pb")
+
     fun lyricsOverridesFile(): Path = appDataDir().resolve("lyrics_overrides.json")
 
     fun lastFmPendingFile(): Path = appDataDir().resolve("lastfm_pending_scrobbles.json")
 
+    fun androidLastFmOfflineFile(): Path = appDataDir().resolve("lastfm_offline.xml")
+
     fun databaseDir(): Path = appDataDir().resolve("database")
+
+    fun downloadsDir(): Path = userHome().resolve("Downloads")
+
+    fun autoBackupDir(): Path = downloadsDir().resolve("AniTail").resolve("AutoBackup")
 }

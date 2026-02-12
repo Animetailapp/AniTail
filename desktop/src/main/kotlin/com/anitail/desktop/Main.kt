@@ -75,6 +75,7 @@ import com.anitail.desktop.player.buildRadioQueuePlan
 import com.anitail.desktop.player.rememberPlayerState
 import com.anitail.desktop.sync.shouldStartSync
 import com.anitail.desktop.storage.DesktopPreferences
+import com.anitail.desktop.storage.DesktopAutoBackupService
 import com.anitail.desktop.storage.AvatarSourcePreference
 import com.anitail.desktop.storage.NavigationTabPreference
 import com.anitail.desktop.storage.ProxyTypePreference
@@ -428,6 +429,11 @@ private fun FrameWindowScope.AniTailDesktopApp(
     val similarContentEnabled by preferences.similarContentEnabled.collectAsState()
     val autoSkipNextOnError by preferences.autoSkipNextOnError.collectAsState()
     val autoStartRadio by preferences.autoStartRadio.collectAsState()
+    val autoBackupEnabled by preferences.autoBackupEnabled.collectAsState()
+    val autoBackupFrequencyHours by preferences.autoBackupFrequencyHours.collectAsState()
+    val autoBackupKeepCount by preferences.autoBackupKeepCount.collectAsState()
+    val autoBackupUseCustomLocation by preferences.autoBackupUseCustomLocation.collectAsState()
+    val autoBackupCustomLocation by preferences.autoBackupCustomLocation.collectAsState()
     val syncService = remember { LibrarySyncService(database) }
     val isSyncing by syncService.isSyncing.collectAsState()
     val lastSyncError by syncService.lastSyncError.collectAsState()
@@ -462,6 +468,25 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
     LaunchedEffect(authCredentials?.cookie) {
         accountInfo = authService.refreshAccountInfo()
+    }
+
+    LaunchedEffect(
+        autoBackupEnabled,
+        autoBackupFrequencyHours,
+        autoBackupKeepCount,
+        autoBackupUseCustomLocation,
+        autoBackupCustomLocation,
+    ) {
+        DesktopAutoBackupService.startOrUpdate(
+            preferences = preferences,
+            authService = authService,
+        )
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            DesktopAutoBackupService.stop()
+        }
     }
 
     LaunchedEffect(authCredentials?.visitorData, authCredentials?.cookie) {
@@ -1057,6 +1082,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                 ?.takeUnless { it.isBlank() }
                 ?: authCredentials?.accountName?.takeUnless { it.isBlank() }
             val youtubeAccountAvatar = accountInfo?.thumbnailUrl?.takeUnless { it.isBlank() }
+                ?: authCredentials?.accountImageUrl?.takeUnless { it.isBlank() }
             val discordAccountName = discordUsername.takeUnless { it.isBlank() }
             val discordAccountAvatar = discordAvatarUrl.takeUnless { it.isBlank() }
             val topBarAccountName = when (preferredAvatarSource) {
@@ -1318,10 +1344,12 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                     ?: authCredentials?.accountName
                             },
                             accountThumbnailUrl = when (preferredAvatarSource) {
-                                AvatarSourcePreference.YOUTUBE -> accountInfo?.thumbnailUrl
+                                AvatarSourcePreference.YOUTUBE ->
+                                    accountInfo?.thumbnailUrl ?: authCredentials?.accountImageUrl
                                 AvatarSourcePreference.DISCORD -> discordAvatarUrl
                                     .takeUnless { it.isBlank() }
                                     ?: accountInfo?.thumbnailUrl
+                                    ?: authCredentials?.accountImageUrl
                             },
                             database = database,
                             downloadService = downloadService,

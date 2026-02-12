@@ -76,6 +76,7 @@ import com.anitail.desktop.auth.AccountInfo
 import com.anitail.desktop.auth.DesktopAccountTokenParser
 import com.anitail.desktop.auth.DesktopAuthService
 import com.anitail.desktop.auth.DesktopDiscordService
+import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.storage.AudioQuality
 import com.anitail.desktop.storage.AvatarSourcePreference
@@ -121,6 +122,8 @@ enum class SettingsDestination {
     CONTENT_ROMANIZATION,
     PRIVACY,
     STORAGE,
+    BACKUP,
+    AUTO_BACKUP,
     ABOUT,
 }
 
@@ -130,6 +133,7 @@ enum class SettingsDestination {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    database: DesktopDatabase = DesktopDatabase.getInstance(),
     preferences: DesktopPreferences = DesktopPreferences.getInstance(),
     downloadService: DesktopDownloadService,
     authService: DesktopAuthService,
@@ -150,7 +154,7 @@ fun SettingsScreen(
                 onNavigate = { currentDestination = it },
                 preferredAvatarSource = preferredAvatarSource,
                 googleAccountName = accountInfo?.name ?: authCredentials?.accountName,
-                googleAvatarUrl = accountInfo?.thumbnailUrl,
+                googleAvatarUrl = accountInfo?.thumbnailUrl ?: authCredentials?.accountImageUrl,
                 discordUsername = discordUsername,
                 discordAvatarUrl = discordAvatarUrl,
             )
@@ -215,6 +219,22 @@ fun SettingsScreen(
                 preferences = preferences,
                 downloadService = downloadService,
                 onBack = { currentDestination = SettingsDestination.MAIN },
+            )
+
+            SettingsDestination.BACKUP -> BackupRestoreSettingsScreen(
+                database = database,
+                preferences = preferences,
+                authService = authService,
+                onAuthChanged = onAuthChanged,
+                onOpenAutoBackup = { currentDestination = SettingsDestination.AUTO_BACKUP },
+                onBack = { currentDestination = SettingsDestination.MAIN },
+            )
+
+            SettingsDestination.AUTO_BACKUP -> AutoBackupSettingsScreen(
+                preferences = preferences,
+                authService = authService,
+                onAuthChanged = onAuthChanged,
+                onBack = { currentDestination = SettingsDestination.BACKUP },
             )
 
             SettingsDestination.ABOUT -> AboutScreen(

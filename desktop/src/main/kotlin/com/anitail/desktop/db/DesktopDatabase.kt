@@ -395,6 +395,42 @@ class DesktopDatabase private constructor(
         saveSearchHistory()
     }
 
+    suspend fun snapshot(): DesktopDatabaseSnapshot = withContext(Dispatchers.IO) {
+        DesktopDatabaseSnapshot(
+            songs = _songs.value.values.toList(),
+            artists = _artists.value.values.toList(),
+            albums = _albums.value.values.toList(),
+            playlists = _playlists.value.values.toList(),
+            playlistSongMaps = _playlistSongMaps.value.toList(),
+            songArtistMaps = _songArtistMaps.value.toList(),
+            relatedSongMaps = _relatedSongMaps.value.toList(),
+            events = _events.value.toList(),
+            searchHistory = _searchHistory.value.toList(),
+        )
+    }
+
+    suspend fun replaceAll(snapshot: DesktopDatabaseSnapshot) = withContext(Dispatchers.IO) {
+        _songs.value = snapshot.songs.associateBy { it.id }
+        _artists.value = snapshot.artists.associateBy { it.id }
+        _albums.value = snapshot.albums.associateBy { it.id }
+        _playlists.value = snapshot.playlists.associateBy { it.id }
+        _playlistSongMaps.value = snapshot.playlistSongMaps
+        _songArtistMaps.value = snapshot.songArtistMaps
+        _relatedSongMaps.value = snapshot.relatedSongMaps
+        _events.value = snapshot.events
+        _searchHistory.value = snapshot.searchHistory
+
+        saveSongs()
+        saveArtists()
+        saveAlbums()
+        savePlaylists()
+        savePlaylistSongMaps()
+        saveSongArtistMaps()
+        saveRelatedSongMaps()
+        saveEvents()
+        saveSearchHistory()
+    }
+
     // === Stats Queries ===
 
     fun mostPlayedSongs(limit: Int = 50): Flow<List<SongEntity>> = _songs.map { songs ->
@@ -917,3 +953,15 @@ class DesktopDatabase private constructor(
         }
     }
 }
+
+data class DesktopDatabaseSnapshot(
+    val songs: List<SongEntity>,
+    val artists: List<ArtistEntity>,
+    val albums: List<AlbumEntity>,
+    val playlists: List<PlaylistEntity>,
+    val playlistSongMaps: List<PlaylistSongMap>,
+    val songArtistMaps: List<SongArtistMap>,
+    val relatedSongMaps: List<RelatedSongMap>,
+    val events: List<EventEntity>,
+    val searchHistory: List<SearchHistory>,
+)

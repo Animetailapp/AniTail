@@ -18,6 +18,7 @@ import org.json.JSONObject
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.util.Base64
 import java.util.Properties
 
 sealed class LastFmServiceResult<out T> {
@@ -46,6 +47,8 @@ private data class PendingScrobble(
 object DesktopLastFmService {
     private const val USER_AGENT = "AniTail Desktop"
     private const val DUPLICATE_WINDOW_MS = 30_000L
+    private const val OBFUSCATED_LASTFM_API_KEY = "NzMyYTkzNDdlNjk0MmE1NTVjODJmM2QxZDgxMmUyNjM="
+    private const val OBFUSCATED_LASTFM_API_SECRET = "ZTI2MzA0MTI2MDNiNmYwY2FmYzI4YTVkZDFhY2Q5NTM="
     private val preferences = DesktopPreferences.getInstance()
     private val pendingFile = DesktopPaths.lastFmPendingFile().toFile()
 
@@ -437,15 +440,38 @@ object DesktopLastFmService {
     private fun loadApiConfig(): ApiConfig {
         val envKey = System.getenv("LASTFM_API_KEY").orEmpty().trim()
         val envSecret = System.getenv("LASTFM_API_SECRET").orEmpty().trim()
-        if (envKey.isNotBlank() && envSecret.isNotBlank()) {
-            return ApiConfig(apiKey = envKey, apiSecret = envSecret)
-        }
-
         val fromLocalProperties = readLocalProperties()
+        val localKey = fromLocalProperties.first.orEmpty().trim()
+        val localSecret = fromLocalProperties.second.orEmpty().trim()
+
+        val apiKey = envKey.ifBlank { localKey }.ifBlank { getObfuscatedApiKey() }
+        val apiSecret = envSecret.ifBlank { localSecret }.ifBlank { getObfuscatedApiSecret() }
+
         return ApiConfig(
-            apiKey = fromLocalProperties.first.orEmpty().trim(),
-            apiSecret = fromLocalProperties.second.orEmpty().trim(),
+            apiKey = apiKey,
+            apiSecret = apiSecret,
         )
+    }
+
+    private fun getObfuscatedApiKey(): String {
+        return decodeObfuscatedValue(
+            encodedValue = OBFUSCATED_LASTFM_API_KEY,
+            fallbackValue = "PLACEHOLDER_API_KEY",
+        )
+    }
+
+    private fun getObfuscatedApiSecret(): String {
+        return decodeObfuscatedValue(
+            encodedValue = OBFUSCATED_LASTFM_API_SECRET,
+            fallbackValue = "PLACEHOLDER_API_SECRET",
+        )
+    }
+
+    private fun decodeObfuscatedValue(encodedValue: String, fallbackValue: String): String {
+        return runCatching {
+            val decoded = Base64.getDecoder().decode(encodedValue)
+            String(decoded, StandardCharsets.UTF_8)
+        }.getOrDefault(fallbackValue)
     }
 
     private fun readLocalProperties(): Pair<String?, String?> {

@@ -43,6 +43,7 @@ internal fun StorageSettingsScreen(
     val maxDownloadSizeMB by preferences.maxDownloadSizeMB.collectAsState()
     val maxSongCacheSizeMB by preferences.maxSongCacheSizeMB.collectAsState()
     val maxImageCacheSizeMB by preferences.maxImageCacheSizeMB.collectAsState()
+    val cancelLabel = stringResource("cancel")
 
     var downloadedSongsSize by remember { mutableStateOf(0L) }
     var songCacheSize by remember { mutableStateOf(0L) }
@@ -156,6 +157,7 @@ internal fun StorageSettingsScreen(
             onClick = { showClearImageCacheDialog = true },
             icon = IconAssets.delete(),
         )
+
     }
 
     if (showClearDownloadsDialog) {
@@ -178,7 +180,7 @@ internal fun StorageSettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearDownloadsDialog = false }) {
-                    Text(stringResource("cancel"))
+                    Text(cancelLabel)
                 }
             },
         )
@@ -204,7 +206,7 @@ internal fun StorageSettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearSongCacheDialog = false }) {
-                    Text(stringResource("cancel"))
+                    Text(cancelLabel)
                 }
             },
         )
@@ -228,7 +230,7 @@ internal fun StorageSettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearImageCacheDialog = false }) {
-                    Text(stringResource("cancel"))
+                    Text(cancelLabel)
                 }
             },
         )

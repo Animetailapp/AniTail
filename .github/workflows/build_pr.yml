@@ -104,6 +104,19 @@ jobs:
         if: matrix.label == 'Linux RPM'
         run: sudo apt-get update && sudo apt-get install -y rpm
 
+      - name: Inject Google OAuth client_secret.json (if secret available)
+        if: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON != '' }}
+        shell: pwsh
+        env:
+          GOOGLE_CLIENT_SECRET_JSON: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
+        run: |
+          New-Item -ItemType Directory -Force "desktop/src/main/resources/oauth" | Out-Null
+          [System.IO.File]::WriteAllText(
+            "desktop/src/main/resources/oauth/client_secret.json",
+            $env:GOOGLE_CLIENT_SECRET_JSON,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
       - name: Build Desktop Release Package
         run: ${{ matrix.gradle_cmd }} ${{ matrix.gradle_task }}
         env:
@@ -115,3 +128,11 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: desktop/build/compose/binaries/**
           if-no-files-found: error
+
+      - name: Cleanup injected Google secret
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path "desktop/src/main/resources/oauth/client_secret.json") {
+            Remove-Item -Force "desktop/src/main/resources/oauth/client_secret.json"
+          }

@@ -118,6 +118,7 @@ internal fun SettingsMainScreen(
     val privacyText = stringResource("privacy")
     val playerText = stringResource("player_and_audio")
     val storageText = stringResource("storage")
+    val backupRestoreText = stringResource("backup_restore")
     val aboutText = stringResource("about")
 
     val allItems = remember(
@@ -132,6 +133,7 @@ internal fun SettingsMainScreen(
         privacyText,
         playerText,
         storageText,
+        backupRestoreText,
         aboutText,
     ) {
         listOf(
@@ -190,6 +192,14 @@ internal fun SettingsMainScreen(
                 icon = IconAssets.storage(),
                 iconColor = Color(0xFF8D6E63),
                 destination = SettingsDestination.STORAGE,
+            ),
+            DesktopSettingItem(
+                id = "backup",
+                title = backupRestoreText,
+                section = sectionSystem,
+                icon = IconAssets.windowRestore(),
+                iconColor = Color(0xFF5C6BC0),
+                destination = SettingsDestination.BACKUP,
             ),
             DesktopSettingItem(
                 id = "about",

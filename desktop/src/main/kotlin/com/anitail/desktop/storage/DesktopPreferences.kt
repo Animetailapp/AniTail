@@ -385,6 +385,25 @@ class DesktopPreferences private constructor(
     private val _downloadAsMp3 = MutableStateFlow(true)
     val downloadAsMp3: StateFlow<Boolean> = _downloadAsMp3.asStateFlow()
 
+    // === Backup Settings ===
+    private val _enableBackupUpload = MutableStateFlow(true)
+    val enableBackupUpload: StateFlow<Boolean> = _enableBackupUpload.asStateFlow()
+
+    private val _autoBackupEnabled = MutableStateFlow(false)
+    val autoBackupEnabled: StateFlow<Boolean> = _autoBackupEnabled.asStateFlow()
+
+    private val _autoBackupFrequencyHours = MutableStateFlow(BackupFrequency.DAILY.hours)
+    val autoBackupFrequencyHours: StateFlow<Int> = _autoBackupFrequencyHours.asStateFlow()
+
+    private val _autoBackupKeepCount = MutableStateFlow(5)
+    val autoBackupKeepCount: StateFlow<Int> = _autoBackupKeepCount.asStateFlow()
+
+    private val _autoBackupUseCustomLocation = MutableStateFlow(false)
+    val autoBackupUseCustomLocation: StateFlow<Boolean> = _autoBackupUseCustomLocation.asStateFlow()
+
+    private val _autoBackupCustomLocation = MutableStateFlow("")
+    val autoBackupCustomLocation: StateFlow<String> = _autoBackupCustomLocation.asStateFlow()
+
     // === Lyrics Settings ===
     private val _showLyrics = MutableStateFlow(true)
     val showLyrics: StateFlow<Boolean> = _showLyrics.asStateFlow()
@@ -980,6 +999,36 @@ class DesktopPreferences private constructor(
         save()
     }
 
+    fun setEnableBackupUpload(value: Boolean) {
+        _enableBackupUpload.value = value
+        save()
+    }
+
+    fun setAutoBackupEnabled(value: Boolean) {
+        _autoBackupEnabled.value = value
+        save()
+    }
+
+    fun setAutoBackupFrequencyHours(value: Int) {
+        _autoBackupFrequencyHours.value = BackupFrequency.fromHours(value).hours
+        save()
+    }
+
+    fun setAutoBackupKeepCount(value: Int) {
+        _autoBackupKeepCount.value = value.coerceIn(1, 20)
+        save()
+    }
+
+    fun setAutoBackupUseCustomLocation(value: Boolean) {
+        _autoBackupUseCustomLocation.value = value
+        save()
+    }
+
+    fun setAutoBackupCustomLocation(value: String) {
+        _autoBackupCustomLocation.value = value.trim()
+        save()
+    }
+
     fun setShowLyrics(value: Boolean) {
         _showLyrics.value = value
         save()
@@ -1217,6 +1266,14 @@ class DesktopPreferences private constructor(
                 }
             }
             _downloadAsMp3.value = json.optBoolean("downloadAsMp3", true)
+            _enableBackupUpload.value = json.optBoolean("enableBackupUpload", true)
+            _autoBackupEnabled.value = json.optBoolean("autoBackupEnabled", false)
+            _autoBackupFrequencyHours.value = BackupFrequency.fromHours(
+                json.optInt("autoBackupFrequency", BackupFrequency.DAILY.hours),
+            ).hours
+            _autoBackupKeepCount.value = json.optInt("autoBackupKeepCount", 5).coerceIn(1, 20)
+            _autoBackupUseCustomLocation.value = json.optBoolean("autoBackupUseCustomLocation", false)
+            _autoBackupCustomLocation.value = json.optString("autoBackupCustomLocation", "")
 
             _showLyrics.value = json.optBoolean("showLyrics", true)
             _romanizeLyrics.value = json.optBoolean("romanizeLyrics", false)
@@ -1404,6 +1461,12 @@ class DesktopPreferences private constructor(
                 put("maxSongCacheSizeMB", _maxSongCacheSizeMB.value)
                 put("maxDownloadSize", _maxDownloadSizeMB.value)
                 put("downloadAsMp3", _downloadAsMp3.value)
+                put("enableBackupUpload", _enableBackupUpload.value)
+                put("autoBackupEnabled", _autoBackupEnabled.value)
+                put("autoBackupFrequency", _autoBackupFrequencyHours.value)
+                put("autoBackupKeepCount", _autoBackupKeepCount.value)
+                put("autoBackupUseCustomLocation", _autoBackupUseCustomLocation.value)
+                put("autoBackupCustomLocation", _autoBackupCustomLocation.value)
 
                 put("showLyrics", _showLyrics.value)
                 put("romanizeLyrics", _romanizeLyrics.value)
@@ -1465,6 +1528,33 @@ enum class QuickPicks {
             "last_listen", "last_listened", "last" -> LAST_LISTEN
             else -> QUICK_PICKS
         }
+    }
+}
+
+enum class BackupFrequency(val hours: Int) {
+    ONE_HOUR(1),
+    THREE_HOURS(3),
+    SIX_HOURS(6),
+    DAILY(24),
+    WEEKLY(24 * 7);
+
+    companion object {
+        fun fromHours(hours: Int): BackupFrequency = when (hours) {
+            1 -> ONE_HOUR
+            3 -> THREE_HOURS
+            6 -> SIX_HOURS
+            24 -> DAILY
+            24 * 7 -> WEEKLY
+            else -> DAILY
+        }
+    }
+
+    fun displayName(): String = when (this) {
+        ONE_HOUR -> "1 hour"
+        THREE_HOURS -> "3 hours"
+        SIX_HOURS -> "6 hours"
+        DAILY -> "Daily"
+        WEEKLY -> "Weekly"
     }
 }
 

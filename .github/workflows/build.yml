@@ -169,6 +169,28 @@ jobs:
         if: matrix.label == 'Linux RPM'
         run: sudo apt-get update && sudo apt-get install -y rpm
 
+      - name: Ensure Google Drive OAuth secret exists
+        shell: pwsh
+        env:
+          GOOGLE_CLIENT_SECRET_JSON: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:GOOGLE_CLIENT_SECRET_JSON)) {
+            Write-Error "Missing required secret GOOGLE_CLIENT_SECRET_JSON for desktop installer builds."
+            exit 1
+          }
+
+      - name: Inject Google OAuth client_secret.json
+        shell: pwsh
+        env:
+          GOOGLE_CLIENT_SECRET_JSON: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
+        run: |
+          New-Item -ItemType Directory -Force "desktop/src/main/resources/oauth" | Out-Null
+          [System.IO.File]::WriteAllText(
+            "desktop/src/main/resources/oauth/client_secret.json",
+            $env:GOOGLE_CLIENT_SECRET_JSON,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
       - name: Build Desktop Release Package
         run: ${{ matrix.gradle_cmd }} ${{ matrix.gradle_task }}
         env:
@@ -180,3 +202,11 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: desktop/build/compose/binaries/**
           if-no-files-found: error
+
+      - name: Cleanup injected Google secret
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path "desktop/src/main/resources/oauth/client_secret.json") {
+            Remove-Item -Force "desktop/src/main/resources/oauth/client_secret.json"
+          }

@@ -63,6 +63,7 @@ class DesktopAuthService(
                 accountName = json.optString("accountName").takeIf { it.isNotBlank() },
                 accountEmail = json.optString("accountEmail").takeIf { it.isNotBlank() },
                 channelHandle = json.optString("channelHandle").takeIf { it.isNotBlank() },
+                accountImageUrl = json.optString("accountImageUrl").takeIf { it.isNotBlank() },
             )
 
             _credentials = loaded.takeIf { it.hasAnyValue() }
@@ -163,11 +164,17 @@ class DesktopAuthService(
     /**
      * Actualiza informacion de la cuenta.
      */
-    suspend fun updateAccountInfo(name: String?, email: String?, channelHandle: String?) {
+    suspend fun updateAccountInfo(
+        name: String?,
+        email: String?,
+        channelHandle: String?,
+        accountImageUrl: String? = null,
+    ) {
         val updated = (_credentials ?: AuthCredentials()).copy(
             accountName = name,
             accountEmail = email,
             channelHandle = channelHandle,
+            accountImageUrl = accountImageUrl ?: _credentials?.accountImageUrl,
         )
         saveCredentials(updated)
     }
@@ -199,6 +206,7 @@ class DesktopAuthService(
                 name = info.name,
                 email = info.email,
                 channelHandle = info.channelHandle,
+                accountImageUrl = info.thumbnailUrl,
             )
             return@withContext AccountInfo(
                 name = info.name,
@@ -249,7 +257,8 @@ class DesktopAuthService(
 
         val hasPublicData = safeCredentials.accountName.orEmpty().isNotBlank() ||
             safeCredentials.accountEmail.orEmpty().isNotBlank() ||
-            safeCredentials.channelHandle.orEmpty().isNotBlank()
+            safeCredentials.channelHandle.orEmpty().isNotBlank() ||
+            safeCredentials.accountImageUrl.orEmpty().isNotBlank()
 
         if (!hasPublicData) {
             if (Files.exists(credentialsFile)) {
@@ -263,6 +272,7 @@ class DesktopAuthService(
             put("accountName", safeCredentials.accountName.orEmpty())
             put("accountEmail", safeCredentials.accountEmail.orEmpty())
             put("channelHandle", safeCredentials.channelHandle.orEmpty())
+            put("accountImageUrl", safeCredentials.accountImageUrl.orEmpty())
         }
         Files.writeString(credentialsFile, json.toString(2), StandardCharsets.UTF_8)
     }
@@ -295,6 +305,7 @@ data class AuthCredentials(
     val accountName: String? = null,
     val accountEmail: String? = null,
     val channelHandle: String? = null,
+    val accountImageUrl: String? = null,
 ) {
     fun hasAnyValue(): Boolean {
         return visitorData.orEmpty().isNotBlank() ||
@@ -302,7 +313,8 @@ data class AuthCredentials(
             cookie.orEmpty().isNotBlank() ||
             accountName.orEmpty().isNotBlank() ||
             accountEmail.orEmpty().isNotBlank() ||
-            channelHandle.orEmpty().isNotBlank()
+            channelHandle.orEmpty().isNotBlank() ||
+            accountImageUrl.orEmpty().isNotBlank()
     }
 }
 
