@@ -632,7 +632,7 @@ class DesktopDatabase private constructor(
                 put("mediaStoreUri", song.mediaStoreUri ?: "")
             })
         }
-        Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)
+        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
     }
 
     // === Artist Persistence ===
@@ -675,7 +675,7 @@ class DesktopDatabase private constructor(
                 put("bookmarkedAt", artist.bookmarkedAt.toJsonString())
             })
         }
-        Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)
+        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
     }
 
     // === Album Persistence ===
@@ -730,7 +730,7 @@ class DesktopDatabase private constructor(
                 put("inLibrary", album.inLibrary.toJsonString())
             })
         }
-        Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)
+        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
     }
 
     // === Playlist Persistence ===
@@ -790,7 +790,7 @@ class DesktopDatabase private constructor(
                 put("backgroundImageUrl", playlist.backgroundImageUrl ?: "")
             })
         }
-        Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)
+        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
     }
 
     // === Playlist Song Map Persistence ===
@@ -837,7 +837,7 @@ class DesktopDatabase private constructor(
                 put("setVideoId", map.setVideoId ?: "")
             })
         }
-        Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)
+        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
     }
 
     // === Song Artist Map Persistence ===
@@ -889,7 +889,7 @@ class DesktopDatabase private constructor(
                 put("position", map.position)
             })
         }
-        Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)
+        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
     }
 
     private fun loadLegacySongArtistMapsFromSongs(): List<SongArtistMap> {
@@ -949,7 +949,7 @@ class DesktopDatabase private constructor(
                 put("relatedSongId", map.relatedSongId)
             })
         }
-        Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)
+        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
     }
 
     // === Event Persistence ===
@@ -989,7 +989,7 @@ class DesktopDatabase private constructor(
                 put("playTime", event.playTime)
             })
         }
-        Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)
+        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
     }
 
     // === Search History Persistence ===
@@ -1030,7 +1030,7 @@ class DesktopDatabase private constructor(
                 put("query", entry.query)
             })
         }
-        Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)
+        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
     }
 
     companion object {
