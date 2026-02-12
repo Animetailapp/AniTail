@@ -35,6 +35,8 @@ object DesktopUpdater {
     private const val RepoOwner = "Animetailapp"
     private const val RepoName = "Anitail-Desktop"
     private const val ApiLatestReleaseUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest"
+    private const val ApiReleasesUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/releases"
+    private const val ApiTagsUrl = "https://api.github.com/repos/$RepoOwner/$RepoName/tags"
     private const val DefaultReleasePage = "https://github.com/$RepoOwner/$RepoName/releases/latest"
 
     private val client = HttpClient(CIO) {
@@ -92,15 +94,17 @@ object DesktopUpdater {
     }
 
     suspend fun getLatestReleaseInfo(): Result<DesktopReleaseInfo> = runCatching {
-        val response = client.get(ApiLatestReleaseUrl) {
-            header(HttpHeaders.UserAgent, "AniTail-Desktop-Updater")
-            header(HttpHeaders.Accept, "application/vnd.github+json")
-        }
-        if (!response.status.isSuccess()) {
-            error("GitHub API error ${response.status.value}")
+        val payload = fetchReleasePayload()
+        if (payload == null) {
+            val version = currentVersionName()
+            return@runCatching DesktopReleaseInfo(
+                versionName = version,
+                downloadUrl = DefaultReleasePage,
+                releaseNotes = "",
+                releasePageUrl = DefaultReleasePage,
+            )
         }
 
-        val payload = JSONObject(response.bodyAsText())
         val versionName = payload.optString("name")
             .ifBlank { payload.optString("tag_name") }
             .trim()
@@ -119,6 +123,52 @@ object DesktopUpdater {
             releaseNotes = notes,
             releasePageUrl = releasePageUrl,
         )
+    }
+
+    private suspend fun fetchReleasePayload(): JSONObject? {
+        val latestResponse = githubGet(ApiLatestReleaseUrl)
+        if (latestResponse.status.isSuccess()) {
+            return JSONObject(latestResponse.bodyAsText())
+        }
+        if (latestResponse.status.value != 404) {
+            error("GitHub API error ${latestResponse.status.value}")
+        }
+
+        val releasesResponse = githubGet("$ApiReleasesUrl?per_page=1")
+        if (releasesResponse.status.isSuccess()) {
+            val releases = JSONArray(releasesResponse.bodyAsText())
+            if (releases.length() > 0) {
+                return releases.optJSONObject(0)
+            }
+        } else if (releasesResponse.status.value != 404) {
+            error("GitHub API error ${releasesResponse.status.value}")
+        }
+
+        val tagsResponse = githubGet("$ApiTagsUrl?per_page=1")
+        if (tagsResponse.status.isSuccess()) {
+            val tags = JSONArray(tagsResponse.bodyAsText())
+            val firstTag = tags.optJSONObject(0)?.optString("name").orEmpty().trim()
+            if (firstTag.isNotBlank()) {
+                return JSONObject(
+                    mapOf(
+                        "tag_name" to firstTag,
+                        "html_url" to "https://github.com/$RepoOwner/$RepoName/releases/tag/$firstTag",
+                        "body" to "",
+                    ),
+                )
+            }
+            return null
+        }
+        if (tagsResponse.status.value == 404) {
+            return null
+        }
+        error("GitHub API error ${tagsResponse.status.value}")
+    }
+
+    private suspend fun githubGet(url: String) = client.get(url) {
+        header(HttpHeaders.UserAgent, "AniTail-Desktop-Updater")
+        header(HttpHeaders.Accept, "application/vnd.github+json")
+        header("X-GitHub-Api-Version", "2022-11-28")
     }
 
     fun shouldCheckForUpdates(

@@ -1565,7 +1565,6 @@ internal fun LegacyStorageSettingsScreen(
 private data class AboutBuildInfo(
     val buildType: String,
     val versionName: String,
-    val versionCode: Int,
     val deviceInfo: String,
 )
 
@@ -1598,8 +1597,7 @@ internal fun LegacyAboutScreen(
 
     val buildInfo = AboutBuildInfo(
         buildType = "Desktop",
-        versionName = "1.0.0",
-        versionCode = 1,
+        versionName = DesktopUpdater.currentVersionName(),
         deviceInfo = "$osName $osVersion ($osArch)",
     )
 

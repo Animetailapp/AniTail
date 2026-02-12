@@ -174,7 +174,12 @@ internal fun UpdateSettingsScreen(
                             strings.get("app_up_to_date")
                         }
                     } else {
-                        feedbackMessage = strings.get("update_check_failed")
+                        val details = result.exceptionOrNull()?.message.orEmpty().trim()
+                        feedbackMessage = if (details.isNotBlank()) {
+                            "${strings.get("update_check_failed")}: $details"
+                        } else {
+                            strings.get("update_check_failed")
+                        }
                     }
                     isChecking = false
                 }
