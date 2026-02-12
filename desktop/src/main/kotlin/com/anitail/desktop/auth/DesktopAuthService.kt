@@ -4,7 +4,7 @@ import com.anitail.desktop.security.DesktopPaths
 import com.anitail.desktop.security.DesktopSecureStore
 import com.anitail.desktop.security.SecureSecretsStore
 import com.anitail.desktop.security.SensitiveKeys
-import com.anitail.innertube.YouTube
+import com.anitail.desktop.YouTube
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject

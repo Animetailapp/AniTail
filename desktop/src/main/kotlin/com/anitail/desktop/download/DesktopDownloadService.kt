@@ -1,9 +1,8 @@
 package com.anitail.desktop.download
 
-import com.anitail.innertube.YouTube
+import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.YouTubeClient
 import com.anitail.innertube.pages.NewPipeUtils
-import com.anitail.desktop.player.PipedResolver
 import com.anitail.desktop.player.StreamClientOrder
 import com.anitail.desktop.storage.AudioQuality
 import com.anitail.desktop.storage.DesktopPreferences
@@ -224,9 +223,6 @@ class DesktopDownloadService {
         // Obtener stream URL con fallback entre clientes
         val resolvedStream = resolveStreamForDownload(songId)
         val streamUrl = resolvedStream?.url
-            ?: PipedResolver.resolveAudioUrl(songId)?.also {
-                println("DesktopDownloadService: Using Piped fallback for songId=$songId")
-            }
         if (streamUrl == null) {
             throw Exception("No se pudo obtener URL del stream")
         }

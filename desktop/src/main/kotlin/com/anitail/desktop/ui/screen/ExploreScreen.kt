@@ -88,7 +88,7 @@ import com.anitail.desktop.i18n.LocalStrings
 import com.anitail.desktop.i18n.StringResolver
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.ui.utils.SnapLayoutInfoProvider
-import com.anitail.innertube.YouTube
+import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.Artist
 import com.anitail.innertube.models.ArtistItem

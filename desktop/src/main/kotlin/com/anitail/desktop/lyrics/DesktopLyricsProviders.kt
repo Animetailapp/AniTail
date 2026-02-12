@@ -2,7 +2,7 @@ package com.anitail.desktop.lyrics
 
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.storage.PreferredLyricsProvider
-import com.anitail.innertube.YouTube
+import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.music.betterlyrics.BetterLyrics
 import com.anitail.simpmusic.SimpMusicLyrics

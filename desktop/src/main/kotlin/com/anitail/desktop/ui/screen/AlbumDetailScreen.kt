@@ -50,7 +50,7 @@ import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.component.ShimmerBox
 import com.anitail.desktop.ui.component.ShimmerListItem
-import com.anitail.innertube.YouTube
+import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.pages.AlbumPage
 import com.anitail.shared.model.LibraryItem

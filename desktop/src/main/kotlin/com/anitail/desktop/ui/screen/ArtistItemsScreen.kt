@@ -69,7 +69,7 @@ import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.component.shimmer.GridItemPlaceholder
 import com.anitail.desktop.ui.component.shimmer.ShimmerHost
-import com.anitail.innertube.YouTube
+import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.Artist
 import com.anitail.innertube.models.ArtistItem

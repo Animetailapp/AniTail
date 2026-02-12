@@ -64,7 +64,7 @@ import com.anitail.desktop.ui.screen.CollectionDownloadMenuState
 import com.anitail.desktop.ui.screen.CollectionMenuHeader
 import com.anitail.desktop.ui.screen.buildBrowseAlbumMenuActions
 import com.anitail.desktop.ui.screen.resolveCollectionDownloadMenuState
-import com.anitail.innertube.YouTube
+import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.WatchEndpoint
 import kotlinx.coroutines.launch
 import java.awt.Toolkit

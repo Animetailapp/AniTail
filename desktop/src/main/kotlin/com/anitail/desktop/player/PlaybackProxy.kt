@@ -1,6 +1,6 @@
 package com.anitail.desktop.player
 
-import com.anitail.innertube.YouTube
+import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.YouTubeClient
 import okhttp3.OkHttpClient
 import okhttp3.Request

@@ -4,7 +4,7 @@ import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.db.mapper.toSongArtistMaps
 import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.db.mapper.toPlaylistEntity
-import com.anitail.innertube.YouTube
+import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.PlaylistItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.pages.PlaylistContinuationPage

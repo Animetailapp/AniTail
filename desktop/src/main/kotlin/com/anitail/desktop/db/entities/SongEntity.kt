@@ -1,6 +1,6 @@
 package com.anitail.desktop.db.entities
 
-import com.anitail.innertube.YouTube
+import com.anitail.desktop.YouTube
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel

@@ -71,7 +71,7 @@ import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.screen.library.SelectionDownloadState
 import com.anitail.desktop.ui.screen.library.resolveSelectionDownloadState
-import com.anitail.innertube.YouTube
+import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.Artist
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint

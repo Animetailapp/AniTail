@@ -43,7 +43,7 @@ import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.shimmer.GridItemPlaceholder
 import com.anitail.desktop.ui.component.shimmer.ShimmerHost
-import com.anitail.innertube.YouTube
+import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.pages.ChartsPage
 import com.anitail.shared.model.LibraryItem

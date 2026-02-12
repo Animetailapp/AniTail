@@ -1,6 +1,6 @@
 package com.anitail.desktop.player
 
-import com.anitail.innertube.YouTube
+import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.YouTubeClient
 import com.anitail.innertube.pages.NewPipeUtils
 import com.anitail.desktop.storage.AudioQuality
@@ -219,18 +219,8 @@ class NativeAudioPlayer {
         // Si todos los clientes locales fallaron, intentar con Remote Fallbacks (Piped)
         println("NativeAudioPlayer: Fallback local agotado. Intentando con Remote APIs (Piped)...")
         
-        // 1. Intentar con Piped
-        try {
-            val pipedUrl = PipedResolver.resolveAudioUrl(videoId)
-            if (pipedUrl != null) {
-                println("NativeAudioPlayer: Éxito con Piped Fallback. Reproduciendo DIRECTAMENTE...")
-                stop()
-                val success = preparePlayer(pipedUrl, YouTubeClient.USER_AGENT_WEB, "https://piped.video/")
-                if (success) return@withContext Result.success(Unit)
-            }
-        } catch (e: Exception) {
-            println("NativeAudioPlayer: Error en Piped fallback: ${e.message}")
-        }
+            // Sin fallback remoto: si no se resolvió localmente, lo reportamos como fallo.
+            println("NativeAudioPlayer: No se resolvió stream localmente para videoId=$videoId; sin fallback remoto.")
 
         val rawError = lastError ?: "No se pudo iniciar reproducción con ningún cliente."
         println("NativeAudioPlayer: ERROR FINAL: $rawError")
