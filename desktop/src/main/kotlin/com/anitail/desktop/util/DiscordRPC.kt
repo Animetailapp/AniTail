@@ -29,15 +29,19 @@ class DesktopDiscordRPC(
                 append(albumName)
             }
         }
-        val fallbackAsset = FALLBACK_DISCORD_ASSET
+
+        // Use a generic music icon as fallback if everything else fails
+        val fallbackAsset = "https://cdn-icons-png.flaticon.com/512/3844/3844724.png"
+
         val largeAsset = item.artworkUrl?.let { RpcImage.ExternalImage(it, fallbackAsset) }
-            ?: RpcImage.DiscordImage(fallbackAsset)
+            ?: RpcImage.ExternalImage(fallbackAsset)
+
         val smallAsset = artistThumbnailUrl?.let {
             RpcImage.ExternalImage(
                 it,
                 fallbackAsset
             )
-        } ?: RpcImage.DiscordImage(fallbackAsset)
+        }
 
         setActivity(
             name = "AniTail",
@@ -45,7 +49,7 @@ class DesktopDiscordRPC(
             state = presenceState,
             largeImage = largeAsset,
             smallImage = smallAsset,
-            largeText = albumName,
+            largeText = albumName ?: item.artist,
             smallText = item.artist,
             buttons = listOf(
                 "Listen on YouTube Music" to "https://music.youtube.com/watch?v=${item.id}",
@@ -60,7 +64,5 @@ class DesktopDiscordRPC(
 
     companion object {
         private const val APPLICATION_ID = "1271273225120125040"
-        private const val FALLBACK_DISCORD_ASSET =
-            "emojis/1372344240465645711.webp?quality=lossless"
     }
 }

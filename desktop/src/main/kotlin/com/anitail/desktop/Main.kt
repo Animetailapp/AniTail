@@ -685,8 +685,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
         val rpc = discordRPC ?: return@LaunchedEffect
         val item = playerState.currentItem ?: return@LaunchedEffect
 
-        // Small delay to allow multiple metadata updates to settle
-        delay(1000)
+        // Increase delay to ensure database thumbnails are available
+        delay(2000)
 
         if (!rpc.isRpcRunning()) {
             rpc.connect()

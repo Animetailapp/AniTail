@@ -18,6 +18,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.url
+import io.ktor.client.statement.HttpResponse
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import java.util.logging.Logger
@@ -36,11 +37,23 @@ class ApiService {
         }
     }
 
-    suspend fun getImage(urls: List<String>) = runCatching {
-        client.get {
-            url("https://kizzy-helper.vercel.app/images")
-            parameter("urls", urls.joinToString(","))
-            header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    private val proxies = listOf(
+        "https://kizzy-helper.vercel.app/images",
+        "https://kizzy-helper-images.vercel.app/images",
+        "https://kizzy.dead8309.xyz/api/images"
+    )
+
+    suspend fun getImage(urls: List<String>, proxyIndex: Int = 0): Result<HttpResponse> {
+        val proxyUrl = proxies.getOrNull(proxyIndex) ?: return Result.failure(Exception("No more proxies"))
+
+        return runCatching {
+            client.get {
+                url(proxyUrl)
+                parameter("urls", urls.joinToString(","))
+                header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            }
         }
     }
+
+    fun getProxyCount() = proxies.size
 }

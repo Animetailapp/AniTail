@@ -15,6 +15,7 @@ package com.my.kizzy.repository
 import com.my.kizzy.remote.ApiService
 import com.my.kizzy.remote.ImageProxyResponse
 import io.ktor.client.call.body
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -33,34 +34,35 @@ class KizzyRepository {
     }
 
     suspend fun getImages(urls: List<String>): Map<String, String>? {
-        val result = api.getImage(urls)
-        val response = result.getOrNull()
-        if (response == null) {
-            val msg = result.exceptionOrNull()?.message ?: "Unknown error"
-            if (!msg.contains("composition")) {
-                logger.warning("Kizzy: Proxy request failed: $msg")
-            }
-            return null
-        }
+        for (i in 0 until api.getProxyCount()) {
+            val result = api.getImage(urls, i)
+            val response: HttpResponse? = result.getOrNull()
 
-        return try {
-            val bodyString = response.bodyAsText()
-            val element = json.parseToJsonElement(bodyString)
-            if (element is kotlinx.serialization.json.JsonObject) {
-                if (element.containsKey("assets")) {
-                    json.decodeFromJsonElement<ImageProxyResponse>(element).assets
-                } else if (element.containsKey("error")) {
-                    logger.warning("Kizzy: Proxy returned error: $bodyString")
-                    null
-                } else {
-                    json.decodeFromJsonElement<Map<String, String>>(element)
+            if (response != null && response.status.value == 200) {
+                try {
+                    val bodyString = response.bodyAsText()
+                    val element = json.parseToJsonElement(bodyString)
+                    if (element is kotlinx.serialization.json.JsonObject) {
+                        return if (element.containsKey("assets")) {
+                            json.decodeFromJsonElement<ImageProxyResponse>(element).assets
+                        } else if (element.containsKey("error")) {
+                            logger.warning("Kizzy: Proxy $i returned error: $bodyString")
+                            null
+                        } else {
+                            json.decodeFromJsonElement<Map<String, String>>(element)
+                        }
+                    }
+                } catch (e: Exception) {
+                    logger.warning("Kizzy: Failed to parse proxy $i response: ${e.message}")
                 }
             } else {
-                null
+                val status = response?.status?.value ?: result.exceptionOrNull()?.message ?: "Unknown Error"
+                if (status is String && !status.contains("composition")) {
+                    logger.warning("Kizzy: Proxy $i failed with status $status")
+                }
             }
-        } catch (e: Exception) {
-            null
         }
+        return null
     }
 
     suspend fun getImage(url: String): String? {
