@@ -306,13 +306,6 @@ fun HomeScreen(
             }
     }
 
-    LaunchedEffect(quickPicks) {
-        quickPicksLazyGridState.scrollToItem(0)
-    }
-
-    LaunchedEffect(forgottenFavorites) {
-        forgottenFavoritesLazyGridState.scrollToItem(0)
-    }
 
     val pullRefreshState = rememberPullToRefreshState()
     BoxWithConstraints(

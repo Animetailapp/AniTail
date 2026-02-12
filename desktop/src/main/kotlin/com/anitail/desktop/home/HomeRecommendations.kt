@@ -80,14 +80,14 @@ private fun buildQuickPicks(
 ): List<SongEntity> {
     if (relatedSongMaps.isEmpty() || songsById.isEmpty()) return emptyList()
 
-    val recentIds = events
-        .sortedByDescending { it.timestamp }
+    val recentIds = events.asReversed().asSequence()
         .map { it.songId }
         .distinct()
         .take(5)
+        .toList()
 
     val weekCutoff = now.minusDays(7)
-    val weekTopIds = events
+    val weekTopIds = events.takeLast(1000)
         .filter { it.timestamp.isAfter(weekCutoff) }
         .groupBy { it.songId }
         .mapValues { entry -> entry.value.sumOf { it.playTime } }
@@ -123,7 +123,7 @@ private fun buildKeepListening(
     now: LocalDateTime,
 ): List<HomeListenItem> {
     val cutoff = now.minusDays(14)
-    val recentEvents = events.filter { it.timestamp.isAfter(cutoff) }
+    val recentEvents = events.takeLast(1000).filter { it.timestamp.isAfter(cutoff) }
 
     val songIds = recentEvents
         .groupBy { it.songId }
@@ -183,7 +183,7 @@ private fun buildForgottenFavorites(
     if (events.isEmpty()) return emptyList()
 
     val recentCutoff = now.minusDays(30)
-    val recentPlayTime = events
+    val recentPlayTime = events.takeLast(2000)
         .filter { it.timestamp.isAfter(recentCutoff) }
         .groupBy { it.songId }
         .mapValues { entry -> entry.value.sumOf { it.playTime } }

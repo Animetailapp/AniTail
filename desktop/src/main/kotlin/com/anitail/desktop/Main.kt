@@ -641,6 +641,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
     }
 
     var homePage by remember { mutableStateOf<HomePage?>(null) }
+    var homeShuffleSeed by remember { mutableStateOf(System.currentTimeMillis()) }
     var selectedChip by remember { mutableStateOf<HomePage.Chip?>(null) }
     var previousHomePage by remember { mutableStateOf<HomePage?>(null) }
     var isHomeLoading by remember { mutableStateOf(false) }
@@ -753,6 +754,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
     }
 
     LaunchedEffect(playerState.currentItem?.id) {
+        delay(1000)
         val item = playerState.currentItem ?: return@LaunchedEffect
         withContext(Dispatchers.IO) {
             val existing = database.song(item.id).first()
@@ -956,62 +958,74 @@ private fun FrameWindowScope.AniTailDesktopApp(
         hideExplicit,
         quickPicksMode,
     ) {
-        val recommendations = buildHomeRecommendations(
-            songs = allSongs,
-            albums = albums,
-            artists = artists,
-            songArtistMaps = songArtistMaps,
-            relatedSongMaps = relatedSongMaps,
-            events = events,
-            hideExplicit = hideExplicit,
-        )
+        delay(500)
+        withContext(Dispatchers.Default) {
+            val recommendations = buildHomeRecommendations(
+                songs = allSongs,
+                albums = albums,
+                artists = artists,
+                songArtistMaps = songArtistMaps,
+                relatedSongMaps = relatedSongMaps,
+                events = events,
+                hideExplicit = hideExplicit,
+            )
 
-        val lastListenQuickPicks = if (quickPicksMode == QuickPicks.LAST_LISTEN) {
-            val lastSongId = events.maxByOrNull { it.timestamp }?.songId
-            val related = lastSongId?.let { database.relatedSongs(it) }.orEmpty()
-            if (hideExplicit) related.filterNot { it.explicit } else related
-        } else {
-            emptyList()
-        }
-
-        val quickPicksSource = if (
-            quickPicksMode == QuickPicks.LAST_LISTEN && lastListenQuickPicks.isNotEmpty()
-        ) {
-            lastListenQuickPicks
-        } else {
-            recommendations.quickPicks
-        }
-
-        quickPicks = quickPicksSource
-            .shuffled()
-            .take(20)
-            .map { it.toLibraryItem() }
-
-        keepListening = recommendations.keepListening
-            .shuffled()
-            .mapNotNull { item ->
-                when (item) {
-                    is HomeListenSong -> item.song.toLibraryItem()
-                    is HomeListenAlbum -> item.album.toLibraryItem()
-                    is HomeListenArtist -> item.artist.toLibraryItem()
-                }
+            val lastListenQuickPicks = if (quickPicksMode == QuickPicks.LAST_LISTEN) {
+                val lastSongId = events.maxByOrNull { it.timestamp }?.songId
+                val related = lastSongId?.let { database.relatedSongs(it) }.orEmpty()
+                if (hideExplicit) related.filterNot { it.explicit } else related
+            } else {
+                emptyList()
             }
-            .take(20)
 
-        forgottenFavorites = recommendations.forgottenFavorites
-            .shuffled()
-            .take(20)
-            .map { it.toLibraryItem() }
+            val quickPicksSource = if (
+                quickPicksMode == QuickPicks.LAST_LISTEN && lastListenQuickPicks.isNotEmpty()
+            ) {
+                lastListenQuickPicks
+            } else {
+                recommendations.quickPicks
+            }
+
+            val random = kotlin.random.Random(homeShuffleSeed)
+            val newQuickPicks = quickPicksSource
+                .shuffled(random)
+                .take(20)
+                .map { it.toLibraryItem() }
+
+            val newKeepListening = recommendations.keepListening
+                .shuffled(random)
+                .mapNotNull { item ->
+                    when (item) {
+                        is HomeListenSong -> item.song.toLibraryItem()
+                        is HomeListenAlbum -> item.album.toLibraryItem()
+                        is HomeListenArtist -> item.artist.toLibraryItem()
+                    }
+                }
+                .take(20)
+
+            val newForgottenFavorites = recommendations.forgottenFavorites
+                .shuffled(random)
+                .take(20)
+                .map { it.toLibraryItem() }
+
+            withContext(Dispatchers.Main) {
+                quickPicks = newQuickPicks
+                keepListening = newKeepListening
+                forgottenFavorites = newForgottenFavorites
+            }
+        }
     }
 
     // Recommendation logic remains similar...
     // [Truncated for brevity, keeping recommendation logic same as before but using updated libraryItems]
     LaunchedEffect(libraryItems.size) {
+        delay(1000)
         if (libraryItems.size >= 3) {
-            val sampledItems = libraryItems.shuffled().take(3)
-            val recommendations = mutableListOf<SimilarRecommendation>()
-            
-            sampledItems.forEach { item ->
+            withContext(Dispatchers.Default) {
+                val sampledItems = libraryItems.shuffled().take(3)
+                val recommendations = mutableListOf<SimilarRecommendation>()
+
+                sampledItems.forEach { item ->
                 val songEntity = songs.firstOrNull { it.id == item.id }
                 val albumEntity = songEntity?.albumId?.let { albumId ->
                     albums.firstOrNull { it.id == albumId }
@@ -1072,7 +1086,10 @@ private fun FrameWindowScope.AniTailDesktopApp(
                 }
             }
             
-            similarRecommendations = recommendations.take(3)
+                withContext(Dispatchers.Main) {
+                    similarRecommendations = recommendations.take(3)
+                }
+            }
         }
     }
 
@@ -1086,6 +1103,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
     val refreshHome: () -> Unit = refreshHome@{
         if (isHomeRefreshing) return@refreshHome
+        homeShuffleSeed = System.currentTimeMillis()
         scope.launch {
             isHomeRefreshing = true
             loadHomePage(
