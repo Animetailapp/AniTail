@@ -19,6 +19,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocketSession
+import io.ktor.client.request.header
 import io.ktor.websocket.CloseReason
 import io.ktor.websocket.CloseReason.Codes.NORMAL
 import io.ktor.websocket.Frame
@@ -57,8 +58,11 @@ import kotlin.math.pow
  */
 open class DiscordWebSocket(
     private val token: String,
+    private val os: String = "Android",
+    private val browser: String = "Discord Android",
+    private val device: String = "Generic Android Device",
 ) : CoroutineScope {
-    private val gatewayUrl = "wss://gateway.discord.gg/?v=10&encoding=json"
+    private val gatewayUrl = "wss://gateway.discord.gg/?v=9&encoding=json"
     private val client: HttpClient = HttpClient {
         install(WebSockets)
     }
@@ -178,7 +182,12 @@ open class DiscordWebSocket(
             try {
                 val url = resumeGatewayUrl ?: gatewayUrl
                 Logger.getLogger("Kizzy").log(INFO, "Gateway: Connecting to $url")
-                websocket = client.webSocketSession(url)
+                websocket = client.webSocketSession(url) {
+                    header("User-Agent", "Discord-Android/314013;RNA")
+                    header("Accept-Language", "en-US")
+                    header("Cache-Control", "no-cache")
+                    header("Pragma", "no-cache")
+                }
                 receiverJob?.cancel()
                 receiverJob = launch { receiveMessages(websocket!!) }
                 return
@@ -246,7 +255,7 @@ open class DiscordWebSocket(
             "READY" -> {
                 val ready = json.decodeFromJsonElement<Ready>(this.d!!)
                 sessionId = ready.sessionId
-                resumeGatewayUrl = ready.resumeGatewayUrl + "/?v=10&encoding=json"
+                resumeGatewayUrl = ready.resumeGatewayUrl + "/?v=9&encoding=json"
                 connected = true
                 connectionStateInternal.value = GatewayConnectionState.Connected
             }
@@ -292,7 +301,11 @@ open class DiscordWebSocket(
         Logger.getLogger("Kizzy").log(INFO, "Gateway: Sending $IDENTIFY")
         send(
             op = IDENTIFY,
-            d = token.toIdentifyPayload()
+            d = token.toIdentifyPayload(
+                os = os,
+                browser = browser,
+                device = device
+            )
         )
     }
 
@@ -348,6 +361,11 @@ open class DiscordWebSocket(
         )
 
         try {
+            if (op == IDENTIFY) {
+                Logger.getLogger("Kizzy").log(INFO, "Gateway sending payload: [REDACTED IDENTIFY PAYLOAD]")
+            } else {
+                Logger.getLogger("Kizzy").log(INFO, "Gateway sending payload: $payload")
+            }
             session.send(Frame.Text(payload))
         } catch (cancellation: CancellationException) {
             throw cancellation

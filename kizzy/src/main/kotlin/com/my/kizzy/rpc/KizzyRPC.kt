@@ -31,9 +31,16 @@ import org.json.JSONObject
 /**
  * Modified by Zion Huang
  */
-open class KizzyRPC(token: String) {
-    private val kizzyRepository = KizzyRepository()
-    private val discordWebSocket = DiscordWebSocket(token)
+open class KizzyRPC(
+    token: String,
+    os: String = "Android",
+    browser: String = "Discord Android",
+    device: String = "Generic Android Device",
+    userAgent: String = "Discord-Android/314013;RNA",
+    superPropertiesBase64: String? = null
+) {
+    private val kizzyRepository = KizzyRepository(userAgent, superPropertiesBase64)
+    private val discordWebSocket = DiscordWebSocket(token, os, browser, device)
 
     val connectionState: StateFlow<GatewayConnectionState> = discordWebSocket.connectionState
     val lastActivityAt: StateFlow<Long?> = discordWebSocket.lastActivityAt
@@ -115,14 +122,22 @@ open class KizzyRPC(token: String) {
     }
 
     companion object {
-        suspend fun getUserInfo(token: String): Result<UserInfo> = runCatching {
+        suspend fun getUserInfo(
+            token: String,
+            userAgent: String = "Discord-Android/314013;RNA",
+            superPropertiesBase64: String? = null
+        ): Result<UserInfo> = runCatching {
             val client = HttpClient()
             val response = client.get("https://discord.com/api/v9/users/@me") {
                 header("Authorization", token)
+                header("User-Agent", userAgent)
+                if (superPropertiesBase64 != null) {
+                    header("X-Super-Properties", superPropertiesBase64)
+                }
             }.bodyAsText()
             val json = JSONObject(response)
             val username = json.getString("username")
-            val name = json.getString("global_name")
+            val name = json.optString("global_name", username)
             val userId = json.getString("id")
             // Avatar is optional
             val avatarHash = if (json.has("avatar") && !json.isNull("avatar")) json.getString("avatar") else null

@@ -667,9 +667,12 @@ private fun FrameWindowScope.AniTailDesktopApp(
         }
     }
 
-    LaunchedEffect(playerState.currentItem, discordRPC, songArtistMaps, artists, songsById) {
+    LaunchedEffect(playerState.currentItem?.id, discordRPC, songArtistMaps, artists, songsById) {
         val rpc = discordRPC ?: return@LaunchedEffect
         val item = playerState.currentItem ?: return@LaunchedEffect
+
+        // Wait a bit for metadata to settle in database
+        delay(1000)
 
         if (!rpc.isRpcRunning()) {
             rpc.connect()
@@ -682,14 +685,18 @@ private fun FrameWindowScope.AniTailDesktopApp(
         val timeStart = System.currentTimeMillis()
         val durationMs = item.durationMs
             ?: (songEntity?.duration?.toLong()?.times(1000L))
-            ?: 0L
+            ?: (item.playbackUrl.let { url ->
+                // Fallback attempt to get duration from item if possible
+                0L
+            })
+
         val remainingMs = (durationMs - playerState.position).coerceAtLeast(0L)
         val timeEnd = if (durationMs > 0) timeStart + remainingMs else 0L
 
         rpc.updateSong(
             item = item,
             artistThumbnailUrl = artistEntity?.thumbnailUrl,
-            albumName = songEntity?.albumName,
+            albumName = songEntity?.albumName ?: item.artist,
             timeStart = timeStart,
             timeEnd = timeEnd
         )

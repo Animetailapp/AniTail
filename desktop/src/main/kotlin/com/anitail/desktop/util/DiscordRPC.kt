@@ -6,7 +6,14 @@ import com.my.kizzy.rpc.RpcImage
 
 class DesktopDiscordRPC(
     token: String,
-) : KizzyRPC(token) {
+) : KizzyRPC(
+    token = token,
+    os = "Android",
+    browser = "Discord Android",
+    device = "Generic Android Device",
+    userAgent = SuperProperties.userAgent,
+    superPropertiesBase64 = SuperProperties.superPropertiesBase64
+) {
 
     suspend fun updateSong(
         item: LibraryItem,
