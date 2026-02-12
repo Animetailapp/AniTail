@@ -184,11 +184,13 @@ private fun buildForgottenFavorites(
 
     val recentCutoff = now.minusDays(30)
     val recentPlayTime = events.takeLast(2000)
+        .asSequence()
         .filter { it.timestamp.isAfter(recentCutoff) }
         .groupBy { it.songId }
         .mapValues { entry -> entry.value.sumOf { it.playTime } }
 
-    val oldPlayTime = events
+    val oldPlayTime = events.takeLast(5000)
+        .asSequence()
         .filter { it.timestamp.isBefore(recentCutoff) }
         .groupBy { it.songId }
         .mapValues { entry -> entry.value.sumOf { it.playTime } }

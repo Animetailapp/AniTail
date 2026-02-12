@@ -7,7 +7,6 @@ import com.anitail.innertube.models.YouTubeClient
 import com.anitail.innertube.models.YouTubeLocale
 import com.anitail.innertube.pages.*
 import java.net.Proxy
-import kotlinx.coroutines.runBlocking
 
 object YouTube {
     private val cache = mutableMapOf<String, Pair<Long, Any>>()
@@ -47,7 +46,7 @@ object YouTube {
         get() = InnertubeYouTube.useLoginForBrowse
         set(value) { InnertubeYouTube.useLoginForBrowse = value }
 
-    private fun <T> getCached(key: String, ttl: Long, loader: suspend () -> Result<T>): Result<T> {
+    private suspend fun <T> getCached(key: String, ttl: Long, loader: suspend () -> Result<T>): Result<T> {
         val now = System.currentTimeMillis()
         synchronized(lock) {
             val entry = cache[key]
@@ -56,7 +55,7 @@ object YouTube {
                 return entry.second as Result<T>
             }
         }
-        val result: Result<T> = runBlocking { loader() }
+        val result: Result<T> = loader()
 
         synchronized(lock) {
             cache[key] = Pair(System.currentTimeMillis() + ttl, result as Any)

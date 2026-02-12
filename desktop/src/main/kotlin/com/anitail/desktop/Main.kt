@@ -61,6 +61,7 @@ import com.anitail.desktop.auth.normalizeDataSyncId
 import com.anitail.desktop.home.HomeListenAlbum
 import com.anitail.desktop.home.HomeListenArtist
 import com.anitail.desktop.home.HomeListenSong
+import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.home.LocalItemType
 import com.anitail.desktop.home.ShuffleSource
 import com.anitail.desktop.home.buildAllYtItems
@@ -623,7 +624,12 @@ private fun FrameWindowScope.AniTailDesktopApp(
     // Library state from Database
     val songs by database.songsInLibrary().collectAsState(initial = emptyList())
     val allSongs by database.songs.collectAsState(initial = emptyList())
-    val songsById = remember(allSongs) { allSongs.associateBy { it.id } }
+    var songsById by remember { mutableStateOf<Map<String, SongEntity>>(emptyMap()) }
+    LaunchedEffect(allSongs) {
+        withContext(Dispatchers.Default) {
+            songsById = allSongs.associateBy { it.id }
+        }
+    }
     val albums by database.albums.collectAsState(initial = emptyList())
     val artists by database.artists.collectAsState(initial = emptyList())
     val playlists by database.allPlaylists().collectAsState(initial = emptyList())
@@ -631,13 +637,16 @@ private fun FrameWindowScope.AniTailDesktopApp(
     val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
     val events by database.events.collectAsState(initial = emptyList())
     // For backward compatibility with existing code that expects LibraryItem
-    val libraryItems = remember(songs, playlists, albums, artists) {
-        val list = mutableListOf<LibraryItem>()
-        list.addAll(songs.map { it.toLibraryItem() })
-        list.addAll(playlists.map { it.toLibraryItem() })
-        list.addAll(albums.map { it.toLibraryItem() })
-        list.addAll(artists.map { it.toLibraryItem() })
-        list.toMutableStateList()
+    var libraryItems by remember { mutableStateOf<List<LibraryItem>>(emptyList()) }
+    LaunchedEffect(songs, playlists, albums, artists) {
+        withContext(Dispatchers.Default) {
+            val list = mutableListOf<LibraryItem>()
+            list.addAll(songs.map { it.toLibraryItem() })
+            list.addAll(playlists.map { it.toLibraryItem() })
+            list.addAll(albums.map { it.toLibraryItem() })
+            list.addAll(artists.map { it.toLibraryItem() })
+            libraryItems = list
+        }
     }
 
     var homePage by remember { mutableStateOf<HomePage?>(null) }

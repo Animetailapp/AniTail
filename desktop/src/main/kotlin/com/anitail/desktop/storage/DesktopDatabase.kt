@@ -372,7 +372,7 @@ class DesktopDatabase(
                 JSONObject()
             }
             settings.put(key, value)
-            Files.writeString(settingsFile, settings.toString(2), StandardCharsets.UTF_8)
+            Files.writeString(settingsFile, settings.toString(), StandardCharsets.UTF_8)
         }
     }
 
@@ -395,7 +395,7 @@ class DesktopDatabase(
     private fun <T> saveJsonArray(file: Path, items: List<T>, mapper: (T) -> JSONObject) {
         val array = JSONArray()
         items.forEach { array.put(mapper(it)) }
-        Files.writeString(file, array.toString(2), StandardCharsets.UTF_8)
+        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
     }
 
     companion object {
