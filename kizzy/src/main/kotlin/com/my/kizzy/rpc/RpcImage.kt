@@ -34,7 +34,7 @@ sealed class RpcImage {
             val asset = ArtworkCache.getOrFetch(image) { repository.getImage(image) }
             return when {
                 asset != null -> "mp:$asset"
-                image.startsWith("http") -> image
+                image.startsWith("http") -> "external:${image}"
                 else -> fallbackDiscordAsset?.let { "mp:${it}" }
             }
         }
