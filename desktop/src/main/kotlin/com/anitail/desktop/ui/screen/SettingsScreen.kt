@@ -1585,7 +1585,7 @@ internal fun LegacyAboutScreen(
 
     val buildInfo = AboutBuildInfo(
         buildType = "Desktop",
-        versionName = "1.13.1",
+        versionName = "1.0.0",
         versionCode = 1,
         deviceInfo = "$osName $osVersion ($osArch)",
     )
