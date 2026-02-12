@@ -19,11 +19,13 @@ import io.ktor.client.statement.bodyAsText
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
+import java.util.logging.Logger
 
 /**
  * Modified by Zion Huang
  */
 class KizzyRepository {
+    private val logger = Logger.getLogger("Kizzy")
     private val api = ApiService()
     private val json = Json {
         ignoreUnknownKeys = true
@@ -31,16 +33,24 @@ class KizzyRepository {
     }
 
     suspend fun getImages(urls: List<String>): Map<String, String>? {
-        val response = api.getImage(urls).getOrNull() ?: return null
+        val result = api.getImage(urls)
+        val response = result.getOrNull()
+        if (response == null) {
+            logger.warning("Kizzy: Proxy request failed: ${result.exceptionOrNull()?.message}")
+            return null
+        }
+
         return try {
             val bodyString = response.bodyAsText()
+            logger.info("Kizzy: Proxy response: $bodyString")
             val element = json.parseToJsonElement(bodyString)
-            if (element.jsonObject.containsKey("assets")) {
+            if (element is kotlinx.serialization.json.JsonObject && element.containsKey("assets")) {
                 json.decodeFromJsonElement<ImageProxyResponse>(element).assets
             } else {
                 json.decodeFromJsonElement<Map<String, String>>(element)
             }
         } catch (e: Exception) {
+            logger.warning("Kizzy: Failed to parse proxy response: ${e.message}")
             null
         }
     }

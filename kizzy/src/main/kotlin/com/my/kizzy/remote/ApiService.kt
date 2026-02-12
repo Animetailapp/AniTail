@@ -15,6 +15,7 @@ package com.my.kizzy.remote
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.url
 import io.ktor.serialization.kotlinx.json.json
@@ -39,6 +40,7 @@ class ApiService {
         client.get {
             url("https://kizzy-helper.vercel.app/images")
             parameter("urls", urls.joinToString(","))
+            header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         }
     }
 }

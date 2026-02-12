@@ -25,7 +25,7 @@ class DesktopDiscordRPC(
         val presenceState = buildString {
             append(item.artist)
             if (!albumName.isNullOrBlank()) {
-                append(" • ")
+                append(" - ")
                 append(albumName)
             }
         }
