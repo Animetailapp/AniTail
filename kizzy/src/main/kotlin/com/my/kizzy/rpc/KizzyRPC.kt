@@ -39,7 +39,7 @@ open class KizzyRPC(
     userAgent: String = "Discord-Android/314013;RNA",
     superPropertiesBase64: String? = null
 ) {
-    private val kizzyRepository = KizzyRepository(userAgent, superPropertiesBase64)
+    private val kizzyRepository = KizzyRepository()
     private val discordWebSocket = DiscordWebSocket(token, os, browser, device)
 
     val connectionState: StateFlow<GatewayConnectionState> = discordWebSocket.connectionState
@@ -102,7 +102,7 @@ open class KizzyRPC(
                     ),
                     buttons = buttons?.map { it.first },
                     metadata = Metadata(buttonUrls = buttons?.map { it.second }),
-                    applicationId = applicationId.takeIf { !buttons.isNullOrEmpty() },
+                    applicationId = applicationId,
                     url = streamUrl
                 )
             ),

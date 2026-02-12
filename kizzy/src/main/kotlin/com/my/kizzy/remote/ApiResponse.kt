@@ -12,5 +12,5 @@ data class ApiResponse(
 @Serializable
 data class ImageProxyResponse(
     @SerialName("assets")
-    val assets: Map<String, String>,
+    val assets: Map<String, String>? = null,
 )
