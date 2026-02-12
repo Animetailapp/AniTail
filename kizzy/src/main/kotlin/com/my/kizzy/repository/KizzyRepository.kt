@@ -36,21 +36,29 @@ class KizzyRepository {
         val result = api.getImage(urls)
         val response = result.getOrNull()
         if (response == null) {
-            logger.warning("Kizzy: Proxy request failed: ${result.exceptionOrNull()?.message}")
+            val msg = result.exceptionOrNull()?.message ?: "Unknown error"
+            if (!msg.contains("composition")) {
+                logger.warning("Kizzy: Proxy request failed: $msg")
+            }
             return null
         }
 
         return try {
             val bodyString = response.bodyAsText()
-            logger.info("Kizzy: Proxy response: $bodyString")
             val element = json.parseToJsonElement(bodyString)
-            if (element is kotlinx.serialization.json.JsonObject && element.containsKey("assets")) {
-                json.decodeFromJsonElement<ImageProxyResponse>(element).assets
+            if (element is kotlinx.serialization.json.JsonObject) {
+                if (element.containsKey("assets")) {
+                    json.decodeFromJsonElement<ImageProxyResponse>(element).assets
+                } else if (element.containsKey("error")) {
+                    logger.warning("Kizzy: Proxy returned error: $bodyString")
+                    null
+                } else {
+                    json.decodeFromJsonElement<Map<String, String>>(element)
+                }
             } else {
-                json.decodeFromJsonElement<Map<String, String>>(element)
+                null
             }
         } catch (e: Exception) {
-            logger.warning("Kizzy: Failed to parse proxy response: ${e.message}")
             null
         }
     }

@@ -667,36 +667,43 @@ private fun FrameWindowScope.AniTailDesktopApp(
         }
     }
 
-    LaunchedEffect(playerState.currentItem?.id, discordRPC, songArtistMaps, artists, songsById) {
+    val currentSongId = playerState.currentItem?.id
+    val currentArtistThumbnail = remember(currentSongId, artists, songArtistMaps) {
+        currentSongId?.let { id ->
+            val artistId = primaryArtistIdForSong(id, songArtistMaps)
+            artists.firstOrNull { it.id == artistId }?.thumbnailUrl
+        }
+    }
+    val currentAlbumName = remember(currentSongId, songsById) {
+        currentSongId?.let { id -> songsById[id]?.albumName }
+    }
+    val currentDbDuration = remember(currentSongId, songsById) {
+        currentSongId?.let { id -> songsById[id]?.duration }
+    }
+
+    LaunchedEffect(currentSongId, currentArtistThumbnail, currentAlbumName, discordRPC) {
         val rpc = discordRPC ?: return@LaunchedEffect
         val item = playerState.currentItem ?: return@LaunchedEffect
 
-        // Wait a bit for metadata to settle in database
+        // Small delay to allow multiple metadata updates to settle
         delay(1000)
 
         if (!rpc.isRpcRunning()) {
             rpc.connect()
         }
 
-        val artistId = primaryArtistIdForSong(item.id, songArtistMaps)
-        val artistEntity = artistId?.let { id -> artists.firstOrNull { it.id == id } }
-        val songEntity = songsById[item.id]
-
         val timeStart = System.currentTimeMillis()
         val durationMs = item.durationMs
-            ?: (songEntity?.duration?.toLong()?.times(1000L))
-            ?: (item.playbackUrl.let { url ->
-                // Fallback attempt to get duration from item if possible
-                0L
-            })
+            ?: (currentDbDuration?.toLong()?.times(1000L))
+            ?: 0L
 
         val remainingMs = (durationMs - playerState.position).coerceAtLeast(0L)
         val timeEnd = if (durationMs > 0) timeStart + remainingMs else 0L
 
         rpc.updateSong(
             item = item,
-            artistThumbnailUrl = artistEntity?.thumbnailUrl,
-            albumName = songEntity?.albumName ?: item.artist,
+            artistThumbnailUrl = currentArtistThumbnail,
+            albumName = currentAlbumName ?: item.artist,
             timeStart = timeStart,
             timeEnd = timeEnd
         )
