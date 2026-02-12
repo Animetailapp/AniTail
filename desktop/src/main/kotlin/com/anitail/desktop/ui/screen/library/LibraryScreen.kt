@@ -110,7 +110,7 @@ fun LibraryScreen(
                 onOpenArtist = onOpenArtist,
             )
             LibraryFilter.ARTISTS -> LibraryArtistsScreen(
-                artists = database.artists.collectAsState(initial = emptyList()).value,
+                artists = database.bookmarkedArtists().collectAsState(initial = emptyList()).value,
                 songs = database.songs.collectAsState(initial = emptyList()).value,
                 playerState = playerState,
                 preferences = preferences,

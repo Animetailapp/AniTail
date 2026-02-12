@@ -59,6 +59,8 @@ object IconAssets {
 
     fun refresh(): ImageVector = VectorResource.load("refresh.xml")
 
+    fun update(): ImageVector = VectorResource.load("update.xml")
+
     fun moreVert(): ImageVector = VectorResource.load("more_vert.xml")
 
     fun moreHoriz(): ImageVector = VectorResource.load("more_horiz.xml")

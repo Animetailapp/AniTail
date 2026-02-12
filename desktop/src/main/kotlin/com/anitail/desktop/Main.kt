@@ -17,8 +17,10 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
@@ -80,6 +82,10 @@ import com.anitail.desktop.storage.AvatarSourcePreference
 import com.anitail.desktop.storage.NavigationTabPreference
 import com.anitail.desktop.storage.ProxyTypePreference
 import com.anitail.desktop.storage.QuickPicks
+import com.anitail.desktop.storage.UpdateCheckFrequency
+import com.anitail.desktop.update.DesktopUpdateBackgroundScheduler
+import com.anitail.desktop.update.DesktopUpdateInstaller
+import com.anitail.desktop.update.DesktopUpdater
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -127,6 +133,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
 import com.anitail.desktop.sync.LibrarySyncService
@@ -371,20 +378,36 @@ private data class DetailNavigation(
     val browseParams: String? = null,
 )
 
-fun main() = application {
-    val windowState = rememberWindowState(width = 1400.dp, height = 900.dp)
-    val windowIcon = remember { loadBitmapResource("drawable/ic_anitail.png") }
-    Window(
-        onCloseRequest = ::exitApplication,
-        title = "AniTail Desktop",
-        state = windowState,
-        icon = windowIcon?.let { BitmapPainter(it) },
-        undecorated = true,
-    ) {
-        AniTailDesktopApp(
-            windowState = windowState,
+fun main(args: Array<String>) {
+    if (args.any { it == "--check-updates-once" }) {
+        runBlocking {
+            val preferences = DesktopPreferences.getInstance()
+            val result = DesktopUpdater.checkForUpdates(preferences = preferences, force = true)
+            if (result.isSuccess) {
+                val report = result.getOrThrow()
+                if (report.isUpdateAvailable) {
+                    DesktopUpdateInstaller.downloadAndInstall(report.releaseInfo.downloadUrl)
+                }
+            }
+        }
+        return
+    }
+
+    application {
+        val windowState = rememberWindowState(width = 1400.dp, height = 900.dp)
+        val windowIcon = remember { loadBitmapResource("drawable/ic_anitail.png") }
+        Window(
             onCloseRequest = ::exitApplication,
-        )
+            title = "AniTail Desktop",
+            state = windowState,
+            icon = windowIcon?.let { BitmapPainter(it) },
+            undecorated = true,
+        ) {
+            AniTailDesktopApp(
+                windowState = windowState,
+                onCloseRequest = ::exitApplication,
+            )
+        }
     }
 }
 
@@ -434,6 +457,9 @@ private fun FrameWindowScope.AniTailDesktopApp(
     val autoBackupKeepCount by preferences.autoBackupKeepCount.collectAsState()
     val autoBackupUseCustomLocation by preferences.autoBackupUseCustomLocation.collectAsState()
     val autoBackupCustomLocation by preferences.autoBackupCustomLocation.collectAsState()
+    val autoUpdateEnabled by preferences.autoUpdateEnabled.collectAsState()
+    val autoUpdateFrequency by preferences.autoUpdateCheckFrequency.collectAsState()
+    val latestVersionName by preferences.latestVersionName.collectAsState()
     val syncService = remember { LibrarySyncService(database) }
     val isSyncing by syncService.isSyncing.collectAsState()
     val lastSyncError by syncService.lastSyncError.collectAsState()
@@ -443,6 +469,12 @@ private fun FrameWindowScope.AniTailDesktopApp(
     var trackedLastFmSongId by remember { mutableStateOf<String?>(null) }
     var lastFmSongStartTimeMs by remember { mutableStateOf(0L) }
     var hasScrobbledCurrentSong by remember { mutableStateOf(false) }
+    var notifiedUpdateVersion by remember { mutableStateOf<String?>(null) }
+    val currentVersionName = remember { DesktopUpdater.currentVersionName() }
+    val showUpdateBadge = remember(latestVersionName, currentVersionName) {
+        latestVersionName.isNotBlank() &&
+            DesktopUpdater.isVersionNewer(latestVersionName, currentVersionName)
+    }
 
     var currentScreen by remember {
         mutableStateOf(
@@ -481,6 +513,43 @@ private fun FrameWindowScope.AniTailDesktopApp(
             preferences = preferences,
             authService = authService,
         )
+    }
+
+    LaunchedEffect(autoUpdateEnabled, autoUpdateFrequency) {
+        DesktopUpdateBackgroundScheduler.startOrUpdate(preferences)
+    }
+
+    LaunchedEffect(autoUpdateEnabled, autoUpdateFrequency, strings.locale) {
+        if (!autoUpdateEnabled || autoUpdateFrequency == UpdateCheckFrequency.NEVER) {
+            return@LaunchedEffect
+        }
+
+        while (true) {
+            val checkResult = DesktopUpdater.maybeCheckForUpdates(preferences).getOrNull()
+            if (checkResult != null &&
+                checkResult.isUpdateAvailable &&
+                checkResult.releaseInfo.versionName != notifiedUpdateVersion
+            ) {
+                notifiedUpdateVersion = checkResult.releaseInfo.versionName
+                val snackbarResult = snackbarHostState.showSnackbar(
+                    message = strings.get("new_version_available_toast", checkResult.releaseInfo.versionName),
+                    actionLabel = strings.get("download_update"),
+                    withDismissAction = true,
+                    duration = SnackbarDuration.Long,
+                )
+                if (snackbarResult == SnackbarResult.ActionPerformed) {
+                    val installResult = DesktopUpdateInstaller.downloadAndInstall(checkResult.releaseInfo.downloadUrl)
+                    if (installResult.isFailure) {
+                        snackbarHostState.showSnackbar(
+                            message = strings.get("update_check_failed"),
+                            withDismissAction = true,
+                            duration = SnackbarDuration.Short,
+                        )
+                    }
+                }
+            }
+            delay(60_000L)
+        }
     }
 
     DisposableEffect(Unit) {
@@ -1305,6 +1374,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             },
                             onWindowClose = onCloseRequest,
                             onRefreshHome = if (currentScreen == DesktopScreen.Home) refreshHome else null,
+                            showUpdateBadge = showUpdateBadge,
                         )
                     },
                     snackbarHost = { SnackbarHost(snackbarHostState) },

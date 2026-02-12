@@ -100,10 +100,8 @@ fun LibraryArtistsScreen(
     }
 
     val filteredArtists = remember(artists, filter) {
-        when (filter) {
-            ArtistFilter.LIKED -> artists.filter { it.bookmarkedAt != null }
-            ArtistFilter.LIBRARY -> artists
-        }
+        // Desktop parity decision: in Library we only expose followed/subscribed artists.
+        artists.filter { it.bookmarkedAt != null }
     }
     val sortedArtists = remember(filteredArtists, sortType, sortDescending, songCountByArtist, playTimeByArtist) {
         sortArtists(

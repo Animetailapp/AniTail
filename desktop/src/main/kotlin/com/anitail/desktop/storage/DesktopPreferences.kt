@@ -404,6 +404,28 @@ class DesktopPreferences private constructor(
     private val _autoBackupCustomLocation = MutableStateFlow("")
     val autoBackupCustomLocation: StateFlow<String> = _autoBackupCustomLocation.asStateFlow()
 
+    // === Update Settings ===
+    private val _autoUpdateEnabled = MutableStateFlow(true)
+    val autoUpdateEnabled: StateFlow<Boolean> = _autoUpdateEnabled.asStateFlow()
+
+    private val _autoUpdateCheckFrequency = MutableStateFlow(UpdateCheckFrequency.DAILY)
+    val autoUpdateCheckFrequency: StateFlow<UpdateCheckFrequency> = _autoUpdateCheckFrequency.asStateFlow()
+
+    private val _lastUpdateCheckTimeMs = MutableStateFlow(-1L)
+    val lastUpdateCheckTimeMs: StateFlow<Long> = _lastUpdateCheckTimeMs.asStateFlow()
+
+    private val _latestVersionName = MutableStateFlow("")
+    val latestVersionName: StateFlow<String> = _latestVersionName.asStateFlow()
+
+    private val _latestVersionDownloadUrl = MutableStateFlow("")
+    val latestVersionDownloadUrl: StateFlow<String> = _latestVersionDownloadUrl.asStateFlow()
+
+    private val _latestVersionReleaseNotes = MutableStateFlow("")
+    val latestVersionReleaseNotes: StateFlow<String> = _latestVersionReleaseNotes.asStateFlow()
+
+    private val _latestVersionReleasePageUrl = MutableStateFlow("")
+    val latestVersionReleasePageUrl: StateFlow<String> = _latestVersionReleasePageUrl.asStateFlow()
+
     // === Lyrics Settings ===
     private val _showLyrics = MutableStateFlow(true)
     val showLyrics: StateFlow<Boolean> = _showLyrics.asStateFlow()
@@ -1029,6 +1051,49 @@ class DesktopPreferences private constructor(
         save()
     }
 
+    fun setAutoUpdateEnabled(value: Boolean) {
+        _autoUpdateEnabled.value = value
+        save()
+    }
+
+    fun setAutoUpdateCheckFrequency(value: UpdateCheckFrequency) {
+        _autoUpdateCheckFrequency.value = value
+        save()
+    }
+
+    fun setUpdateLastCheckTime(value: Long) {
+        _lastUpdateCheckTimeMs.value = value.coerceAtLeast(-1L)
+        save()
+    }
+
+    fun setLatestUpdateInfo(
+        versionName: String,
+        downloadUrl: String,
+        releaseNotes: String = "",
+        releasePageUrl: String = "",
+    ) {
+        _latestVersionName.value = versionName.trim()
+        _latestVersionDownloadUrl.value = downloadUrl.trim()
+        _latestVersionReleaseNotes.value = releaseNotes
+        _latestVersionReleasePageUrl.value = releasePageUrl.trim()
+        save()
+    }
+
+    fun updateLatestReleaseCheck(
+        checkTimeMs: Long,
+        versionName: String?,
+        downloadUrl: String?,
+        releaseNotes: String? = null,
+        releasePageUrl: String? = null,
+    ) {
+        _lastUpdateCheckTimeMs.value = checkTimeMs.coerceAtLeast(-1L)
+        _latestVersionName.value = versionName.orEmpty().trim()
+        _latestVersionDownloadUrl.value = downloadUrl.orEmpty().trim()
+        _latestVersionReleaseNotes.value = releaseNotes.orEmpty()
+        _latestVersionReleasePageUrl.value = releasePageUrl.orEmpty().trim()
+        save()
+    }
+
     fun setShowLyrics(value: Boolean) {
         _showLyrics.value = value
         save()
@@ -1274,6 +1339,15 @@ class DesktopPreferences private constructor(
             _autoBackupKeepCount.value = json.optInt("autoBackupKeepCount", 5).coerceIn(1, 20)
             _autoBackupUseCustomLocation.value = json.optBoolean("autoBackupUseCustomLocation", false)
             _autoBackupCustomLocation.value = json.optString("autoBackupCustomLocation", "")
+            _autoUpdateEnabled.value = json.optBoolean("autoUpdateEnabled", true)
+            _autoUpdateCheckFrequency.value = UpdateCheckFrequency.fromString(
+                json.optString("autoUpdateCheckFrequency", UpdateCheckFrequency.DAILY.name),
+            )
+            _lastUpdateCheckTimeMs.value = json.optLong("lastUpdateCheckTimeMs", -1L)
+            _latestVersionName.value = json.optString("latestVersionName", "")
+            _latestVersionDownloadUrl.value = json.optString("latestVersionDownloadUrl", "")
+            _latestVersionReleaseNotes.value = json.optString("latestVersionReleaseNotes", "")
+            _latestVersionReleasePageUrl.value = json.optString("latestVersionReleasePageUrl", "")
 
             _showLyrics.value = json.optBoolean("showLyrics", true)
             _romanizeLyrics.value = json.optBoolean("romanizeLyrics", false)
@@ -1467,6 +1541,13 @@ class DesktopPreferences private constructor(
                 put("autoBackupKeepCount", _autoBackupKeepCount.value)
                 put("autoBackupUseCustomLocation", _autoBackupUseCustomLocation.value)
                 put("autoBackupCustomLocation", _autoBackupCustomLocation.value)
+                put("autoUpdateEnabled", _autoUpdateEnabled.value)
+                put("autoUpdateCheckFrequency", _autoUpdateCheckFrequency.value.name)
+                put("lastUpdateCheckTimeMs", _lastUpdateCheckTimeMs.value)
+                put("latestVersionName", _latestVersionName.value)
+                put("latestVersionDownloadUrl", _latestVersionDownloadUrl.value)
+                put("latestVersionReleaseNotes", _latestVersionReleaseNotes.value)
+                put("latestVersionReleasePageUrl", _latestVersionReleasePageUrl.value)
 
                 put("showLyrics", _showLyrics.value)
                 put("romanizeLyrics", _romanizeLyrics.value)
@@ -1555,6 +1636,26 @@ enum class BackupFrequency(val hours: Int) {
         SIX_HOURS -> "6 hours"
         DAILY -> "Daily"
         WEEKLY -> "Weekly"
+    }
+}
+
+enum class UpdateCheckFrequency {
+    DAILY,
+    WEEKLY,
+    MONTHLY,
+    NEVER;
+
+    fun toMillis(): Long = when (this) {
+        DAILY -> 24L * 60L * 60L * 1000L
+        WEEKLY -> 7L * 24L * 60L * 60L * 1000L
+        MONTHLY -> 30L * 24L * 60L * 60L * 1000L
+        NEVER -> Long.MAX_VALUE
+    }
+
+    companion object {
+        fun fromString(value: String): UpdateCheckFrequency {
+            return entries.find { it.name.equals(value, ignoreCase = true) } ?: DAILY
+        }
     }
 }
 

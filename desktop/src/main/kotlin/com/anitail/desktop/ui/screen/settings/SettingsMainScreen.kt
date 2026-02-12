@@ -67,6 +67,7 @@ internal fun SettingsMainScreen(
     googleAvatarUrl: String?,
     discordUsername: String?,
     discordAvatarUrl: String?,
+    hasUpdate: Boolean,
 ) {
     var query by remember { mutableStateOf("") }
     val currentHour = remember { LocalTime.now().hour }
@@ -119,6 +120,8 @@ internal fun SettingsMainScreen(
     val playerText = stringResource("player_and_audio")
     val storageText = stringResource("storage")
     val backupRestoreText = stringResource("backup_restore")
+    val updateText = stringResource("update_settings")
+    val newVersionAvailableText = stringResource("new_version_available")
     val aboutText = stringResource("about")
 
     val allItems = remember(
@@ -134,7 +137,10 @@ internal fun SettingsMainScreen(
         playerText,
         storageText,
         backupRestoreText,
+        updateText,
+        newVersionAvailableText,
         aboutText,
+        hasUpdate,
     ) {
         listOf(
             DesktopSettingItem(
@@ -200,6 +206,15 @@ internal fun SettingsMainScreen(
                 icon = IconAssets.windowRestore(),
                 iconColor = Color(0xFF5C6BC0),
                 destination = SettingsDestination.BACKUP,
+            ),
+            DesktopSettingItem(
+                id = "update",
+                title = updateText,
+                subtitle = if (hasUpdate) newVersionAvailableText else null,
+                section = sectionSystem,
+                icon = IconAssets.update(),
+                iconColor = if (hasUpdate) Color(0xFF66BB6A) else Color(0xFFBDBDBD),
+                destination = SettingsDestination.UPDATE,
             ),
             DesktopSettingItem(
                 id = "about",

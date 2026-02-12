@@ -211,15 +211,15 @@ class DesktopDatabase private constructor(
     }
 
     suspend fun insertPlaylist(playlist: PlaylistEntity) = withContext(Dispatchers.IO) {
-        val existing = _playlists.value[playlist.id]
-        val merged = if (existing != null) mergePlaylist(existing, playlist) else playlist
-        _playlists.value = _playlists.value + (playlist.id to merged)
+        upsertPlaylistResolvingDuplicates(playlist)
         savePlaylists()
+        savePlaylistSongMaps()
     }
 
     suspend fun updatePlaylist(playlist: PlaylistEntity) = withContext(Dispatchers.IO) {
-        _playlists.value = _playlists.value + (playlist.id to playlist)
+        upsertPlaylistResolvingDuplicates(playlist)
         savePlaylists()
+        savePlaylistSongMaps()
     }
 
     suspend fun deletePlaylist(playlistId: String) = withContext(Dispatchers.IO) {
@@ -251,6 +251,100 @@ class DesktopDatabase private constructor(
             radioEndpointParams = incoming.radioEndpointParams ?: existing.radioEndpointParams,
             backgroundImageUrl = incoming.backgroundImageUrl ?: existing.backgroundImageUrl,
         )
+    }
+
+    private fun upsertPlaylistResolvingDuplicates(playlist: PlaylistEntity) {
+        val current = _playlists.value.toMutableMap()
+        val duplicateKeyByBrowseId = resolveDuplicatePlaylistKeyByBrowseId(
+            browseId = playlist.browseId,
+            excludeId = playlist.id,
+            playlists = current,
+        )
+
+        if (duplicateKeyByBrowseId != null) {
+            val existing = current[duplicateKeyByBrowseId]
+            if (existing != null) {
+                val merged = mergePlaylist(existing, playlist).copy(
+                    id = duplicateKeyByBrowseId,
+                    browseId = existing.browseId ?: playlist.browseId,
+                )
+                current[duplicateKeyByBrowseId] = merged
+                if (playlist.id != duplicateKeyByBrowseId) {
+                    current.remove(playlist.id)
+                    _playlistSongMaps.value = _playlistSongMaps.value.filterNot { it.playlistId == playlist.id }
+                }
+                _playlists.value = current
+                normalizeDuplicatePlaylistsByBrowseId()
+                return
+            }
+        }
+
+        val existing = current[playlist.id]
+        val merged = if (existing != null) mergePlaylist(existing, playlist) else playlist
+        current[playlist.id] = merged
+        _playlists.value = current
+        normalizeDuplicatePlaylistsByBrowseId()
+    }
+
+    private fun resolveDuplicatePlaylistKeyByBrowseId(
+        browseId: String?,
+        excludeId: String,
+        playlists: Map<String, PlaylistEntity>,
+    ): String? {
+        val normalizedBrowseId = browseId?.trim().orEmpty()
+        if (normalizedBrowseId.isBlank()) return null
+        return playlists.entries.firstOrNull { (id, candidate) ->
+            id != excludeId &&
+                candidate.browseId?.trim().orEmpty() == normalizedBrowseId
+        }?.key
+    }
+
+    private fun normalizeDuplicatePlaylistsByBrowseId() {
+        val playlists = _playlists.value
+        if (playlists.size < 2) return
+
+        val grouped = playlists.entries
+            .filter { it.value.browseId?.isNotBlank() == true }
+            .groupBy { it.value.browseId!!.trim() }
+            .filterValues { it.size > 1 }
+        if (grouped.isEmpty()) return
+
+        val songCountByPlaylist = _playlistSongMaps.value.groupingBy { it.playlistId }.eachCount()
+        val updatedPlaylists = playlists.toMutableMap()
+        var updatedMaps = _playlistSongMaps.value
+
+        grouped.values.forEach { entries ->
+            val canonical = selectCanonicalPlaylist(entries, songCountByPlaylist)
+            var canonicalPlaylist = canonical.value
+            entries.forEach { duplicate ->
+                if (duplicate.key == canonical.key) return@forEach
+                canonicalPlaylist = mergePlaylist(canonicalPlaylist, duplicate.value).copy(
+                    id = canonical.key,
+                    browseId = canonicalPlaylist.browseId ?: duplicate.value.browseId,
+                )
+                updatedPlaylists.remove(duplicate.key)
+                updatedMaps = updatedMaps.filterNot { it.playlistId == duplicate.key }
+            }
+            updatedPlaylists[canonical.key] = canonicalPlaylist
+        }
+
+        _playlists.value = updatedPlaylists
+        _playlistSongMaps.value = updatedMaps
+    }
+
+    private fun selectCanonicalPlaylist(
+        entries: List<Map.Entry<String, PlaylistEntity>>,
+        songCountByPlaylist: Map<String, Int>,
+    ): Map.Entry<String, PlaylistEntity> {
+        return entries.maxWithOrNull(
+            compareBy<Map.Entry<String, PlaylistEntity>>(
+                { songCountByPlaylist[it.key] ?: 0 },
+                { if (it.value.bookmarkedAt != null) 1 else 0 },
+                { it.value.remoteSongCount ?: 0 },
+                { it.value.lastUpdateTime ?: LocalDateTime.MIN },
+                { it.value.createdAt ?: LocalDateTime.MIN },
+            ),
+        ) ?: entries.first()
     }
 
     // === Playlist Song Map Operations ===
@@ -415,6 +509,7 @@ class DesktopDatabase private constructor(
         _albums.value = snapshot.albums.associateBy { it.id }
         _playlists.value = snapshot.playlists.associateBy { it.id }
         _playlistSongMaps.value = snapshot.playlistSongMaps
+        normalizeDuplicatePlaylistsByBrowseId()
         _songArtistMaps.value = snapshot.songArtistMaps
         _relatedSongMaps.value = snapshot.relatedSongMaps
         _events.value = snapshot.events
@@ -451,6 +546,9 @@ class DesktopDatabase private constructor(
         loadAlbums()
         loadPlaylists()
         loadPlaylistSongMaps()
+        normalizeDuplicatePlaylistsByBrowseId()
+        savePlaylists()
+        savePlaylistSongMaps()
         loadRelatedSongMaps()
         loadEvents()
         loadSearchHistory()

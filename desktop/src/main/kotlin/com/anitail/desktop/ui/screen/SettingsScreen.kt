@@ -90,6 +90,7 @@ import com.anitail.desktop.storage.PlayerButtonsStyle
 import com.anitail.desktop.storage.PreferredLyricsProvider
 import com.anitail.desktop.storage.QuickPicks
 import com.anitail.desktop.storage.SliderStyle
+import com.anitail.desktop.update.DesktopUpdater
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.RemoteImage
@@ -124,6 +125,7 @@ enum class SettingsDestination {
     STORAGE,
     BACKUP,
     AUTO_BACKUP,
+    UPDATE,
     ABOUT,
 }
 
@@ -147,6 +149,11 @@ fun SettingsScreen(
     val preferredAvatarSource by preferences.preferredAvatarSource.collectAsState()
     val discordUsername by preferences.discordUsername.collectAsState()
     val discordAvatarUrl by preferences.discordAvatarUrl.collectAsState()
+    val latestVersionName by preferences.latestVersionName.collectAsState()
+    val currentVersionName = remember { DesktopUpdater.currentVersionName() }
+    val hasUpdate = remember(latestVersionName, currentVersionName) {
+        latestVersionName.isNotBlank() && DesktopUpdater.isVersionNewer(latestVersionName, currentVersionName)
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         when (currentDestination) {
@@ -157,6 +164,7 @@ fun SettingsScreen(
                 googleAvatarUrl = accountInfo?.thumbnailUrl ?: authCredentials?.accountImageUrl,
                 discordUsername = discordUsername,
                 discordAvatarUrl = discordAvatarUrl,
+                hasUpdate = hasUpdate,
             )
 
             SettingsDestination.ACCOUNT -> AccountSettingsScreen(
@@ -235,6 +243,11 @@ fun SettingsScreen(
                 authService = authService,
                 onAuthChanged = onAuthChanged,
                 onBack = { currentDestination = SettingsDestination.BACKUP },
+            )
+
+            SettingsDestination.UPDATE -> UpdateSettingsScreen(
+                preferences = preferences,
+                onBack = { currentDestination = SettingsDestination.MAIN },
             )
 
             SettingsDestination.ABOUT -> AboutScreen(

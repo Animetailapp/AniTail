@@ -34,8 +34,8 @@ import com.anitail.desktop.db.entities.AlbumEntity
 import com.anitail.desktop.db.entities.ArtistEntity
 import com.anitail.desktop.db.entities.PlaylistEntity
 import com.anitail.desktop.db.entities.SongEntity
+import com.anitail.desktop.db.entities.SongArtistMap
 import com.anitail.desktop.db.mapper.toLibraryItem
-import com.anitail.desktop.db.relations.songHasArtist
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadedSong
 import com.anitail.desktop.i18n.LocalStrings
@@ -69,7 +69,7 @@ fun LibraryMixScreen(
     val playlists by database.playlists.collectAsState(initial = emptyList())
     val playlistSongMaps by database.playlistSongMaps.collectAsState(initial = emptyList())
     val albums by database.albums.collectAsState(initial = emptyList())
-    val artists by database.artists.collectAsState(initial = emptyList())
+    val artists by database.bookmarkedArtists().collectAsState(initial = emptyList())
     val songs by database.songs.collectAsState(initial = emptyList())
     val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
@@ -138,13 +138,11 @@ fun LibraryMixScreen(
     }
     val activeAlbumId = currentSong?.albumId
     val artistSongCount = remember(artists, songs, songArtistMaps) {
-        artists.associate { artist ->
-            val count = songs.count { song ->
-                songHasArtist(song.id, artist.id, songArtistMaps) ||
-                    (!song.artistName.isNullOrBlank() && song.artistName.equals(artist.name, ignoreCase = true))
-            }
-            artist.id to count
-        }
+        buildArtistSongCountMap(
+            artists = artists,
+            songs = songs,
+            songArtistMaps = songArtistMaps,
+        )
     }
 
     val headerContent = @Composable {
@@ -373,4 +371,47 @@ private fun DownloadedSong.toFallbackSong(): SongEntity {
         duration = duration,
         dateModified = LocalDateTime.now(),
     )
+}
+
+private fun buildArtistSongCountMap(
+    artists: List<ArtistEntity>,
+    songs: List<SongEntity>,
+    songArtistMaps: List<SongArtistMap>,
+): Map<String, Int> {
+    if (artists.isEmpty() || songs.isEmpty()) {
+        return artists.associate { it.id to 0 }
+    }
+
+    val artistIds = artists.map { it.id }.toSet()
+    val counts = artists.associate { it.id to 0 }.toMutableMap()
+    val songToArtistIds = songArtistMaps
+        .asSequence()
+        .filter { it.artistId in artistIds }
+        .groupBy { it.songId }
+        .mapValues { (_, maps) -> maps.map { it.artistId }.toSet() }
+
+    val artistNameToIds = artists
+        .asSequence()
+        .map { it.name.trim().lowercase() to it.id }
+        .filter { it.first.isNotBlank() }
+        .groupBy(keySelector = { it.first }, valueTransform = { it.second })
+
+    songs.forEach { song ->
+        val linkedArtistIds = songToArtistIds[song.id]
+        if (!linkedArtistIds.isNullOrEmpty()) {
+            linkedArtistIds.forEach { artistId ->
+                counts[artistId] = (counts[artistId] ?: 0) + 1
+            }
+            return@forEach
+        }
+
+        val fallbackName = song.artistName?.trim()?.lowercase().orEmpty()
+        if (fallbackName.isBlank()) return@forEach
+        val fallbackIds = artistNameToIds[fallbackName].orEmpty()
+        fallbackIds.forEach { artistId ->
+            counts[artistId] = (counts[artistId] ?: 0) + 1
+        }
+    }
+
+    return counts
 }
