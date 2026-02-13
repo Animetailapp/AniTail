@@ -216,6 +216,7 @@ jobs:
       TARGET_REPO: Animetailapp/Anitail-Desktop
       RELEASE_TAG: ${{ needs.check-version.outputs.release_tag }}
       GH_TOKEN: ${{ secrets.DESKTOP_RELEASE_TOKEN }}
+      DISCORD_WEBHOOK_BETA: ${{ secrets.DISCORD_WEBHOOK_BETA }}
     steps:
       - name: Download all build artifacts
         uses: actions/download-artifact@v7
@@ -250,3 +251,52 @@ jobs:
         run: |
           RELEASE_ID=$(gh release view "$RELEASE_TAG" --repo "$TARGET_REPO" --json id --jq .id)
           gh api -X PATCH "repos/$TARGET_REPO/releases/$RELEASE_ID" -f make_latest=true
+
+      - name: Notify Discord (beta)
+        env:
+          RELEASE_TAG: ${{ needs.check-version.outputs.release_tag }}
+          RELEASE_VERSION: ${{ needs.check-version.outputs.release_version }}
+          REPO_URL: https://github.com/Animetailapp/Anitail-Desktop
+        shell: bash
+        run: |
+          DISCORD_WEBHOOK="${DISCORD_WEBHOOK:-$DISCORD_WEBHOOK_BETA}"
+
+          if [ -z "$DISCORD_WEBHOOK" ]; then
+            echo "Missing DISCORD webhook (secrets.DISCORD_WEBHOOK_BETA), skipping Discord notification"
+            exit 0
+          fi
+
+          # Send initial embed with links
+          ts=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          payload="{\"content\":\"**🚀 Nuevo release de AniTail Desktop disponible!**\",\"username\":\"AniTail Bot\",\"embeds\":[{\"title\":\"AniTail Desktop $RELEASE_TAG\",\"url\":\"$REPO_URL/releases/tag/$RELEASE_TAG\",\"description\":\"Se ha publicado una nueva versión de AniTail Desktop: **$RELEASE_VERSION**.\",\"color\":51711,\"fields\":[{\"name\":\"Descargar release\",\"value\":\"<$REPO_URL/releases/tag/$RELEASE_TAG>\",\"inline\":false}],\"timestamp\":\"$ts\"}]}"
+
+          curl -H "Content-Type: application/json" -X POST -d "$payload" "$DISCORD_WEBHOOK" || true
+
+          # Try to upload any build files that are <= 8 MiB (Discord attachment limit for many servers)
+          small_files=()
+          max_size=$((8 * 1024 * 1024))
+          while IFS= read -r -d '' f; do
+            # get file size in bytes (compatible with GNU stat)
+            if size=$(stat -c%s "$f" 2>/dev/null); then
+              :
+            else
+              size=$(stat -f%z "$f" 2>/dev/null || echo 0)
+            fi
+            if [ "$size" -le "$max_size" ]; then
+              small_files+=("$f")
+            fi
+          done < <(find release_assets -type f -print0)
+
+          if [ ${#small_files[@]} -eq 0 ]; then
+            echo "No hay archivos pequeños (<=8MiB) para adjuntar. Se enviaron solo los enlaces."
+            exit 0
+          fi
+
+          for f in "${small_files[@]}"; do
+            base=$(basename "$f")
+            echo "Uploading $base to Discord webhook..."
+            curl -s -H "Expect:" -X POST \
+              -F "payload_json={\"content\": \"Adjuntando build: $base\", \"username\": \"AniTail Bot\"}" \
+              -F "file=@$f" \
+              "$DISCORD_WEBHOOK" || echo "Failed to upload $base"
+          done
