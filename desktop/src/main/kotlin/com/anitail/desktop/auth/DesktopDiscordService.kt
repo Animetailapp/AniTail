@@ -1,5 +1,6 @@
 package com.anitail.desktop.auth
 
+import com.anitail.desktop.util.SuperProperties
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -18,8 +19,10 @@ object DesktopDiscordService {
         if (trimmedToken.isBlank()) return null
 
         val request = Request.Builder()
-            .url("https://discord.com/api/v10/users/@me")
+            .url("https://discord.com/api/v9/users/@me")
             .header("Authorization", trimmedToken)
+            .header("User-Agent", SuperProperties.userAgent)
+            .header("X-Super-Properties", SuperProperties.superPropertiesBase64)
             .build()
 
         return runCatching {

@@ -4,6 +4,7 @@ import com.anitail.shared.model.LibraryItem
 import com.my.kizzy.rpc.KizzyRPC
 import com.my.kizzy.rpc.RpcImage
 
+
 class DesktopDiscordRPC(
     token: String,
 ) : KizzyRPC(token) {
@@ -17,10 +18,6 @@ class DesktopDiscordRPC(
     ) = runCatching {
         val presenceState = buildString {
             append(item.artist)
-            if (!albumName.isNullOrBlank()) {
-                append(" • ")
-                append(albumName)
-            }
         }
         val fallbackAsset = FALLBACK_DISCORD_ASSET
         val largeAsset = item.artworkUrl?.let { RpcImage.ExternalImage(it, fallbackAsset) }
@@ -33,12 +30,12 @@ class DesktopDiscordRPC(
         } ?: RpcImage.DiscordImage(fallbackAsset)
 
         setActivity(
-            name = "AniTail",
+            name = "AniTail Music",
             details = item.title,
             state = presenceState,
             largeImage = largeAsset,
             smallImage = smallAsset,
-            largeText = albumName,
+            largeText = "Album: " + (albumName ?: "Unknown"),
             smallText = item.artist,
             buttons = listOf(
                 "Listen on YouTube Music" to "https://music.youtube.com/watch?v=${item.id}",

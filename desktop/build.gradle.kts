@@ -47,6 +47,7 @@ dependencies {
     implementation(projects.innertube)
     implementation(projects.betterlyrics)
     implementation(projects.simpmusic)
+    implementation(projects.kizzy)
 
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)

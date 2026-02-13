@@ -22,7 +22,7 @@ sealed class RpcImage {
 
     class DiscordImage(val image: String) : RpcImage() {
         override suspend fun resolveImage(repository: KizzyRepository): String {
-            return "mp:${image}"
+            return if (image.startsWith("http")) image else "mp:${image}"
         }
     }
 
@@ -32,7 +32,11 @@ sealed class RpcImage {
     ) : RpcImage() {
         override suspend fun resolveImage(repository: KizzyRepository): String? {
             val asset = ArtworkCache.getOrFetch(image) { repository.getImage(image) }
-            return asset ?: fallbackDiscordAsset?.let { "mp:${it}" }
+            return when {
+                asset != null -> "mp:$asset"
+                image.startsWith("http") -> image // Raw URL
+                else -> fallbackDiscordAsset?.let { if (it.startsWith("http")) it else "mp:${it}" }
+            }
         }
     }
 }

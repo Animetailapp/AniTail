@@ -13,7 +13,7 @@ import java.io.File
  * is capped at roughly 25 MB.
  */
 internal object ArtworkCache {
-    private const val TTL_MILLIS = 5 * 60 * 1000L
+    private const val TTL_MILLIS = 24 * 60 * 60 * 1000L
     private const val MAX_BYTES = 25L * 1024L * 1024L
 
     private val json = Json {

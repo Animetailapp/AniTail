@@ -117,6 +117,7 @@ import com.anitail.desktop.ui.screen.PlaylistDetailScreen
 import com.anitail.desktop.ui.screen.SearchScreen
 import com.anitail.desktop.ui.screen.SettingsScreen
 import com.anitail.desktop.ui.screen.StatsScreen
+import com.anitail.desktop.util.DesktopDiscordRPC
 import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
@@ -443,6 +444,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
     val proxyUrl by preferences.proxyUrl.collectAsState()
     val proxyUsername by preferences.proxyUsername.collectAsState()
     val proxyPassword by preferences.proxyPassword.collectAsState()
+    val discordToken by preferences.discordToken.collectAsState()
+    val enableDiscordRPC by preferences.enableDiscordRPC.collectAsState()
     val discordUsername by preferences.discordUsername.collectAsState()
     val discordAvatarUrl by preferences.discordAvatarUrl.collectAsState()
     val preferredAvatarSource by preferences.preferredAvatarSource.collectAsState()
@@ -476,6 +479,9 @@ private fun FrameWindowScope.AniTailDesktopApp(
         latestVersionName.isNotBlank() &&
             DesktopUpdater.isVersionNewer(latestVersionName, currentVersionName)
     }
+
+    var discordRPC by remember { mutableStateOf<DesktopDiscordRPC?>(null) }
+    var discordRpcController by remember { mutableStateOf<com.anitail.desktop.rpc.DesktopPlayerRpcController?>(null) }
 
     var currentScreen by remember {
         mutableStateOf(
@@ -647,6 +653,57 @@ private fun FrameWindowScope.AniTailDesktopApp(
             list.addAll(artists.map { it.toLibraryItem() })
             libraryItems = list
         }
+    }
+
+    LaunchedEffect(enableDiscordRPC, discordToken, playerState.isPlaying, playerState.currentItem == null) {
+        val shouldBeRunning = enableDiscordRPC && discordToken.isNotBlank() &&
+            playerState.isPlaying && playerState.currentItem != null
+        if (shouldBeRunning) {
+            if (discordRPC == null) {
+                discordRPC = DesktopDiscordRPC(discordToken)
+                discordRpcController = com.anitail.desktop.rpc.DesktopPlayerRpcController(discordRPC!!)
+            }
+        } else {
+            discordRpcController?.close()
+            discordRpcController = null
+            discordRPC?.closeRPC()
+            discordRPC = null
+        }
+    }
+
+    val currentSongId = playerState.currentItem?.id
+    val currentArtistThumbnail = remember(currentSongId, artists, songArtistMaps) {
+        currentSongId?.let { id ->
+            val artistId = primaryArtistIdForSong(id, songArtistMaps)
+            artists.firstOrNull { it.id == artistId }?.thumbnailUrl
+        }
+    }
+    val currentAlbumName = remember(currentSongId, songsById) {
+        currentSongId?.let { id -> songsById[id]?.albumName }
+    }
+    val currentDbDuration = remember(currentSongId, songsById) {
+        currentSongId?.let { id -> songsById[id]?.duration }
+    }
+
+    LaunchedEffect(currentSongId, currentArtistThumbnail, currentAlbumName, discordRpcController) {
+        val controller = discordRpcController ?: return@LaunchedEffect
+        val item = playerState.currentItem ?: return@LaunchedEffect
+
+        val timeStart = System.currentTimeMillis()
+        val durationMs = item.durationMs
+            ?: (currentDbDuration?.toLong()?.times(1000L))
+            ?: 0L
+
+        val remainingMs = (durationMs - playerState.position).coerceAtLeast(0L)
+        val timeEnd = if (durationMs > 0) timeStart + remainingMs else 0L
+
+        controller.onTrackChanged(
+            item = item,
+            artistThumbnailUrl = currentArtistThumbnail,
+            albumName = currentAlbumName,
+            timeStart = timeStart,
+            timeEnd = timeEnd,
+        )
     }
 
     var homePage by remember { mutableStateOf<HomePage?>(null) }
