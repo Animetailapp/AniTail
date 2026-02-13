@@ -255,14 +255,15 @@ jobs:
             gh release create "$RELEASE_TAG" release_assets/* \
               --repo "$TARGET_REPO" \
               --title "AniTail Desktop $RELEASE_TAG" \
+              --make-latest \
               --notes "Automated desktop release for version ${{ needs.check-version.outputs.release_version }} from $GITHUB_REPOSITORY (${GITHUB_SHA})."
           fi
 
-      - name: Mark release as latest
+      - name: Ensure release is marked as latest
         shell: bash
         run: |
-          RELEASE_ID=$(gh release view "$RELEASE_TAG" --repo "$TARGET_REPO" --json id --jq .id)
-          gh api -X PATCH "repos/$TARGET_REPO/releases/$RELEASE_ID" -f make_latest=true
+          echo "Ensuring $RELEASE_TAG is marked as latest..."
+          gh release edit "$RELEASE_TAG" --repo "$TARGET_REPO" --make-latest
 
       - name: Notify Discord (beta)
         env:
@@ -288,12 +289,7 @@ jobs:
           small_files=()
           max_size=$((8 * 1024 * 1024))
           while IFS= read -r -d '' f; do
-            # get file size in bytes (compatible with GNU stat)
-            if size=$(stat -c%s "$f" 2>/dev/null); then
-              :
-            else
-              size=$(stat -f%z "$f" 2>/dev/null || echo 0)
-            fi
+            if size=$(stat -c%s "$f" 2>/dev/null); then :; else size=$(stat -f%z "$f" 2>/dev/null || echo 0); fi
             if [ "$size" -le "$max_size" ]; then
               small_files+=("$f")
             fi
