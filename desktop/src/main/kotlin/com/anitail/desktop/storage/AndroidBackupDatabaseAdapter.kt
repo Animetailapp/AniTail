@@ -129,6 +129,26 @@ internal class AndroidBackupDatabaseAdapter(
             val latest = latestSchemaInDirectory(directory)
             if (latest != null) return latest
         }
+        // Fallback: try to load schema from classpath resources (packaged jars)
+        try {
+            val resourceCandidates = listOf(
+                schemaFile.toString().replace('\\', '/'),
+                schemaFile.toString().removePrefix("app/").replace('\\', '/'),
+            )
+            for (res in resourceCandidates) {
+                val stream = Thread.currentThread().contextClassLoader.getResourceAsStream(res)
+                if (stream != null) {
+                    stream.use { input ->
+                        val tmp = Files.createTempFile("room-schema-", ".json")
+                        java.nio.file.Files.copy(input, tmp, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                        return tmp
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // Ignore and return null below
+        }
+
         return null
     }
 
