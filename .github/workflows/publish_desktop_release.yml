@@ -35,7 +35,8 @@ jobs:
           set -e
 
           extract_version() {
-            grep -oP 'packageVersion\\s*=\\s*"\\K[^"]+' desktop/build.gradle.kts | head -n1 || true
+            # Regex updated to support single (') and double (") quotes
+            grep -oP "packageVersion\s*=\s*['\"]\K[^'\"]+" desktop/build.gradle.kts | head -n1 || true
           }
 
           normalize_tag() {
@@ -49,27 +50,38 @@ jobs:
 
           INPUT_VERSION="${{ inputs.version }}"
           CURRENT_VERSION="$(extract_version)"
+          IS_MANUAL="${{ github.event_name == 'workflow_dispatch' }}"
+
+          # 1. Check for Manual Input Override
+          if [ "$IS_MANUAL" = "true" ] && [ -n "$INPUT_VERSION" ]; then
+            RELEASE_VERSION="${INPUT_VERSION#v}"
+            RELEASE_TAG="$(normalize_tag "$RELEASE_VERSION")"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "release_version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+            echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            echo "Manual input detected: Force publishing $RELEASE_TAG"
+            exit 0
+          fi
+
+          # 2. Check if file reading failed
           if [ -z "$CURRENT_VERSION" ]; then
             echo "Could not read packageVersion from desktop/build.gradle.kts"
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ -n "$INPUT_VERSION" ]; then
-              RELEASE_VERSION="${INPUT_VERSION#v}"
-            else
-              RELEASE_VERSION="$CURRENT_VERSION"
-            fi
-            RELEASE_TAG="$(normalize_tag "$RELEASE_VERSION")"
+          # 3. Check for Manual Trigger without Input (Force publish current file version)
+          if [ "$IS_MANUAL" = "true" ]; then
+            RELEASE_TAG="$(normalize_tag "$CURRENT_VERSION")"
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
-            echo "release_version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+            echo "release_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
             echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
-            echo "Manual publish for $RELEASE_TAG"
+            echo "Manual trigger (empty input): Force publishing from file version $CURRENT_VERSION"
             exit 0
           fi
 
-          PREVIOUS_VERSION="$(git diff HEAD^ HEAD -- desktop/build.gradle.kts | grep -oP 'packageVersion\\s*=\\s*"\\K[^"]+' | head -n1 || true)"
+          # 4. Check for Git Changes (Push event)
+          PREVIOUS_VERSION="$(git diff HEAD^ HEAD -- desktop/build.gradle.kts | grep -oP "packageVersion\s*=\s*['\"]\K[^'\"]+" | head -n1 || true)"
 
           if [ -z "$PREVIOUS_VERSION" ] || [ "$PREVIOUS_VERSION" != "$CURRENT_VERSION" ]; then
             RELEASE_TAG="$(normalize_tag "$CURRENT_VERSION")"
