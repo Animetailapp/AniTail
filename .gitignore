@@ -91,3 +91,12 @@ output-metadata.json
 
 # VS Code
 .vscode/
+.agents/
+*.keystore
+*.jks
+.maestro/
+docs/
+.tmp/
+client_secret.json
+client_secret_*.json
+desktop/src/main/resources/oauth/client_secret.json

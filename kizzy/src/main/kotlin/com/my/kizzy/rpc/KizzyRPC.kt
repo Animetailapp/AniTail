@@ -25,15 +25,24 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 
 /**
  * Modified by Zion Huang
  */
-open class KizzyRPC(token: String) {
+open class KizzyRPC(
+    private val token: String,
+    os: String = "Android",
+    browser: String = "Discord Android",
+    device: String = "Generic Android Device",
+    private val userAgent: String = "Discord-Android/314013;RNA",
+    private val superPropertiesBase64: String? = null
+) {
     private val kizzyRepository = KizzyRepository()
-    private val discordWebSocket = DiscordWebSocket(token)
+    private val discordWebSocket = DiscordWebSocket(token, os, browser, device)
+    private val httpClient = HttpClient()
 
     val connectionState: StateFlow<GatewayConnectionState> = discordWebSocket.connectionState
     val lastActivityAt: StateFlow<Long?> = discordWebSocket.lastActivityAt
@@ -73,9 +82,48 @@ open class KizzyRPC(token: String) {
         status: String? = "online",
         since: Long? = null,
     ) {
-        if (!isRpcRunning()) {
-            discordWebSocket.connect()
+        if (!isRpcRunning()) discordWebSocket.connect()
+
+        // Try to resolve external URLs via Discord `external-assets` first (requires applicationId + token).
+        val resolvedLargeImage = when {
+            largeImage == null -> null
+            largeImage is RpcImage.DiscordImage -> largeImage.resolveImage(kizzyRepository)
+            largeImage is RpcImage.ExternalImage -> {
+                var maybe: String? = null
+                if (applicationId != null) {
+                    // Retry a few times because Discord may take a short moment to create external assets
+                    repeat(3) { attempt ->
+                        if (maybe != null) return@repeat
+                        maybe = runCatching {
+                            fetchExternalAsset(httpClient, applicationId, token, largeImage.image, userAgent, superPropertiesBase64)
+                        }.getOrNull()
+                        if (maybe == null) delay((200L * (attempt + 1)))
+                    }
+                }
+                maybe ?: largeImage.resolveImage(kizzyRepository)
+            }
+            else -> largeImage.resolveImage(kizzyRepository)
         }
+
+        val resolvedSmallImage = when {
+            smallImage == null -> null
+            smallImage is RpcImage.DiscordImage -> smallImage.resolveImage(kizzyRepository)
+            smallImage is RpcImage.ExternalImage -> {
+                var maybe: String? = null
+                if (applicationId != null) {
+                    repeat(3) { attempt ->
+                        if (maybe != null) return@repeat
+                        maybe = runCatching {
+                            fetchExternalAsset(httpClient, applicationId, token, smallImage.image, userAgent, superPropertiesBase64)
+                        }.getOrNull()
+                        if (maybe == null) delay((200L * (attempt + 1)))
+                    }
+                }
+                maybe ?: smallImage.resolveImage(kizzyRepository)
+            }
+            else -> smallImage.resolveImage(kizzyRepository)
+        }
+
         val presence = Presence(
             activities = listOf(
                 Activity(
@@ -88,14 +136,14 @@ open class KizzyRPC(token: String) {
                         end = endTime
                     ),
                     assets = Assets(
-                        largeImage = largeImage?.resolveImage(kizzyRepository),
-                        smallImage = smallImage?.resolveImage(kizzyRepository),
+                        largeImage = resolvedLargeImage,
+                        smallImage = resolvedSmallImage,
                         largeText = largeText,
                         smallText = smallText
                     ),
                     buttons = buttons?.map { it.first },
                     metadata = Metadata(buttonUrls = buttons?.map { it.second }),
-                    applicationId = applicationId.takeIf { !buttons.isNullOrEmpty() },
+                    applicationId = applicationId,
                     url = streamUrl
                 )
             ),
@@ -115,14 +163,22 @@ open class KizzyRPC(token: String) {
     }
 
     companion object {
-        suspend fun getUserInfo(token: String): Result<UserInfo> = runCatching {
+        suspend fun getUserInfo(
+            token: String,
+            userAgent: String = "Discord-Android/314013;RNA",
+            superPropertiesBase64: String? = null
+        ): Result<UserInfo> = runCatching {
             val client = HttpClient()
             val response = client.get("https://discord.com/api/v9/users/@me") {
                 header("Authorization", token)
+                header("User-Agent", userAgent)
+                if (superPropertiesBase64 != null) {
+                    header("X-Super-Properties", superPropertiesBase64)
+                }
             }.bodyAsText()
             val json = JSONObject(response)
             val username = json.getString("username")
-            val name = json.getString("global_name")
+            val name = json.optString("global_name", username)
             val userId = json.getString("id")
             // Avatar is optional
             val avatarHash = if (json.has("avatar") && !json.isNull("avatar")) json.getString("avatar") else null

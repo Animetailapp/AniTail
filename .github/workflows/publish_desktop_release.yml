@@ -1,0 +1,252 @@
+name: Publish Desktop Release
+
+on:
+  push:
+    branches:
+      - "master"
+    paths:
+      - "desktop/build.gradle.kts"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (example: 1.14.0 or v1.14.0). Leave empty to use desktop/build.gradle.kts"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.resolve.outputs.should_publish }}
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      release_version: ${{ steps.resolve.outputs.release_version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Resolve desktop version
+        id: resolve
+        shell: bash
+        run: |
+          set -e
+
+          extract_version() {
+            grep -oP 'packageVersion\\s*=\\s*"\\K[^"]+' desktop/build.gradle.kts | head -n1 || true
+          }
+
+          normalize_tag() {
+            local value="$1"
+            if [[ "$value" == v* ]]; then
+              echo "$value"
+            else
+              echo "v$value"
+            fi
+          }
+
+          INPUT_VERSION="${{ inputs.version }}"
+          CURRENT_VERSION="$(extract_version)"
+          if [ -z "$CURRENT_VERSION" ]; then
+            echo "Could not read packageVersion from desktop/build.gradle.kts"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -n "$INPUT_VERSION" ]; then
+              RELEASE_VERSION="${INPUT_VERSION#v}"
+            else
+              RELEASE_VERSION="$CURRENT_VERSION"
+            fi
+            RELEASE_TAG="$(normalize_tag "$RELEASE_VERSION")"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "release_version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+            echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            echo "Manual publish for $RELEASE_TAG"
+            exit 0
+          fi
+
+          PREVIOUS_VERSION="$(git diff HEAD^ HEAD -- desktop/build.gradle.kts | grep -oP 'packageVersion\\s*=\\s*"\\K[^"]+' | head -n1 || true)"
+
+          if [ -z "$PREVIOUS_VERSION" ] || [ "$PREVIOUS_VERSION" != "$CURRENT_VERSION" ]; then
+            RELEASE_TAG="$(normalize_tag "$CURRENT_VERSION")"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "release_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+            echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            echo "Desktop version changed: ${PREVIOUS_VERSION:-<none>} -> $CURRENT_VERSION"
+          else
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            echo "release_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+            echo "release_tag=$(normalize_tag "$CURRENT_VERSION")" >> "$GITHUB_OUTPUT"
+            echo "Desktop version did not change."
+          fi
+
+  build_desktop:
+    needs: check-version
+    if: needs.check-version.outputs.should_publish == 'true'
+    name: Build (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: Linux DEB
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageReleaseDeb
+            java_arch: x64
+            ext: deb
+            asset_suffix: linux-x64
+          - os: ubuntu-latest
+            label: Linux RPM
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageReleaseRpm
+            java_arch: x64
+            ext: rpm
+            asset_suffix: linux-x64
+          - os: macos-latest
+            label: macOS DMG
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageReleaseDmg
+            java_arch: aarch64
+            ext: dmg
+            asset_suffix: macos-arm64
+          - os: windows-latest
+            label: Windows MSI
+            gradle_cmd: ./gradlew.bat
+            gradle_task: :desktop:packageReleaseMsi
+            java_arch: x64
+            ext: msi
+            asset_suffix: windows-x64
+          - os: windows-11-arm
+            label: Windows ARM64 MSI
+            gradle_cmd: ./gradlew.bat
+            gradle_task: :desktop:packageReleaseMsi
+            java_arch: aarch64
+            ext: msi
+            asset_suffix: windows-arm64
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          architecture: ${{ matrix.java_arch }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-cleanup: on-success
+
+      - name: Grant execute permission for gradlew
+        if: runner.os != 'Windows'
+        run: chmod +x gradlew
+
+      - name: Install RPM tools
+        if: matrix.ext == 'rpm'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Validate Google OAuth secret
+        shell: pwsh
+        env:
+          GOOGLE_CLIENT_SECRET_JSON: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:GOOGLE_CLIENT_SECRET_JSON)) {
+            throw "Missing required secret: GOOGLE_CLIENT_SECRET_JSON"
+          }
+
+      - name: Inject Google OAuth client_secret.json
+        shell: pwsh
+        env:
+          GOOGLE_CLIENT_SECRET_JSON: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
+        run: |
+          New-Item -ItemType Directory -Force "desktop/src/main/resources/oauth" | Out-Null
+          [System.IO.File]::WriteAllText(
+            "desktop/src/main/resources/oauth/client_secret.json",
+            $env:GOOGLE_CLIENT_SECRET_JSON,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
+      - name: Build desktop package
+        run: ${{ matrix.gradle_cmd }} ${{ matrix.gradle_task }}
+
+      - name: Prepare release asset
+        shell: pwsh
+        run: |
+          $ext = ".${{ matrix.ext }}"
+          $files = Get-ChildItem -Path "desktop/build/compose/binaries" -Recurse -File |
+            Where-Object { $_.Extension -ieq $ext }
+
+          if (-not $files) {
+            throw "No package found with extension $ext"
+          }
+
+          $latest = $files | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+          New-Item -ItemType Directory -Force "dist" | Out-Null
+
+          $assetName = "AniTail-Desktop-${{ needs.check-version.outputs.release_tag }}-${{ matrix.asset_suffix }}.${{ matrix.ext }}"
+          Copy-Item $latest.FullName ("dist/" + $assetName)
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: desktop-${{ matrix.asset_suffix }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Cleanup injected secret
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path "desktop/src/main/resources/oauth/client_secret.json") {
+            Remove-Item -Force "desktop/src/main/resources/oauth/client_secret.json"
+          }
+
+  publish:
+    needs: [check-version, build_desktop]
+    if: needs.check-version.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    env:
+      TARGET_REPO: Animetailapp/Anitail-Desktop
+      RELEASE_TAG: ${{ needs.check-version.outputs.release_tag }}
+      GH_TOKEN: ${{ secrets.DESKTOP_RELEASE_TOKEN }}
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: release_assets
+
+      - name: Publish/Update target release
+        shell: bash
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "Missing required secret: DESKTOP_RELEASE_TOKEN"
+            exit 1
+          fi
+
+          ls -la release_assets
+
+          if gh release view "$RELEASE_TAG" --repo "$TARGET_REPO" >/dev/null 2>&1; then
+            echo "Release already exists. Uploading assets with overwrite..."
+            gh release upload "$RELEASE_TAG" release_assets/* --repo "$TARGET_REPO" --clobber
+          else
+            echo "Creating release in target repository..."
+            gh release create "$RELEASE_TAG" release_assets/* \
+              --repo "$TARGET_REPO" \
+              --title "AniTail Desktop $RELEASE_TAG" \
+              --notes "Automated desktop release for version ${{ needs.check-version.outputs.release_version }} from $GITHUB_REPOSITORY (${GITHUB_SHA})."
+          fi
+
+      - name: Mark release as latest
+        shell: bash
+        run: |
+          RELEASE_ID=$(gh release view "$RELEASE_TAG" --repo "$TARGET_REPO" --json id --jq .id)
+          gh api -X PATCH "repos/$TARGET_REPO/releases/$RELEASE_ID" -f make_latest=true

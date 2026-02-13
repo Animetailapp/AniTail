@@ -3,6 +3,7 @@
     <string name="home">Inicio</string>
     <string name="songs">Canciones</string>
     <string name="artists">Artistas</string>
+    <string name="artist">Artista</string>
     <string name="albums">Álbumes</string>
     <string name="playlists">Listas de reproducción</string>
     <string name="explore">Explorar</string>
@@ -61,6 +62,19 @@
     <string name="filter_playlists">Listas de reproducción</string>
     <string name="filter_community_playlists">Listas de la comunidad</string>
     <string name="filter_featured_playlists">Listas destacadas</string>
+    <string name="mixes">Mixes</string>
+    <string name="library_empty_title">Tu biblioteca está vacía</string>
+    <string name="library_empty_subtitle">Busca música y añádela a tu biblioteca</string>
+    <string name="library_songs_empty_title">No hay canciones</string>
+    <string name="library_songs_empty_subtitle">Las canciones que guardes aparecerán aquí</string>
+    <string name="library_albums_empty_title">No hay álbumes</string>
+    <string name="library_albums_empty_subtitle">Los álbumes que guardes aparecerán aquí</string>
+    <string name="library_downloads_empty_title">No hay descargas</string>
+    <string name="library_downloads_empty_subtitle">Las descargas estarán disponibles próximamente en Desktop</string>
+    <string name="library_playlists_empty_title">No hay playlists guardadas</string>
+    <string name="library_artists_empty_title">No hay artistas guardados</string>
+    <string name="library_albums_unavailable">Los álbumes aparecerán aquí cuando estén disponibles en Desktop</string>
+    <string name="library_downloads_unavailable">Descargas locales no disponibles en Desktop por ahora</string>
     <string name="no_results_found">No se encontraron resultados</string>
 
     <!-- Pantalla de artista -->
@@ -70,6 +84,7 @@
 
     <!-- Biblioteca -->
     <string name="liked">Me gusta</string>
+    <string name="in_library">Biblioteca</string>
     <string name="offline">Descargados</string>
     <string name="my_top">Mis favoritos</string>
     <string name="cached_playlist">En caché</string>
@@ -93,6 +108,7 @@
 
     <!-- Menú -->
     <string name="details">Detalles</string>
+    <string name="open">Abrir</string>
     <string name="edit">Editar</string>
     <string name="start_radio">Iniciar radio</string>
     <string name="play">Reproducir</string>
@@ -275,6 +291,7 @@
     <string name="appearance">Apariencia</string>
     <string name="theme">Tema</string>
     <string name="enable_dynamic_theme">Activar tema dinámico</string>
+    <string name="enable_dynamic_theme_desc">Usa colores de la carátula actual</string>
     <string name="dark_theme">Tema oscuro</string>
     <string name="dark_theme_on">Activado</string>
     <string name="dark_theme_off">Desactivado</string>
@@ -290,6 +307,7 @@
     <string name="enable_swipe_thumbnail">Activar deslizar para cambiar canción</string>
     <string name="swipe_song_to_add">Desliza la canción a la derecha para reproducir siguiente o a la izquierda para añadir a la cola</string>
     <string name="pure_black">Negro puro</string>
+    <string name="pure_black_desc">Usa negro puro en modo oscuro (OLED)</string>
     <string name="player">Reproductor</string>
     <string name="lyrics_text_position">Posición del texto de la letra</string>
     <string name="left">Izquierda</string>
@@ -327,10 +345,14 @@
     <string name="token_hidden">Toca para mostrar token</string>
     <string name="token_shown">Toca de nuevo para copiar o editar</string>
     <string name="token_adv_login_description">Este es un método de inicio de sesión AVANZADO. Como alternativa al portal web, puedes ingresar o actualizar directamente tu token de inicio de sesión aquí. Por ejemplo, esto puede acelerar el inicio de sesión en múltiples dispositivos. Ten en cuenta que no se aceptarán formatos de token no válidos que la aplicación no pueda procesar</string>
+    <string name="login_requires_cookie">Falta la cookie de YouTube. Pega el token avanzado completo.</string>
+    <string name="login_not_available_desktop">No disponible en desktop. Usa inicio de sesión avanzado.</string>
     <string name="ytm_sync">Sincronizar automáticamente con tu cuenta de YouTube Music</string>
     <string name="general">General</string>
     <string name="content_language">Idioma de contenido predeterminado</string>
     <string name="content_country">País de contenido predeterminado</string>
+    <string name="hide_explicit">Ocultar contenido explícito</string>
+    <string name="hide_explicit_desc">Filtra canciones con contenido explícito</string>
     <string name="system_default">Predeterminado del sistema</string>
     <string name="proxy">Proxy</string>
     <string name="enable_proxy">Activar proxy</string>
@@ -350,11 +372,15 @@
     <string name="audio_quality_auto">Automática</string>
     <string name="audio_quality_high">Alta</string>
     <string name="audio_quality_low">Baja</string>
+    <string name="audio_quality_medium">Media</string>
+    <string name="crossfade">Crossfade</string>
     <string name="queue">Cola</string>
     <string name="persistent_queue">Cola persistente</string>
     <string name="persistent_queue_desc">Restaurar tu última cola cuando la aplicación se inicia</string>
     <string name="auto_load_more">Cargar automáticamente más canciones</string>
     <string name="auto_load_more_desc">Añadir automáticamente más canciones cuando se llega al final de la cola, si es posible</string>
+    <string name="auto_start_radio">Radio automática</string>
+    <string name="auto_start_radio_desc">Inicia radio cuando termina la cola</string>
     <string name="enable_similar_content">Activar contenido similar</string>
     <string name="similar_content_desc">Añadir automáticamente más canciones similares cuando se llega al final de la cola</string>
     <string name="skip_silence">Omitir silencios</string>
@@ -369,11 +395,17 @@
     <string name="auto_download_lyrics_desc">Descargar automáticamente las letras de las canciones descargadas</string>
 
     <string name="storage">Almacenamiento</string>
+    <string name="download_as_mp3">Descargar en MP3</string>
+    <string name="download_as_mp3_desc">Requiere FFmpeg instalado en el sistema</string>
     <string name="image_cache">Caché de imágenes</string>
     <string name="song_cache">Caché de canciones</string>
     <string name="max_cache_size">Tamaño máximo de caché</string>
     <string name="unlimited">Ilimitado</string>
     <string name="clear_all_downloads">Borrar todas las descargas</string>
+    <string name="clear_cache">Limpiar caché</string>
+    <string name="clear_cache_desc">Libera espacio eliminando archivos temporales</string>
+    <string name="clear_cache_confirm_title">¿Limpiar caché?</string>
+    <string name="clear_cache_confirm_desc">Se eliminarán las imágenes y datos en caché. Las canciones descargadas no se verán afectadas.</string>
     <string name="clear_image_cache">Limpiar caché de imágenes</string>
     <string name="clear_song_cache">Limpiar caché de canciones</string>
     <string name="size_used">%s usado</string>
@@ -381,6 +413,9 @@
 
 
     <string name="privacy">Privacidad</string>
+    <string name="search_settings_placeholder">Buscar ajustes...</string>
+    <string name="no_settings_found">No se encontraron ajustes</string>
+    <string name="back">Volver</string>
     <string name="listen_history">Historial de escucha</string>
     <string name="search_history">Historial de búsqueda</string>
     <string name="pause_listen_history">Pausar historial de escucha</string>
@@ -389,8 +424,16 @@
     <string name="pause_search_history">Pausar historial de búsqueda</string>
     <string name="clear_search_history">Borrar historial de búsqueda</string>
     <string name="clear_search_history_confirm">¿Estás seguro de que quieres borrar todo el historial de búsqueda?</string>
+    <string name="security">Seguridad</string>
+    <string name="clear_sensitive_data">Borrar datos sensibles</string>
+    <string name="clear_sensitive_data_description">Elimina tokens, cookies y credenciales privadas de este dispositivo.</string>
+    <string name="clear_sensitive_data_confirm">Se eliminarán las credenciales y tokens guardados. ¿Deseas continuar?</string>
+    <string name="reset_app_keep_downloads">Restablecer app (mantener descargas)</string>
+    <string name="reset_app_keep_downloads_description">Restablece datos locales y ajustes sin borrar canciones descargadas.</string>
+    <string name="reset_app_keep_downloads_confirm">Se restablecerán todos los datos locales de la app. Las canciones descargadas se conservarán.</string>
     <string name="disable_screenshot">Desactivar capturas de pantalla</string>
     <string name="disable_screenshot_desc">Cuando esta opción está activada, las capturas de pantalla y la vista de la aplicación en Recientes están desactivadas.</string>
+    <string name="disable_screenshot_not_supported_desktop">No compatible en desktop.</string>
 
 
     <string name="backup_restore">Copia de seguridad y restauración</string>
@@ -403,6 +446,7 @@
     <string name="discord_integration">Integración con Discord</string>
     <string name="discord_information">AniTail utiliza la biblioteca KizzyRPC para establecer el estado de tu cuenta de Discord. Esto implica el uso de la conexión Discord Gateway, lo que puede considerarse una violación de los términos de servicio de Discord. Sin embargo, no hay casos conocidos de cuentas de usuario suspendidas por esta razón. Úsalo bajo tu propio riesgo.\n\nAnitail solo extraerá tu token, y todo lo demás se almacena localmente.</string>
     <string name="dismiss">Descartar</string>
+    <string name="open_link">Abrir enlace</string>
     <string name="options">Opciones</string>
     <string name="preview">Vista previa</string>
     <string name="not_logged_in_youtube">No has iniciado sesión en YouTube</string>
@@ -418,6 +462,16 @@
     <string name="about">Acerca de</string>
     <string name="build_type">Estado de la app |</string>
     <string name="version">Versión |</string>
+    <string name="desktop_edition">Edición de escritorio</string>
+    <string name="about_build">Compilación</string>
+    <string name="about_version_title">Versión</string>
+    <string name="about_device">Dispositivo</string>
+    <string name="about_kotlin">Kotlin</string>
+    <string name="about_compose_desktop">Compose Desktop</string>
+    <string name="about_source_code">Código fuente</string>
+    <string name="about_source_code_desc">Ver en GitHub</string>
+    <string name="about_licenses">Licencias</string>
+    <string name="about_licenses_desc">Bibliotecas de código abierto</string>
     <string name="device">Dispositivo |</string>
     <string name="info_dev">Desarrollado por un entusiasta de la tecnología</string>
     <string name="other_apps">Otras apps para Android</string>
@@ -496,6 +550,7 @@
     <string name="love_tracks_description">Automáticamente dar/quitar me gusta cuando des like/unlike</string>
     <string name="about_lastfm">Acerca de Last.fm</string>
     <string name="about_lastfm_description">Aprende más sobre descubrimiento musical y recomendaciones de Last.fm</string>
+    <string name="show_lastfm_avatar">Mostrar avatar de Last.fm</string>
     <string name="username">Nombre de usuario</string>
     <string name="password">Contraseña</string>
     
@@ -515,6 +570,7 @@
     <string name="no_top_artists_data">No hay datos de artistas principales. ¡Escucha más música para ver tus estadísticas!</string>
     <string name="retry_pending_scrobbles">Reintentar scrobbles pendientes</string>
     <string name="clear_pending_scrobbles">Limpiar scrobbles pendientes</string>
+    <string name="lastfm_api_keys_missing">Faltan las claves API de Last.fm.</string>
 
     <!-- Welcome -->
     <string name="good_morning">Buenos días</string>
@@ -732,4 +788,74 @@
     <string name="discord_status_connecting">Conectando...</string>
     <string name="discord_status_connected">Conectado</string>
     <string name="discord_status_reconnecting">Reconectando...</string>
+
+    <!-- Desktop supplemental -->
+    <string name="downloads">Descargas</string>
+    <string name="downloads_active">Activas (%d)</string>
+    <string name="downloads_completed">Completadas (%d)</string>
+    <string name="downloads_failed">Fallidas</string>
+    <string name="downloads_no_active">No hay descargas activas</string>
+    <string name="downloads_storage_usage">%1$.1f MB usados • %2$d canciones</string>
+    <string name="download_queued">En cola...</string>
+    <string name="download_paused">Pausada</string>
+    <string name="resume">Reanudar</string>
+    <string name="pause">Pausar</string>
+    <string name="remove_download_confirm">¿Eliminar "%s" de las descargas?</string>
+    <string name="remove_downloads">Eliminar descargas</string>
+    <string name="remove_downloads_confirmation">Se eliminarán las descargas seleccionadas.</string>
+    <string name="open_in_browser">Abrir en navegador</string>
+    <string name="remove_from_queue">Quitar de la cola</string>
+    <string name="close_selection">Cerrar selección</string>
+    <string name="deselect_all">Deseleccionar todo</string>
+    <string name="connected_user">Usuario conectado</string>
+    <string name="login_prompt_details">Inicia sesión para acceder a tu biblioteca, playlists y recomendaciones personalizadas.</string>
+    <string name="error_loading_playlist">Error al cargar playlist</string>
+    <string name="error_loading_album">Error al cargar álbum</string>
+    <string name="error_loading_artist">Error al cargar artista</string>
+    <string name="song">Canción</string>
+    <string name="album">Álbum</string>
+    <string name="playlist">Playlist</string>
+    <string name="all">Todo</string>
+    <string name="use_suggestion">Usar sugerencia</string>
+    <string name="repeat">Repetir</string>
+    <string name="top_songs">Canciones populares</string>
+    <string name="explicit_badge">E</string>
+    <string name="playing_indicator">▶</string>
+    <string name="list_separator">, </string>
+    <string name="history_empty">No hay reproducciones recientes.</string>
+    <string name="nothing_playing">No hay nada reproduciéndose</string>
+    <string name="stats_songs_in_library">Canciones en biblioteca</string>
+    <string name="stats_recent_plays">Reproducciones recientes</string>
+    <string name="stats_more_soon">Más estadísticas llegarán pronto en Desktop.</string>
+    <string name="app_name">AniTail Music</string>
+    <string name="refresh">Actualizar</string>
+    <string name="minimize">Minimizar</string>
+    <string name="maximize">Maximizar</string>
+    <string name="previous">Anterior</string>
+    <string name="next">Siguiente</string>
+    <string name="shuffle_play">Reproducir aleatorio</string>
+    <string name="repeat_all">Todo</string>
+    <string name="repeat_one">Uno</string>
+    <string name="up_next">A continuación</string>
+    <string name="previously_played">Reproducido anteriormente</string>
+    <string name="lyrics_synced">Sincronizadas</string>
+    <string name="lyrics_plain">Texto</string>
+    <string name="lyrics_start_playing">Reproduce una canción para ver las letras</string>
+    <string name="retry">Reintentar</string>
+    <string name="search_suggestions_available">Sugerencias disponibles</string>
+    <string name="time_remaining">Restante: %1$s</string>
+    <string name="start">Iniciar</string>
+    <string name="update">Actualizar</string>
+    <string name="volume_percent">Volumen: %1$d%%</string>
+    <string name="tempo_value">Tempo: %1$sx</string>
+    <string name="pitch_value">Tono: %1$s</string>
+    <string name="select_artist">Selecciona artista</string>
+    <string name="duration">Duración</string>
+    <string name="id">ID</string>
+    <string name="url">URL</string>
+
+    <plurals name="queue_items_removed">
+        <item quantity="one">%d canción eliminada</item>
+        <item quantity="other">%d canciones eliminadas</item>
+    </plurals>
 </resources>

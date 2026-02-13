@@ -223,6 +223,7 @@ dependencies {
     implementation(projects.kizzy)
     implementation(projects.betterlyrics)
     implementation(projects.simpmusic)
+    implementation(projects.common)
 
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.serialization.json)

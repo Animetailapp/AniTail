@@ -105,3 +105,108 @@ jobs:
         with:
           name: app-universal-debug
           path: app/build/outputs/apk/universal/debug/*.apk
+
+  desktop_release:
+    if: github.actor != 'dependabot[bot]'
+    name: Desktop Release (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: Linux DEB
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageReleaseDeb
+            artifact_name: desktop-deb-release
+            java_arch: x64
+          - os: ubuntu-latest
+            label: Linux RPM
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageReleaseRpm
+            artifact_name: desktop-rpm-release
+            java_arch: x64
+          - os: macos-latest
+            label: macOS DMG
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageReleaseDmg
+            artifact_name: desktop-dmg-release
+            java_arch: aarch64
+          - os: windows-latest
+            label: Windows MSI
+            gradle_cmd: ./gradlew.bat
+            gradle_task: :desktop:packageReleaseMsi
+            artifact_name: desktop-msi-release
+            java_arch: x64
+          - os: windows-11-arm
+            label: Windows ARM64 MSI
+            gradle_cmd: ./gradlew.bat
+            gradle_task: :desktop:packageReleaseMsi
+            artifact_name: desktop-msi-arm64-release
+            java_arch: aarch64
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          architecture: ${{ matrix.java_arch }}
+
+      - name: Set Up Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-cleanup: on-success
+
+      - name: Grant execute permission for gradlew
+        if: runner.os != 'Windows'
+        run: chmod +x gradlew
+      
+      - name: Install RPM tools
+        if: matrix.label == 'Linux RPM'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Ensure Google Drive OAuth secret exists
+        shell: pwsh
+        env:
+          GOOGLE_CLIENT_SECRET_JSON: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:GOOGLE_CLIENT_SECRET_JSON)) {
+            Write-Error "Missing required secret GOOGLE_CLIENT_SECRET_JSON for desktop installer builds."
+            exit 1
+          }
+
+      - name: Inject Google OAuth client_secret.json
+        shell: pwsh
+        env:
+          GOOGLE_CLIENT_SECRET_JSON: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
+        run: |
+          New-Item -ItemType Directory -Force "desktop/src/main/resources/oauth" | Out-Null
+          [System.IO.File]::WriteAllText(
+            "desktop/src/main/resources/oauth/client_secret.json",
+            $env:GOOGLE_CLIENT_SECRET_JSON,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
+      - name: Build Desktop Release Package
+        run: ${{ matrix.gradle_cmd }} ${{ matrix.gradle_task }}
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+
+      - name: Upload Desktop Release Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: desktop/build/compose/binaries/**
+          if-no-files-found: error
+
+      - name: Cleanup injected Google secret
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path "desktop/src/main/resources/oauth/client_secret.json") {
+            Remove-Item -Force "desktop/src/main/resources/oauth/client_secret.json"
+          }
