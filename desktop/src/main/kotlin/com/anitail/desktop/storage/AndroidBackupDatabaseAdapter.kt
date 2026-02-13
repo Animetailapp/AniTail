@@ -66,50 +66,219 @@ internal class AndroidBackupDatabaseAdapter(
 
     private fun createSchema(db: Connection) {
         val resolvedSchema = resolveSchemaFile()
-        require(resolvedSchema != null && Files.exists(resolvedSchema)) {
-            "Room schema not found: $schemaFile"
-        }
+        if (resolvedSchema != null && Files.exists(resolvedSchema)) {
+            val schema = JSONObject(Files.readString(resolvedSchema, StandardCharsets.UTF_8))
+            val database = schema.getJSONObject("database")
 
-        val schema = JSONObject(Files.readString(resolvedSchema, StandardCharsets.UTF_8))
-        val database = schema.getJSONObject("database")
+            db.createStatement().use { statement ->
+                statement.execute("PRAGMA foreign_keys = OFF")
 
-        db.createStatement().use { statement ->
-            statement.execute("PRAGMA foreign_keys = OFF")
-
-            val entities = database.getJSONArray("entities")
-            for (index in 0 until entities.length()) {
-                val entity = entities.getJSONObject(index)
-                val tableName = entity.getString("tableName")
-                val createSql = entity.getString("createSql")
-                    .replace("`${'$'}{TABLE_NAME}`", "`$tableName`")
-                statement.execute(createSql)
-
-                val indices = entity.optJSONArray("indices") ?: continue
-                for (i in 0 until indices.length()) {
-                    val indexSql = indices.getJSONObject(i).getString("createSql")
+                val entities = database.getJSONArray("entities")
+                for (index in 0 until entities.length()) {
+                    val entity = entities.getJSONObject(index)
+                    val tableName = entity.getString("tableName")
+                    val createSql = entity.getString("createSql")
                         .replace("`${'$'}{TABLE_NAME}`", "`$tableName`")
-                    statement.execute(indexSql)
+                    statement.execute(createSql)
+
+                    val indices = entity.optJSONArray("indices") ?: continue
+                    for (i in 0 until indices.length()) {
+                        val indexSql = indices.getJSONObject(i).getString("createSql")
+                            .replace("`${'$'}{TABLE_NAME}`", "`$tableName`")
+                        statement.execute(indexSql)
+                    }
                 }
-            }
 
-            val views = database.optJSONArray("views")
-            if (views != null) {
-                for (index in 0 until views.length()) {
-                    val view = views.getJSONObject(index)
-                    val viewName = view.getString("viewName")
-                    val viewSql = view.getString("createSql")
-                        .replace("`${'$'}{VIEW_NAME}`", "`$viewName`")
-                    statement.execute(viewSql)
+                val views = database.optJSONArray("views")
+                if (views != null) {
+                    for (index in 0 until views.length()) {
+                        val view = views.getJSONObject(index)
+                        val viewName = view.getString("viewName")
+                        val viewSql = view.getString("createSql")
+                            .replace("`${'$'}{VIEW_NAME}`", "`$viewName`")
+                        statement.execute(viewSql)
+                    }
                 }
-            }
 
-            val setupQueries = database.getJSONArray("setupQueries")
-            for (index in 0 until setupQueries.length()) {
-                statement.execute(setupQueries.getString(index))
-            }
+                val setupQueries = database.getJSONArray("setupQueries")
+                for (index in 0 until setupQueries.length()) {
+                    statement.execute(setupQueries.getString(index))
+                }
 
-            statement.execute("PRAGMA user_version = ${database.getInt("version")}")
-            statement.execute("PRAGMA foreign_keys = ON")
+                statement.execute("PRAGMA user_version = ${database.getInt("version")}")
+                statement.execute("PRAGMA foreign_keys = ON")
+            }
+        } else {
+            // Fallback: create a minimal compatible schema so first-time sync can produce an Android DB
+            db.createStatement().use { statement ->
+                statement.execute("PRAGMA foreign_keys = OFF")
+
+                statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS song(
+                        id TEXT NOT NULL PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        duration INTEGER NOT NULL,
+                        thumbnailUrl TEXT,
+                        albumId TEXT,
+                        albumName TEXT,
+                        artistName TEXT,
+                        explicit INTEGER NOT NULL DEFAULT 0,
+                        year INTEGER,
+                        date INTEGER,
+                        dateModified INTEGER,
+                        liked INTEGER NOT NULL DEFAULT 0,
+                        likedDate INTEGER,
+                        totalPlayTime INTEGER NOT NULL DEFAULT 0,
+                        inLibrary INTEGER,
+                        dateDownload INTEGER,
+                        isLocal INTEGER NOT NULL DEFAULT 0,
+                        romanizeLyrics INTEGER NOT NULL DEFAULT 0,
+                        mediaStoreUri TEXT
+                    )
+                    """.trimIndent(),
+                )
+
+                statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS artist(
+                        id TEXT NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        thumbnailUrl TEXT,
+                        channelId TEXT,
+                        lastUpdateTime INTEGER NOT NULL DEFAULT 0,
+                        bookmarkedAt INTEGER
+                    )
+                    """.trimIndent(),
+                )
+
+                statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS album(
+                        id TEXT NOT NULL PRIMARY KEY,
+                        playlistId TEXT,
+                        title TEXT NOT NULL,
+                        year INTEGER,
+                        thumbnailUrl TEXT,
+                        themeColor INTEGER,
+                        songCount INTEGER NOT NULL DEFAULT 0,
+                        duration INTEGER NOT NULL DEFAULT 0,
+                        lastUpdateTime INTEGER NOT NULL DEFAULT 0,
+                        bookmarkedAt INTEGER,
+                        likedDate INTEGER,
+                        inLibrary INTEGER
+                    )
+                    """.trimIndent(),
+                )
+
+                statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS playlist(
+                        id TEXT NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        browseId TEXT,
+                        createdAt INTEGER,
+                        lastUpdateTime INTEGER,
+                        isEditable INTEGER NOT NULL DEFAULT 0,
+                        bookmarkedAt INTEGER,
+                        remoteSongCount INTEGER,
+                        playEndpointParams TEXT,
+                        thumbnailUrl TEXT,
+                        shuffleEndpointParams TEXT,
+                        radioEndpointParams TEXT,
+                        backgroundImageUrl TEXT
+                    )
+                    """.trimIndent(),
+                )
+
+                statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS playlist_song_map(
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        playlistId TEXT NOT NULL,
+                        songId TEXT NOT NULL,
+                        position INTEGER NOT NULL,
+                        setVideoId TEXT
+                    )
+                    """.trimIndent(),
+                )
+
+                statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS song_artist_map(
+                        songId TEXT NOT NULL,
+                        artistId TEXT NOT NULL,
+                        position INTEGER NOT NULL,
+                        PRIMARY KEY(songId, artistId)
+                    )
+                    """.trimIndent(),
+                )
+
+                statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS song_album_map(
+                        songId TEXT NOT NULL,
+                        albumId TEXT NOT NULL,
+                        `index` INTEGER,
+                        PRIMARY KEY(songId, albumId)
+                    )
+                    """.trimIndent(),
+                )
+
+                statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS album_artist_map(
+                        albumId TEXT NOT NULL,
+                        artistId TEXT NOT NULL,
+                        `order` INTEGER NOT NULL,
+                        PRIMARY KEY(albumId, artistId)
+                    )
+                    """.trimIndent(),
+                )
+
+                statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS related_song_map(
+                        id INTEGER PRIMARY KEY NOT NULL,
+                        songId TEXT NOT NULL,
+                        relatedSongId TEXT NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+
+                statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS event(
+                        id INTEGER PRIMARY KEY NOT NULL,
+                        songId TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        playTime INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+
+                statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS search_history(
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        query TEXT NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+
+                statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS set_video_id(
+                        videoId TEXT PRIMARY KEY NOT NULL,
+                        setVideoId TEXT
+                    )
+                    """.trimIndent(),
+                )
+
+                // Set expected schema version
+                statement.execute("PRAGMA user_version = 26")
+                statement.execute("PRAGMA foreign_keys = ON")
+            }
         }
     }
 
