@@ -252,7 +252,6 @@ jobs:
             gh release upload "$RELEASE_TAG" release_assets/* --repo "$TARGET_REPO" --clobber
           else
             echo "Creating release in target repository..."
-            # FIXED: Used --latest instead of --make-latest for create command
             gh release create "$RELEASE_TAG" release_assets/* \
               --repo "$TARGET_REPO" \
               --title "AniTail Desktop $RELEASE_TAG" \
@@ -264,8 +263,7 @@ jobs:
         shell: bash
         run: |
           echo "Ensuring $RELEASE_TAG is marked as latest..."
-          # This command correctly uses --make-latest
-          gh release edit "$RELEASE_TAG" --repo "$TARGET_REPO" --make-latest
+          gh release edit "$RELEASE_TAG" --repo "$TARGET_REPO" --latest
 
       - name: Notify Discord (beta)
         env:
