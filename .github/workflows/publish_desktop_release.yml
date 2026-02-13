@@ -279,11 +279,67 @@ jobs:
             exit 0
           fi
 
-          # Send initial embed with links
-          ts=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-          payload="{\"content\":\"**🚀 Nuevo release de AniTail Desktop disponible!**\",\"username\":\"AniTail Bot\",\"embeds\":[{\"title\":\"AniTail Desktop $RELEASE_TAG\",\"url\":\"$REPO_URL/releases/tag/$RELEASE_TAG\",\"description\":\"Se ha publicado una nueva versión de AniTail Desktop: **$RELEASE_VERSION**.\",\"color\":51711,\"fields\":[{\"name\":\"Descargar release\",\"value\":\"<$REPO_URL/releases/tag/$RELEASE_TAG>\",\"inline\":false}],\"timestamp\":\"$ts\"}]}"
+          # Create JSON payload file
+          ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          cat > payload.json << 'EOF'
+          {
+            "content": "**🚀 Nuevo release de AniTail Desktop disponible!**",
+            "username": "AniTail Bot",
+            "avatar_url": "https://github.com/Animetailapp/AniTail/blob/master/fastlane/metadata/android/en-US/images/icon.png?raw=true",
+            "embeds": [
+              {
+                "title": "🚀 Nuevo Release - AniTail Desktop RELEASE_TAG",
+                "url": "REPO_URL/releases/tag/RELEASE_TAG",
+                "description": "Se ha creado una nueva release para AniTail Desktop: **RELEASE_VERSION**.\n\nPuedes revisar los paquetes y descargar los archivos a continuación.",
+                "color": 51711,
+                "image": {
+                  "url": "https://github.com/Animetailapp/AniTail/blob/master/fastlane/metadata/android/en-US/images/featureGraphic.png?raw=true"
+                },
+                "fields": [
+                  {
+                    "name": "📦 Linux DEB",
+                    "value": "[⬇️ Descargar DEB](REPO_URL/releases/download/RELEASE_TAG/AniTail-Desktop-RELEASE_TAG-linux-x64.deb)",
+                    "inline": false
+                  },
+                  {
+                    "name": "📦 Linux RPM",
+                    "value": "[⬇️ Descargar RPM](REPO_URL/releases/download/RELEASE_TAG/AniTail-Desktop-RELEASE_TAG-linux-x64.rpm)",
+                    "inline": false
+                  },
+                  {
+                    "name": "💿 macOS DMG",
+                    "value": "[⬇️ Descargar DMG](REPO_URL/releases/download/RELEASE_TAG/AniTail-Desktop-RELEASE_TAG-macos-arm64.dmg)",
+                    "inline": false
+                  },
+                  {
+                    "name": "🪟 Windows x64 MSI",
+                    "value": "[⬇️ Descargar MSI](REPO_URL/releases/download/RELEASE_TAG/AniTail-Desktop-RELEASE_TAG-windows-x64.msi)",
+                    "inline": false
+                  },
+                  {
+                    "name": "🪟 Windows ARM64 MSI",
+                    "value": "[⬇️ Descargar MSI ARM64](REPO_URL/releases/download/RELEASE_TAG/AniTail-Desktop-RELEASE_TAG-windows-arm64.msi)",
+                    "inline": false
+                  }
+                ],
+                "footer": {
+                  "text": "Release generado automáticamente por AniTail Bot",
+                  "icon_url": "https://github.com/Animetailapp/AniTail/blob/master/fastlane/metadata/android/en-US/images/icon.png?raw=true"
+                },
+                "timestamp": "TIMESTAMP"
+              }
+            ]
+          }
+          EOF
 
-          curl -H "Content-Type: application/json" -X POST -d "$payload" "$DISCORD_WEBHOOK" || true
+          # Replace placeholders
+          sed -i "s/RELEASE_TAG/$RELEASE_TAG/g" payload.json
+          sed -i "s/RELEASE_VERSION/$RELEASE_VERSION/g" payload.json
+          sed -i "s|REPO_URL|$REPO_URL|g" payload.json
+          sed -i "s/TIMESTAMP/$ts/g" payload.json
+
+          # Post embed
+          curl -H "Content-Type: application/json" -X POST -d @payload.json "$DISCORD_WEBHOOK" || true
 
           # Try to upload any build files that are <= 8 MiB (Discord attachment limit for many servers)
           small_files=()
