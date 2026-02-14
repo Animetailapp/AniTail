@@ -7,7 +7,7 @@ pluginManagement {
         mavenCentral()
     }
     plugins {
-        id("org.jetbrains.compose") version "1.9.1"
+        id("org.jetbrains.compose") version "1.11.0-alpha02"
         id("org.jetbrains.kotlin.plugin.compose") version "2.3.20-Beta2"
     }
 }
