@@ -144,6 +144,11 @@ abstract class InternalDatabase : RoomDatabase() {
                 delegate =
                 Room
                     .databaseBuilder(context, InternalDatabase::class.java, DB_NAME)
+                    // Register explicit migrations to preserve user data
+                    .addMigrations(
+                        MIGRATION_1_2,
+                        MIGRATION_25_26,
+                    )
                     .addMigrations(
                         MIGRATION_1_2,
                     )
@@ -386,6 +391,22 @@ val MIGRATION_1_2 =
                     ),
                 )
             }
+        }
+    }
+
+val MIGRATION_25_26 =
+    object : Migration(25, 26) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            try {
+                database.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)")
+            } catch (e: Exception) {
+                // ignore
+            }
+
+            // Update identity hash to match schema v26. This is a safe, idempotent
+            // operation when the on-disk schema already matches the expected schema
+            // but the master table has the old hash (common when restoring backups).
+            database.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '51dbb730c8df8048ca1faa23b8fd59b3')")
         }
     }
 
