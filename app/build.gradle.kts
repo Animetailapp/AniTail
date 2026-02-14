@@ -233,6 +233,8 @@ dependencies {
     implementation(libs.timber)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
+    // Ensure Android dispatcher is available at runtime to avoid coroutine runtime mismatches
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation(libs.compose.icons.extended)
     implementation(libs.work.runtime.ktx)
     implementation(libs.hilt.work)    // OneSignal Push Notifications
