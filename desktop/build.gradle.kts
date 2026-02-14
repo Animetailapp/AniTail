@@ -95,7 +95,7 @@ configurations.all {
         force("org.jetbrains.compose.runtime:runtime:1.11.0-SNAPSHOT+ok-check-kotlin-2-3-20")
         force("org.jetbrains.compose.ui:ui:1.9.3")
         force("org.jetbrains.compose.foundation:foundation:1.11.0-SNAPSHOT+ok-check-kotlin-2-3-20")
-        force("org.jetbrains.compose.material3:material3:1.9.0")
+        force("org.jetbrains.compose.material3:material3:1.11.0-SNAPSHOT+ok-check-kotlin-2-3-20")
     }
 }
 
