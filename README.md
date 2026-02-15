@@ -94,6 +94,8 @@ width="70%" />
 [mostafaalagamy](https://github.com/mostafaalagamy/Metrolist)
 </div>
 
+[**MusicRecognizer**](https://github.com/aleksey-saenko/MusicRecognizer) – for the music recognition feature implementation and Shazam API integration.
+
 <div align="center">
 <h1>Disclaimer</h1>
 </div>

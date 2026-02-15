@@ -231,3 +231,9 @@
 -keep class io.ktor.** { *; }
 -keep interface io.ktor.** { *; }
 -dontwarn io.ktor.**
+
+# Vibra fingerprint library
+-keep class com.metrolist.music.recognition.VibraSignature { *; }
+-keepclassmembers class com.metrolist.music.recognition.VibraSignature {
+    native <methods>;
+}
