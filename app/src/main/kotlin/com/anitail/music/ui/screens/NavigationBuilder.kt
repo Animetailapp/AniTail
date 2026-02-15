@@ -22,6 +22,8 @@ import com.anitail.music.ui.screens.playlist.CachePlaylistScreen
 import com.anitail.music.ui.screens.playlist.LocalPlaylistScreen
 import com.anitail.music.ui.screens.playlist.OnlinePlaylistScreen
 import com.anitail.music.ui.screens.playlist.TopPlaylistScreen
+import com.anitail.music.ui.screens.recognition.RecognitionHistoryScreen
+import com.anitail.music.ui.screens.recognition.RecognitionScreen
 import com.anitail.music.ui.screens.search.OnlineSearchResult
 import com.anitail.music.ui.screens.settings.AboutScreen
 import com.anitail.music.ui.screens.settings.AccountSettings
@@ -60,6 +62,12 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable("history") {
         HistoryScreen(navController)
+    }
+    composable("recognition") {
+        RecognitionScreen(navController)
+    }
+    composable("recognition_history") {
+        RecognitionHistoryScreen(navController)
     }
     composable("stats") {
         StatsScreen(navController)

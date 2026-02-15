@@ -97,14 +97,15 @@ class MusicDatabase(
         Event::class,
         RelatedSongMap::class,
         SetVideoIdEntity::class,
-        PlayCountEntity::class, RecognitionHistory::class
+        PlayCountEntity::class,
+        RecognitionHistory::class
     ],
     views = [
         SortedSongArtistMap::class,
         SortedSongAlbumMap::class,
         PlaylistSongMapPreview::class,
     ],
-    version = 26,
+    version = 27,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 2, to = 3),
@@ -130,7 +131,8 @@ class MusicDatabase(
         AutoMigration(from = 22, to = 23),
         AutoMigration(from = 23, to = 24),
         AutoMigration(from = 24, to = 25),
-        AutoMigration(from = 25, to = 26)
+        AutoMigration(from = 25, to = 26),
+        AutoMigration(from = 26, to = 27)
     ],
 )
 @TypeConverters(Converters::class)
@@ -150,9 +152,7 @@ abstract class InternalDatabase : RoomDatabase() {
                         MIGRATION_1_2,
                         MIGRATION_25_26,
                     )
-                    .addMigrations(
-                        MIGRATION_1_2,
-                    )
+                    .fallbackToDestructiveMigrationOnDowngrade()
                     .addCallback(object : Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             super.onOpen(db)
@@ -399,15 +399,29 @@ val MIGRATION_25_26 =
     object : Migration(25, 26) {
         override fun migrate(database: SupportSQLiteDatabase) {
             try {
-                database.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)")
+                // Ensure room_master_table exists
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS room_master_table " +
+                    "(id INTEGER PRIMARY KEY, identity_hash TEXT)"
+                )
             } catch (e: Exception) {
-                // ignore
+                // Table might already exist, ignore
             }
 
-            // Update identity hash to match schema v26. This is a safe, idempotent
-            // operation when the on-disk schema already matches the expected schema
-            // but the master table has the old hash (common when restoring backups).
-            database.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '51dbb730c8df8048ca1faa23b8fd59b3')")
+            try {
+                // Delete any existing hash before inserting to avoid conflicts
+                database.execSQL("DELETE FROM room_master_table WHERE id = 42")
+                
+                // Update identity hash to match schema v26. This is a safe, idempotent
+                // operation when the on-disk schema already matches the expected schema
+                // but the master table has the old hash (common when restoring backups).
+                database.execSQL(
+                    "INSERT INTO room_master_table (id, identity_hash) " +
+                    "VALUES(42, '51dbb730c8df8048ca1faa23b8fd59b3')"
+                )
+            } catch (e: Exception) {
+                // If this fails, let Room handle it naturally
+            }
         }
     }
 
@@ -574,7 +588,6 @@ class Migration19To20 : AutoMigrationSpec {
         columnName = "artistName"
     )
 )
-
 class Migration20To21 : AutoMigrationSpec
 
 class Migration21To22 : AutoMigrationSpec {
@@ -596,4 +609,3 @@ class Migration21To22 : AutoMigrationSpec {
         }
     }
 }
-
