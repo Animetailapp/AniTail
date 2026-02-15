@@ -36,6 +36,7 @@ import com.anitail.music.db.entities.Playlist
 import com.anitail.music.db.entities.PlaylistEntity
 import com.anitail.music.db.entities.PlaylistSong
 import com.anitail.music.db.entities.PlaylistSongMap
+import com.anitail.music.db.entities.RecognitionHistory
 import com.anitail.music.db.entities.RelatedSongMap
 import com.anitail.music.db.entities.SearchHistory
 import com.anitail.music.db.entities.SetVideoIdEntity
@@ -1058,6 +1059,19 @@ interface DatabaseDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     fun insert(map: RelatedSongMap)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insert(recognitionHistory: RecognitionHistory): Long
+
+    @Transaction
+    @Query("SELECT * FROM recognition_history ORDER BY recognizedAt DESC")
+    fun recognitionHistory(): Flow<List<RecognitionHistory>>
+
+    @Query("DELETE FROM recognition_history")
+    fun clearRecognitionHistory()
+
+    @Query("DELETE FROM recognition_history WHERE id = :id")
+    fun deleteRecognitionHistoryById(id: Long)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     fun insert(playCountEntity: PlayCountEntity): Long

@@ -24,6 +24,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -75,11 +76,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
-import coil3.compose.AsyncImage
-import com.anitail.music.recognition.MusicRecognitionService
+import coil.compose.AsyncImage
 import com.anitail.music.LocalDatabase
 import com.anitail.music.R
 import com.anitail.music.db.entities.RecognitionHistory
+import com.anitail.music.recognition.MusicRecognitionService
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.shazamkit.models.RecognitionResult
 import com.anitail.shazamkit.models.RecognitionStatus
@@ -177,7 +178,10 @@ fun RecognitionScreen(
                 navigationIcon = {
                     IconButton(
                         onClick = { navController.navigateUp() },
-                        onLongClick = { navController.backToMain() }
+                        modifier = Modifier.combinedClickable(
+                            onClick = { navController.navigateUp() },
+                            onLongClick = { navController.backToMain() }
+                        )
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.arrow_back),
@@ -217,7 +221,7 @@ fun RecognitionScreen(
                     }
                     is RecognitionStatus.Listening -> {
                         ListeningState(
-                            onCancel = { com.anitail.music.recognition.MusicRecognitionService.reset() }
+                            onCancel = { MusicRecognitionService.reset() }
                         )
                     }
                     is RecognitionStatus.Processing -> {
@@ -387,14 +391,6 @@ private fun ProcessingState() {
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         val infiniteTransition = rememberInfiniteTransition(label = "rotate")
-        val rotation by infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(2000, easing = LinearEasing)
-            ),
-            label = "rotation"
-        )
 
         Box(
             modifier = Modifier.size(160.dp),

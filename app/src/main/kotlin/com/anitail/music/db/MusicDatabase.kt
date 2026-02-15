@@ -26,6 +26,7 @@ import com.anitail.music.db.entities.PlayCountEntity
 import com.anitail.music.db.entities.PlaylistEntity
 import com.anitail.music.db.entities.PlaylistSongMap
 import com.anitail.music.db.entities.PlaylistSongMapPreview
+import com.anitail.music.db.entities.RecognitionHistory
 import com.anitail.music.db.entities.RelatedSongMap
 import com.anitail.music.db.entities.SearchHistory
 import com.anitail.music.db.entities.SetVideoIdEntity
@@ -96,7 +97,7 @@ class MusicDatabase(
         Event::class,
         RelatedSongMap::class,
         SetVideoIdEntity::class,
-        PlayCountEntity::class
+        PlayCountEntity::class, RecognitionHistory::class
     ],
     views = [
         SortedSongArtistMap::class,

@@ -6,6 +6,7 @@
 package com.anitail.music.ui.screens.recognition
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,7 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import coil3.compose.AsyncImage
+import coil.compose.AsyncImage
 import com.anitail.music.LocalDatabase
 import com.anitail.music.R
 import com.anitail.music.db.entities.RecognitionHistory
@@ -64,7 +65,7 @@ fun RecognitionHistoryScreen(
     navController: NavController
 ) {
     val database = LocalDatabase.current
-    val menuState = LocalMenuState.current
+    LocalMenuState.current
     val coroutineScope = rememberCoroutineScope()
 
     val historyItems by database.recognitionHistory().collectAsState(initial = emptyList())
@@ -104,7 +105,10 @@ fun RecognitionHistoryScreen(
                 navigationIcon = {
                     IconButton(
                         onClick = { navController.navigateUp() },
-                        onLongClick = { navController.backToMain() }
+                        modifier = Modifier.combinedClickable(
+                            onClick = { navController.navigateUp() },
+                            onLongClick = { navController.backToMain() }
+                        )
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.arrow_back),
