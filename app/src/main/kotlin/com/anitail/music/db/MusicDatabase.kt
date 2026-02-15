@@ -397,6 +397,22 @@ val MIGRATION_1_2 =
 val MIGRATION_25_26 =
     object : Migration(25, 26) {
         override fun migrate(database: SupportSQLiteDatabase) {
+            // Schema change introduced in v26: lyrics.provider (nullable TEXT).
+            // Add it defensively for users coming from older backups/installations.
+            var providerColumnExists = false
+            database.query("PRAGMA table_info(lyrics)").use { cursor ->
+                val nameColumnIndex = cursor.getColumnIndex("name")
+                while (cursor.moveToNext()) {
+                    if (nameColumnIndex >= 0 && cursor.getString(nameColumnIndex) == "provider") {
+                        providerColumnExists = true
+                        break
+                    }
+                }
+            }
+            if (!providerColumnExists) {
+                database.execSQL("ALTER TABLE lyrics ADD COLUMN provider TEXT")
+            }
+
             try {
                 database.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)")
             } catch (e: Exception) {
@@ -595,4 +611,3 @@ class Migration21To22 : AutoMigrationSpec {
         }
     }
 }
-
