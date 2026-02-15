@@ -84,7 +84,9 @@ object MusicRecognitionService {
                 decodedAudio,
                 VibraSignature.REQUIRED_SAMPLE_RATE
             ).getOrElse { error ->
-                _recognitionStatus.value = RecognitionStatus.Error("Failed to resample audio: ${error.message}")
+                _recognitionStatus.value = RecognitionStatus.Error(
+                    "Could not process audio. Try again in a quieter place."
+                )
                 return@withContext _recognitionStatus.value
             }
 
@@ -102,7 +104,9 @@ object MusicRecognitionService {
             val signature = try {
                 VibraSignature.fromI16(resampledAudio.data)
             } catch (e: Exception) {
-                _recognitionStatus.value = RecognitionStatus.Error("Failed to generate fingerprint: ${e.message}")
+                _recognitionStatus.value = RecognitionStatus.Error(
+                    "Could not generate audio fingerprint. Try again."
+                )
                 return@withContext _recognitionStatus.value
             }
 
@@ -116,20 +120,65 @@ object MusicRecognitionService {
                     _recognitionStatus.value = RecognitionStatus.Success(recognitionResult)
                 },
                 onFailure = { error ->
-                    val message = error.message ?: "Unknown error"
-                    _recognitionStatus.value = if (message.contains("No match", ignoreCase = true)) {
-                        RecognitionStatus.NoMatch("No matches found. Try again with clearer audio.")
-                    } else {
-                        RecognitionStatus.Error(message)
-                    }
+                    _recognitionStatus.value = mapRecognitionFailure(error.message)
                 }
             )
 
             _recognitionStatus.value
         } catch (e: Exception) {
-            _recognitionStatus.value = RecognitionStatus.Error(e.message ?: "Recognition failed")
+            _recognitionStatus.value = mapRecognitionFailure(e.message)
             _recognitionStatus.value
         }
+    }
+
+    private fun mapRecognitionFailure(rawMessage: String?): RecognitionStatus {
+        val message = rawMessage?.trim().orEmpty()
+        if (message.isBlank()) {
+            return RecognitionStatus.Error("Recognition failed. Please try again.")
+        }
+        if (message.contains("No match", ignoreCase = true)) {
+            return RecognitionStatus.NoMatch(
+                "No matches found. Try again near the audio source."
+            )
+        }
+        if (isTlsError(message)) {
+            return RecognitionStatus.Error(
+                "Secure connection failed. Please update the app and try again."
+            )
+        }
+        if (isTimeoutError(message)) {
+            return RecognitionStatus.Error(
+                "Request timed out. Check your connection and try again."
+            )
+        }
+        if (isNetworkError(message)) {
+            return RecognitionStatus.Error(
+                "Connection issue. Check your internet and try again."
+            )
+        }
+        return RecognitionStatus.Error("Recognition failed. Please try again.")
+    }
+
+    private fun isTimeoutError(message: String): Boolean {
+        return message.contains("timeout", ignoreCase = true) ||
+            message.contains("timed out", ignoreCase = true)
+    }
+
+    private fun isNetworkError(message: String): Boolean {
+        return message.contains("Unable to resolve host", ignoreCase = true) ||
+            message.contains("failed to connect", ignoreCase = true) ||
+            message.contains("connection reset", ignoreCase = true) ||
+            message.contains("network is unreachable", ignoreCase = true) ||
+            message.contains("no address associated with hostname", ignoreCase = true)
+    }
+
+    private fun isTlsError(message: String): Boolean {
+        return message.contains("SSL", ignoreCase = true) ||
+            message.contains("tls", ignoreCase = true) ||
+            message.contains("certificate", ignoreCase = true) ||
+            message.contains("handshake", ignoreCase = true) ||
+            message.contains("checkServerTrusted", ignoreCase = true) ||
+            message.contains("hostname aware", ignoreCase = true)
     }
 
     @SuppressLint("MissingPermission")

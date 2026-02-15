@@ -6,6 +6,7 @@
 package com.anitail.music.ui.screens.recognition
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -171,6 +172,23 @@ fun RecognitionScreen(
         }
     }
 
+    fun shareRecognitionResult(result: RecognitionResult) {
+        val linkSuffix = result.shazamUrl?.takeIf { it.isNotBlank() }?.let {
+            context.getString(R.string.recognition_share_link_template, it)
+        } ?: ""
+        val shareText = context.getString(
+            R.string.recognition_share_template,
+            result.title,
+            result.artist,
+            linkSuffix
+        )
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, shareText)
+        }
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.share)))
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -239,7 +257,8 @@ fun RecognitionScreen(
                                 startRecognition()
                             },
                             onClose = ::resetToReady,
-                            onSaveToHistory = ::saveToHistory
+                            onSaveToHistory = ::saveToHistory,
+                            onShare = ::shareRecognitionResult
                         )
                     }
                     is RecognitionStatus.NoMatch -> {
@@ -437,7 +456,8 @@ private fun SuccessState(
     onPlayOnApp: (RecognitionResult) -> Unit,
     onTryAgain: () -> Unit,
     onClose: () -> Unit,
-    onSaveToHistory: (RecognitionResult) -> Unit
+    onSaveToHistory: (RecognitionResult) -> Unit,
+    onShare: (RecognitionResult) -> Unit
 ) {
     // Save to history when success is shown
     LaunchedEffect(result) {
@@ -543,6 +563,19 @@ private fun SuccessState(
             }
 
             FilledTonalButton(
+                onClick = { onShare(result) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.share),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.share))
+            }
+
+            FilledTonalButton(
                 onClick = onTryAgain,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -610,6 +643,14 @@ private fun NoMatchState(
             modifier = Modifier.padding(horizontal = 32.dp)
         )
 
+        Text(
+            text = stringResource(R.string.recognition_no_match_tip),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        )
+
         Button(onClick = onTryAgain) {
             Icon(
                 painter = painterResource(R.drawable.refresh),
@@ -655,6 +696,14 @@ private fun ErrorState(
         Text(
             text = message,
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        )
+
+        Text(
+            text = stringResource(R.string.recognition_error_tip),
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 32.dp)

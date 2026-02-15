@@ -896,8 +896,12 @@
     <string name="play_on_app">Play on app</string>
     <string name="re_listen">Re-listen</string>
     <string name="no_match_found">No match found</string>
+    <string name="recognition_no_match_tip">Tip: move closer to the speaker and avoid background noise.</string>
     <string name="try_again">Try again</string>
     <string name="recognition_error">Recognition error</string>
+    <string name="recognition_error_tip">Tip: check your internet connection and try again.</string>
+    <string name="recognition_share_template">I recognized "%1$s" by %2$s on AniTail Music.%3$s</string>
+    <string name="recognition_share_link_template">\nListen: %1$s</string>
     <string name="clear_recognition_history">Clear recognition history</string>
     <string name="clear_recognition_history_confirm">Are you sure you want to clear recognition history?</string>
     <string name="delete_from_history">Delete from history</string>
