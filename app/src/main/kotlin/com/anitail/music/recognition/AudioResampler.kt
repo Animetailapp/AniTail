@@ -66,7 +66,7 @@ object AudioResampler {
                 decodedAudio.pcmEncoding
             )
             val outputFormat = sonic.configure(inputFormat)
-            sonic.flush()
+            sonic.flush(AudioProcessor.StreamMetadata.DEFAULT)
 
             val inputBuf = ByteBuffer.wrap(decodedAudio.data).order(ByteOrder.nativeOrder())
             sonic.queueInput(inputBuf)
