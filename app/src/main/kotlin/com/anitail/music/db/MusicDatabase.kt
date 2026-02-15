@@ -151,6 +151,7 @@ abstract class InternalDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2,
                         MIGRATION_25_26,
+                        MIGRATION_26_27,
                     )
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .addCallback(object : Callback() {
@@ -437,6 +438,27 @@ val MIGRATION_25_26 =
                 )
             } catch (e: Exception) {
                 // If this fails, let Room handle it naturally
+            }
+        }
+    }
+
+val MIGRATION_26_27 =
+    object : Migration(26, 27) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            // Rescue migration for installs restored with a broken v26 schema
+            // where lyrics.provider is missing.
+            var providerColumnExists = false
+            database.query("PRAGMA table_info(lyrics)").use { cursor ->
+                val nameColumnIndex = cursor.getColumnIndex("name")
+                while (cursor.moveToNext()) {
+                    if (nameColumnIndex >= 0 && cursor.getString(nameColumnIndex) == "provider") {
+                        providerColumnExists = true
+                        break
+                    }
+                }
+            }
+            if (!providerColumnExists) {
+                database.execSQL("ALTER TABLE lyrics ADD COLUMN provider TEXT")
             }
         }
     }
