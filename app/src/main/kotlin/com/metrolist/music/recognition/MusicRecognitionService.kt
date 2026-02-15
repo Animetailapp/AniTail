@@ -7,7 +7,7 @@
  * Special thanks to Aleksey Saenko for the music recognition implementation.
  */
 
-package com.metrolist.music.recognition
+package com.anitail.music.recognition
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -17,9 +17,9 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import androidx.core.content.ContextCompat
-import com.metrolist.shazamkit.Shazam
-import com.metrolist.shazamkit.models.RecognitionResult
-import com.metrolist.shazamkit.models.RecognitionStatus
+import com.anitail.shazamkit.Shazam
+import com.anitail.shazamkit.models.RecognitionResult
+import com.anitail.shazamkit.models.RecognitionStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

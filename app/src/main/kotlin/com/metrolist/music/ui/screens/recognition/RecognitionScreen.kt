@@ -3,7 +3,7 @@
  * Licensed under GPL-3.0 | See git history for contributors
  */
 
-package com.metrolist.music.ui.screens.recognition
+package com.anitail.music.ui.screens.recognition
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -85,8 +85,8 @@ import com.metrolist.music.R
 import com.metrolist.music.db.entities.RecognitionHistory
 import com.metrolist.music.ui.component.IconButton
 import com.metrolist.music.ui.utils.backToMain
-import com.metrolist.shazamkit.models.RecognitionResult
-import com.metrolist.shazamkit.models.RecognitionStatus
+import com.anitail.shazamkit.models.RecognitionResult
+import com.anitail.shazamkit.models.RecognitionStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
@@ -102,18 +102,18 @@ fun RecognitionScreen(
 
     // Reset recognition status when entering the screen
     LaunchedEffect(Unit) {
-        com.metrolist.music.recognition.MusicRecognitionService.reset()
+        com.anitail.music.recognition.MusicRecognitionService.reset()
     }
 
     // Reset recognition status when leaving the screen
     DisposableEffect(Unit) {
         onDispose {
-            com.metrolist.music.recognition.MusicRecognitionService.reset()
+            com.anitail.music.recognition.MusicRecognitionService.reset()
         }
     }
 
     // Observe recognition status from service for real-time updates (Listening -> Processing -> Result)
-    val recognitionStatus by com.metrolist.music.recognition.MusicRecognitionService.recognitionStatus.collectAsState()
+    val recognitionStatus by com.anitail.music.recognition.MusicRecognitionService.recognitionStatus.collectAsState()
 
     var hasPermission by remember {
         mutableStateOf(
@@ -125,10 +125,10 @@ fun RecognitionScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        hasPermission = isGranted
+                hasPermission = isGranted
         if (isGranted) {
             coroutineScope.launch {
-                com.metrolist.music.recognition.MusicRecognitionService.recognize(context)
+                com.anitail.music.recognition.MusicRecognitionService.recognize(context)
             }
         }
     }
@@ -136,7 +136,7 @@ fun RecognitionScreen(
     fun startRecognition() {
         if (hasPermission) {
             coroutineScope.launch {
-                com.metrolist.music.recognition.MusicRecognitionService.recognize(context)
+                com.anitail.music.recognition.MusicRecognitionService.recognize(context)
             }
         } else {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -144,7 +144,7 @@ fun RecognitionScreen(
     }
 
     fun resetToReady() {
-        com.metrolist.music.recognition.MusicRecognitionService.reset()
+        com.anitail.music.recognition.MusicRecognitionService.reset()
     }
 
     fun saveToHistory(result: RecognitionResult) {

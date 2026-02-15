@@ -1,8 +1,8 @@
-package com.metrolist.shazamkit
+package com.anitail.shazamkit
 
-import com.metrolist.shazamkit.models.RecognitionResult
-import com.metrolist.shazamkit.models.ShazamRequestJson
-import com.metrolist.shazamkit.models.ShazamResponseJson
+import com.anitail.shazamkit.models.RecognitionResult
+import com.anitail.shazamkit.models.ShazamRequestJson
+import com.anitail.shazamkit.models.ShazamResponseJson
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO

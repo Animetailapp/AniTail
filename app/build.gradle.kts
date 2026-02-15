@@ -47,10 +47,14 @@ android {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
         }
     }
-    externalNativeBuild {
-        cmake {
-            path("src/main/cpp/vibrafp/lib/CMakeLists.txt")
-            version = "3.22.1"
+    // Native vibrafp build is optional. Enable by passing -PenableVibrafp=true
+    val enableVibrafp = (project.findProperty("enableVibrafp") as? String)?.toBoolean() ?: false
+    if (enableVibrafp) {
+        externalNativeBuild {
+            cmake {
+                path("src/main/cpp/vibrafp/lib/CMakeLists.txt")
+                version = "3.22.1"
+            }
         }
     }
 
@@ -117,12 +121,14 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            externalNativeBuild {
-                cmake {
-                    arguments += listOf(
-                        "-DENABLE_LTO=ON",
-                        "-DCMAKE_BUILD_TYPE=Release"
-                    )
+            if (enableVibrafp) {
+                externalNativeBuild {
+                    cmake {
+                        arguments += listOf(
+                            "-DENABLE_LTO=ON",
+                            "-DCMAKE_BUILD_TYPE=Release"
+                        )
+                    }
                 }
             }
             ndk {
@@ -137,12 +143,14 @@ android {
             } else {
                 signingConfigs.getByName("persistentDebug")
             }
-            externalNativeBuild {
-                cmake {
-                    arguments += listOf(
-                        "-DENABLE_LTO=OFF",
-                        "-DCMAKE_BUILD_TYPE=Debug"
-                    )
+            if (enableVibrafp) {
+                externalNativeBuild {
+                    cmake {
+                        arguments += listOf(
+                            "-DENABLE_LTO=OFF",
+                            "-DCMAKE_BUILD_TYPE=Debug"
+                        )
+                    }
                 }
             }
             ndk {

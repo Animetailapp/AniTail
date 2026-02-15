@@ -1,4 +1,4 @@
-package com.metrolist.music.recognition
+package com.anitail.music.recognition
 
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi

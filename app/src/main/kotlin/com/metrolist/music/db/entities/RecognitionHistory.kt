@@ -3,7 +3,7 @@
  * Licensed under GPL-3.0 | See git history for contributors
  */
 
-package com.metrolist.music.db.entities
+package com.anitail.music.db.entities
 
 import androidx.room.Entity
 import androidx.room.Index

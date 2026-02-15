@@ -1,4 +1,4 @@
-package com.metrolist.shazamkit.models
+package com.anitail.shazamkit.models
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

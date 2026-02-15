@@ -1,4 +1,4 @@
-package com.metrolist.music.recognition
+package com.anitail.music.recognition
 
 /**
  * Native library interface for generating Shazam-compatible audio fingerprints.
