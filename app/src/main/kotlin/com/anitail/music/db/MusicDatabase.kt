@@ -463,6 +463,27 @@ val MIGRATION_26_27 =
         }
     }
 
+val MIGRATION_26_27 =
+    object : Migration(26, 27) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            // Rescue migration for installs restored with a broken v26 schema
+            // where lyrics.provider is missing.
+            var providerColumnExists = false
+            database.query("PRAGMA table_info(lyrics)").use { cursor ->
+                val nameColumnIndex = cursor.getColumnIndex("name")
+                while (cursor.moveToNext()) {
+                    if (nameColumnIndex >= 0 && cursor.getString(nameColumnIndex) == "provider") {
+                        providerColumnExists = true
+                        break
+                    }
+                }
+            }
+            if (!providerColumnExists) {
+                database.execSQL("ALTER TABLE lyrics ADD COLUMN provider TEXT")
+            }
+        }
+    }
+
 @DeleteColumn.Entries(
     DeleteColumn(tableName = "song", columnName = "isTrash"),
     DeleteColumn(tableName = "playlist", columnName = "author"),
