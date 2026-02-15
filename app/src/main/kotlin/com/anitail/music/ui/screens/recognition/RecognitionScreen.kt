@@ -67,8 +67,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -459,6 +461,13 @@ private fun SuccessState(
     onSaveToHistory: (RecognitionResult) -> Unit,
     onShare: (RecognitionResult) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+
+    // Confirm recognition with haptic feedback when success is shown.
+    LaunchedEffect(result) {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+
     // Save to history when success is shown
     LaunchedEffect(result) {
         onSaveToHistory(result)
