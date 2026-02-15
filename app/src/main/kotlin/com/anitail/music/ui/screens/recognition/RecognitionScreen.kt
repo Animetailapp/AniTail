@@ -8,6 +8,10 @@ package com.anitail.music.ui.screens.recognition
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -462,10 +466,12 @@ private fun SuccessState(
     onShare: (RecognitionResult) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
 
     // Confirm recognition with haptic feedback when success is shown.
     LaunchedEffect(result) {
         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        triggerRecognitionVibration(context)
     }
 
     // Save to history when success is shown
@@ -611,6 +617,24 @@ private fun SuccessState(
                 Text(stringResource(R.string.close))
             }
         }
+    }
+}
+
+private fun triggerRecognitionVibration(context: android.content.Context) {
+    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val manager = context.getSystemService(VibratorManager::class.java)
+        manager?.defaultVibrator
+    } else {
+        @Suppress("DEPRECATION")
+        context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as? Vibrator
+    } ?: return
+
+    if (!vibrator.hasVibrator()) return
+
+    try {
+        vibrator.vibrate(VibrationEffect.createOneShot(120L, VibrationEffect.DEFAULT_AMPLITUDE))
+    } catch (_: Exception) {
+        // Ignore vibration failures on devices with restricted haptics.
     }
 }
 
