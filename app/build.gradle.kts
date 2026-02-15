@@ -15,7 +15,7 @@ plugins {
 android {
     namespace = "com.anitail.music"
     compileSdk = 36
-    ndkVersion = "25.1.8937393"
+    ndkVersion = "27.0.12077973"
     defaultConfig {
         applicationId = "com.anitail.music"
         minSdk = 23
@@ -41,6 +41,21 @@ android {
             
         buildConfigField("String", "LASTFM_API_KEY", "\"$lastfmApiKey\"")
         buildConfigField("String", "LASTFM_API_SECRET", "\"$lastfmApiSecret\"")
+        
+        // NDK configuration for vibra_fp library
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+        }
+    }
+    // Native vibrafp build is optional. Enable by passing -PenableVibrafp=true
+    val enableVibrafp = (project.findProperty("enableVibrafp") as? String)?.toBoolean() ?: false
+    if (enableVibrafp) {
+        externalNativeBuild {
+            cmake {
+                path("src/main/cpp/vibrafp/lib/CMakeLists.txt")
+                version = "3.22.1"
+            }
+        }
     }
 
     flavorDimensions += "abi"
@@ -106,6 +121,19 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (enableVibrafp) {
+                externalNativeBuild {
+                    cmake {
+                        arguments += listOf(
+                            "-DENABLE_LTO=ON",
+                            "-DCMAKE_BUILD_TYPE=Release"
+                        )
+                    }
+                }
+            }
+            ndk {
+                debugSymbolLevel = "NONE"
+            }
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -114,6 +142,19 @@ android {
                 signingConfigs.getByName("debug")
             } else {
                 signingConfigs.getByName("persistentDebug")
+            }
+            if (enableVibrafp) {
+                externalNativeBuild {
+                    cmake {
+                        arguments += listOf(
+                            "-DENABLE_LTO=OFF",
+                            "-DCMAKE_BUILD_TYPE=Debug"
+                        )
+                    }
+                }
+            }
+            ndk {
+                debugSymbolLevel = "FULL"
             }
         }
     }
@@ -223,6 +264,7 @@ dependencies {
     implementation(projects.kizzy)
     implementation(projects.betterlyrics)
     implementation(projects.simpmusic)
+    implementation(project(":shazamkit"))
     implementation(projects.common)
 
     implementation(libs.ktor.client.core)

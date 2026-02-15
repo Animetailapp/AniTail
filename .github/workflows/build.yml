@@ -39,11 +39,14 @@ jobs:
         with:
           cache-cleanup: on-success
           
+      - name: Setup FFTW for Android
+        uses: ./.github/actions/setup-fftw
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Build Release APK
-        run: ./gradlew assemble${{ matrix.abi }}Release
+        run: ./gradlew assemble${{ matrix.abi }}Release -PenableVibrafp=true
         env:
           PULL_REQUEST: 'false'
           GITHUB_EVENT_NAME: ${{ github.event_name }}
@@ -87,6 +90,9 @@ jobs:
         with:
           cache-cleanup: on-success
           
+      - name: Setup FFTW for Android
+        uses: ./.github/actions/setup-fftw
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
@@ -95,7 +101,7 @@ jobs:
           echo "${{ secrets.DEBUG_KEYSTORE }}" | base64 -d > ./app/persistent-debug.keystore
 
       - name: Build Debug APK
-        run: ./gradlew assembleUniversalDebug
+        run: ./gradlew assembleUniversalDebug -PenableVibrafp=true
         env:
           PULL_REQUEST: 'false'
           GITHUB_EVENT_NAME: ${{ github.event_name }}

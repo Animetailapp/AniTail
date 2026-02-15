@@ -431,7 +431,7 @@ fun Lyrics(
 
     val lazyListState = rememberLazyListState()
 
-    // Auto scroll state like Metrolist
+    // Auto scroll state
     var isAutoScrollEnabled by rememberSaveable { mutableStateOf(true) }
 
     // Define max selection limit
@@ -1116,7 +1116,7 @@ fun Lyrics(
             }
         }
 
-        // Auto-scroll button at bottom center like Metrolist
+        // Auto-scroll button at bottom center
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)

@@ -38,6 +38,7 @@ include(":lrclib")
 include(":kizzy")
 include(":betterlyrics")
 include(":simpmusic")
+include(":shazamkit")
 
 project(":android").projectDir = file("app")
 

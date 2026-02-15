@@ -73,11 +73,14 @@ jobs:
         with:
           cache-cleanup: on-success
           
+      - name: Setup FFTW for Android
+        uses: ./.github/actions/setup-fftw
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
  
       - name: Build Release APK
-        run: ./gradlew assemble${{ matrix.abi }}Release
+        run: ./gradlew assemble${{ matrix.abi }}Release -PenableVibrafp=true
         env:
           PULL_REQUEST: 'false'
           GITHUB_EVENT_NAME: ${{ github.event_name }}

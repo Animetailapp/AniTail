@@ -29,6 +29,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -110,6 +115,7 @@ import com.anitail.music.ui.menu.YouTubeArtistMenu
 import com.anitail.music.ui.menu.YouTubePlaylistMenu
 import com.anitail.music.ui.menu.YouTubeSongMenu
 import com.anitail.music.ui.utils.SnapLayoutInfoProvider
+import com.anitail.music.ui.utils.isScrollingUp
 import com.anitail.music.utils.rememberPreference
 import com.anitail.music.viewmodels.HomeViewModel
 import kotlinx.coroutines.Dispatchers
@@ -791,6 +797,30 @@ fun HomeScreen(
                 }
             }
         )
+
+        // Recognition Floating Action Button (above the shuffle FAB)
+        AnimatedVisibility(
+            visible = (allLocalItems.isNotEmpty() || allYtItems.isNotEmpty()) && lazylistState.isScrollingUp(),
+            enter = slideInVertically { it },
+            exit = slideOutVertically { it },
+            modifier =
+            Modifier
+                .align(Alignment.BottomEnd)
+                .windowInsetsPadding(
+                    LocalPlayerAwareWindowInsets.current
+                        .only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
+                ),
+        ) {
+            FloatingActionButton(
+                modifier = Modifier.padding(16.dp).padding(bottom = 72.dp),
+                onClick = { navController.navigate("recognition") }
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.mic),
+                    contentDescription = null,
+                )
+            }
+        }
 
         Indicator(
             isRefreshing = isRefreshing,
