@@ -44,7 +44,7 @@ android {
         
         // NDK configuration for vibra_fp library
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86", "universal")
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
         }
     }
     // Native vibrafp build is optional. Enable by passing -PenableVibrafp=true
