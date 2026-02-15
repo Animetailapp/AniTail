@@ -39,7 +39,7 @@ jobs:
             -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Build universal debug APK
-        run: ./gradlew assembleUniversalDebug
+        run: ./gradlew assembleUniversalDebug -PenableVibrafp=true
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
 

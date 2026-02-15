@@ -80,7 +80,7 @@ jobs:
         run: chmod +x gradlew
  
       - name: Build Release APK
-        run: ./gradlew assemble${{ matrix.abi }}Release
+        run: ./gradlew assemble${{ matrix.abi }}Release -PenableVibrafp=true
         env:
           PULL_REQUEST: 'false'
           GITHUB_EVENT_NAME: ${{ github.event_name }}
