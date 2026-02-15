@@ -1265,6 +1265,16 @@ class MainActivity : AppCompatActivity() {
         val uri = intent.data ?: intent.extras?.getString(Intent.EXTRA_TEXT)?.toUri() ?: return
         val coroutineScope = lifecycleScope
 
+        if (uri.scheme.equals("anitail", ignoreCase = true)) {
+            val deepLinkQuery = uri.getQueryParameter("q")
+                ?.takeIf { it.isNotBlank() }
+                ?: uri.getQueryParameter("query")?.takeIf { it.isNotBlank() }
+            if (uri.host.equals("search", ignoreCase = true) && !deepLinkQuery.isNullOrBlank()) {
+                navController.navigate("search/${URLEncoder.encode(deepLinkQuery, "UTF-8")}")
+            }
+            return
+        }
+
         when (val path = uri.pathSegments.firstOrNull()) {
             "playlist" -> uri.getQueryParameter("list")?.let { playlistId ->
                 if (playlistId.startsWith("OLAK5uy_")) {

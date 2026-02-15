@@ -173,9 +173,9 @@ fun RecognitionScreen(
     }
 
     fun shareRecognitionResult(result: RecognitionResult) {
-        val linkSuffix = result.shazamUrl?.takeIf { it.isNotBlank() }?.let {
-            context.getString(R.string.recognition_share_link_template, it)
-        } ?: ""
+        val searchQuery = "${result.title} ${result.artist}".trim()
+        val appDeepLink = "anitail://search?q=${URLEncoder.encode(searchQuery, "UTF-8")}"
+        val linkSuffix = context.getString(R.string.recognition_share_link_template, appDeepLink)
         val shareText = context.getString(
             R.string.recognition_share_template,
             result.title,
