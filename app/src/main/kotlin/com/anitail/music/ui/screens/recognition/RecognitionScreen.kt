@@ -1,5 +1,5 @@
 /**
- * Metrolist Project (C) 2026
+ * anitail Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
  */
 
@@ -10,7 +10,6 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -28,7 +27,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,7 +38,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -76,19 +73,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
-import com.metrolist.music.LocalDatabase
-import com.metrolist.music.R
-import com.metrolist.music.db.entities.RecognitionHistory
-import com.metrolist.music.ui.component.IconButton
-import com.metrolist.music.ui.utils.backToMain
+import com.anitail.music.recognition.MusicRecognitionService
+import com.anitail.music.LocalDatabase
+import com.anitail.music.R
+import com.anitail.music.db.entities.RecognitionHistory
+import com.anitail.music.ui.utils.backToMain
 import com.anitail.shazamkit.models.RecognitionResult
 import com.anitail.shazamkit.models.RecognitionStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.net.URLEncoder
 import java.time.LocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -102,18 +99,18 @@ fun RecognitionScreen(
 
     // Reset recognition status when entering the screen
     LaunchedEffect(Unit) {
-        com.anitail.music.recognition.MusicRecognitionService.reset()
+        MusicRecognitionService.reset()
     }
 
     // Reset recognition status when leaving the screen
     DisposableEffect(Unit) {
         onDispose {
-            com.anitail.music.recognition.MusicRecognitionService.reset()
+            MusicRecognitionService.reset()
         }
     }
 
     // Observe recognition status from service for real-time updates (Listening -> Processing -> Result)
-    val recognitionStatus by com.anitail.music.recognition.MusicRecognitionService.recognitionStatus.collectAsState()
+    val recognitionStatus by MusicRecognitionService.recognitionStatus.collectAsState()
 
     var hasPermission by remember {
         mutableStateOf(
@@ -128,7 +125,7 @@ fun RecognitionScreen(
                 hasPermission = isGranted
         if (isGranted) {
             coroutineScope.launch {
-                com.anitail.music.recognition.MusicRecognitionService.recognize(context)
+                MusicRecognitionService.recognize(context)
             }
         }
     }
@@ -136,7 +133,7 @@ fun RecognitionScreen(
     fun startRecognition() {
         if (hasPermission) {
             coroutineScope.launch {
-                com.anitail.music.recognition.MusicRecognitionService.recognize(context)
+                MusicRecognitionService.recognize(context)
             }
         } else {
             permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -144,7 +141,7 @@ fun RecognitionScreen(
     }
 
     fun resetToReady() {
-        com.anitail.music.recognition.MusicRecognitionService.reset()
+        MusicRecognitionService.reset()
     }
 
     fun saveToHistory(result: RecognitionResult) {
@@ -220,7 +217,7 @@ fun RecognitionScreen(
                     }
                     is RecognitionStatus.Listening -> {
                         ListeningState(
-                            onCancel = { com.metrolist.music.recognition.MusicRecognitionService.reset() }
+                            onCancel = { com.anitail.music.recognition.MusicRecognitionService.reset() }
                         )
                     }
                     is RecognitionStatus.Processing -> {
@@ -232,7 +229,7 @@ fun RecognitionScreen(
                             onPlayOnApp = { result ->
                                 // Search for the track on YouTube Music
                                 val searchQuery = "${result.title} ${result.artist}"
-                                navController.navigate("search/${java.net.URLEncoder.encode(searchQuery, "UTF-8")}")
+                                navController.navigate("search/${URLEncoder.encode(searchQuery, "UTF-8")}")
                             },
                             onTryAgain = {
                                 startRecognition()

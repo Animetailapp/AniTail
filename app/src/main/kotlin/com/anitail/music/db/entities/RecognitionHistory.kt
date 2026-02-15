@@ -1,14 +1,10 @@
-/**
- * Metrolist Project (C) 2026
- * Licensed under GPL-3.0 | See git history for contributors
- */
-
 package com.anitail.music.db.entities
 
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.time.LocalDateTime
+
 
 @Entity(
     tableName = "recognition_history",

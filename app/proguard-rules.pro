@@ -233,7 +233,7 @@
 -dontwarn io.ktor.**
 
 # Vibra fingerprint library
--keep class com.metrolist.music.recognition.VibraSignature { *; }
--keepclassmembers class com.metrolist.music.recognition.VibraSignature {
+-keep class com.anitail.music.recognition.VibraSignature { *; }
+-keepclassmembers class com.anitail.music.recognition.VibraSignature {
     native <methods>;
 }

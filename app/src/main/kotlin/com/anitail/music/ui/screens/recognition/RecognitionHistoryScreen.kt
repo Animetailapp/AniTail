@@ -1,5 +1,5 @@
 /**
- * Metrolist Project (C) 2026
+ * anitail Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
  */
 
@@ -44,19 +44,18 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
-import com.metrolist.music.LocalDatabase
-import com.metrolist.music.R
-import com.metrolist.music.db.entities.RecognitionHistory
-import com.metrolist.music.ui.component.IconButton
-import com.metrolist.music.ui.component.LocalMenuState
-import com.metrolist.music.ui.utils.backToMain
+import com.anitail.music.LocalDatabase
+import com.anitail.music.R
+import com.anitail.music.db.entities.RecognitionHistory
+import com.anitail.music.ui.component.LocalMenuState
+import com.anitail.music.ui.utils.backToMain
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.net.URLEncoder
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -165,7 +164,7 @@ fun RecognitionHistoryScreen(
                         onClick = {
                             // Search for the track on YouTube Music
                             val searchQuery = "${item.title} ${item.artist}"
-                            navController.navigate("search/${java.net.URLEncoder.encode(searchQuery, "UTF-8")}")
+                            navController.navigate("search/${URLEncoder.encode(searchQuery, "UTF-8")}")
                         },
                         onDelete = {
                             coroutineScope.launch(Dispatchers.IO) {

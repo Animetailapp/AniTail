@@ -18,7 +18,6 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import androidx.core.content.ContextCompat
 import com.anitail.shazamkit.Shazam
-import com.anitail.shazamkit.models.RecognitionResult
 import com.anitail.shazamkit.models.RecognitionStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
