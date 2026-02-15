@@ -103,7 +103,7 @@ class MusicDatabase(
         SortedSongAlbumMap::class,
         PlaylistSongMapPreview::class,
     ],
-    version = 26,
+    version = 27,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 2, to = 3),
@@ -148,9 +148,7 @@ abstract class InternalDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2,
                         MIGRATION_25_26,
-                    )
-                    .addMigrations(
-                        MIGRATION_1_2,
+                        MIGRATION_26_27,
                     )
                     .addCallback(object : Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
@@ -423,6 +421,27 @@ val MIGRATION_25_26 =
             // operation when the on-disk schema already matches the expected schema
             // but the master table has the old hash (common when restoring backups).
             database.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '51dbb730c8df8048ca1faa23b8fd59b3')")
+        }
+    }
+
+val MIGRATION_26_27 =
+    object : Migration(26, 27) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            // Rescue migration for installs restored with a broken v26 schema
+            // where lyrics.provider is missing.
+            var providerColumnExists = false
+            database.query("PRAGMA table_info(lyrics)").use { cursor ->
+                val nameColumnIndex = cursor.getColumnIndex("name")
+                while (cursor.moveToNext()) {
+                    if (nameColumnIndex >= 0 && cursor.getString(nameColumnIndex) == "provider") {
+                        providerColumnExists = true
+                        break
+                    }
+                }
+            }
+            if (!providerColumnExists) {
+                database.execSQL("ALTER TABLE lyrics ADD COLUMN provider TEXT")
+            }
         }
     }
 
