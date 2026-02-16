@@ -338,6 +338,104 @@ fun SliderPreference(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DurationSliderPreference(
+    modifier: Modifier = Modifier,
+    title: @Composable () -> Unit,
+    icon: (@Composable () -> Unit)? = null,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    dialogTitle: String,
+    specialValueText: String,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    defaultValue: Float,
+    specialValue: Float = valueRange.start,
+    isEnabled: Boolean = true,
+) {
+    var showDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var sliderValue by remember {
+        mutableFloatStateOf(value.coerceIn(valueRange.start, valueRange.endInclusive))
+    }
+
+    val valueInt = value.roundToInt()
+    val specialValueInt = specialValue.roundToInt()
+    val descriptionText =
+        if (valueInt == specialValueInt) {
+            specialValueText
+        } else {
+            pluralStringResource(R.plurals.seconds, valueInt, valueInt)
+        }
+
+    if (showDialog) {
+        ActionPromptDialog(
+            titleBar = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = dialogTitle,
+                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 1,
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
+                }
+            },
+            onDismiss = { showDialog = false },
+            onConfirm = {
+                showDialog = false
+                onValueChange(sliderValue.roundToInt().toFloat())
+            },
+            onCancel = {
+                sliderValue = value
+                showDialog = false
+            },
+            onReset = {
+                sliderValue = defaultValue.coerceIn(valueRange.start, valueRange.endInclusive)
+            },
+            content = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    val sliderValueInt = sliderValue.roundToInt()
+                    val sliderLabel =
+                        if (sliderValueInt == specialValueInt) {
+                            specialValueText
+                        } else {
+                            pluralStringResource(
+                                R.plurals.seconds,
+                                sliderValueInt,
+                                sliderValueInt
+                            )
+                        }
+
+                    Text(text = sliderLabel)
+                    Spacer(Modifier.height(16.dp))
+                    Slider(
+                        value = sliderValue,
+                        onValueChange = { newValue -> sliderValue = newValue },
+                        valueRange = valueRange,
+                        steps = steps,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        )
+    }
+
+    PreferenceEntry(
+        modifier = modifier,
+        title = title,
+        description = descriptionText,
+        icon = icon,
+        onClick = { showDialog = true },
+        isEnabled = isEnabled,
+    )
+}
+
 @Composable
 fun PreferenceGroupTitle(
     title: String,
