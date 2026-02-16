@@ -9,6 +9,9 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 
 val DynamicThemeKey = booleanPreferencesKey("dynamicTheme")
+val DynamicIconKey = booleanPreferencesKey("dynamicIcon")
+val HighRefreshRateKey = booleanPreferencesKey("highRefreshRate")
+val ThemePaletteKey = stringPreferencesKey("themePalette")
 val DarkModeKey = stringPreferencesKey("darkMode")
 val PureBlackKey = booleanPreferencesKey("pureBlack")
 val DensityScaleKey = floatPreferencesKey("density_scale_factor")
@@ -48,6 +51,21 @@ enum class SliderStyle {
     DEFAULT,
     SQUIGGLY,
     SLIM,
+}
+
+enum class ThemePalette {
+    LAVENDER,
+    SUNSET,
+    CHERRY,
+    VIOLET,
+    INDIGO,
+    OCEAN,
+    RUBY,
+    FOREST,
+    GOLDEN_HOUR,
+    MIDNIGHT,
+    SKY,
+    MINT,
 }
 
 enum class UpdateCheckFrequency {

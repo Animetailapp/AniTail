@@ -40,6 +40,7 @@ import com.anitail.music.ui.screens.settings.PrivacySettings
 import com.anitail.music.ui.screens.settings.RomanizationSettings
 import com.anitail.music.ui.screens.settings.SettingsScreen
 import com.anitail.music.ui.screens.settings.StorageSettings
+import com.anitail.music.ui.screens.settings.ThemeColorsSettings
 import com.anitail.music.ui.screens.settings.UpdateSettings
 import com.anitail.music.ui.screens.settings.import_from_spotify.ImportFromSpotifyScreen
 
@@ -267,6 +268,9 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable("settings/appearance") {
         AppearanceSettings(navController, scrollBehavior)
+    }
+    composable("settings/theme_colors") {
+        ThemeColorsSettings(navController, scrollBehavior)
     }
     composable("settings/account") {
         AccountSettings(navController, scrollBehavior)

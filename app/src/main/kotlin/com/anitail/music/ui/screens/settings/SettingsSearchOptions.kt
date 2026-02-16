@@ -25,12 +25,26 @@ object SettingsSearchOptions {
     private fun appearance(context: Context): List<SettingOptionData> = listOf(
         option(
             context,
-            "dynamic_theme",
-            R.string.enable_dynamic_theme,
+            "dynamic_icon",
+            R.string.enable_dynamic_icon,
+            R.string.enable_dynamic_icon_desc,
+            sectionRes = R.string.theme
+        ),
+        option(
+            context,
+            "high_refresh_rate",
+            R.string.enable_high_refresh_rate,
+            R.string.enable_high_refresh_rate_desc,
+            sectionRes = R.string.theme
+        ),
+        option(
+            context,
+            "theme_and_colors",
+            R.string.theme,
+            R.string.customize_app_theme,
             sectionRes = R.string.theme
         ),
         option(context, "dark_theme", R.string.dark_theme, sectionRes = R.string.theme),
-        option(context, "pure_black", R.string.pure_black, sectionRes = R.string.theme),
         option(
             context,
             "display_density",

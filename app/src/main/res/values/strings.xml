@@ -306,6 +306,15 @@
 
     <string name="appearance">Appearance</string>
     <string name="theme">Theme</string>
+    <string name="enable_dynamic_icon">Enable dynamic icon</string>
+    <string name="enable_dynamic_icon_desc">Enable Android themed launcher icon support</string>
+    <string name="dynamic_icon_not_supported_desc">Requires Android 13 or newer</string>
+    <string name="enable_high_refresh_rate">Enable high refresh rate</string>
+    <string name="enable_high_refresh_rate_desc">Force the display to run at the highest supported refresh rate (e.g. 120Hz)</string>
+    <string name="customize_app_theme">Customize your app theme</string>
+    <string name="theme_and_colors">Theme &amp; Colors</string>
+    <string name="theme_mode">Theme Mode</string>
+    <string name="color_palette">Color Palette</string>
     <string name="enable_dynamic_theme">Enable dynamic theme</string>
     <string name="enable_dynamic_theme_desc">Use colors from the current cover art</string>
     <string name="dark_theme">Dark theme</string>

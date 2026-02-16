@@ -9,7 +9,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -54,18 +53,19 @@ import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.R
 import com.anitail.music.constants.ChipSortTypeKey
 import com.anitail.music.constants.CustomDensityScaleKey
-import com.anitail.music.constants.DarkModeKey
 import com.anitail.music.constants.DefaultOpenTabKey
 import com.anitail.music.constants.DensityScale
 import com.anitail.music.constants.DensityScaleKey
+import com.anitail.music.constants.DynamicIconKey
 import com.anitail.music.constants.DynamicThemeKey
 import com.anitail.music.constants.GridItemSize
 import com.anitail.music.constants.GridItemsSizeKey
+import com.anitail.music.constants.HighRefreshRateKey
 import com.anitail.music.constants.LibraryFilter
-import com.anitail.music.constants.LyricsClickKey
-import com.anitail.music.constants.LyricsCustomFontPathKey
 import com.anitail.music.constants.LyricsAnimationStyle
 import com.anitail.music.constants.LyricsAnimationStyleKey
+import com.anitail.music.constants.LyricsClickKey
+import com.anitail.music.constants.LyricsCustomFontPathKey
 import com.anitail.music.constants.LyricsFontSizeKey
 import com.anitail.music.constants.LyricsScrollKey
 import com.anitail.music.constants.LyricsSmoothScrollKey
@@ -74,7 +74,6 @@ import com.anitail.music.constants.PlayerBackgroundStyle
 import com.anitail.music.constants.PlayerBackgroundStyleKey
 import com.anitail.music.constants.PlayerButtonsStyle
 import com.anitail.music.constants.PlayerButtonsStyleKey
-import com.anitail.music.constants.PureBlackKey
 import com.anitail.music.constants.ShowCachedPlaylistKey
 import com.anitail.music.constants.ShowDownloadedPlaylistKey
 import com.anitail.music.constants.ShowLikedPlaylistKey
@@ -112,13 +111,17 @@ fun AppearanceSettings(
     navController: NavController,
     scrollBehavior: TopAppBarScrollBehavior,
 ) {
+    val (dynamicIcon, onDynamicIconChange) = rememberPreference(
+        DynamicIconKey,
+        defaultValue = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    )
+    val (highRefreshRate, onHighRefreshRateChange) = rememberPreference(
+        HighRefreshRateKey,
+        defaultValue = false
+    )
     val (dynamicTheme, onDynamicThemeChange) = rememberPreference(
         DynamicThemeKey,
         defaultValue = true
-    )
-    val (darkMode, onDarkModeChange) = rememberEnumPreference(
-        DarkModeKey,
-        defaultValue = DarkMode.AUTO
     )
     val (useNewPlayerDesign, onUseNewPlayerDesignChange) = rememberPreference(
         UseNewPlayerDesignKey,
@@ -133,13 +136,13 @@ fun AppearanceSettings(
             PlayerBackgroundStyleKey,
             defaultValue = PlayerBackgroundStyle.DEFAULT,
         )
-    val (pureBlack, onPureBlackChange) = rememberPreference(PureBlackKey, defaultValue = false)
     val (densityScale, setDensityScale) = rememberPreference(DensityScaleKey, defaultValue = 1.0f)
     val (customDensityValue, setCustomDensityValue) = rememberPreference(
         CustomDensityScaleKey,
         defaultValue = 0.85f
     )
     val context = LocalContext.current
+    val supportsDynamicIcon = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     var showRestartDialog by rememberSaveable { mutableStateOf(false) }
     var showCustomDensityDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -287,12 +290,6 @@ fun AppearanceSettings(
     PlayerBackgroundStyle.entries.filter {
         it != PlayerBackgroundStyle.BLUR || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     }
-
-    val isSystemInDarkTheme = isSystemInDarkTheme()
-    val useDarkTheme =
-        remember(darkMode, isSystemInDarkTheme) {
-            if (darkMode == DarkMode.AUTO) isSystemInDarkTheme else darkMode == DarkMode.ON
-        }
 
     val (defaultChip, onDefaultChipChange) = rememberEnumPreference(
         key = ChipSortTypeKey,
@@ -449,35 +446,41 @@ fun AppearanceSettings(
         )
 
         SwitchPreference(
-            title = { Text(stringResource(R.string.enable_dynamic_theme)) },
-            icon = { Icon(painterResource(R.drawable.palette), null) },
-            checked = dynamicTheme,
-            onCheckedChange = onDynamicThemeChange,
-        )
-
-        EnumListPreference(
-            title = { Text(stringResource(R.string.dark_theme)) },
-            icon = { Icon(painterResource(R.drawable.dark_mode), null) },
-            selectedValue = darkMode,
-            onValueSelected = onDarkModeChange,
-            valueText = {
-                when (it) {
-                    DarkMode.ON -> stringResource(R.string.dark_theme_on)
-                    DarkMode.OFF -> stringResource(R.string.dark_theme_off)
-                    DarkMode.AUTO -> stringResource(R.string.dark_theme_follow_system)
-                    DarkMode.TIME_BASED -> stringResource(R.string.dark_theme_time_based)
-                }
+            title = { Text(stringResource(R.string.enable_dynamic_icon)) },
+            description = if (supportsDynamicIcon) {
+                stringResource(R.string.enable_dynamic_icon_desc)
+            } else {
+                stringResource(R.string.dynamic_icon_not_supported_desc)
             },
+            icon = { Icon(painterResource(R.drawable.radio_button_unchecked), null) },
+            checked = dynamicIcon,
+            onCheckedChange = onDynamicIconChange,
+            isEnabled = supportsDynamicIcon,
         )
 
-        AnimatedVisibility(useDarkTheme) {
+        SwitchPreference(
+            title = { Text(stringResource(R.string.enable_high_refresh_rate)) },
+            description = stringResource(R.string.enable_high_refresh_rate_desc),
+            icon = { Icon(painterResource(R.drawable.speed), null) },
+            checked = highRefreshRate,
+            onCheckedChange = onHighRefreshRateChange,
+        )
+
+        if (dynamicTheme) {
             SwitchPreference(
-                title = { Text(stringResource(R.string.pure_black)) },
-                icon = { Icon(painterResource(R.drawable.contrast), null) },
-                checked = pureBlack,
-                onCheckedChange = onPureBlackChange,
+                title = { Text(stringResource(R.string.enable_dynamic_theme)) },
+                icon = { Icon(painterResource(R.drawable.palette), null) },
+                checked = dynamicTheme,
+                onCheckedChange = onDynamicThemeChange,
             )
         }
+
+        PreferenceEntry(
+            title = { Text(stringResource(R.string.theme)) },
+            description = stringResource(R.string.customize_app_theme),
+            icon = { Icon(painterResource(R.drawable.palette), null) },
+            onClick = { navController.navigate("settings/theme_colors") },
+        )
 
         ListPreference(
             title = { Text(stringResource(R.string.display_density_title)) },

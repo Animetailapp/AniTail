@@ -131,7 +131,9 @@ import com.anitail.music.constants.AppBarHeight
 import com.anitail.music.constants.DarkModeKey
 import com.anitail.music.constants.DefaultOpenTabKey
 import com.anitail.music.constants.DisableScreenshotKey
+import com.anitail.music.constants.DynamicIconKey
 import com.anitail.music.constants.DynamicThemeKey
+import com.anitail.music.constants.HighRefreshRateKey
 import com.anitail.music.constants.MiniPlayerBottomSpacing
 import com.anitail.music.constants.MiniPlayerHeight
 import com.anitail.music.constants.NavigationBarAnimationSpec
@@ -143,6 +145,8 @@ import com.anitail.music.constants.SearchSourceKey
 import com.anitail.music.constants.SlimNavBarHeight
 import com.anitail.music.constants.SlimNavBarKey
 import com.anitail.music.constants.StopMusicOnTaskClearKey
+import com.anitail.music.constants.ThemePalette
+import com.anitail.music.constants.ThemePaletteKey
 import com.anitail.music.constants.UseNewMiniPlayerDesignKey
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.SearchHistory
@@ -175,6 +179,7 @@ import com.anitail.music.ui.theme.AnitailTheme
 import com.anitail.music.ui.theme.ColorSaver
 import com.anitail.music.ui.theme.DefaultThemeColor
 import com.anitail.music.ui.theme.extractThemeColor
+import com.anitail.music.ui.theme.seedColor
 import com.anitail.music.ui.utils.appBarScrollBehavior
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.ui.utils.resetHeightOffset
@@ -382,13 +387,31 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            val dynamicIconEnabled by rememberPreference(
+                DynamicIconKey,
+                defaultValue = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+            )
+            val highRefreshRateEnabled by rememberPreference(
+                HighRefreshRateKey,
+                defaultValue = false
+            )
             val enableDynamicTheme by rememberPreference(DynamicThemeKey, defaultValue = true)
+            val selectedThemePalette by rememberEnumPreference(
+                ThemePaletteKey,
+                defaultValue = ThemePalette.LAVENDER
+            )
             val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
             val isSystemInDarkTheme = isSystemInDarkTheme()
             val useDarkTheme =
                 remember(darkTheme, isSystemInDarkTheme) {
                     if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON
                 }
+            LaunchedEffect(dynamicIconEnabled) {
+                applyDynamicLauncherIcon(dynamicIconEnabled)
+            }
+            LaunchedEffect(highRefreshRateEnabled) {
+                applyHighRefreshRate(highRefreshRateEnabled)
+            }
             LaunchedEffect(useDarkTheme) {
                 setSystemBarAppearance(useDarkTheme)
             }
@@ -399,9 +422,18 @@ class MainActivity : AppCompatActivity() {
                 mutableStateOf(DefaultThemeColor)
             }
 
-            LaunchedEffect(playerConnection, enableDynamicTheme, isSystemInDarkTheme) {
+            LaunchedEffect(
+                playerConnection,
+                enableDynamicTheme,
+                selectedThemePalette,
+                isSystemInDarkTheme
+            ) {
                 val playerConnection = playerConnection
-                if (!enableDynamicTheme || playerConnection == null) {
+                if (!enableDynamicTheme) {
+                    themeColor = selectedThemePalette.seedColor()
+                    return@LaunchedEffect
+                }
+                if (playerConnection == null) {
                     themeColor = DefaultThemeColor
                     return@LaunchedEffect
                 }
@@ -1346,10 +1378,67 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun applyDynamicLauncherIcon(enabled: Boolean) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+        val dynamicComponent = ComponentName(this, "$packageName$DYNAMIC_LAUNCHER_ALIAS_SUFFIX")
+        val defaultComponent = ComponentName(this, "$packageName$DEFAULT_LAUNCHER_ALIAS_SUFFIX")
+        val dynamicState = if (enabled) {
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+        } else {
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        }
+        val defaultState = if (enabled) {
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        } else {
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+        }
+
+        runCatching {
+            packageManager.setComponentEnabledSetting(
+                dynamicComponent,
+                dynamicState,
+                PackageManager.DONT_KILL_APP
+            )
+            packageManager.setComponentEnabledSetting(
+                defaultComponent,
+                defaultState,
+                PackageManager.DONT_KILL_APP
+            )
+        }.onFailure {
+            Timber.w(it, "Failed to apply launcher icon mode")
+        }
+    }
+
+    private fun applyHighRefreshRate(enabled: Boolean) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+
+        val activeDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display
+        } else {
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay
+        } ?: return
+
+        val preferredModeId = if (enabled) {
+            activeDisplay.supportedModes.maxByOrNull { it.refreshRate }?.modeId ?: 0
+        } else {
+            0
+        }
+
+        val params = window.attributes
+        if (params.preferredDisplayModeId != preferredModeId) {
+            params.preferredDisplayModeId = preferredModeId
+            window.attributes = params
+        }
+    }
+
     companion object {
         const val ACTION_SEARCH = "com.anitail.music.action.SEARCH"
         const val ACTION_EXPLORE = "com.anitail.music.action.EXPLORE"
         const val ACTION_LIBRARY = "com.anitail.music.action.LIBRARY"
+        private const val DEFAULT_LAUNCHER_ALIAS_SUFFIX = ".MainActivityLauncherDefault"
+        private const val DYNAMIC_LAUNCHER_ALIAS_SUFFIX = ".MainActivityLauncherDynamic"
     }
 
     @RequiresApi(Build.VERSION_CODES.M)

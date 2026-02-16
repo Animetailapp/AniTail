@@ -290,6 +290,15 @@
 
     <string name="appearance">Apariencia</string>
     <string name="theme">Tema</string>
+    <string name="enable_dynamic_icon">Habilitar icono dinámico</string>
+    <string name="enable_dynamic_icon_desc">Activa el soporte de icono temático de Android en el launcher</string>
+    <string name="dynamic_icon_not_supported_desc">Requiere Android 13 o superior</string>
+    <string name="enable_high_refresh_rate">Activar alta tasa de refresco</string>
+    <string name="enable_high_refresh_rate_desc">Forzar la pantalla para usar la tasa de refresco más alta soportada (p. ej. 120Hz)</string>
+    <string name="customize_app_theme">Personaliza el tema de la app</string>
+    <string name="theme_and_colors">Tema y colores</string>
+    <string name="theme_mode">Modo de tema</string>
+    <string name="color_palette">Paleta de colores</string>
     <string name="enable_dynamic_theme">Activar tema dinámico</string>
     <string name="enable_dynamic_theme_desc">Usa colores de la carátula actual</string>
     <string name="dark_theme">Tema oscuro</string>
