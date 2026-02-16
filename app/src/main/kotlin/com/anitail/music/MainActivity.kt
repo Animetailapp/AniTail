@@ -274,12 +274,28 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        startService(Intent(this, MusicService::class.java))
+        startMusicServiceSafely()
         bindService(
             Intent(this, MusicService::class.java),
             serviceConnection,
             BIND_AUTO_CREATE
         )
+    }
+
+    private fun startMusicServiceSafely() {
+        val serviceIntent = Intent(this, MusicService::class.java)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ContextCompat.startForegroundService(this, serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+        } catch (e: IllegalStateException) {
+            Timber.w(
+                e,
+                "MusicService start deferred due background start restriction; binding will proceed"
+            )
+        }
     }
 
     override fun onStop() {
