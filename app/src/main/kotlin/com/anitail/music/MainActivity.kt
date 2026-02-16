@@ -179,6 +179,7 @@ import com.anitail.music.ui.screens.settings.NavigationTab
 import com.anitail.music.ui.theme.AnitailTheme
 import com.anitail.music.ui.theme.ColorSaver
 import com.anitail.music.ui.theme.DefaultThemeColor
+import com.anitail.music.ui.theme.ThemePreviewState
 import com.anitail.music.ui.theme.extractThemeColor
 import com.anitail.music.ui.theme.seedColor
 import com.anitail.music.ui.utils.appBarScrollBehavior
@@ -405,6 +406,8 @@ class MainActivity : AppCompatActivity() {
                 CustomThemeSeedColorKey,
                 defaultValue = 0xFFB39DDB.toInt()
             )
+            val customThemePreviewColorInt = ThemePreviewState.customSeedPreviewColorInt
+            val isPaletteCustomizationPreviewActive = ThemePreviewState.isPaletteCustomizationActive
             val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
             val isSystemInDarkTheme = isSystemInDarkTheme()
             val useDarkTheme =
@@ -432,9 +435,19 @@ class MainActivity : AppCompatActivity() {
                 enableDynamicTheme,
                 selectedThemePalette,
                 customThemeSeedColorInt,
+                customThemePreviewColorInt,
+                isPaletteCustomizationPreviewActive,
                 isSystemInDarkTheme
             ) {
                 val playerConnection = playerConnection
+                val previewColor = customThemePreviewColorInt
+                    ?.takeIf { isPaletteCustomizationPreviewActive }
+                    ?.let { Color(it.toLong() and 0xFFFFFFFF) }
+
+                if (previewColor != null) {
+                    themeColor = previewColor
+                    return@LaunchedEffect
+                }
                 if (!enableDynamicTheme) {
                     themeColor = selectedThemePalette.seedColor(
                         customSeed = Color(customThemeSeedColorInt.toLong() and 0xFFFFFFFF)
@@ -480,6 +493,8 @@ class MainActivity : AppCompatActivity() {
                 darkMode = darkTheme,
                 pureBlack = pureBlack,
                 themeColor = themeColor,
+                preferFidelityStyle = isPaletteCustomizationPreviewActive ||
+                    (!enableDynamicTheme && selectedThemePalette == ThemePalette.CUSTOM),
             ) {
                 BoxWithConstraints(
                     modifier =

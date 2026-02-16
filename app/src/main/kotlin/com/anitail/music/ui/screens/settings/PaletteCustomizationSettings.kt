@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -36,7 +38,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,7 +58,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.R
@@ -63,6 +69,7 @@ import com.anitail.music.constants.DynamicThemeKey
 import com.anitail.music.constants.ThemePalette
 import com.anitail.music.constants.ThemePaletteKey
 import com.anitail.music.ui.component.IconButton
+import com.anitail.music.ui.theme.ThemePreviewState
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.utils.rememberPreference
@@ -104,6 +111,17 @@ fun PaletteCustomizationSettings(
     val savedColor = Color(customSeedColorInt.toLong() and 0xFFFFFFFF)
     var hsvState by remember(customSeedColorInt) { mutableStateOf(savedColor.toHsv()) }
     val selectedColor = Color.hsv(hsvState.hue, hsvState.saturation, hsvState.value)
+
+    DisposableEffect(savedColor) {
+        ThemePreviewState.beginCustomPalettePreview(savedColor.toArgb())
+        onDispose {
+            ThemePreviewState.endCustomPalettePreview()
+        }
+    }
+
+    LaunchedEffect(selectedColor) {
+        ThemePreviewState.updateCustomPalettePreview(selectedColor.toArgb())
+    }
 
     val presetPalettes = remember {
         listOf(
@@ -250,7 +268,13 @@ fun PaletteCustomizationSettings(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.palette_customization)) },
+                title = {
+                    Text(
+                        text = stringResource(R.string.palette_customization),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 navigationIcon = {
                     IconButton(
@@ -277,9 +301,9 @@ fun PaletteCustomizationSettings(
                     )
                 )
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp, vertical = 6.dp),
+                .padding(horizontal = 14.dp, vertical = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             HueSaturationWheel(
                 hue = hsvState.hue,
@@ -288,9 +312,11 @@ fun PaletteCustomizationSettings(
                     hsvState = hsvState.copy(hue = hue, saturation = saturation)
                 },
                 modifier = Modifier
-                    .fillMaxWidth(0.78f)
-                    .padding(top = 2.dp)
+                    .fillMaxWidth(0.72f)
+                    .padding(top = 10.dp)
             )
+
+            Spacer(modifier = Modifier.height(6.dp))
 
             ValueGradientSlider(
                 value = hsvState.value,
@@ -299,28 +325,49 @@ fun PaletteCustomizationSettings(
                 onValueChanged = { value ->
                     hsvState = hsvState.copy(value = value)
                 },
-                modifier = Modifier.fillMaxWidth(0.88f)
+                modifier = Modifier.fillMaxWidth(0.82f)
             )
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Column(
+                modifier = Modifier.fillMaxWidth(0.62f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                ColorInfoSwatch(
-                    hex = selectedColor.toHexArgb(),
-                    color = selectedColor
-                )
-                Icon(
-                    painter = painterResource(R.drawable.arrow_forward),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp)
-                )
-                ColorInfoSwatch(
-                    hex = savedColor.toHexArgb(),
-                    color = savedColor
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = selectedColor.toHexArgb(),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = savedColor.toHexArgb(),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ColorSquareSwatch(color = selectedColor)
+                    Icon(
+                        painter = painterResource(R.drawable.arrow_forward),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    ColorSquareSwatch(color = savedColor)
+                }
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             Button(
                 onClick = {
@@ -336,34 +383,61 @@ fun PaletteCustomizationSettings(
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ),
                 modifier = Modifier
-                    .fillMaxWidth(0.92f)
-                    .height(52.dp)
+                    .fillMaxWidth(0.86f)
+                    .height(44.dp)
             ) {
                 Text(
                     text = stringResource(R.string.confirm_color),
-                    style = MaterialTheme.typography.titleLarge
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
 
-            presetPalettes.forEach { preset ->
+            Spacer(modifier = Modifier.height(16.dp))
+
+            presetPalettes.forEachIndexed { index, preset ->
+                if (index > 0) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
                 Text(
                     text = preset.title,
-                    style = MaterialTheme.typography.titleLarge
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Normal
                 )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    preset.colors.forEach { color ->
-                        PalettePresetChip(
-                            color = color,
-                            selected = color.toArgb() == selectedColor.toArgb(),
-                            onClick = {
-                                hsvState = color.toHsv()
+                if (preset.colors.size <= 5) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        preset.colors.forEachIndexed { index, color ->
+                            PalettePresetChip(
+                                color = color,
+                                selected = color.toArgb() == selectedColor.toArgb(),
+                                onClick = {
+                                    hsvState = color.toHsv()
+                                }
+                            )
+                            if (index < preset.colors.lastIndex) {
+                                Spacer(modifier = Modifier.width(10.dp))
                             }
-                        )
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        preset.colors.forEach { color ->
+                            PalettePresetChip(
+                                color = color,
+                                selected = color.toArgb() == selectedColor.toArgb(),
+                                onClick = {
+                                    hsvState = color.toHsv()
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -372,26 +446,15 @@ fun PaletteCustomizationSettings(
 }
 
 @Composable
-private fun ColorInfoSwatch(
-    hex: String,
+private fun ColorSquareSwatch(
     color: Color,
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = hex,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(color)
-        )
-    }
+    Box(
+        modifier = Modifier
+            .size(52.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(color)
+    )
 }
 
 @Composable
@@ -408,7 +471,7 @@ private fun HueSaturationWheel(
         val dx = position.x - wheelCenter.x
         val dy = position.y - wheelCenter.y
         val distance = sqrt((dx * dx) + (dy * dy))
-        val sat = (distance / wheelRadius).coerceIn(0f, 1f)
+        val sat = (distance / wheelRadius).coerceIn(0f, 1f) * 0.96f
         var angle = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
         if (angle < 0f) angle += 360f
         onColorChanged(angle, sat)
@@ -465,13 +528,13 @@ private fun HueSaturationWheel(
             drawCircle(
                 color = Color.White,
                 center = indicatorCenter,
-                radius = 14f,
-                style = Stroke(width = 6f)
+                radius = 12f,
+                style = Stroke(width = 5f)
             )
             drawCircle(
                 color = Color.hsv(hue, saturation, 1f),
                 center = indicatorCenter,
-                radius = 10f
+                radius = 8f
             )
         }
     }
@@ -493,7 +556,7 @@ private fun ValueGradientSlider(
 
     Box(
         modifier = modifier
-            .height(24.dp)
+            .height(20.dp)
             .clip(RoundedCornerShape(999.dp))
             .onSizeChanged {
                 widthPx = it.width.toFloat().coerceAtLeast(1f)
@@ -518,12 +581,13 @@ private fun ValueGradientSlider(
                 cornerRadius = CornerRadius(size.height / 2f, size.height / 2f)
             )
 
-            val knobX = size.width * value
+            val knobRadius = size.height * 0.36f
+            val knobX = (size.width * value).coerceIn(knobRadius, size.width - knobRadius)
             val knobCenter = Offset(knobX, size.height / 2f)
             drawCircle(
                 color = Color.White,
                 center = knobCenter,
-                radius = size.height * 0.34f,
+                radius = knobRadius,
                 style = Stroke(width = size.height * 0.11f)
             )
         }
@@ -538,13 +602,13 @@ private fun PalettePresetChip(
 ) {
     Box(
         modifier = Modifier
-            .size(56.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .size(50.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(color)
             .border(
-                width = if (selected) 3.dp else 0.dp,
+                width = if (selected) 2.dp else 0.dp,
                 color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(12.dp)
             )
             .clickable(onClick = onClick)
     )
