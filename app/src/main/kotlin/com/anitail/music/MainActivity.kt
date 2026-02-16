@@ -129,6 +129,7 @@ import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.music.constants.AppBarHeight
 import com.anitail.music.constants.DarkModeKey
+import com.anitail.music.constants.CustomThemeSeedColorKey
 import com.anitail.music.constants.DefaultOpenTabKey
 import com.anitail.music.constants.DisableScreenshotKey
 import com.anitail.music.constants.DynamicIconKey
@@ -400,6 +401,10 @@ class MainActivity : AppCompatActivity() {
                 ThemePaletteKey,
                 defaultValue = ThemePalette.LAVENDER
             )
+            val customThemeSeedColorInt by rememberPreference(
+                CustomThemeSeedColorKey,
+                defaultValue = 0xFFB39DDB.toInt()
+            )
             val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
             val isSystemInDarkTheme = isSystemInDarkTheme()
             val useDarkTheme =
@@ -426,11 +431,14 @@ class MainActivity : AppCompatActivity() {
                 playerConnection,
                 enableDynamicTheme,
                 selectedThemePalette,
+                customThemeSeedColorInt,
                 isSystemInDarkTheme
             ) {
                 val playerConnection = playerConnection
                 if (!enableDynamicTheme) {
-                    themeColor = selectedThemePalette.seedColor()
+                    themeColor = selectedThemePalette.seedColor(
+                        customSeed = Color(customThemeSeedColorInt.toLong() and 0xFFFFFFFF)
+                    )
                     return@LaunchedEffect
                 }
                 if (playerConnection == null) {

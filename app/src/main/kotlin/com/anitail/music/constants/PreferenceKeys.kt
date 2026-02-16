@@ -12,6 +12,7 @@ val DynamicThemeKey = booleanPreferencesKey("dynamicTheme")
 val DynamicIconKey = booleanPreferencesKey("dynamicIcon")
 val HighRefreshRateKey = booleanPreferencesKey("highRefreshRate")
 val ThemePaletteKey = stringPreferencesKey("themePalette")
+val CustomThemeSeedColorKey = intPreferencesKey("customThemeSeedColor")
 val DarkModeKey = stringPreferencesKey("darkMode")
 val PureBlackKey = booleanPreferencesKey("pureBlack")
 val DensityScaleKey = floatPreferencesKey("density_scale_factor")
@@ -54,6 +55,7 @@ enum class SliderStyle {
 }
 
 enum class ThemePalette {
+    CUSTOM,
     LAVENDER,
     SUNSET,
     CHERRY,

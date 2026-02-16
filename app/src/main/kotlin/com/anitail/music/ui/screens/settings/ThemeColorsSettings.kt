@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.R
+import com.anitail.music.constants.CustomThemeSeedColorKey
 import com.anitail.music.constants.DarkModeKey
 import com.anitail.music.constants.DynamicThemeKey
 import com.anitail.music.constants.PureBlackKey
@@ -51,6 +52,7 @@ import com.anitail.music.constants.ThemePaletteKey
 import com.anitail.music.ui.component.IconButton
 import com.anitail.music.ui.theme.ThemePalettePreview
 import com.anitail.music.ui.theme.ThemePalettePreviews
+import com.anitail.music.ui.theme.customThemePalettePreview
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.utils.rememberPreference
@@ -81,6 +83,10 @@ fun ThemeColorsSettings(
         ThemePaletteKey,
         defaultValue = ThemePalette.LAVENDER
     )
+    val (customSeedColorInt, _) = rememberPreference(
+        CustomThemeSeedColorKey,
+        defaultValue = 0xFFB39DDB.toInt()
+    )
 
     val selectedMode = remember(darkMode, pureBlack) {
         when {
@@ -91,9 +97,20 @@ fun ThemeColorsSettings(
         }
     }
 
-    val activePalette = ThemePalettePreviews.firstOrNull { it.name == themePalette }
-        ?: ThemePalettePreviews.firstOrNull { it.name == ThemePalette.LAVENDER }
-        ?: ThemePalettePreviews.first()
+    val customPreview = remember(customSeedColorInt) {
+        customThemePalettePreview(Color(customSeedColorInt.toLong() and 0xFFFFFFFF))
+    }
+    val paletteOptions = remember(customPreview) {
+        listOf(customPreview) + ThemePalettePreviews
+    }
+    val activePalette = remember(themePalette, customPreview) {
+        when (themePalette) {
+            ThemePalette.CUSTOM -> customPreview
+            else -> ThemePalettePreviews.firstOrNull { it.name == themePalette }
+                ?: ThemePalettePreviews.firstOrNull { it.name == ThemePalette.LAVENDER }
+                ?: ThemePalettePreviews.first()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -219,7 +236,7 @@ fun ThemeColorsSettings(
                             onClick = { onDynamicThemeChange(true) }
                         )
 
-                        ThemePalettePreviews.forEach { palette ->
+                        paletteOptions.forEach { palette ->
                             PaletteCircleButton(
                                 selected = !dynamicTheme && themePalette == palette.name,
                                 palette = palette,
@@ -229,6 +246,39 @@ fun ThemeColorsSettings(
                                 }
                             )
                         }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .clickable { navController.navigate("settings/palette_customization") }
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.palette),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.palette_customization),
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = stringResource(R.string.design_your_own_palette),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            painter = painterResource(R.drawable.arrow_forward),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }

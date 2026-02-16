@@ -44,6 +44,13 @@ object SettingsSearchOptions {
             R.string.customize_app_theme,
             sectionRes = R.string.theme
         ),
+        option(
+            context,
+            "palette_customization",
+            R.string.palette_customization,
+            R.string.design_your_own_palette,
+            sectionRes = R.string.theme
+        ),
         option(context, "dark_theme", R.string.dark_theme, sectionRes = R.string.theme),
         option(
             context,

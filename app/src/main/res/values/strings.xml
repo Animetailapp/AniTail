@@ -315,6 +315,9 @@
     <string name="theme_and_colors">Theme &amp; Colors</string>
     <string name="theme_mode">Theme Mode</string>
     <string name="color_palette">Color Palette</string>
+    <string name="palette_customization">Palette Customization</string>
+    <string name="design_your_own_palette">Design your own palette</string>
+    <string name="confirm_color">Confirm color</string>
     <string name="enable_dynamic_theme">Enable dynamic theme</string>
     <string name="enable_dynamic_theme_desc">Use colors from the current cover art</string>
     <string name="dark_theme">Dark theme</string>

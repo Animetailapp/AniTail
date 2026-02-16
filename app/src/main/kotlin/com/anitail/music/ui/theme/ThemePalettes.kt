@@ -111,7 +111,30 @@ val ThemePalettePreviews = listOf(
     ),
 )
 
-fun ThemePalette.seedColor(): Color =
-    ThemePalettePreviews.firstOrNull { it.name == this }?.seed
-        ?: ThemePalettePreviews.firstOrNull { it.name == ThemePalette.LAVENDER }?.seed
-        ?: ThemePalettePreviews.first().seed
+private fun Color.blendWith(color: Color, amount: Float): Color {
+    val ratio = amount.coerceIn(0f, 1f)
+    return Color(
+        red = (red * (1f - ratio)) + (color.red * ratio),
+        green = (green * (1f - ratio)) + (color.green * ratio),
+        blue = (blue * (1f - ratio)) + (color.blue * ratio),
+        alpha = 1f
+    )
+}
+
+fun customThemePalettePreview(seed: Color): ThemePalettePreview =
+    ThemePalettePreview(
+        name = ThemePalette.CUSTOM,
+        seed = seed,
+        chipA = seed.blendWith(Color.Black, 0.7f),
+        chipB = seed.blendWith(Color.White, 0.1f),
+        chipC = seed.blendWith(Color.White, 0.45f),
+        chipD = seed.blendWith(Color(0xFFFFB5C8), 0.25f),
+    )
+
+fun ThemePalette.seedColor(customSeed: Color = Color(0xFFB39DDB)): Color =
+    when (this) {
+        ThemePalette.CUSTOM -> customSeed
+        else -> ThemePalettePreviews.firstOrNull { it.name == this }?.seed
+            ?: ThemePalettePreviews.firstOrNull { it.name == ThemePalette.LAVENDER }?.seed
+            ?: ThemePalettePreviews.first().seed
+    }

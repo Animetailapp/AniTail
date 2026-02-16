@@ -35,6 +35,7 @@ import com.anitail.music.ui.screens.settings.DiscordLoginScreen
 import com.anitail.music.ui.screens.settings.DiscordSettings
 import com.anitail.music.ui.screens.settings.JamSettingsScreen
 import com.anitail.music.ui.screens.settings.LastFmSettingsScreen
+import com.anitail.music.ui.screens.settings.PaletteCustomizationSettings
 import com.anitail.music.ui.screens.settings.PlayerSettings
 import com.anitail.music.ui.screens.settings.PrivacySettings
 import com.anitail.music.ui.screens.settings.RomanizationSettings
@@ -271,6 +272,9 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable("settings/theme_colors") {
         ThemeColorsSettings(navController, scrollBehavior)
+    }
+    composable("settings/palette_customization") {
+        PaletteCustomizationSettings(navController, scrollBehavior)
     }
     composable("settings/account") {
         AccountSettings(navController, scrollBehavior)
