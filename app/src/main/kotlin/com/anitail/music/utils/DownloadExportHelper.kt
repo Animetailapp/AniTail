@@ -3,12 +3,12 @@ package com.anitail.music.utils
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.core.graphics.drawable.toBitmap
 import androidx.documentfile.provider.DocumentFile
 import androidx.media3.datasource.cache.SimpleCache
-import coil3.ImageLoader
-import coil3.request.ImageRequest
-import coil3.request.SuccessResult
-import coil3.toBitmap
+import coil.ImageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import com.anitail.innertube.YouTube
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.FormatEntity
@@ -245,7 +245,7 @@ class DownloadExportHelper @Inject constructor(
 
             val result = imageLoader.execute(request)
             if (result is SuccessResult) {
-                val bitmap = result.image.toBitmap()
+                val bitmap = result.drawable.toBitmap()
                 val outputStream = ByteArrayOutputStream()
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
                 outputStream.toByteArray()
