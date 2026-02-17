@@ -630,6 +630,11 @@ class MainActivity : AppCompatActivity() {
                             collapsedBound = bottomInset + getNavPadding() + (if (useNewMiniPlayerDesign) MiniPlayerBottomSpacing else 0.dp) + MiniPlayerHeight,
                             expandedBound = maxHeight,
                         )
+                    val activePlayerFlow =
+                        remember(playerConnection) { playerConnection?.service?.playerFlow }
+                    val activePlayer by
+                    (activePlayerFlow?.collectAsState(initial = playerConnection?.player)
+                        ?: remember { mutableStateOf<Player?>(null) })
 
                     val playerAwareWindowInsets =
                         remember(
@@ -711,8 +716,8 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
-                    LaunchedEffect(playerConnection) {
-                        val player = playerConnection?.player ?: return@LaunchedEffect
+                    LaunchedEffect(activePlayer) {
+                        val player = activePlayer ?: return@LaunchedEffect
                         if (player.currentMediaItem == null) {
                             if (!playerBottomSheetState.isDismissed) {
                                 playerBottomSheetState.dismiss()
@@ -723,9 +728,8 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     }
-                    DisposableEffect(playerConnection, playerBottomSheetState) {
-                        val player =
-                            playerConnection?.player ?: return@DisposableEffect onDispose { }
+                    DisposableEffect(activePlayer, playerBottomSheetState) {
+                        val player = activePlayer ?: return@DisposableEffect onDispose { }
                         val listener =
                             object : Player.Listener {
                                 override fun onPlaybackStateChanged(state: Int) {

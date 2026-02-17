@@ -237,6 +237,7 @@ object SettingsSearchOptions {
         option(context, "history_duration", R.string.history_duration),
         option(context, "skip_silence", R.string.skip_silence),
         option(context, "audio_normalization", R.string.audio_normalization),
+        option(context, "crossfade", R.string.crossfade),
         option(context, "audio_offload", R.string.audio_offload),
         option(context, "persistent_queue", R.string.persistent_queue),
         option(context, "auto_load_more", R.string.auto_load_more),

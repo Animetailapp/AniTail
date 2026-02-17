@@ -29,6 +29,7 @@ import com.anitail.music.constants.AutoDownloadLyricsKey
 import com.anitail.music.constants.AutoDownloadOnLikeKey
 import com.anitail.music.constants.AutoLoadMoreKey
 import com.anitail.music.constants.AutoSkipNextOnErrorKey
+import com.anitail.music.constants.CrossfadeDurationKey
 import com.anitail.music.constants.EnableCastKey
 import com.anitail.music.constants.HistoryDuration
 import com.anitail.music.constants.NotificationButtonType
@@ -37,6 +38,7 @@ import com.anitail.music.constants.PersistentQueueKey
 import com.anitail.music.constants.SimilarContent
 import com.anitail.music.constants.SkipSilenceKey
 import com.anitail.music.constants.StopMusicOnTaskClearKey
+import com.anitail.music.ui.component.DurationSliderPreference
 import com.anitail.music.ui.component.EnumListPreference
 import com.anitail.music.ui.component.IconButton
 import com.anitail.music.ui.component.PreferenceGroupTitle
@@ -69,6 +71,10 @@ fun PlayerSettings(
     val (audioNormalization, onAudioNormalizationChange) = rememberPreference(
         AudioNormalizationKey,
         defaultValue = true
+    )
+    val (crossfadeDuration, onCrossfadeDurationChange) = rememberPreference(
+        CrossfadeDurationKey,
+        defaultValue = 0
     )
     val (autoLoadMore, onAutoLoadMoreChange) = rememberPreference(
         AutoLoadMoreKey,
@@ -167,6 +173,18 @@ fun PlayerSettings(
             icon = { Icon(painterResource(R.drawable.volume_up), null) },
             checked = audioNormalization,
             onCheckedChange = onAudioNormalizationChange
+        )
+
+        DurationSliderPreference(
+            title = { Text(stringResource(R.string.crossfade)) },
+            icon = { Icon(painterResource(R.drawable.graphic_eq), null) },
+            value = crossfadeDuration.toFloat().coerceIn(0f, 12f),
+            onValueChange = { onCrossfadeDurationChange(it.toInt()) },
+            dialogTitle = stringResource(R.string.crossfade),
+            specialValueText = stringResource(R.string.dark_theme_off),
+            valueRange = 0f..12f,
+            steps = 11,
+            defaultValue = 0f
         )
 
         PreferenceGroupTitle(
