@@ -72,9 +72,9 @@ import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.constants.CustomDownloadPathEnabledKey
 import com.anitail.music.constants.CustomDownloadPathUriKey
+import com.anitail.music.constants.MaxDownloadSizeKey
 import com.anitail.music.constants.MaxImageCacheSizeKey
 import com.anitail.music.constants.MaxSongCacheSizeKey
-import com.anitail.music.constants.MaxDownloadSizeKey
 import com.anitail.music.extensions.tryOrNull
 import com.anitail.music.ui.component.AnimatedIconButton
 import com.anitail.music.ui.component.EnhancedListPreference
@@ -89,6 +89,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private data class StorageSnapshot(
+    val imageCacheSize: Long,
+    val playerCacheSize: Long,
+    val downloadCacheSize: Long,
+    val downloadedSongsSize: Long,
+)
 
 @OptIn(ExperimentalCoilApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -136,14 +143,26 @@ fun StorageSettings(
     var showImageCacheClearConfirm by remember { mutableStateOf(false) }
     var customPathValid by remember { mutableStateOf(true) }
 
+    suspend fun loadStorageSnapshot(): StorageSnapshot = withContext(Dispatchers.IO) {
+        StorageSnapshot(
+            imageCacheSize = imageDiskCache.size,
+            playerCacheSize = tryOrNull { playerCache.cacheSpace } ?: 0,
+            downloadCacheSize = tryOrNull { downloadCache.cacheSpace } ?: 0,
+            downloadedSongsSize = mediaStoreHelper.getAnitailFolderSize(),
+        )
+    }
+
     LaunchedEffect(customDownloadPathUri) {
-        if (customDownloadPathUri.isEmpty()) {
-            customPathValid = true
+        customPathValid = if (customDownloadPathUri.isEmpty()) {
+            true
         } else {
-            customPathValid = try {
-                DocumentFile.fromTreeUri(context, Uri.parse(customDownloadPathUri))?.canWrite() == true
-            } catch (_: Exception) {
-                false
+            withContext(Dispatchers.IO) {
+                try {
+                    DocumentFile.fromTreeUri(context, Uri.parse(customDownloadPathUri))
+                        ?.canWrite() == true
+                } catch (_: Exception) {
+                    false
+                }
             }
         }
     }
@@ -176,7 +195,7 @@ fun StorageSettings(
         ),
         label = "",
     )
-    val downloadCachePercentage = if (downloadCacheSize > 0) {
+    if (downloadCacheSize > 0) {
         (downloadCacheSize.toFloat() / (8192 * 1024 * 1024L)).coerceIn(0f, 1f) * 100
     } else 0f
     val downloadedSongsPercentage = if (maxDownloadSize != -1 && downloadedSongsSize > 0) {
@@ -186,10 +205,11 @@ fun StorageSettings(
     // Refresh cache information periodically
     LaunchedEffect(Unit) {
         while (isActive) {
-            imageCacheSize = imageDiskCache.size
-            playerCacheSize = tryOrNull { playerCache.cacheSpace } ?: 0
-            downloadCacheSize = tryOrNull { downloadCache.cacheSpace } ?: 0
-            downloadedSongsSize = mediaStoreHelper.getAnitailFolderSize()
+            val snapshot = loadStorageSnapshot()
+            imageCacheSize = snapshot.imageCacheSize
+            playerCacheSize = snapshot.playerCacheSize
+            downloadCacheSize = snapshot.downloadCacheSize
+            downloadedSongsSize = snapshot.downloadedSongsSize
             delay(500)
         }
     }
@@ -198,14 +218,13 @@ fun StorageSettings(
     fun refreshCacheInfo() {
         coroutineScope.launch {
             isRefreshing = true
-            withContext(Dispatchers.IO) {
-                imageCacheSize = imageDiskCache.size
-                playerCacheSize = tryOrNull { playerCache.cacheSpace } ?: 0
-                downloadCacheSize = tryOrNull { downloadCache.cacheSpace } ?: 0
-                downloadedSongsSize = mediaStoreHelper.getAnitailFolderSize()
-                delay(800) // Show refresh animation for a minimum time
-                isRefreshing = false
-            }
+            val snapshot = loadStorageSnapshot()
+            imageCacheSize = snapshot.imageCacheSize
+            playerCacheSize = snapshot.playerCacheSize
+            downloadCacheSize = snapshot.downloadCacheSize
+            downloadedSongsSize = snapshot.downloadedSongsSize
+            delay(800) // Show refresh animation for a minimum time
+            isRefreshing = false
         }
     }
 

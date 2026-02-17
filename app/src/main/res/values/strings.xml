@@ -129,9 +129,14 @@
     <string name="swap_download">Swap download</string>
     <string name="swap_download_desc">Re-download with different quality</string>
     <string name="choose_download_quality">Choose download quality</string>
+    <string name="download_quality_dialog_subtitle">Best quality is listed first. Pick the format you want to keep offline.</string>
     <string name="loading_formats">Loading available qualities…</string>
     <string name="no_formats_available">No formats available</string>
+    <string name="recommended_badge">Recommended</string>
     <string name="metadata_badge">+ Metadata</string>
+    <string name="audio_only_badge">Audio only</string>
+    <string name="metadata_supported_hint">Includes embedded cover art and tags</string>
+    <string name="metadata_unsupported_hint">No embedded metadata</string>
     <string name="m4a_metadata_note">M4A 128kbps+ includes embedded cover art and metadata. Lower bitrate M4A and OPUS files will not have embedded metadata.</string>
 
     <!-- MediaStore downloads -->

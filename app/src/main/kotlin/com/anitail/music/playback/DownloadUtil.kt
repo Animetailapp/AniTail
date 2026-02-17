@@ -30,6 +30,7 @@ import com.anitail.music.utils.stringPreference
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
@@ -70,6 +71,7 @@ constructor(
 
     private val songUrlCache = ConcurrentHashMap<String, Pair<String, Long>>()
     private val targetItagOverride = ConcurrentHashMap<String, Int>()
+    private val exportJobs = ConcurrentHashMap<String, Job>()
 
     // Legacy cache downloads (for compatibility)
     private val cacheDownloads = MutableStateFlow<Map<String, Download>>(emptyMap())
@@ -88,6 +90,34 @@ constructor(
 
     fun invalidateUrl(songId: String) {
         songUrlCache.remove(songId)
+    }
+
+    private fun scheduleCustomPathExport(songId: String) {
+        if (!customDownloadPathEnabled || customDownloadPathUri.isEmpty()) return
+
+        exportJobs[songId]?.takeIf { it.isActive }?.let { return }
+        exportJobs.remove(songId)
+
+        exportJobs[songId] = scope.launch {
+            try {
+                val existingUri = database.getDownloadUri(songId)
+                if (!existingUri.isNullOrBlank() && downloadExportHelper.verifyFileAccess(
+                        existingUri
+                    )
+                ) {
+                    return@launch
+                }
+                downloadExportHelper.exportToCustomPath(songId, customDownloadPathUri)
+            } catch (e: Exception) {
+                Timber.e(e, "Custom path export failed for %s", songId)
+            } finally {
+                exportJobs.remove(songId)
+            }
+        }
+    }
+
+    private fun cancelCustomPathExport(songId: String) {
+        exportJobs.remove(songId)?.cancel()
     }
 
     private val dataSourceFactory =
@@ -228,28 +258,23 @@ constructor(
                             }
                         }
 
-                        scope.launch {
-                            val songId = download.request.id
-                            when (download.state) {
-                                Download.STATE_COMPLETED -> {
-                                    clearTargetItag(songId)
+                        val songId = download.request.id
+                        when (download.state) {
+                            Download.STATE_COMPLETED -> {
+                                clearTargetItag(songId)
+                                scheduleCustomPathExport(songId)
+                            }
 
-                                    if (customDownloadPathEnabled && customDownloadPathUri.isNotEmpty()) {
-                                        try {
-                                            downloadExportHelper.exportToCustomPath(songId, customDownloadPathUri)
-                                        } catch (e: Exception) {
-                                            Timber.e(e, "Custom path export failed for %s", songId)
-                                        }
-                                    }
-                                }
+                            Download.STATE_FAILED,
+                            Download.STATE_STOPPED -> {
+                                clearTargetItag(songId)
+                                cancelCustomPathExport(songId)
+                            }
 
-                                Download.STATE_FAILED,
-                                Download.STATE_STOPPED -> {
-                                    clearTargetItag(songId)
-                                }
-
-                                Download.STATE_REMOVING -> {
-                                    clearTargetItag(songId)
+                            Download.STATE_REMOVING -> {
+                                clearTargetItag(songId)
+                                cancelCustomPathExport(songId)
+                                scope.launch {
                                     try {
                                         downloadExportHelper.deleteFromCustomPath(songId)
                                     } catch (e: Exception) {

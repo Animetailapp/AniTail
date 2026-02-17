@@ -6,7 +6,7 @@ import android.net.Uri
 import androidx.core.graphics.drawable.toBitmap
 import androidx.documentfile.provider.DocumentFile
 import androidx.media3.datasource.cache.SimpleCache
-import coil.ImageLoader
+import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.anitail.innertube.YouTube
@@ -238,7 +238,7 @@ class DownloadExportHelper @Inject constructor(
         if (thumbnailUrl.isNullOrEmpty()) return null
 
         return try {
-            val imageLoader = ImageLoader.Builder(context).build()
+            val imageLoader = context.imageLoader
             val request = ImageRequest.Builder(context)
                 .data(thumbnailUrl)
                 .build()
