@@ -57,8 +57,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.net.toUri
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.exoplayer.offline.Download
+import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import com.anitail.innertube.YouTube
@@ -73,11 +75,13 @@ import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.BigSeekBar
 import com.anitail.music.ui.component.BottomSheetState
+import com.anitail.music.ui.component.DownloadFormatDialog
 import com.anitail.music.ui.component.ListDialog
+import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.utils.makeTimeString
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.log2
 import kotlin.math.pow
 import kotlin.math.round
@@ -111,6 +115,32 @@ fun PlayerMenu(
         remember(mediaMetadata.artists) {
             mediaMetadata.artists.filter { it.id != null }
         }
+    var showDownloadFormatDialog by rememberSaveable { mutableStateOf(false) }
+    var isLoadingFormats by remember { mutableStateOf(false) }
+    var availableFormats by remember { mutableStateOf<List<YTPlayerUtils.AudioFormatOption>>(emptyList()) }
+
+    if (showDownloadFormatDialog) {
+        DownloadFormatDialog(
+            isLoading = isLoadingFormats,
+            formats = availableFormats,
+            onFormatSelected = { format ->
+                showDownloadFormatDialog = false
+                downloadUtil.setTargetItag(mediaMetadata.id, format.itag)
+                val request = DownloadRequest.Builder(mediaMetadata.id, mediaMetadata.id.toUri())
+                    .setCustomCacheKey(mediaMetadata.id)
+                    .setData(mediaMetadata.title.toByteArray())
+                    .build()
+                DownloadService.sendAddDownload(
+                    context,
+                    ExoDownloadService::class.java,
+                    request,
+                    false,
+                )
+                onDismiss()
+            },
+            onDismiss = { showDownloadFormatDialog = false },
+        )
+    }
 
     var showChoosePlaylistDialog by rememberSaveable {
         mutableStateOf(false)
@@ -397,6 +427,35 @@ fun PlayerMenu(
                             )
                         }
                     )
+
+                    ListItem(
+                        headlineContent = { Text(text = stringResource(R.string.swap_download)) },
+                        supportingContent = { Text(text = stringResource(R.string.swap_download_desc)) },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.sync),
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            DownloadService.sendRemoveDownload(
+                                context,
+                                ExoDownloadService::class.java,
+                                mediaMetadata.id,
+                                false,
+                            )
+                            showDownloadFormatDialog = true
+                            isLoadingFormats = true
+                            availableFormats = emptyList()
+                            coroutineScope.launch {
+                                val formats = withContext(Dispatchers.IO) {
+                                    YTPlayerUtils.getAllAvailableAudioFormats(mediaMetadata.id).getOrDefault(emptyList())
+                                }
+                                availableFormats = formats
+                                isLoadingFormats = false
+                            }
+                        }
+                    )
                 }
                 Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
                     ListItem(
@@ -427,14 +486,18 @@ fun PlayerMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            coroutineScope.launch(Dispatchers.IO) {
+                            showDownloadFormatDialog = true
+                            isLoadingFormats = true
+                            availableFormats = emptyList()
+                            coroutineScope.launch {
                                 database.transaction {
                                     insert(mediaMetadata)
                                 }
-                                val song = database.song(mediaMetadata.id).first()
-                                song?.let {
-                                    downloadUtil.downloadToMediaStore(it)
+                                val formats = withContext(Dispatchers.IO) {
+                                    YTPlayerUtils.getAllAvailableAudioFormats(mediaMetadata.id).getOrDefault(emptyList())
                                 }
+                                availableFormats = formats
+                                isLoadingFormats = false
                             }
                         }
                     )

@@ -29,11 +29,11 @@ add_library(vibra_fp SHARED ${LIBVIBRA_SOURCES})
 
 target_include_directories(vibra_fp
         PRIVATE
-        ${CMAKE_SOURCE_DIR}/../include
-        ${CMAKE_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/algorithm
-        ${CMAKE_SOURCE_DIR}/audio
-        ${CMAKE_SOURCE_DIR}/utils
+        ${CMAKE_CURRENT_SOURCE_DIR}/../include
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/algorithm
+        ${CMAKE_CURRENT_SOURCE_DIR}/audio
+        ${CMAKE_CURRENT_SOURCE_DIR}/utils
 )
 
 # ========== FFTW detection and import ==========
@@ -55,9 +55,9 @@ if(FFTW3_PATH)
 endif()
 
 # If FFTW3_PATH not provided, try the repository-local default layout:
-# <CMAKE_SOURCE_DIR>/third_party/fftw-android/<ANDROID_ABI>/libfftw3.a
+# <CMAKE_CURRENT_SOURCE_DIR>/../third_party/fftw-android/<ANDROID_ABI>/libfftw3.a
 if(ANDROID AND (NOT FFTW3_STATIC_LIB OR NOT EXISTS "${FFTW3_STATIC_LIB}"))
-    set(LOCAL_THIRD "${CMAKE_SOURCE_DIR}/../third_party/fftw-android")
+    set(LOCAL_THIRD "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/fftw-android")
     if(DEFINED ANDROID_ABI)
         set(LOCAL_LIB "${LOCAL_THIRD}/${ANDROID_ABI}/lib/libfftw3.a")
         if(EXISTS "${LOCAL_LIB}")

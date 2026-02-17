@@ -972,6 +972,12 @@ interface DatabaseDao {
     @Query("UPDATE song SET liked = 1 WHERE id = :songId")
     suspend fun toggleLikedToTrue(songId: String)
 
+    @Query("UPDATE song SET downloadUri = :uri WHERE id = :songId")
+    fun updateDownloadUri(songId: String, uri: String?)
+
+    @Query("SELECT downloadUri FROM song WHERE id = :songId")
+    fun getDownloadUri(songId: String): String?
+
 
     @Transaction
     @Query("SELECT COUNT(1) FROM related_song_map WHERE songId = :songId LIMIT 1")

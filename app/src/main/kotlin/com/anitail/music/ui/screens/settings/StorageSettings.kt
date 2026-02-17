@@ -1,5 +1,10 @@
 package com.anitail.music.ui.screens.settings
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.DocumentsContract
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -58,12 +63,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.documentfile.provider.DocumentFile
 import androidx.navigation.NavController
 import coil.annotation.ExperimentalCoilApi
 import coil.imageLoader
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
+import com.anitail.music.constants.CustomDownloadPathEnabledKey
+import com.anitail.music.constants.CustomDownloadPathUriKey
 import com.anitail.music.constants.MaxImageCacheSizeKey
 import com.anitail.music.constants.MaxSongCacheSizeKey
 import com.anitail.music.constants.MaxDownloadSizeKey
@@ -71,6 +79,7 @@ import com.anitail.music.extensions.tryOrNull
 import com.anitail.music.ui.component.AnimatedIconButton
 import com.anitail.music.ui.component.EnhancedListPreference
 import com.anitail.music.ui.component.EnhancedPreferenceEntry
+import com.anitail.music.ui.component.SwitchPreference
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.ui.utils.formatFileSize
 import com.anitail.music.utils.MediaStoreHelper
@@ -106,6 +115,14 @@ fun StorageSettings(
         key = MaxSongCacheSizeKey,
         defaultValue = 1024
     )
+    val (customDownloadPathEnabled, onCustomDownloadPathEnabledChange) = rememberPreference(
+        key = CustomDownloadPathEnabledKey,
+        defaultValue = false,
+    )
+    val (customDownloadPathUri, onCustomDownloadPathUriChange) = rememberPreference(
+        key = CustomDownloadPathUriKey,
+        defaultValue = "",
+    )
 
     var imageCacheSize by remember { mutableStateOf(imageDiskCache.size) }
     var playerCacheSize by remember { mutableStateOf(tryOrNull { playerCache.cacheSpace } ?: 0) }
@@ -117,6 +134,36 @@ fun StorageSettings(
     var showDownloadClearConfirm by remember { mutableStateOf(false) }
     var showSongCacheClearConfirm by remember { mutableStateOf(false) }
     var showImageCacheClearConfirm by remember { mutableStateOf(false) }
+    var customPathValid by remember { mutableStateOf(true) }
+
+    LaunchedEffect(customDownloadPathUri) {
+        if (customDownloadPathUri.isEmpty()) {
+            customPathValid = true
+        } else {
+            customPathValid = try {
+                DocumentFile.fromTreeUri(context, Uri.parse(customDownloadPathUri))?.canWrite() == true
+            } catch (_: Exception) {
+                false
+            }
+        }
+    }
+
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree(),
+    ) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+
+        val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(uri, takeFlags)
+        }
+
+        onCustomDownloadPathUriChange(uri.toString())
+        customPathValid = true
+        if (!customDownloadPathEnabled) {
+            onCustomDownloadPathEnabledChange(true)
+        }
+    }
 
     val imageCacheProgress by animateFloatAsState(
         targetValue = (imageCacheSize.toFloat() / imageDiskCache.maxSize).coerceIn(0f, 1f),
@@ -291,6 +338,73 @@ fun StorageSettings(
                         refreshCacheInfo()
                     },
                 )
+
+                SwitchPreference(
+                    title = { Text(text = stringResource(R.string.custom_download_path)) },
+                    description = stringResource(R.string.custom_download_path_desc),
+                    icon = {
+                        Icon(
+                            painter = painterResource(R.drawable.storage),
+                            contentDescription = null,
+                        )
+                    },
+                    checked = customDownloadPathEnabled,
+                    onCheckedChange = { enabled ->
+                        if (enabled && customDownloadPathUri.isEmpty()) {
+                            folderPickerLauncher.launch(null)
+                        } else {
+                            onCustomDownloadPathEnabledChange(enabled)
+                        }
+                    },
+                )
+
+                if (customDownloadPathEnabled) {
+                    val currentPathDescription = if (customDownloadPathUri.isNotEmpty()) {
+                        val displayPath = try {
+                            val docId = DocumentsContract.getTreeDocumentId(Uri.parse(customDownloadPathUri))
+                            docId.substringAfter(":", docId)
+                        } catch (_: Exception) {
+                            customDownloadPathUri
+                        }
+                        val base = context.getString(R.string.current_path, displayPath)
+                        if (customPathValid) {
+                            base
+                        } else {
+                            "$base\n${context.getString(R.string.permission_lost_warning)}"
+                        }
+                    } else {
+                        stringResource(R.string.no_folder_selected)
+                    }
+
+                    EnhancedPreferenceEntry(
+                        title = stringResource(R.string.select_download_folder),
+                        subtitle = currentPathDescription,
+                        icon = R.drawable.storage,
+                        onClick = { folderPickerLauncher.launch(null) },
+                    )
+
+                    if (customDownloadPathUri.isNotEmpty()) {
+                        EnhancedPreferenceEntry(
+                            title = stringResource(R.string.reset_download_path),
+                            icon = R.drawable.close,
+                            iconTint = MaterialTheme.colorScheme.error,
+                            onClick = {
+                                val uri = runCatching { Uri.parse(customDownloadPathUri) }.getOrNull()
+                                if (uri != null) {
+                                    val takeFlags =
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                                    runCatching {
+                                        context.contentResolver.releasePersistableUriPermission(uri, takeFlags)
+                                    }
+                                }
+
+                                onCustomDownloadPathUriChange("")
+                                onCustomDownloadPathEnabledChange(false)
+                                customPathValid = true
+                            },
+                        )
+                    }
+                }
 
                 EnhancedPreferenceEntry(
                     title = stringResource(R.string.clear_all_downloads),

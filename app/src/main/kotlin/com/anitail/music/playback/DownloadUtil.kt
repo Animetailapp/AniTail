@@ -1,6 +1,5 @@
 package com.anitail.music.playback
 
-
 import android.content.Context
 import android.net.ConnectivityManager
 import androidx.core.content.getSystemService
@@ -16,13 +15,18 @@ import androidx.media3.exoplayer.offline.DownloadNotificationHelper
 import com.anitail.innertube.YouTube
 import com.anitail.music.constants.AudioQuality
 import com.anitail.music.constants.AudioQualityKey
+import com.anitail.music.constants.CustomDownloadPathEnabledKey
+import com.anitail.music.constants.CustomDownloadPathUriKey
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.FormatEntity
 import com.anitail.music.db.entities.SongEntity
 import com.anitail.music.di.DownloadCache
 import com.anitail.music.di.PlayerCache
+import com.anitail.music.utils.DownloadExportHelper
 import com.anitail.music.utils.YTPlayerUtils
+import com.anitail.music.utils.booleanPreference
 import com.anitail.music.utils.enumPreference
+import com.anitail.music.utils.stringPreference
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +40,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
+import timber.log.Timber
 import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -48,24 +53,42 @@ import javax.inject.Singleton
 class DownloadUtil
 @Inject
 constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
     val database: MusicDatabase,
     val databaseProvider: DatabaseProvider,
     @DownloadCache val downloadCache: SimpleCache,
     @PlayerCache val playerCache: SimpleCache,
     val mediaStoreDownloadManager: MediaStoreDownloadManager,
+    private val downloadExportHelper: DownloadExportHelper,
 ) {
     private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
+    private val customDownloadPathEnabled by booleanPreference(context, CustomDownloadPathEnabledKey, false)
+    private val customDownloadPathUri by stringPreference(context, CustomDownloadPathUriKey, "")
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val songUrlCache = ConcurrentHashMap<String, Pair<String, Long>>()
+    private val targetItagOverride = ConcurrentHashMap<String, Int>()
 
     // Legacy cache downloads (for compatibility)
     private val cacheDownloads = MutableStateFlow<Map<String, Download>>(emptyMap())
 
     // Unified downloads combining cache and MediaStore
     val downloads = MutableStateFlow<Map<String, Download>>(emptyMap())
+
+    fun setTargetItag(songId: String, itag: Int) {
+        targetItagOverride[songId] = itag
+        invalidateUrl(songId)
+    }
+
+    fun clearTargetItag(songId: String) {
+        targetItagOverride.remove(songId)
+    }
+
+    fun invalidateUrl(songId: String) {
+        songUrlCache.remove(songId)
+    }
 
     private val dataSourceFactory =
         ResolvingDataSource.Factory(
@@ -90,16 +113,31 @@ constructor(
             val mediaId = dataSpec.key ?: error("No media id")
             val length = if (dataSpec.length >= 0) dataSpec.length else 1
 
-            if (playerCache.isCached(mediaId, dataSpec.position, length)) {
-                return@Factory dataSpec
-            }
+            val targetItag = targetItagOverride[mediaId] ?: 0
+            val hasTargetItag = targetItag > 0
 
-            songUrlCache[mediaId]?.takeIf { it.second < System.currentTimeMillis() }?.let {
-                return@Factory dataSpec.withUri(it.first.toUri())
+            if (!hasTargetItag) {
+                if (playerCache.isCached(mediaId, dataSpec.position, length)) {
+                    return@Factory dataSpec
+                }
+
+                // Keep URL cache while it is still valid.
+                songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }?.let {
+                    return@Factory dataSpec.withUri(it.first.toUri())
+                }
+            } else {
+                // For format overrides we must force a fresh URL/cache entry.
+                songUrlCache.remove(mediaId)
+                try {
+                    if (playerCache.getCachedSpans(mediaId).isNotEmpty()) {
+                        playerCache.removeResource(mediaId)
+                    }
+                } catch (_: Exception) {
+                }
             }
 
             val playbackData =
-                fetchPlaybackDataBlocking(mediaId) ?: error("Playback data unavailable")
+                fetchPlaybackDataBlocking(mediaId, targetItag) ?: error("Playback data unavailable")
             val format = playbackData.format
 
             database.query {
@@ -143,7 +181,10 @@ constructor(
             dataSpec.withUri(streamUrl.toUri())
         }
 
-    private fun fetchPlaybackDataBlocking(mediaId: String): YTPlayerUtils.PlaybackData? {
+    private fun fetchPlaybackDataBlocking(
+        mediaId: String,
+        targetItag: Int = 0,
+    ): YTPlayerUtils.PlaybackData? {
         val future = CompletableFuture<YTPlayerUtils.PlaybackData?>()
         scope.launch {
             val data =
@@ -151,6 +192,7 @@ constructor(
                     mediaId,
                     audioQuality = audioQuality,
                     connectivityManager = connectivityManager,
+                    targetItag = targetItag,
                 ).getOrNull()
             future.complete(data)
         }
@@ -183,6 +225,37 @@ constructor(
                         cacheDownloads.update { map ->
                             map.toMutableMap().apply {
                                 set(download.request.id, download)
+                            }
+                        }
+
+                        scope.launch {
+                            val songId = download.request.id
+                            when (download.state) {
+                                Download.STATE_COMPLETED -> {
+                                    clearTargetItag(songId)
+
+                                    if (customDownloadPathEnabled && customDownloadPathUri.isNotEmpty()) {
+                                        try {
+                                            downloadExportHelper.exportToCustomPath(songId, customDownloadPathUri)
+                                        } catch (e: Exception) {
+                                            Timber.e(e, "Custom path export failed for %s", songId)
+                                        }
+                                    }
+                                }
+
+                                Download.STATE_FAILED,
+                                Download.STATE_STOPPED -> {
+                                    clearTargetItag(songId)
+                                }
+
+                                Download.STATE_REMOVING -> {
+                                    clearTargetItag(songId)
+                                    try {
+                                        downloadExportHelper.deleteFromCustomPath(songId)
+                                    } catch (e: Exception) {
+                                        Timber.e(e, "Failed removing exported file for %s", songId)
+                                    }
+                                }
                             }
                         }
                     }
@@ -271,6 +344,4 @@ constructor(
     fun retryMediaStoreDownload(songId: String) {
         mediaStoreDownloadManager.retryDownload(songId)
     }
-
-
 }

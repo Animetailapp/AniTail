@@ -101,6 +101,8 @@ val ProxyPasswordKey = stringPreferencesKey("proxyPassword")
 val YtmSyncKey = booleanPreferencesKey("ytmSync")
 
 val AudioQualityKey = stringPreferencesKey("audioQuality")
+val CustomDownloadPathEnabledKey = booleanPreferencesKey("customDownloadPathEnabled")
+val CustomDownloadPathUriKey = stringPreferencesKey("customDownloadPathUri")
 
 enum class AudioQuality {
     AUTO,

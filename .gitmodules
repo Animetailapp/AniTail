@@ -1,0 +1,3 @@
+[submodule "app/src/main/cpp/coverart"]
+	path = app/src/main/cpp/coverart
+	url = https://github.com/Animetailapp/Coverart-Lib
