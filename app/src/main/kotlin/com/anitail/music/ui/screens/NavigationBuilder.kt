@@ -74,6 +74,32 @@ fun NavGraphBuilder.navigationBuilder(
     composable("stats") {
         StatsScreen(navController)
     }
+    composable(
+        route = "stats/time/{year}/{month}",
+        arguments = listOf(
+            navArgument("year") { type = NavType.IntType },
+            navArgument("month") { type = NavType.IntType },
+        ),
+    ) { backStackEntry ->
+        StatsTimeListenedScreen(
+            navController = navController,
+            year = backStackEntry.arguments?.getInt("year") ?: 1970,
+            month = backStackEntry.arguments?.getInt("month") ?: 1,
+        )
+    }
+    composable(
+        route = "stats/top-artists/{year}/{month}",
+        arguments = listOf(
+            navArgument("year") { type = NavType.IntType },
+            navArgument("month") { type = NavType.IntType },
+        ),
+    ) { backStackEntry ->
+        StatsTopArtistsScreen(
+            navController = navController,
+            year = backStackEntry.arguments?.getInt("year") ?: 1970,
+            month = backStackEntry.arguments?.getInt("month") ?: 1,
+        )
+    }
     composable("mood_and_genres") {
         MoodAndGenresScreen(navController, scrollBehavior)
     }
