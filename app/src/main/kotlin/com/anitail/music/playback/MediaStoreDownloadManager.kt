@@ -464,7 +464,7 @@ constructor(
 
             // Check response code
             val responseCode = connection.responseCode
-            if (responseCode == HttpURLConnection.HTTP_REQUESTED_RANGE_NOT_SATISFIABLE &&
+            if (responseCode == 416 &&
                 expectedContentLength != null &&
                 startByte >= expectedContentLength
             ) {
