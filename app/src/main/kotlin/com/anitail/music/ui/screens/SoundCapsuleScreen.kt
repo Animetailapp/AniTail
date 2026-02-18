@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -173,192 +174,173 @@ private fun SoundCapsuleMonthSection(
             return@Column
         }
 
-        TimeListenedCard(
-            month = month,
-            onClick = onTimeListenedClick,
-        )
-
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            TopArtistCard(
-                month = month,
-                onClick = onTopArtistsClick,
-            )
-            TopSongCard(
-                month = month,
-                onClick = onTopSongsClick,
-            )
+        Card(
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column {
+                TimeInsightRow(
+                    month = month,
+                    onClick = onTimeListenedClick,
+                )
+                HorizontalDivider(color = colors.divider, thickness = 0.8.dp)
+                TopArtistInsightRow(
+                    month = month,
+                    onClick = onTopArtistsClick,
+                )
+                HorizontalDivider(color = colors.divider, thickness = 0.8.dp)
+                TopSongInsightRow(
+                    month = month,
+                    onClick = onTopSongsClick,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun TimeListenedCard(
+private fun TimeInsightRow(
     month: SoundCapsuleMonthUiState,
     onClick: () -> Unit,
 ) {
     val colors = capsuleColors()
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
-        modifier = Modifier.fillMaxWidth(),
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            Modifier
+                .clickable(onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier =
-                Modifier
-                    .clickable(onClick = onClick)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+        Column(
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.weight(1f),
         ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(
-                    text = stringResource(R.string.time_listened),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.mutedText,
-                )
-                Text(
-                    text = stringResource(R.string.sound_capsule_minutes_value, month.totalMinutes),
-                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = colors.primaryAccent,
-                )
-            }
-            Icon(
-                painter = painterResource(R.drawable.navigate_next),
-                contentDescription = null,
-                tint = colors.subtleText,
+            Text(
+                text = stringResource(R.string.time_listened),
+                style = MaterialTheme.typography.labelLarge,
+                color = colors.mutedText,
+            )
+            Text(
+                text = stringResource(R.string.sound_capsule_minutes_value, month.totalMinutes),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                color = colors.primaryAccent,
+            )
+            Text(
+                text = stringResource(R.string.sound_capsule_daily_average, dailyAverageForMonth(month)),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.mutedText,
             )
         }
+        Icon(
+            painter = painterResource(R.drawable.navigate_next),
+            contentDescription = null,
+            tint = colors.subtleText,
+        )
     }
 }
 
 @Composable
-private fun TopArtistCard(
+private fun TopArtistInsightRow(
     month: SoundCapsuleMonthUiState,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val colors = capsuleColors()
     val topArtist = month.topArtist
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
-        modifier = modifier.fillMaxWidth(),
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            Modifier
+                .clickable(onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier =
-                Modifier
-                    .clickable(onClick = onClick)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+        ThumbnailCircle(
+            imageUrl = topArtist?.thumbnailUrl,
+            fallbackIcon = R.drawable.person,
+            size = 44.dp,
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.weight(1f),
         ) {
-            ThumbnailCircle(
-                imageUrl = topArtist?.thumbnailUrl,
-                fallbackIcon = R.drawable.person,
-                size = 52.dp,
+            Text(
+                text = stringResource(R.string.sound_capsule_top_artist),
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.mutedText,
             )
-            Spacer(modifier = Modifier.width(10.dp))
-            Column(
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(
-                    text = stringResource(R.string.sound_capsule_top_artist),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.mutedText,
-                )
-                Text(
-                    text = topArtist?.name ?: stringResource(R.string.sound_capsule_no_data),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = colors.secondaryAccent,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text =
-                        if (topArtist?.isNewTopFive == true) {
-                            stringResource(R.string.sound_capsule_new_to_top_five)
-                        } else {
-                            stringResource(R.string.sound_capsule_top_artist_of_month)
-                        },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.mutedText,
-                )
-            }
+            Text(
+                text = topArtist?.name ?: stringResource(R.string.sound_capsule_no_data),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             if (topArtist?.isNewTopFive == true) {
-                NewBadge()
-                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = stringResource(R.string.sound_capsule_new_to_top_five),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.secondaryAccent,
+                )
             }
-            Icon(
-                painter = painterResource(R.drawable.navigate_next),
-                contentDescription = null,
-                tint = colors.subtleText,
-            )
         }
+        Icon(
+            painter = painterResource(R.drawable.navigate_next),
+            contentDescription = null,
+            tint = colors.subtleText,
+        )
     }
 }
 
 @Composable
-private fun TopSongCard(
+private fun TopSongInsightRow(
     month: SoundCapsuleMonthUiState,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val colors = capsuleColors()
     val topSong = month.topSong
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
-        modifier = modifier.fillMaxWidth(),
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            Modifier
+                .clickable(onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier =
-                Modifier
-                    .clickable(onClick = onClick)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+        ThumbnailSquare(
+            imageUrl = topSong?.thumbnailUrl,
+            fallbackIcon = R.drawable.music_note,
+            size = 44.dp,
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.weight(1f),
         ) {
-            ThumbnailSquare(
-                imageUrl = topSong?.thumbnailUrl,
-                fallbackIcon = R.drawable.music_note,
-                size = 52.dp,
+            Text(
+                text = stringResource(R.string.sound_capsule_top_song),
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.mutedText,
             )
-            Spacer(modifier = Modifier.width(10.dp))
-            Column(
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(
-                    text = stringResource(R.string.sound_capsule_top_song),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.mutedText,
-                )
-                Text(
-                    text = topSong?.title ?: stringResource(R.string.sound_capsule_no_data),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = colors.tertiaryAccent,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = topSong?.subtitle ?: stringResource(R.string.sound_capsule_top_song),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.mutedText,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (topSong?.isNew == true) {
-                NewBadge()
-                Spacer(modifier = Modifier.width(6.dp))
-            }
-            Icon(
-                painter = painterResource(R.drawable.navigate_next),
-                contentDescription = null,
-                tint = colors.subtleText,
+            Text(
+                text = topSong?.title ?: stringResource(R.string.sound_capsule_no_data),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = topSong?.subtitle ?: stringResource(R.string.sound_capsule_top_song),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.mutedText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
+        Icon(
+            painter = painterResource(R.drawable.navigate_next),
+            contentDescription = null,
+            tint = colors.subtleText,
+        )
     }
 }
 
@@ -400,8 +382,8 @@ private fun LifetimeInsightCard(totalSongs: Int) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             HeroPulseGraphic()
             Text(
@@ -410,7 +392,7 @@ private fun LifetimeInsightCard(totalSongs: Int) {
                         R.string.sound_capsule_lifetime_headline,
                         totalSongs,
                     ),
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
@@ -515,25 +497,6 @@ private fun ThumbnailSquare(
 }
 
 @Composable
-private fun NewBadge() {
-    val colors = capsuleColors()
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier =
-            Modifier
-                .clip(CircleShape)
-                .background(colors.badgeBackground)
-                .padding(horizontal = 10.dp, vertical = 4.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.sound_capsule_new),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-        )
-    }
-}
-
-@Composable
 fun monthYearLabel(yearMonth: YearMonth): AnnotatedString {
     val colors = capsuleColors()
     return buildAnnotatedString {
@@ -553,10 +516,9 @@ private data class CapsuleColors(
     val thumbnailBackground: Color,
     val mutedText: Color,
     val subtleText: Color,
+    val divider: Color,
     val primaryAccent: Color,
     val secondaryAccent: Color,
-    val tertiaryAccent: Color,
-    val badgeBackground: Color,
 )
 
 @Composable
@@ -568,9 +530,13 @@ private fun capsuleColors(): CapsuleColors {
         thumbnailBackground = scheme.surfaceContainer,
         mutedText = scheme.onSurfaceVariant,
         subtleText = scheme.onSurfaceVariant.copy(alpha = 0.75f),
+        divider = scheme.outlineVariant.copy(alpha = 0.7f),
         primaryAccent = scheme.primary,
         secondaryAccent = scheme.secondary,
-        tertiaryAccent = scheme.tertiary,
-        badgeBackground = scheme.secondaryContainer,
     )
+}
+
+private fun dailyAverageForMonth(month: SoundCapsuleMonthUiState): Int {
+    val days = month.yearMonth.lengthOfMonth().coerceAtLeast(1)
+    return month.totalMinutes / days
 }
