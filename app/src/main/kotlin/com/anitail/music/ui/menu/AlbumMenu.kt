@@ -138,7 +138,30 @@ fun AlbumMenu(
                     it.status == MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING ||
                             it.status == MediaStoreDownloadManager.DownloadState.Status.QUEUED
                 } -> {
-                    val totalProgress = songStates.sumOf { it.progress.toDouble() } / songs.size
+                    val totalBytes = songStates.sumOf { it.totalBytes.coerceAtLeast(0L) }
+                    val downloadedBytes = songStates.sumOf { state ->
+                        when (state.status) {
+                            MediaStoreDownloadManager.DownloadState.Status.COMPLETED ->
+                                state.totalBytes.coerceAtLeast(0L)
+
+                            MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING,
+                            MediaStoreDownloadManager.DownloadState.Status.QUEUED ->
+                                state.bytesDownloaded.coerceAtLeast(0L)
+
+                            else -> 0L
+                        }
+                    }
+                    val totalProgress = if (totalBytes > 0L) {
+                        (downloadedBytes.toDouble() / totalBytes.toDouble()).coerceIn(0.0, 1.0)
+                    } else {
+                        songStates.sumOf { state ->
+                            when (state.status) {
+                                MediaStoreDownloadManager.DownloadState.Status.COMPLETED -> 1.0
+                                MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING -> state.progress.toDouble()
+                                else -> 0.0
+                            }
+                        } / songs.size
+                    }
                     AlbumMediaStoreDownloadStatus.Downloading(totalProgress.toFloat())
                 }
 

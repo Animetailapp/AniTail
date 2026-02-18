@@ -26,6 +26,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.time.LocalDateTime
@@ -77,6 +78,10 @@ constructor(
         private const val INITIAL_RETRY_DELAY_MS = 1000L
         private const val RETRY_BACKOFF_MULTIPLIER = 2.0
         private const val UNKNOWN_ARTIST_NAME = "Unknown Artist"
+        private const val MIN_PROGRESS_UPDATE_BYTES = 256 * 1024L
+        private const val MIN_PROGRESS_UPDATE_INTERVAL_MS = 500L
+        private const val CONNECT_TIMEOUT_MS = 60_000
+        private const val READ_TIMEOUT_MS = 120_000
     }
 
     /**
@@ -254,52 +259,89 @@ constructor(
     /**
      * Perform the actual download with retry logic
      */
-    private suspend fun performDownload(song: Song, retryAttempt: Int = 0): Unit =
-        withContext(Dispatchers.IO) {
-            try {
-                updateDownloadState(
-                    song.id,
-                    DownloadState(
-                        songId = song.id,
-                        status = DownloadState.Status.DOWNLOADING,
-                        retryAttempt = retryAttempt
-                    )
-                )
+    private suspend fun performDownload(song: Song): Unit = withContext(Dispatchers.IO) {
+        val tempFile = File(context.cacheDir, "temp_${song.id}.part")
+        var retryAttempt = 0
+        var lastError: Exception? = null
+        var lockedItag = 0
 
-                Timber.Forest.d("Starting download for: ${song.song.title} (attempt ${retryAttempt + 1})")
+        runCatching {
+            if (tempFile.exists()) {
+                tempFile.delete()
+            }
+        }
 
-                // Get playback URL from YouTube using YTPlayerUtils
-                val playbackData = YTPlayerUtils.playerResponseForPlayback(
-                    videoId = song.id,
-                    audioQuality = audioQuality,
-                    connectivityManager = connectivityManager
-                ).getOrThrow()
-
-                val format = playbackData.format
-                val downloadUrl = playbackData.streamUrl
-                val tempFileName = "temp_${song.id}_${System.currentTimeMillis()}_${retryAttempt}.${
-                    format.mimeType.substringAfter("/")
-                }"
-                val tempFile = File(context.cacheDir, tempFileName)
-
+        try {
+            while (retryAttempt <= MAX_RETRY_ATTEMPTS) {
                 try {
+                    val alreadyDownloadedBytes = tempFile.takeIf { it.exists() }?.length() ?: 0L
+                    val previousState = _downloadStates.value[song.id]
+                    val previousTotalBytes = previousState?.totalBytes ?: 0L
+                    val initialProgress = if (previousTotalBytes > 0L) {
+                        (alreadyDownloadedBytes.toFloat() / previousTotalBytes.toFloat()).coerceIn(0f, 1f)
+                    } else {
+                        previousState?.progress ?: 0f
+                    }
 
-                    downloadFile(downloadUrl, tempFile, song.id)
+                    updateDownloadState(
+                        song.id,
+                        DownloadState(
+                            songId = song.id,
+                            status = DownloadState.Status.DOWNLOADING,
+                            progress = initialProgress,
+                            bytesDownloaded = alreadyDownloadedBytes,
+                            totalBytes = previousTotalBytes,
+                            retryAttempt = retryAttempt
+                        )
+                    )
 
-                    if (!tempFile.exists() || tempFile.length() == 0L) {
+                    Timber.Forest.d(
+                        "Starting download for: ${song.song.title} (attempt ${retryAttempt + 1})"
+                    )
+
+                    // Get playback URL from YouTube using YTPlayerUtils
+                    val playbackData = YTPlayerUtils.playerResponseForPlayback(
+                        videoId = song.id,
+                        audioQuality = audioQuality,
+                        connectivityManager = connectivityManager,
+                        targetItag = lockedItag
+                    ).getOrThrow()
+                    if (lockedItag == 0) {
+                        lockedItag = playbackData.format.itag
+                    }
+
+                    val format = playbackData.format
+                    val downloadUrl = playbackData.streamUrl
+                    val expectedContentLength = format.contentLength?.takeIf { it > 0L }
+                    val resumeFromBytes = tempFile.takeIf { it.exists() }?.length() ?: 0L
+
+                    downloadFile(
+                        url = downloadUrl,
+                        outputFile = tempFile,
+                        songId = song.id,
+                        startByte = resumeFromBytes,
+                        expectedContentLength = expectedContentLength
+                    )
+
+                    val downloadedBytes = tempFile.takeIf { it.exists() }?.length() ?: 0L
+                    if (downloadedBytes == 0L) {
                         throw Exception("Download failed - temp file not created or empty")
                     }
-                    // Get audio metadata
+
+                    if (expectedContentLength != null && downloadedBytes < expectedContentLength) {
+                        throw Exception(
+                            "Incomplete download ($downloadedBytes/$expectedContentLength bytes)"
+                        )
+                    }
+
                     val title = song.song.title
                     val artist = resolvePrimaryArtist(song)
                     val album = song.album?.title
-                    val duration = song.song.duration.takeIf { it > 0 }
-                        ?.times(1000L) // Convert to milliseconds
+                    val duration = song.song.duration.takeIf { it > 0 }?.times(1000L)
                     val year = song.song.year
                     val extension = "mp3"
                     val mimeType = mediaStoreHelper.getMimeType(extension)
 
-                    // Save to MediaStore
                     val fileName = "$artist - $title.$extension"
                     val uri = mediaStoreHelper.saveFileToMediaStore(
                         tempFile = tempFile,
@@ -313,7 +355,6 @@ constructor(
                     )
 
                     if (uri != null) {
-                        // Mark as completed
                         updateDownloadState(
                             song.id,
                             DownloadState(
@@ -322,67 +363,84 @@ constructor(
                                 progress = 1f
                             )
                         )
-
-                        // Update database with MediaStore URI
                         markSongAsDownloaded(song.id, uri.toString())
-
+                        return@withContext
                     } else {
                         throw Exception("Failed to save file to MediaStore")
                     }
-                } finally {
-                    try {
-                        if (tempFile.exists()) {
-                            tempFile.delete()
-                            Timber.Forest.d("Cleaned up temp file: ${tempFile.absolutePath}")
-                        }
-                    } catch (e: Exception) {
-                        Timber.Forest.w(e, "Failed to delete temp file: ${tempFile.absolutePath}")
+                } catch (e: Exception) {
+                    lastError = e
+                    Timber.Forest.e(
+                        e,
+                        "Download failed for ${song.song.title} (attempt ${retryAttempt + 1}): ${e.message}"
+                    )
+
+                    if (retryAttempt >= MAX_RETRY_ATTEMPTS) {
+                        break
                     }
-                }
 
-            } catch (e: Exception) {
-                Timber.Forest.e(
-                    e,
-                    "Download failed for ${song.song.title} (attempt ${retryAttempt + 1}): ${e.message}"
-                )
-
-                // Retry logic with exponential backoff
-                if (retryAttempt < MAX_RETRY_ATTEMPTS) {
                     val delayMs: Long =
                         (INITIAL_RETRY_DELAY_MS * RETRY_BACKOFF_MULTIPLIER.pow(retryAttempt)).toLong()
-                    Timber.Forest.d("Retrying download in ${delayMs}ms...")
+                    val downloadedBytes = tempFile.takeIf { it.exists() }?.length() ?: 0L
+                    val previousState = _downloadStates.value[song.id]
+                    val previousTotalBytes = previousState?.totalBytes ?: 0L
+                    val resumeProgress = if (previousTotalBytes > 0L) {
+                        (downloadedBytes.toFloat() / previousTotalBytes.toFloat()).coerceIn(0f, 1f)
+                    } else {
+                        previousState?.progress ?: 0f
+                    }
+
+                    Timber.Forest.d("Retrying download in ${delayMs}ms from byte $downloadedBytes...")
 
                     updateDownloadState(
                         song.id,
                         DownloadState(
                             songId = song.id,
                             status = DownloadState.Status.DOWNLOADING,
+                            progress = resumeProgress,
+                            bytesDownloaded = downloadedBytes,
+                            totalBytes = previousTotalBytes,
                             error = "Retrying... (${retryAttempt + 1}/$MAX_RETRY_ATTEMPTS)",
                             retryAttempt = retryAttempt + 1
                         )
                     )
 
                     delay(delayMs)
-                    performDownload(song, retryAttempt + 1)
-                } else {
-                    // Max retries reached
-                    updateDownloadState(
-                        song.id,
-                        DownloadState(
-                            songId = song.id,
-                            status = DownloadState.Status.FAILED,
-                            error = e.message ?: "Unknown error",
-                            retryAttempt = retryAttempt
-                        )
-                    )
+                    retryAttempt++
                 }
             }
+
+            updateDownloadState(
+                song.id,
+                DownloadState(
+                    songId = song.id,
+                    status = DownloadState.Status.FAILED,
+                    error = lastError?.message ?: "Unknown error",
+                    retryAttempt = retryAttempt
+                )
+            )
+        } finally {
+            runCatching {
+                if (tempFile.exists()) {
+                    tempFile.delete()
+                    Timber.Forest.d("Cleaned up temp file: ${tempFile.absolutePath}")
+                }
+            }.onFailure { error ->
+                Timber.Forest.w(error, "Failed to delete temp file: ${tempFile.absolutePath}")
+            }
         }
+    }
 
     /**
      * Download a file from a URL to a temp file with progress tracking
      */
-    private suspend fun downloadFile(url: String, outputFile: File, songId: String) =
+    private suspend fun downloadFile(
+        url: String,
+        outputFile: File,
+        songId: String,
+        startByte: Long,
+        expectedContentLength: Long?,
+    ) =
         withContext(Dispatchers.IO) {
             val connection = URL(url).openConnection() as HttpURLConnection
 
@@ -394,9 +452,11 @@ constructor(
                 )
                 setRequestProperty("Accept", "*/*")
                 setRequestProperty("Accept-Language", "en-US,en;q=0.9")
-                setRequestProperty("Range", "bytes=0-")
-                connectTimeout = 30000
-                readTimeout = 30000
+                if (startByte > 0L) {
+                    setRequestProperty("Range", "bytes=$startByte-")
+                }
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
                 instanceFollowRedirects = true
             }
 
@@ -404,16 +464,33 @@ constructor(
 
             // Check response code
             val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_REQUESTED_RANGE_NOT_SATISFIABLE &&
+                expectedContentLength != null &&
+                startByte >= expectedContentLength
+            ) {
+                return@withContext
+            }
             if (responseCode !in 200..299) {
                 throw Exception("HTTP error $responseCode: ${connection.responseMessage}")
             }
 
-            val contentLength = connection.contentLength
-            var totalBytesRead = 0L
+            val appendMode = startByte > 0L && responseCode == HttpURLConnection.HTTP_PARTIAL
+            if (startByte > 0L && !appendMode) {
+                // Server ignored Range; restart from zero to avoid file corruption.
+                runCatching { outputFile.delete() }
+            }
+
+            val serverContentLength = connection.contentLengthLong.takeIf { it > 0L }
+            val totalBytes = expectedContentLength ?: serverContentLength?.let { length ->
+                if (appendMode) startByte + length else length
+            }
+            var totalBytesRead = if (appendMode) startByte else 0L
+            var lastProgressBytes = totalBytesRead
+            var lastProgressAt = System.currentTimeMillis()
 
             connection.getInputStream().use { input ->
-                outputFile.outputStream().use { output ->
-                    val buffer = ByteArray(8192)
+                FileOutputStream(outputFile, appendMode).use { output ->
+                    val buffer = ByteArray(64 * 1024)
                     var bytesRead: Int
 
                     while (input.read(buffer).also { bytesRead = it } != -1) {
@@ -421,21 +498,50 @@ constructor(
                         totalBytesRead += bytesRead
 
                         // Update progress
-                        if (contentLength > 0) {
-                            val progress = totalBytesRead.toFloat() / contentLength.toFloat()
-                            updateDownloadState(
-                                songId,
-                                DownloadState(
-                                    songId = songId,
-                                    status = DownloadState.Status.DOWNLOADING,
-                                    progress = progress,
-                                    bytesDownloaded = totalBytesRead,
-                                    totalBytes = contentLength.toLong()
+                        if (totalBytes != null && totalBytes > 0L) {
+                            val now = System.currentTimeMillis()
+                            val shouldEmitProgress =
+                                (totalBytesRead - lastProgressBytes) >= MIN_PROGRESS_UPDATE_BYTES ||
+                                    (now - lastProgressAt) >= MIN_PROGRESS_UPDATE_INTERVAL_MS
+
+                            if (shouldEmitProgress) {
+                                val progress =
+                                    (totalBytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                                updateDownloadState(
+                                    songId,
+                                    DownloadState(
+                                        songId = songId,
+                                        status = DownloadState.Status.DOWNLOADING,
+                                        progress = progress,
+                                        bytesDownloaded = totalBytesRead,
+                                        totalBytes = totalBytes
+                                    )
                                 )
-                            )
+                                lastProgressBytes = totalBytesRead
+                                lastProgressAt = now
+                            }
                         }
                     }
                 }
+            }
+
+            if (totalBytes != null && totalBytes > 0L) {
+                val finalProgress =
+                    (totalBytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                updateDownloadState(
+                    songId,
+                    DownloadState(
+                        songId = songId,
+                        status = DownloadState.Status.DOWNLOADING,
+                        progress = finalProgress,
+                        bytesDownloaded = totalBytesRead,
+                        totalBytes = totalBytes
+                    )
+                )
+            }
+
+            if (expectedContentLength != null && totalBytesRead < expectedContentLength) {
+                throw Exception("Incomplete stream read ($totalBytesRead/$expectedContentLength bytes)")
             }
 
             Timber.Forest.d("Download completed: $totalBytesRead bytes written to ${outputFile.absolutePath}")
