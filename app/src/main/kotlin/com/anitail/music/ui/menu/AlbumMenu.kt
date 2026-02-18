@@ -59,8 +59,8 @@ import com.anitail.music.constants.ListItemHeight
 import com.anitail.music.constants.ListThumbnailSize
 import com.anitail.music.db.entities.Album
 import com.anitail.music.db.entities.Song
+import com.anitail.music.playback.DownloadUtil
 import com.anitail.music.extensions.toMediaItem
-import com.anitail.music.playback.MediaStoreDownloadManager
 import com.anitail.music.ui.component.AlbumListItem
 import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.component.ListItem
@@ -96,7 +96,7 @@ fun AlbumMenu(
     }
 
     var mediaStoreDownloadState by remember {
-        mutableStateOf<AlbumMediaStoreDownloadStatus>(AlbumMediaStoreDownloadStatus.NotDownloaded)
+        mutableStateOf<DownloadUtil.MediaStoreCollectionStatus>(DownloadUtil.MediaStoreCollectionStatus.NotDownloaded)
     }
 
     LaunchedEffect(songs) {
@@ -104,7 +104,7 @@ fun AlbumMenu(
         val songIds = songs.map { it.id }
         downloadUtil.getMediaStoreDownloads(songIds).collect { states ->
             val nextStatus = withContext(Dispatchers.Default) {
-                calculateAlbumMediaStoreDownloadStatus(songs = songs, states = states)
+                downloadUtil.calculateMediaStoreCollectionStatus(songs = songs, states = states)
             }
             if (nextStatus != mediaStoreDownloadState) {
                 mediaStoreDownloadState = nextStatus
@@ -309,7 +309,7 @@ fun AlbumMenu(
         }
         item {
             when (mediaStoreDownloadState) {
-                is AlbumMediaStoreDownloadStatus.Completed -> {
+                is DownloadUtil.MediaStoreCollectionStatus.Completed -> {
                     ListItem(
                         headlineContent = {
                             Text(
@@ -330,9 +330,9 @@ fun AlbumMenu(
                     )
                 }
 
-                is AlbumMediaStoreDownloadStatus.Downloading -> {
+                is DownloadUtil.MediaStoreCollectionStatus.Downloading -> {
                     val progress =
-                        (mediaStoreDownloadState as AlbumMediaStoreDownloadStatus.Downloading).progress
+                        (mediaStoreDownloadState as DownloadUtil.MediaStoreCollectionStatus.Downloading).progress
                     ListItem(
                         headlineContent = {
                             Text(text = stringResource(R.string.downloading_to_device))
@@ -354,7 +354,7 @@ fun AlbumMenu(
                     )
                 }
 
-                is AlbumMediaStoreDownloadStatus.Failed -> {
+                is DownloadUtil.MediaStoreCollectionStatus.Failed -> {
                     ListItem(
                         headlineContent = {
                             Text(
@@ -378,7 +378,7 @@ fun AlbumMenu(
                     )
                 }
 
-                AlbumMediaStoreDownloadStatus.NotDownloaded -> {
+                DownloadUtil.MediaStoreCollectionStatus.NotDownloaded -> {
                     ListItem(
                         headlineContent = { Text(text = stringResource(R.string.download)) },
                         leadingContent = {
@@ -460,63 +460,5 @@ fun AlbumMenu(
                 }
             )
         }
-    }
-}
-
-private sealed class AlbumMediaStoreDownloadStatus {
-    object NotDownloaded : AlbumMediaStoreDownloadStatus()
-    object Completed : AlbumMediaStoreDownloadStatus()
-    data class Downloading(val progress: Float) : AlbumMediaStoreDownloadStatus()
-    object Failed : AlbumMediaStoreDownloadStatus()
-}
-
-private fun calculateAlbumMediaStoreDownloadStatus(
-    songs: List<Song>,
-    states: Map<String, MediaStoreDownloadManager.DownloadState>,
-): AlbumMediaStoreDownloadStatus {
-    val songStates = songs.mapNotNull { states[it.id] }
-    val allPersistedInMediaStore = songs.all { !it.song.mediaStoreUri.isNullOrEmpty() }
-
-    return when {
-        allPersistedInMediaStore -> AlbumMediaStoreDownloadStatus.Completed
-        songStates.isEmpty() -> AlbumMediaStoreDownloadStatus.NotDownloaded
-        songStates.all { it.status == MediaStoreDownloadManager.DownloadState.Status.COMPLETED } ->
-            AlbumMediaStoreDownloadStatus.Completed
-
-        songStates.any {
-            it.status == MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING ||
-                it.status == MediaStoreDownloadManager.DownloadState.Status.QUEUED
-        } -> {
-            val totalBytes = songStates.sumOf { it.totalBytes.coerceAtLeast(0L) }
-            val downloadedBytes = songStates.sumOf { state ->
-                when (state.status) {
-                    MediaStoreDownloadManager.DownloadState.Status.COMPLETED ->
-                        state.totalBytes.coerceAtLeast(0L)
-
-                    MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING,
-                    MediaStoreDownloadManager.DownloadState.Status.QUEUED ->
-                        state.bytesDownloaded.coerceAtLeast(0L)
-
-                    else -> 0L
-                }
-            }
-            val totalProgress = if (totalBytes > 0L) {
-                (downloadedBytes.toDouble() / totalBytes.toDouble()).coerceIn(0.0, 1.0)
-            } else {
-                songStates.sumOf { state ->
-                    when (state.status) {
-                        MediaStoreDownloadManager.DownloadState.Status.COMPLETED -> 1.0
-                        MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING -> state.progress.toDouble()
-                        else -> 0.0
-                    }
-                } / songs.size
-            }
-            AlbumMediaStoreDownloadStatus.Downloading(totalProgress.toFloat())
-        }
-
-        songStates.any { it.status == MediaStoreDownloadManager.DownloadState.Status.FAILED } ->
-            AlbumMediaStoreDownloadStatus.Failed
-
-        else -> AlbumMediaStoreDownloadStatus.NotDownloaded
     }
 }

@@ -20,6 +20,7 @@ import com.anitail.music.constants.CustomDownloadPathEnabledKey
 import com.anitail.music.constants.CustomDownloadPathUriKey
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.FormatEntity
+import com.anitail.music.db.entities.Song
 import com.anitail.music.db.entities.SongEntity
 import com.anitail.music.di.DownloadCache
 import com.anitail.music.utils.DownloadExportHelper
@@ -34,7 +35,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -63,6 +63,13 @@ constructor(
     val mediaStoreDownloadManager: MediaStoreDownloadManager,
     private val downloadExportHelper: DownloadExportHelper,
 ) {
+    sealed class MediaStoreCollectionStatus {
+        object NotDownloaded : MediaStoreCollectionStatus()
+        object Completed : MediaStoreCollectionStatus()
+        data class Downloading(val progress: Float) : MediaStoreCollectionStatus()
+        object Failed : MediaStoreCollectionStatus()
+    }
+
     private data class CachedMediaStoreDownload(
         val state: MediaStoreDownloadManager.DownloadState,
         val download: Download,
@@ -421,6 +428,59 @@ constructor(
             .flatMapLatest { songIds -> getMediaStoreDownloads(songIds) }
             .distinctUntilChanged()
 
+    fun calculateMediaStoreCollectionStatus(
+        songs: List<Song>,
+        states: Map<String, MediaStoreDownloadManager.DownloadState>,
+    ): MediaStoreCollectionStatus {
+        if (songs.isEmpty()) return MediaStoreCollectionStatus.NotDownloaded
+
+        val songStates = songs.mapNotNull { states[it.id] }
+        val allPersistedInMediaStore = songs.all { !it.song.mediaStoreUri.isNullOrEmpty() }
+
+        return when {
+            allPersistedInMediaStore -> MediaStoreCollectionStatus.Completed
+            songStates.isEmpty() -> MediaStoreCollectionStatus.NotDownloaded
+            songStates.all { it.status == MediaStoreDownloadManager.DownloadState.Status.COMPLETED } ->
+                MediaStoreCollectionStatus.Completed
+
+            songStates.any {
+                it.status == MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING ||
+                    it.status == MediaStoreDownloadManager.DownloadState.Status.QUEUED
+            } -> {
+                val totalBytes = songStates.sumOf { it.totalBytes.coerceAtLeast(0L) }
+                val downloadedBytes = songStates.sumOf { state ->
+                    when (state.status) {
+                        MediaStoreDownloadManager.DownloadState.Status.COMPLETED ->
+                            state.totalBytes.coerceAtLeast(0L)
+
+                        MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING,
+                        MediaStoreDownloadManager.DownloadState.Status.QUEUED ->
+                            state.bytesDownloaded.coerceAtLeast(0L)
+
+                        else -> 0L
+                    }
+                }
+                val totalProgress = if (totalBytes > 0L) {
+                    (downloadedBytes.toDouble() / totalBytes.toDouble()).coerceIn(0.0, 1.0)
+                } else {
+                    songStates.sumOf { state ->
+                        when (state.status) {
+                            MediaStoreDownloadManager.DownloadState.Status.COMPLETED -> 1.0
+                            MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING -> state.progress.toDouble()
+                            else -> 0.0
+                        }
+                    } / songs.size
+                }
+                MediaStoreCollectionStatus.Downloading(totalProgress.toFloat())
+            }
+
+            songStates.any { it.status == MediaStoreDownloadManager.DownloadState.Status.FAILED } ->
+                MediaStoreCollectionStatus.Failed
+
+            else -> MediaStoreCollectionStatus.NotDownloaded
+        }
+    }
+
     private fun calculateDownloadState(
         songIds: Set<String>,
         currentDownloads: Map<String, Download>,
@@ -487,9 +547,6 @@ constructor(
         mediaStoreDownloadManager.downloadStates
             .map { it[songId] }
             .distinctUntilChanged()
-
-    fun getAllMediaStoreDownloads(): StateFlow<Map<String, MediaStoreDownloadManager.DownloadState>> =
-        mediaStoreDownloadManager.downloadStates
 
     fun downloadToMediaStore(song: com.anitail.music.db.entities.Song) {
         mediaStoreDownloadManager.downloadSongs(listOf(song))
