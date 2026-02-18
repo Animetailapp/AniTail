@@ -39,6 +39,8 @@ object DesktopGoogleDriveSyncService {
     private const val BACKUP_MIME_TYPE = "application/octet-stream"
     private const val CLIENT_SECRET_FILE_NAME = "client_secret.json"
     private const val CLIENT_SECRET_RESOURCE_PATH = "/oauth/client_secret.json"
+    const val CLOUD_SYNC_REMOTE_BACKUP_NAME = "AniTail_Desktop_CloudSync.backup"
+    const val MANUAL_REMOTE_BACKUP_NAME = "AniTail_Desktop_Backup.backup"
 
     private val _signedInEmail = MutableStateFlow<String?>(null)
     val signedInEmail: StateFlow<String?> = _signedInEmail.asStateFlow()
@@ -111,6 +113,38 @@ object DesktopGoogleDriveSyncService {
         }
     }
 
+    suspend fun uploadBackupReplacingByName(
+        backupFile: Path,
+        remoteName: String = backupFile.fileName.toString(),
+    ): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            require(Files.exists(backupFile)) { "Backup file not found." }
+            val service = ensureDriveService(
+                forceAuthPrompt = false,
+                allowInteractiveAuth = true,
+            )
+            val folderId = getOrCreateBackupsFolder(service)
+            val existingFileId = findFileIdInFolderByName(service, folderId, remoteName)
+            val media = FileContent(BACKUP_MIME_TYPE, backupFile.toFile())
+
+            val uploaded = if (existingFileId != null) {
+                service.files().update(existingFileId, null, media)
+                    .setFields("id,name")
+                    .execute()
+            } else {
+                val metadata = File().apply {
+                    name = remoteName
+                    parents = listOf(folderId)
+                }
+                service.files().create(metadata, media)
+                    .setFields("id,name")
+                    .execute()
+            }
+
+            uploaded.id ?: error("Upload succeeded without file id.")
+        }
+    }
+
     suspend fun downloadLatestBackup(destinationFile: Path): Result<Path> = withContext(Dispatchers.IO) {
         runCatching {
             val service = ensureDriveService(
@@ -138,16 +172,16 @@ object DesktopGoogleDriveSyncService {
             val folderId = getOrCreateBackupsFolder(service)
             val response: FileList = service.files().list()
                 .setQ("'$folderId' in parents and trashed = false")
-                .setOrderBy("createdTime desc")
+                .setOrderBy("modifiedTime desc")
                 .setPageSize(limit)
-                .setFields("files(id,name,createdTime,size)")
+                .setFields("files(id,name,modifiedTime,createdTime,size)")
                 .execute()
 
             response.files.orEmpty().map { file ->
                 DesktopDriveBackupInfo(
                     id = file.id.orEmpty(),
                     name = file.name.orEmpty(),
-                    createdTimeMillis = file.createdTime?.value ?: 0L,
+                    createdTimeMillis = file.modifiedTime?.value ?: file.createdTime?.value ?: 0L,
                     sizeBytes = file.size.toLong(),
                 )
             }.filter { it.id.isNotBlank() }
@@ -243,18 +277,32 @@ object DesktopGoogleDriveSyncService {
         val query = "'$folderId' in parents and trashed = false and (name contains '.backup' or name contains '.zip')"
         val response = service.files().list()
             .setQ(query)
-            .setOrderBy("createdTime desc")
+            .setOrderBy("modifiedTime desc")
             .setPageSize(1)
-            .setFields("files(id,name,createdTime,size)")
+            .setFields("files(id,name,modifiedTime,createdTime,size)")
             .execute()
         val file = response.files?.firstOrNull() ?: return null
         val id = file.id ?: return null
         return DesktopDriveBackupInfo(
             id = id,
             name = file.name.orEmpty(),
-            createdTimeMillis = file.createdTime?.value ?: 0L,
+            createdTimeMillis = file.modifiedTime?.value ?: file.createdTime?.value ?: 0L,
             sizeBytes = file.size.toLong(),
         )
+    }
+
+    private fun findFileIdInFolderByName(
+        service: Drive,
+        folderId: String,
+        fileName: String,
+    ): String? {
+        val escaped = fileName.replace("'", "\\'")
+        val response = service.files().list()
+            .setQ("'$folderId' in parents and name = '$escaped' and trashed = false")
+            .setPageSize(1)
+            .setFields("files(id)")
+            .execute()
+        return response.files?.firstOrNull()?.id
     }
 
     private fun tokenStorePath(): Path = DesktopPaths.appDataDir().resolve(TOKEN_STORE_DIR)
