@@ -703,8 +703,10 @@ fun YouTubeListItem(
             Icon.Library()
         }
         if (item is SongItem) {
-            val downloads by LocalDownloadUtil.current.downloads.collectAsState()
-            Icon.Download(downloads[item.id]?.state)
+            val download by LocalDownloadUtil.current.getDownload(item.id).collectAsState(initial = null)
+            val effectiveDownloadState = download?.state
+                ?: if (!song?.song?.mediaStoreUri.isNullOrEmpty()) Download.STATE_COMPLETED else null
+            Icon.Download(effectiveDownloadState)
         }
     },
 ) {
@@ -767,8 +769,10 @@ fun YouTubeGridItem(
         if (item.explicit) Icon.Explicit()
         if (item is SongItem && song?.song?.inLibrary != null) Icon.Library()
         if (item is SongItem) {
-            val downloads by LocalDownloadUtil.current.downloads.collectAsState()
-            Icon.Download(downloads[item.id]?.state)
+            val download by LocalDownloadUtil.current.getDownload(item.id).collectAsState(initial = null)
+            val effectiveDownloadState = download?.state
+                ?: if (!song?.song?.mediaStoreUri.isNullOrEmpty()) Download.STATE_COMPLETED else null
+            Icon.Download(effectiveDownloadState)
         }
     },
     thumbnailRatio: Float = if (item is SongItem) 16f / 9 else 1f,

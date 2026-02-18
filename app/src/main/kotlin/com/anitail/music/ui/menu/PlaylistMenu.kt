@@ -49,6 +49,7 @@ import com.anitail.music.ui.component.PlaylistListItem
 import com.anitail.music.ui.component.TextFieldDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
@@ -92,7 +93,7 @@ fun PlaylistMenu(
     LaunchedEffect(songs) {
         if (songs.isEmpty()) return@LaunchedEffect
         val songIds = songs.map { it.id }
-        downloadUtil.getMediaStoreDownloads(songIds).collect { states ->
+        downloadUtil.getMediaStoreDownloads(songIds).collectLatest { states ->
             val nextStatus = withContext(Dispatchers.Default) {
                 downloadUtil.calculateMediaStoreCollectionStatus(songs = songs, states = states)
             }

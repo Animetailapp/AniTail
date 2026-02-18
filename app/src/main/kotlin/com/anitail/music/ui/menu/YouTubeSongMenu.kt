@@ -47,10 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.net.toUri
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadRequest
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.anitail.innertube.YouTube
@@ -67,7 +64,6 @@ import com.anitail.music.db.entities.SongEntity
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.models.MediaMetadata
 import com.anitail.music.models.toMediaMetadata
-import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.DownloadFormatDialog
 import com.anitail.music.ui.component.ListDialog
@@ -77,6 +73,7 @@ import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.utils.joinByBullet
 import com.anitail.music.utils.makeTimeString
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
@@ -119,22 +116,19 @@ fun YouTubeSongMenu(
             formats = availableFormats,
             onFormatSelected = { format ->
                 showDownloadFormatDialog = false
-                database.transaction {
-                    insert(song.toMediaMetadata())
+                coroutineScope.launch {
+                    val songToDownload = withContext(Dispatchers.IO) {
+                        database.insert(song.toMediaMetadata())
+                        database.song(song.id).first()
+                    }
+                    if (songToDownload != null) {
+                        downloadUtil.downloadToMediaStore(songToDownload, targetItag = format.itag)
+                        Toast.makeText(context, R.string.downloading, Toast.LENGTH_SHORT).show()
+                        onDismiss()
+                    } else {
+                        Toast.makeText(context, R.string.download_failed, Toast.LENGTH_SHORT).show()
+                    }
                 }
-                downloadUtil.setTargetItag(song.id, format.itag)
-                val request = DownloadRequest.Builder(song.id, song.id.toUri())
-                    .setCustomCacheKey(song.id)
-                    .setData(song.title.toByteArray())
-                    .build()
-                DownloadService.sendAddDownload(
-                    context,
-                    ExoDownloadService::class.java,
-                    request,
-                    true,
-                )
-                Toast.makeText(context, R.string.downloading, Toast.LENGTH_SHORT).show()
-                onDismiss()
             },
             onDismiss = { showDownloadFormatDialog = false },
         )

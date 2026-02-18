@@ -100,12 +100,14 @@ constructor(
     fun setTargetItag(songId: String, itag: Int) {
         targetItagOverride[songId] = itag
         pendingTargetCacheReset[songId] = true
+        mediaStoreDownloadManager.setTargetItag(songId, itag)
         invalidateUrl(songId)
     }
 
     fun clearTargetItag(songId: String) {
         targetItagOverride.remove(songId)
         pendingTargetCacheReset.remove(songId)
+        mediaStoreDownloadManager.setTargetItag(songId, 0)
     }
 
     fun invalidateUrl(songId: String) {
@@ -548,7 +550,8 @@ constructor(
             .map { it[songId] }
             .distinctUntilChanged()
 
-    fun downloadToMediaStore(song: com.anitail.music.db.entities.Song) {
+    fun downloadToMediaStore(song: com.anitail.music.db.entities.Song, targetItag: Int? = null) {
+        targetItag?.let { mediaStoreDownloadManager.setTargetItag(song.id, it) }
         mediaStoreDownloadManager.downloadSongs(listOf(song))
     }
 

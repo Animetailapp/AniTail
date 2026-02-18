@@ -88,6 +88,7 @@ constructor(
     private val downloadQueue = mutableListOf<Song>()
     private val activeDownloads = ConcurrentHashMap<String, Job>()
     private val cancelRequested = ConcurrentHashMap.newKeySet<String>()
+    private val targetItagOverride = ConcurrentHashMap<String, Int>()
 
     companion object {
         private const val MAX_CONCURRENT_DOWNLOADS = 3
@@ -145,6 +146,14 @@ constructor(
             repeat(MAX_CONCURRENT_DOWNLOADS) {
                 processQueue()
             }
+        }
+    }
+
+    fun setTargetItag(songId: String, itag: Int) {
+        if (itag > 0) {
+            targetItagOverride[songId] = itag
+        } else {
+            targetItagOverride.remove(songId)
         }
     }
 
@@ -294,9 +303,26 @@ constructor(
         val uniqueSongs = songs
             .groupBy { it.id }
             .mapNotNull { (_, sameIdSongs) -> sameIdSongs.firstOrNull() }
+        val customPathWritable = if (customDownloadPathEnabled) {
+            isCustomPathWritable()
+        } else {
+            false
+        }
 
         val songsToQueue = ArrayList<Song>(uniqueSongs.size)
         for (song in uniqueSongs) {
+            if (customDownloadPathEnabled && !customPathWritable) {
+                updateDownloadState(
+                    song.id,
+                    DownloadState(
+                        songId = song.id,
+                        status = DownloadState.Status.FAILED,
+                        error = "Custom folder is unavailable or read-only"
+                    )
+                )
+                continue
+            }
+
             if (!song.song.mediaStoreUri.isNullOrEmpty()) {
                 Timber.Forest.d(
                     "Song ${song.song.title} is already downloaded in database: ${song.song.mediaStoreUri}"
@@ -356,7 +382,7 @@ constructor(
         val tempFile = File(context.cacheDir, "temp_${song.id}.part")
         var retryAttempt = 0
         var lastError: Exception? = null
-        var lockedItag = 0
+        var lockedItag = targetItagOverride[song.id] ?: 0
 
         runCatching {
             if (tempFile.exists()) {
@@ -550,6 +576,7 @@ constructor(
                 )
             )
         } finally {
+            targetItagOverride.remove(song.id)
             runCatching {
                 if (tempFile.exists()) {
                     tempFile.delete()
@@ -895,6 +922,13 @@ constructor(
 
     private fun isMediaStoreContentUri(uriString: String): Boolean {
         return uriString.startsWith("content://media/")
+    }
+
+    private fun isCustomPathWritable(): Boolean {
+        if (customDownloadPathUri.isBlank()) return false
+        val rootUri = runCatching { Uri.parse(customDownloadPathUri) }.getOrNull() ?: return false
+        val root = DocumentFile.fromTreeUri(context, rootUri) ?: return false
+        return root.canWrite()
     }
 
     private fun extensionFromMimeType(mimeType: String): String {
