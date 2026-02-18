@@ -285,7 +285,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   val automixItems = MutableStateFlow<List<MediaItem>>(emptyList())
     private var consecutivePlaybackErr = 0
     private var lastWidgetUpdateAt: Long = 0L
-    private var foregroundBootstrapStarted = false
 
     override fun onCreate() {
     super.onCreate()
@@ -1322,8 +1321,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   }
 
   private fun ensureForegroundBootstrap() {
-    if (foregroundBootstrapStarted) return
-
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
       val channel =
@@ -1358,7 +1355,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       } else {
         startForeground(NOTIFICATION_ID, notification)
       }
-      foregroundBootstrapStarted = true
     }.onFailure { error ->
       Timber.w(error, "Failed to bootstrap foreground state for MusicService")
     }
