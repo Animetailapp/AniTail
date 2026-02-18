@@ -17,7 +17,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -77,7 +76,6 @@ class MediaStoreDownloadService : Service() {
         // Observe download states and update notifications
         scope.launch {
             downloadManager.downloadStates
-                .conflate()
                 .collectLatest { states ->
                     updateNotification(states)
 
