@@ -2,6 +2,7 @@ package com.anitail.music.ui.menu
 
 import android.content.Intent
 import android.media.audiofx.AudioEffect
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
@@ -134,8 +135,9 @@ fun PlayerMenu(
                     context,
                     ExoDownloadService::class.java,
                     request,
-                    false,
+                    true,
                 )
+                Toast.makeText(context, R.string.downloading, Toast.LENGTH_SHORT).show()
                 onDismiss()
             },
             onDismiss = { showDownloadFormatDialog = false },

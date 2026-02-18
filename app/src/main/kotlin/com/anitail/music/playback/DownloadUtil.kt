@@ -21,7 +21,6 @@ import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.FormatEntity
 import com.anitail.music.db.entities.SongEntity
 import com.anitail.music.di.DownloadCache
-import com.anitail.music.di.PlayerCache
 import com.anitail.music.utils.DownloadExportHelper
 import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.utils.booleanPreference
@@ -31,7 +30,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,7 +56,6 @@ constructor(
     val database: MusicDatabase,
     val databaseProvider: DatabaseProvider,
     @DownloadCache val downloadCache: SimpleCache,
-    @PlayerCache val playerCache: SimpleCache,
     val mediaStoreDownloadManager: MediaStoreDownloadManager,
     private val downloadExportHelper: DownloadExportHelper,
 ) {
@@ -68,6 +65,11 @@ constructor(
     private val customDownloadPathUri by stringPreference(context, CustomDownloadPathUriKey, "")
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val downloadCallbackExecutor = Executor { command ->
+        scope.launch {
+            command.run()
+        }
+    }
 
     private val songUrlCache = ConcurrentHashMap<String, Pair<String, Long>>()
     private val targetItagOverride = ConcurrentHashMap<String, Int>()
@@ -124,7 +126,7 @@ constructor(
         ResolvingDataSource.Factory(
             CacheDataSource
                 .Factory()
-                .setCache(playerCache)
+                .setCache(downloadCache)
                 .setUpstreamDataSourceFactory(
                     OkHttpDataSource.Factory(
                         OkHttpClient.Builder()
@@ -147,7 +149,7 @@ constructor(
             val hasTargetItag = targetItag > 0
 
             if (!hasTargetItag) {
-                if (playerCache.isCached(mediaId, dataSpec.position, length)) {
+                if (downloadCache.isCached(mediaId, dataSpec.position, length)) {
                     return@Factory dataSpec
                 }
 
@@ -159,8 +161,8 @@ constructor(
                 // For format overrides we must force a fresh URL/cache entry.
                 songUrlCache.remove(mediaId)
                 try {
-                    if (playerCache.getCachedSpans(mediaId).isNotEmpty()) {
-                        playerCache.removeResource(mediaId)
+                    if (downloadCache.getCachedSpans(mediaId).isNotEmpty()) {
+                        downloadCache.removeResource(mediaId)
                     }
                 } catch (_: Exception) {
                 }
@@ -242,7 +244,7 @@ constructor(
             databaseProvider,
             downloadCache,
             dataSourceFactory,
-            Executor(Runnable::run)
+            downloadCallbackExecutor
         ).apply {
             maxParallelDownloads = 3
             addListener(

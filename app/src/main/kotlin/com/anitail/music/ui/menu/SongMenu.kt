@@ -1,6 +1,7 @@
 package com.anitail.music.ui.menu
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -141,8 +142,9 @@ fun SongMenu(
                     context,
                     ExoDownloadService::class.java,
                     request,
-                    false,
+                    true,
                 )
+                Toast.makeText(context, R.string.downloading, Toast.LENGTH_SHORT).show()
                 onDismiss()
             },
             onDismiss = { showDownloadFormatDialog = false },

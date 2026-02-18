@@ -30,6 +30,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import com.anitail.music.R
 import com.anitail.music.utils.YTPlayerUtils.AudioFormatOption
 
@@ -51,6 +52,8 @@ fun DownloadFormatDialog(
     }
 
     AlertDialog(
+        modifier = Modifier.fillMaxWidth(0.84f),
+        properties = DialogProperties(usePlatformDefaultWidth = false),
         onDismissRequest = onDismiss,
         title = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

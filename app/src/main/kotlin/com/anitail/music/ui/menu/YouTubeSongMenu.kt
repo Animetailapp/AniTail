@@ -2,6 +2,7 @@ package com.anitail.music.ui.menu
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -124,8 +125,9 @@ fun YouTubeSongMenu(
                     context,
                     ExoDownloadService::class.java,
                     request,
-                    false,
+                    true,
                 )
+                Toast.makeText(context, R.string.downloading, Toast.LENGTH_SHORT).show()
                 onDismiss()
             },
             onDismiss = { showDownloadFormatDialog = false },

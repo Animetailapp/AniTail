@@ -210,7 +210,7 @@ fun StorageSettings(
             playerCacheSize = snapshot.playerCacheSize
             downloadCacheSize = snapshot.downloadCacheSize
             downloadedSongsSize = snapshot.downloadedSongsSize
-            delay(500)
+            delay(2500)
         }
     }
 
