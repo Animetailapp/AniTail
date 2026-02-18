@@ -359,14 +359,6 @@ class MainActivity : AppCompatActivity() {
                 }
         }
 
-        lifecycleScope.launch {
-            try {
-                checkAndRequestStoragePermissions()
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to check backup permissions")
-            }
-        }
-
         lifecycleScope.launch(Dispatchers.IO) {
             downloadLibraryRepository.cleanupOrphans()
         }

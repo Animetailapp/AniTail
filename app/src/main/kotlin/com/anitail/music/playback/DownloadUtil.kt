@@ -68,6 +68,7 @@ constructor(
 
     private val songUrlCache = ConcurrentHashMap<String, Pair<String, Long>>()
     private val targetItagOverride = ConcurrentHashMap<String, Int>()
+    private val pendingTargetCacheReset = ConcurrentHashMap<String, Boolean>()
     private val exportJobs = ConcurrentHashMap<String, Job>()
 
     // Legacy cache downloads (for compatibility)
@@ -78,11 +79,13 @@ constructor(
 
     fun setTargetItag(songId: String, itag: Int) {
         targetItagOverride[songId] = itag
+        pendingTargetCacheReset[songId] = true
         invalidateUrl(songId)
     }
 
     fun clearTargetItag(songId: String) {
         targetItagOverride.remove(songId)
+        pendingTargetCacheReset.remove(songId)
     }
 
     fun invalidateUrl(songId: String) {
@@ -143,17 +146,7 @@ constructor(
             val targetItag = targetItagOverride[mediaId] ?: 0
             val hasTargetItag = targetItag > 0
 
-            if (!hasTargetItag) {
-                if (downloadCache.isCached(mediaId, dataSpec.position, length)) {
-                    return@Factory dataSpec
-                }
-
-                // Keep URL cache while it is still valid.
-                songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }?.let {
-                    return@Factory dataSpec.withUri(it.first.toUri())
-                }
-            } else {
-                // For format overrides we must force a fresh URL/cache entry.
+            if (hasTargetItag && pendingTargetCacheReset.remove(mediaId) != null) {
                 songUrlCache.remove(mediaId)
                 try {
                     if (downloadCache.getCachedSpans(mediaId).isNotEmpty()) {
@@ -163,9 +156,19 @@ constructor(
                 }
             }
 
+            if (downloadCache.isCached(mediaId, dataSpec.position, length)) {
+                return@Factory dataSpec
+            }
+
+            // Keep URL cache while it is still valid.
+            songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }?.let {
+                return@Factory dataSpec.withUri(it.first.toUri())
+            }
+
             val playbackData =
                 fetchPlaybackDataBlocking(mediaId, targetItag) ?: error("Playback data unavailable")
             val format = playbackData.format
+            val resolvedContentLength = format.contentLength ?: 0L
 
             database.query {
                 upsert(
@@ -176,7 +179,7 @@ constructor(
                         codecs = format.mimeType.split("codecs=")[1].removeSurrounding("\""),
                         bitrate = format.bitrate,
                         sampleRate = format.audioSampleRate,
-                        contentLength = format.contentLength!!,
+                        contentLength = resolvedContentLength,
                         loudnessDb = playbackData.audioConfig?.loudnessDb,
                         playbackUrl = playbackData.playbackTracking?.videostatsPlaybackUrl?.baseUrl
                     ),
@@ -200,11 +203,10 @@ constructor(
                 upsert(updatedSong)
             }
 
-            val streamUrl = playbackData.streamUrl.let {
-                "${it}&range=0-${format.contentLength ?: 10000000}"
-            }
+            val streamUrl = playbackData.streamUrl
 
-            songUrlCache[mediaId] = streamUrl to playbackData.streamExpiresInSeconds * 1000L
+            val streamExpiryMs = System.currentTimeMillis() + (playbackData.streamExpiresInSeconds * 1000L)
+            songUrlCache[mediaId] = streamUrl to streamExpiryMs
             dataSpec.withUri(streamUrl.toUri())
         }
 
