@@ -338,8 +338,9 @@ class MediaStoreHelper(private val context: Context) {
     }
 
     /**
-     * Get the public Music/Anitail folder path (for display purposes)
+     * Get the default public Music/Anitail folder path (for display purposes)
      * Note: On Android 10+, direct file access is restricted
+     * Note: This does not override custom-folder export logic.
      *
      * @return Folder path string
      */

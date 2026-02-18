@@ -2,15 +2,22 @@ package com.anitail.music.playback
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.Uri
 import androidx.core.content.getSystemService
 import androidx.core.net.toUri
+import androidx.documentfile.provider.DocumentFile
 import com.anitail.music.constants.AudioQuality
 import com.anitail.music.constants.AudioQualityKey
+import com.anitail.music.constants.CustomDownloadPathEnabledKey
+import com.anitail.music.constants.CustomDownloadPathUriKey
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.Song
+import com.anitail.music.utils.DownloadExportHelper
 import com.anitail.music.utils.MediaStoreHelper
 import com.anitail.music.utils.YTPlayerUtils
+import com.anitail.music.utils.booleanPreference
 import com.anitail.music.utils.enumPreference
+import com.anitail.music.utils.stringPreference
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
@@ -57,11 +64,15 @@ class MediaStoreDownloadManager
 constructor(
     @ApplicationContext private val context: Context,
     private val database: MusicDatabase,
+    private val downloadExportHelper: DownloadExportHelper,
 ) {
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private val mediaStoreHelper = MediaStoreHelper(context)
     private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
+    private val customDownloadPathEnabled by
+        booleanPreference(context, CustomDownloadPathEnabledKey, false)
+    private val customDownloadPathUri by stringPreference(context, CustomDownloadPathUriKey, "")
 
     // Concurrent download limiter (max 3 simultaneous downloads)
     private val downloadSemaphore = Semaphore(MAX_CONCURRENT_DOWNLOADS)
@@ -290,19 +301,46 @@ constructor(
                 Timber.Forest.d(
                     "Song ${song.song.title} is already downloaded in database: ${song.song.mediaStoreUri}"
                 )
+                val movedToCustomPath = exportToCustomPathIfEnabled(
+                    song.id,
+                    sourceMediaStoreUri = song.song.mediaStoreUri
+                )
+                if (!movedToCustomPath && customDownloadPathEnabled) {
+                    updateDownloadState(
+                        song.id,
+                        DownloadState(
+                            songId = song.id,
+                            status = DownloadState.Status.FAILED,
+                            error = "Unable to move existing file to custom folder"
+                        )
+                    )
+                } else {
+                    clearDownloadState(song.id)
+                }
+                continue
+            }
+
+            if (!song.song.downloadUri.isNullOrEmpty() &&
+                downloadExportHelper.verifyFileAccess(song.song.downloadUri)
+            ) {
+                if (song.song.mediaStoreUri != song.song.downloadUri) {
+                    markSongAsDownloaded(song.id, song.song.downloadUri)
+                }
                 clearDownloadState(song.id)
                 continue
             }
 
-            val existingFile = mediaStoreHelper.findExistingFile(
-                title = song.song.title,
-                artist = resolvePrimaryArtist(song)
-            )
-            if (existingFile != null) {
-                Timber.Forest.d("Song ${song.song.title} already exists in MediaStore: $existingFile")
-                markSongAsDownloaded(song.id, existingFile.toString())
-                clearDownloadState(song.id)
-                continue
+            if (!customDownloadPathEnabled) {
+                val existingFile = mediaStoreHelper.findExistingFile(
+                    title = song.song.title,
+                    artist = resolvePrimaryArtist(song)
+                )
+                if (existingFile != null) {
+                    Timber.Forest.d("Song ${song.song.title} already exists in MediaStore: $existingFile")
+                    markSongAsDownloaded(song.id, existingFile.toString())
+                    clearDownloadState(song.id)
+                    continue
+                }
             }
 
             songsToQueue += song
@@ -398,41 +436,56 @@ constructor(
                     val album = song.album?.title
                     val duration = song.song.duration.takeIf { it > 0 }?.times(1000L)
                     val year = song.song.year
-                    val extension = "mp3"
-                    val mimeType = mediaStoreHelper.getMimeType(extension)
-
-                    val fileName = "$artist - $title.$extension"
-                    val uri = mediaStoreHelper.saveFileToMediaStore(
-                        tempFile = tempFile,
-                        fileName = fileName,
-                        mimeType = mimeType,
-                        title = title,
-                        artist = artist,
-                        album = album,
-                        durationMs = duration,
-                        year = year
-                    )
-
-                    if (uri != null) {
-                        if (isCancelRequested(song.id)) {
-                            mediaStoreHelper.deleteFromMediaStore(uri)
-                            clearDownloadState(song.id)
-                            return@withContext
-                        }
-                        updateDownloadState(
-                            song.id,
-                            DownloadState(
-                                songId = song.id,
-                                status = DownloadState.Status.COMPLETED,
-                                progress = 1f
-                            )
+                    val mimeType = format.mimeType.substringBefore(";").trim().ifBlank {
+                        "audio/mp4"
+                    }
+                    val extension = extensionFromMimeType(mimeType)
+                    val persistedUri = if (customDownloadPathEnabled) {
+                        saveFileToCustomPath(
+                            song = song,
+                            tempFile = tempFile,
+                            mimeType = mimeType,
+                            extension = extension
                         )
-                        markSongAsDownloaded(song.id, uri.toString())
+                    } else {
+                        val fileName = "$artist - $title.$extension"
+                        mediaStoreHelper.saveFileToMediaStore(
+                            tempFile = tempFile,
+                            fileName = fileName,
+                            mimeType = mimeType,
+                            title = title,
+                            artist = artist,
+                            album = album,
+                            durationMs = duration,
+                            year = year
+                        )?.toString()
+                    }
+
+                    if (persistedUri.isNullOrBlank()) {
+                        val destination = if (customDownloadPathEnabled) {
+                            "custom folder"
+                        } else {
+                            "MediaStore"
+                        }
+                        throw Exception("Failed to save file to $destination")
+                    }
+
+                    if (isCancelRequested(song.id)) {
+                        deletePersistedUri(persistedUri)
                         clearDownloadState(song.id)
                         return@withContext
-                    } else {
-                        throw Exception("Failed to save file to MediaStore")
                     }
+                    updateDownloadState(
+                        song.id,
+                        DownloadState(
+                            songId = song.id,
+                            status = DownloadState.Status.COMPLETED,
+                            progress = 1f
+                        )
+                    )
+                    markSongAsDownloaded(song.id, persistedUri)
+                    clearDownloadState(song.id)
+                    return@withContext
                 } catch (e: CancellationException) {
                     clearDownloadState(song.id)
                     return@withContext
@@ -665,23 +718,25 @@ constructor(
     /**
      * Mark a song as downloaded in the database with MediaStore URI
      */
-    private suspend fun markSongAsDownloaded(songId: String, mediaStoreUri: String) {
+    private suspend fun markSongAsDownloaded(songId: String, persistedUri: String) {
         if (isCancelRequested(songId)) {
-            mediaStoreHelper.deleteFromMediaStore(mediaStoreUri.toUri())
+            deletePersistedUri(persistedUri)
             return
         }
 
         val song = database.song(songId).first()
         if (song != null) {
+            val isMediaStoreUri = isMediaStoreContentUri(persistedUri)
             database.query {
                 database.upsert(
                     song.song.copy(
                         dateDownload = LocalDateTime.now(),
-                        mediaStoreUri = mediaStoreUri
+                        mediaStoreUri = persistedUri,
+                        downloadUri = if (isMediaStoreUri) null else persistedUri,
                     )
                 )
             }
-            Timber.d("Marked song as downloaded: ${song.song.title}, URI: $mediaStoreUri")
+            Timber.d("Marked song as downloaded: ${song.song.title}, URI: $persistedUri")
         }
     }
 
@@ -692,15 +747,23 @@ constructor(
         val songsToPersist = mutableListOf<com.anitail.music.db.entities.SongEntity>()
         songs.forEach { song ->
             val mediaStoreUri = song.song.mediaStoreUri
+            val downloadUri = song.song.downloadUri
 
             if (!mediaStoreUri.isNullOrEmpty()) {
-                mediaStoreHelper.deleteFromMediaStore(mediaStoreUri.toUri())
+                deletePersistedUri(mediaStoreUri)
+            }
+            if (!downloadUri.isNullOrEmpty() && downloadUri != mediaStoreUri) {
+                deletePersistedUri(downloadUri)
             }
 
-            if (!song.song.mediaStoreUri.isNullOrEmpty() || song.song.dateDownload != null) {
+            if (!song.song.mediaStoreUri.isNullOrEmpty() ||
+                !song.song.downloadUri.isNullOrEmpty() ||
+                song.song.dateDownload != null
+            ) {
                 songsToPersist += song.song.copy(
                     mediaStoreUri = null,
-                    dateDownload = null
+                    downloadUri = null,
+                    dateDownload = null,
                 )
             }
         }
@@ -711,6 +774,138 @@ constructor(
                     database.upsert(songEntity)
                 }
             }
+        }
+    }
+
+    private suspend fun exportToCustomPathIfEnabled(
+        songId: String,
+        sourceMediaStoreUri: String?
+    ): Boolean {
+        if (!customDownloadPathEnabled || customDownloadPathUri.isBlank()) return true
+        val existingSong = database.song(songId).first()?.song
+        val existingDownloadUri = existingSong?.downloadUri
+        val alreadyOnCustomUri =
+            !existingDownloadUri.isNullOrBlank() &&
+                sourceMediaStoreUri == existingDownloadUri &&
+                !existingDownloadUri.startsWith("content://media/") &&
+                downloadExportHelper.verifyFileAccess(existingDownloadUri)
+        if (alreadyOnCustomUri) return true
+
+        val exportedUri = runCatching {
+            downloadExportHelper.exportToCustomPath(songId, customDownloadPathUri)
+        }.onFailure { error ->
+            Timber.w(error, "Custom path export failed for MediaStore download %s", songId)
+        }.getOrNull()
+
+        if (exportedUri.isNullOrBlank()) return false
+
+        promoteCustomUriAsPrimary(
+            songId = songId,
+            customUri = exportedUri,
+            previousMediaStoreUri = sourceMediaStoreUri
+        )
+        return true
+    }
+
+    private suspend fun promoteCustomUriAsPrimary(
+        songId: String,
+        customUri: String,
+        previousMediaStoreUri: String?,
+    ) {
+        val song = database.song(songId).first() ?: return
+        val currentPrimaryUri = song.song.mediaStoreUri
+        if (currentPrimaryUri != null && currentPrimaryUri != customUri) {
+            deletePersistedUri(currentPrimaryUri)
+        } else if (!previousMediaStoreUri.isNullOrBlank() && previousMediaStoreUri != customUri) {
+            deletePersistedUri(previousMediaStoreUri)
+        }
+
+        database.query {
+            database.upsert(
+                song.song.copy(
+                    mediaStoreUri = customUri,
+                    downloadUri = customUri,
+                    dateDownload = song.song.dateDownload ?: LocalDateTime.now(),
+                )
+            )
+        }
+    }
+
+    private suspend fun deletePersistedUri(uriString: String) {
+        if (uriString.isBlank()) return
+        val uri = uriString.toUri()
+        if (isMediaStoreContentUri(uriString)) {
+            mediaStoreHelper.deleteFromMediaStore(uri)
+            return
+        }
+
+        runCatching {
+            val file = DocumentFile.fromSingleUri(context, uri)
+            val deleted = file?.delete() == true
+            if (!deleted && file?.exists() == true) {
+                Timber.w("Failed to delete persisted file URI: %s", uriString)
+            }
+        }.onFailure { error ->
+            Timber.w(error, "Failed deleting persisted file URI: %s", uriString)
+        }
+    }
+
+    private suspend fun saveFileToCustomPath(
+        song: Song,
+        tempFile: File,
+        mimeType: String,
+        extension: String,
+    ): String? = withContext(Dispatchers.IO) {
+        val rootUri = runCatching { Uri.parse(customDownloadPathUri) }.getOrNull()
+            ?: return@withContext null
+        val root = DocumentFile.fromTreeUri(context, rootUri) ?: return@withContext null
+        if (!root.canWrite()) return@withContext null
+
+        val artistFolderName = sanitizeForFilesystem(resolvePrimaryArtist(song))
+        val artistFolder = root.findFile(artistFolderName)?.takeIf { it.isDirectory }
+            ?: root.createDirectory(artistFolderName)
+            ?: return@withContext null
+
+        val fileName = sanitizeForFilesystem("${song.song.title}.$extension")
+        artistFolder.findFile(fileName)?.delete()
+
+        val targetFile = artistFolder.createFile(mimeType, fileName) ?: return@withContext null
+        val output = context.contentResolver.openOutputStream(targetFile.uri)
+        if (output == null) {
+            targetFile.delete()
+            return@withContext null
+        }
+
+        output.use { out ->
+            tempFile.inputStream().use { input ->
+                input.copyTo(out)
+            }
+        }
+        targetFile.uri.toString()
+    }
+
+    private fun sanitizeForFilesystem(value: String): String {
+        return value
+            .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .ifBlank { "Unknown" }
+            .take(200)
+    }
+
+    private fun isMediaStoreContentUri(uriString: String): Boolean {
+        return uriString.startsWith("content://media/")
+    }
+
+    private fun extensionFromMimeType(mimeType: String): String {
+        return when {
+            mimeType.contains("audio/mpeg") -> "mp3"
+            mimeType.contains("audio/webm") -> "webm"
+            mimeType.contains("audio/ogg") -> "ogg"
+            mimeType.contains("audio/mp4") -> "m4a"
+            mimeType.contains("audio/aac") -> "aac"
+            mimeType.contains("audio/flac") -> "flac"
+            else -> "m4a"
         }
     }
 

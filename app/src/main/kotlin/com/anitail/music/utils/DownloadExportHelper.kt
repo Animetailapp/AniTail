@@ -48,7 +48,7 @@ class DownloadExportHelper @Inject constructor(
             }
 
             val format = database.format(songId).first()
-            val extension = getExtensionFromFormat(format)
+            val extension = getExtensionFromFormat(format, song.song.mediaStoreUri)
 
             val firstArtist = song.artists.firstOrNull()?.name ?: "Unknown Artist"
             val allArtists = song.artists.joinToString(", ") { it.name }
@@ -82,7 +82,7 @@ class DownloadExportHelper @Inject constructor(
                 existingFile.delete()
             }
 
-            val mimeType = format?.mimeType ?: "audio/mp4"
+            val mimeType = format?.mimeType ?: mimeTypeFromExtension(extension)
             val newFile = artistFolder.createFile(mimeType, sanitizedFilename) ?: run {
                 Timber.tag(TAG).e("Failed to create file: %s", sanitizedFilename)
                 return@withContext null
@@ -96,15 +96,28 @@ class DownloadExportHelper @Inject constructor(
 
             outputStream.use { out ->
                 val cachedSpans = downloadCache.getCachedSpans(songId)
-                if (cachedSpans.isEmpty()) {
-                    Timber.tag(TAG).w("No cached data found for: %s", songId)
-                    newFile.delete()
-                    return@withContext null
-                }
-
-                val sortedSpans = cachedSpans.sortedBy { it.position }
-                for (span in sortedSpans) {
-                    span.file?.inputStream()?.use { input ->
+                if (cachedSpans.isNotEmpty()) {
+                    val sortedSpans = cachedSpans.sortedBy { it.position }
+                    for (span in sortedSpans) {
+                        span.file?.inputStream()?.use { input ->
+                            input.copyTo(out)
+                        }
+                    }
+                } else {
+                    val mediaStoreUri = song.song.mediaStoreUri
+                    if (mediaStoreUri.isNullOrBlank()) {
+                        Timber.tag(TAG).w("No cached data or MediaStore URI found for: %s", songId)
+                        newFile.delete()
+                        return@withContext null
+                    }
+                    val sourceUri = Uri.parse(mediaStoreUri)
+                    val sourceStream = context.contentResolver.openInputStream(sourceUri)
+                    if (sourceStream == null) {
+                        Timber.tag(TAG).w("Unable to open MediaStore URI for export: %s", mediaStoreUri)
+                        newFile.delete()
+                        return@withContext null
+                    }
+                    sourceStream.use { input ->
                         input.copyTo(out)
                     }
                 }
@@ -217,13 +230,34 @@ class DownloadExportHelper @Inject constructor(
         }
     }
 
-    private fun getExtensionFromFormat(format: FormatEntity?): String = when {
-        format == null -> "m4a"
+    private fun getExtensionFromFormat(format: FormatEntity?, mediaStoreUri: String?): String = when {
+        format == null -> inferExtensionFromMediaStoreUri(mediaStoreUri) ?: "m4a"
         format.mimeType.contains("audio/webm") -> "ogg"
         format.mimeType.contains("audio/mp4") -> "m4a"
         format.mimeType.contains("audio/mpeg") -> "mp3"
         format.mimeType.contains("audio/ogg") -> "ogg"
         else -> "m4a"
+    }
+
+    private fun inferExtensionFromMediaStoreUri(mediaStoreUri: String?): String? {
+        if (mediaStoreUri.isNullOrBlank()) return null
+        val mimeType = runCatching {
+            context.contentResolver.getType(Uri.parse(mediaStoreUri))
+        }.getOrNull() ?: return null
+        return when {
+            mimeType.contains("audio/mpeg") -> "mp3"
+            mimeType.contains("audio/mp4") -> "m4a"
+            mimeType.contains("audio/ogg") -> "ogg"
+            mimeType.contains("audio/webm") -> "ogg"
+            else -> null
+        }
+    }
+
+    private fun mimeTypeFromExtension(extension: String): String = when (extension) {
+        "mp3" -> "audio/mpeg"
+        "ogg" -> "audio/ogg"
+        "m4a" -> "audio/mp4"
+        else -> "audio/mp4"
     }
 
     private fun sanitizeFilename(filename: String): String {
