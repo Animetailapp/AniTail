@@ -43,4 +43,19 @@ fun StatsTopArtistsScreen(
     )
 }
 
+@Composable
+fun StatsTopSongsScreen(
+    navController: NavController,
+    year: Int,
+    month: Int,
+    viewModel: SoundCapsuleViewModel = hiltViewModel(),
+) {
+    SoundCapsuleTopSongsScreen(
+        navController = navController,
+        year = year,
+        month = month,
+        viewModel = viewModel,
+    )
+}
+
 enum class OptionStats { WEEKS, MONTHS, YEARS, CONTINUOUS }

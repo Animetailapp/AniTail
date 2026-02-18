@@ -20,6 +20,7 @@ data class TopSongUi(
     val id: String,
     val title: String,
     val thumbnailUrl: String?,
+    val subtitle: String? = null,
     val isNew: Boolean,
 )
 
@@ -38,6 +39,7 @@ data class SoundCapsuleMonthUiState(
     val totalSongsPlayed: Int,
     val topArtist: TopArtistUi?,
     val topSong: TopSongUi?,
+    val rankedSongs: List<TopSongUi>,
     val rankedArtists: List<RankedArtistUi>,
     val dailyPlayTimeMs: List<Long>,
     val periodPlayTimeMs: Map<ListeningPeriod, Long>,

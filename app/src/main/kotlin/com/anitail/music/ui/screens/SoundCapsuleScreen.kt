@@ -57,14 +57,6 @@ import com.anitail.music.viewmodels.SoundCapsuleViewModel
 import java.time.YearMonth
 import java.util.Locale
 
-private val CapsuleBackground = Color(0xFF050609)
-private val CapsuleCardBackground = Color(0xFF1C1D21)
-private val CapsuleMutedText = Color(0xFFB4B6BE)
-private val CapsuleSubtleText = Color(0xFF8A8D96)
-private val CapsuleGreen = Color(0xFF1ED760)
-private val CapsuleBlue = Color(0xFF4C8EEC)
-private val CapsuleYellow = Color(0xFFE8D96A)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SoundCapsuleScreen(
@@ -78,12 +70,13 @@ fun SoundCapsuleScreen(
             .only(WindowInsetsSides.Bottom)
             .asPaddingValues()
             .calculateBottomPadding()
+    val colors = capsuleColors()
 
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(CapsuleBackground),
+                .background(colors.background),
     ) {
         LazyColumn(
             contentPadding = PaddingValues(top = 84.dp, bottom = bottomInsets + 24.dp),
@@ -111,6 +104,9 @@ fun SoundCapsuleScreen(
                     onTopArtistsClick = {
                         navController.navigate("stats/top-artists/${month.year}/${month.month}")
                     },
+                    onTopSongsClick = {
+                        navController.navigate("stats/top-songs/${month.year}/${month.month}")
+                    },
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
@@ -131,7 +127,7 @@ fun SoundCapsuleScreen(
                     Icon(
                         painter = painterResource(R.drawable.arrow_back),
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             },
@@ -144,8 +140,10 @@ private fun SoundCapsuleMonthSection(
     month: SoundCapsuleMonthUiState,
     onTimeListenedClick: () -> Unit,
     onTopArtistsClick: () -> Unit,
+    onTopSongsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = capsuleColors()
     Column(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = modifier,
@@ -157,18 +155,18 @@ private fun SoundCapsuleMonthSection(
             Text(
                 text = monthYearLabel(month.yearMonth),
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(modifier = Modifier.weight(1f))
             Icon(
                 painter = painterResource(R.drawable.share),
                 contentDescription = null,
-                tint = CapsuleMutedText,
+                tint = colors.mutedText,
                 modifier = Modifier.size(20.dp),
             )
         }
 
-        if (month.totalMinutes <= 0) {
+        if (month.totalSongsPlayed <= 0) {
             NoMusicMonthCard()
             return@Column
         }
@@ -186,6 +184,7 @@ private fun SoundCapsuleMonthSection(
             )
             TopSongCard(
                 month = month,
+                onClick = onTopSongsClick,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -197,9 +196,10 @@ private fun TimeListenedCard(
     month: SoundCapsuleMonthUiState,
     onClick: () -> Unit,
 ) {
+    val colors = capsuleColors()
     Card(
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = CapsuleCardBackground),
+        colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -216,18 +216,18 @@ private fun TimeListenedCard(
                 Text(
                     text = stringResource(R.string.time_listened),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = CapsuleMutedText,
+                    color = colors.mutedText,
                 )
                 Text(
                     text = stringResource(R.string.sound_capsule_minutes_value, month.totalMinutes),
                     style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = CapsuleGreen,
+                    color = colors.primaryAccent,
                 )
             }
             Icon(
                 painter = painterResource(R.drawable.navigate_next),
                 contentDescription = null,
-                tint = CapsuleSubtleText,
+                tint = colors.subtleText,
             )
         }
     }
@@ -239,10 +239,11 @@ private fun TopArtistCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = capsuleColors()
     val topArtist = month.topArtist
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CapsuleCardBackground),
+        colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
         modifier = modifier,
     ) {
         Column(
@@ -259,19 +260,19 @@ private fun TopArtistCard(
                 Text(
                     text = stringResource(R.string.sound_capsule_top_artist),
                     style = MaterialTheme.typography.bodySmall,
-                    color = CapsuleMutedText,
+                    color = colors.mutedText,
                     modifier = Modifier.weight(1f),
                 )
                 Icon(
                     painter = painterResource(R.drawable.navigate_next),
                     contentDescription = null,
-                    tint = CapsuleSubtleText,
+                    tint = colors.subtleText,
                 )
             }
             Text(
                 text = topArtist?.name ?: stringResource(R.string.sound_capsule_no_data),
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                color = CapsuleBlue,
+                color = colors.secondaryAccent,
                 maxLines = 2,
             )
             Row(
@@ -294,18 +295,21 @@ private fun TopArtistCard(
 @Composable
 private fun TopSongCard(
     month: SoundCapsuleMonthUiState,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = capsuleColors()
     val topSong = month.topSong
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CapsuleCardBackground),
+        colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
         modifier = modifier,
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier =
                 Modifier
+                    .clickable(onClick = onClick)
                     .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
             Row(
@@ -315,19 +319,19 @@ private fun TopSongCard(
                 Text(
                     text = stringResource(R.string.sound_capsule_top_song),
                     style = MaterialTheme.typography.bodySmall,
-                    color = CapsuleMutedText,
+                    color = colors.mutedText,
                     modifier = Modifier.weight(1f),
                 )
                 Icon(
                     painter = painterResource(R.drawable.navigate_next),
                     contentDescription = null,
-                    tint = CapsuleSubtleText,
+                    tint = colors.subtleText,
                 )
             }
             Text(
                 text = topSong?.title ?: stringResource(R.string.sound_capsule_no_data),
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                color = CapsuleYellow,
+                color = colors.tertiaryAccent,
                 maxLines = 2,
             )
             Row(
@@ -349,9 +353,10 @@ private fun TopSongCard(
 
 @Composable
 private fun NoMusicMonthCard() {
+    val colors = capsuleColors()
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CapsuleCardBackground),
+        colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -362,13 +367,13 @@ private fun NoMusicMonthCard() {
             Text(
                 text = stringResource(R.string.sound_capsule_musicless_title),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
             )
             Text(
                 text = stringResource(R.string.sound_capsule_musicless_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
-                color = CapsuleMutedText,
+                color = colors.mutedText,
                 textAlign = TextAlign.Center,
             )
         }
@@ -377,9 +382,10 @@ private fun NoMusicMonthCard() {
 
 @Composable
 private fun LifetimeInsightCard(totalSongs: Int) {
+    val colors = capsuleColors()
     Card(
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = CapsuleCardBackground),
+        colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -394,12 +400,12 @@ private fun LifetimeInsightCard(totalSongs: Int) {
                         totalSongs,
                     ),
                 style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.SemiBold),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = stringResource(R.string.sound_capsule_lifetime_description),
                 style = MaterialTheme.typography.bodyLarge,
-                color = CapsuleMutedText,
+                color = colors.mutedText,
             )
         }
     }
@@ -407,6 +413,7 @@ private fun LifetimeInsightCard(totalSongs: Int) {
 
 @Composable
 private fun HeroPulseGraphic() {
+    val colors = capsuleColors()
     val barHeights = listOf(24.dp, 40.dp, 60.dp, 40.dp, 24.dp)
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -423,7 +430,7 @@ private fun HeroPulseGraphic() {
                         .clip(CircleShape)
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(Color(0xFF295136), Color(0xFF20D665)),
+                                colors = listOf(colors.primaryAccent.copy(alpha = 0.45f), colors.primaryAccent),
                             ),
                         ),
             )
@@ -437,19 +444,20 @@ private fun ThumbnailCircle(
     imageUrl: String?,
     fallbackIcon: Int,
 ) {
+    val colors = capsuleColors()
     Box(
         contentAlignment = Alignment.Center,
         modifier =
             Modifier
                 .size(82.dp)
                 .clip(CircleShape)
-                .background(Color(0xFF101217)),
+                .background(colors.thumbnailBackground),
     ) {
         if (imageUrl.isNullOrBlank()) {
             Icon(
                 painter = painterResource(fallbackIcon),
                 contentDescription = null,
-                tint = CapsuleMutedText,
+                tint = colors.mutedText,
                 modifier = Modifier.size(26.dp),
             )
         } else {
@@ -467,19 +475,20 @@ private fun ThumbnailSquare(
     imageUrl: String?,
     fallbackIcon: Int,
 ) {
+    val colors = capsuleColors()
     Box(
         contentAlignment = Alignment.Center,
         modifier =
             Modifier
                 .size(82.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF101217)),
+                .background(colors.thumbnailBackground),
     ) {
         if (imageUrl.isNullOrBlank()) {
             Icon(
                 painter = painterResource(fallbackIcon),
                 contentDescription = null,
-                tint = CapsuleMutedText,
+                tint = colors.mutedText,
                 modifier = Modifier.size(26.dp),
             )
         } else {
@@ -494,30 +503,61 @@ private fun ThumbnailSquare(
 
 @Composable
 private fun NewBadge() {
+    val colors = capsuleColors()
     Box(
         contentAlignment = Alignment.Center,
         modifier =
             Modifier
                 .clip(CircleShape)
-                .background(Color(0xFF4C4F59))
+                .background(colors.badgeBackground)
                 .padding(horizontal = 12.dp, vertical = 5.dp),
     ) {
         Text(
             text = stringResource(R.string.sound_capsule_new),
             style = MaterialTheme.typography.labelMedium,
-            color = Color(0xFFE3E4E9),
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
         )
     }
 }
 
 @Composable
-fun monthYearLabel(yearMonth: YearMonth): AnnotatedString =
-    buildAnnotatedString {
+fun monthYearLabel(yearMonth: YearMonth): AnnotatedString {
+    val colors = capsuleColors()
+    return buildAnnotatedString {
         val locale = Locale.getDefault()
         val monthName = yearMonth.month.getDisplayName(java.time.format.TextStyle.FULL, locale)
         append(monthName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() })
         append(" ")
-        withStyle(SpanStyle(color = CapsuleMutedText)) {
+        withStyle(SpanStyle(color = colors.mutedText)) {
             append(yearMonth.year.toString())
         }
     }
+}
+
+private data class CapsuleColors(
+    val background: Color,
+    val cardBackground: Color,
+    val thumbnailBackground: Color,
+    val mutedText: Color,
+    val subtleText: Color,
+    val primaryAccent: Color,
+    val secondaryAccent: Color,
+    val tertiaryAccent: Color,
+    val badgeBackground: Color,
+)
+
+@Composable
+private fun capsuleColors(): CapsuleColors {
+    val scheme = MaterialTheme.colorScheme
+    return CapsuleColors(
+        background = scheme.background,
+        cardBackground = scheme.surfaceVariant.copy(alpha = 0.65f),
+        thumbnailBackground = scheme.surfaceContainer,
+        mutedText = scheme.onSurfaceVariant,
+        subtleText = scheme.onSurfaceVariant.copy(alpha = 0.75f),
+        primaryAccent = scheme.primary,
+        secondaryAccent = scheme.secondary,
+        tertiaryAccent = scheme.tertiary,
+        badgeBackground = scheme.secondaryContainer,
+    )
+}

@@ -100,6 +100,19 @@ fun NavGraphBuilder.navigationBuilder(
             month = backStackEntry.arguments?.getInt("month") ?: 1,
         )
     }
+    composable(
+        route = "stats/top-songs/{year}/{month}",
+        arguments = listOf(
+            navArgument("year") { type = NavType.IntType },
+            navArgument("month") { type = NavType.IntType },
+        ),
+    ) { backStackEntry ->
+        StatsTopSongsScreen(
+            navController = navController,
+            year = backStackEntry.arguments?.getInt("year") ?: 1970,
+            month = backStackEntry.arguments?.getInt("month") ?: 1,
+        )
+    }
     composable("mood_and_genres") {
         MoodAndGenresScreen(navController, scrollBehavior)
     }
