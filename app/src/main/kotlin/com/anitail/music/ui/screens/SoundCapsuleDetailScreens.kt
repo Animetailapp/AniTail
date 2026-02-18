@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -209,8 +210,8 @@ fun SoundCapsuleTopArtistsScreen(
                 .background(colors.background),
     ) {
         LazyColumn(
-            contentPadding = PaddingValues(top = 84.dp, bottom = bottomInsets + 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(top = 74.dp, bottom = bottomInsets + 24.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -218,12 +219,12 @@ fun SoundCapsuleTopArtistsScreen(
         ) {
             item {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(horizontal = 16.dp),
                 ) {
                     Text(
                         text = monthYearLabel(state.yearMonth),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     TopArtistsHeadline(count = state.rankedArtists.size)
@@ -240,11 +241,16 @@ fun SoundCapsuleTopArtistsScreen(
                     )
                 }
             } else {
-                items(items = state.rankedArtists, key = { artist -> artist.id }) { artist ->
-                    TopArtistRow(
-                        artist = artist,
+                itemsIndexed(items = state.rankedArtists, key = { _, artist -> artist.id }) { index, artist ->
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(horizontal = 16.dp),
-                    )
+                    ) {
+                        TopArtistRow(artist = artist)
+                        if (index < state.rankedArtists.lastIndex) {
+                            HorizontalDivider(color = colors.divider, thickness = 0.6.dp)
+                        }
+                    }
                 }
             }
         }
@@ -296,8 +302,8 @@ fun SoundCapsuleTopSongsScreen(
                 .background(colors.background),
     ) {
         LazyColumn(
-            contentPadding = PaddingValues(top = 84.dp, bottom = bottomInsets + 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(top = 74.dp, bottom = bottomInsets + 24.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -305,12 +311,12 @@ fun SoundCapsuleTopSongsScreen(
         ) {
             item {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(horizontal = 16.dp),
                 ) {
                     Text(
                         text = monthYearLabel(state.yearMonth),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     TopSongsHeadline(count = state.rankedSongs.size)
@@ -327,11 +333,19 @@ fun SoundCapsuleTopSongsScreen(
                     )
                 }
             } else {
-                items(items = state.rankedSongs, key = { song -> song.id }) { song ->
-                    TopSongRow(
-                        song = song,
+                itemsIndexed(items = state.rankedSongs, key = { _, song -> song.id }) { index, song ->
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.padding(horizontal = 16.dp),
-                    )
+                    ) {
+                        TopSongRow(
+                            rank = index + 1,
+                            song = song,
+                        )
+                        if (index < state.rankedSongs.lastIndex) {
+                            HorizontalDivider(color = colors.divider, thickness = 0.6.dp)
+                        }
+                    }
                 }
             }
         }
@@ -379,18 +393,20 @@ private fun TimeHeadline(totalMinutes: Int) {
 @Composable
 private fun TopArtistsHeadline(count: Int) {
     val colors = detailColors()
+    val artistsWord = stringResource(R.string.artists).lowercase()
+    val sentenceSuffix = stringResource(R.string.sound_capsule_top_artists_suffix)
     Text(
         text =
             buildAnnotatedString {
                 append(stringResource(R.string.sound_capsule_top_artists_prefix))
                 withStyle(SpanStyle(color = colors.secondaryAccent)) {
                     append(count.toString())
-                    append(" ")
-                    append(stringResource(R.string.artists).lowercase())
                 }
-                append(stringResource(R.string.sound_capsule_top_artists_suffix))
+                append(" ")
+                append(artistsWord)
+                append(sentenceSuffix)
             },
-        style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.SemiBold),
+        style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.SemiBold),
         color = MaterialTheme.colorScheme.onSurface,
     )
 }
@@ -398,18 +414,20 @@ private fun TopArtistsHeadline(count: Int) {
 @Composable
 private fun TopSongsHeadline(count: Int) {
     val colors = detailColors()
+    val songsWord = stringResource(R.string.songs).lowercase()
+    val sentenceSuffix = stringResource(R.string.sound_capsule_top_artists_suffix)
     Text(
         text =
             buildAnnotatedString {
                 append(stringResource(R.string.sound_capsule_top_artists_prefix))
                 withStyle(SpanStyle(color = colors.secondaryAccent)) {
                     append(count.toString())
-                    append(" ")
-                    append(stringResource(R.string.songs).lowercase())
                 }
-                append(stringResource(R.string.sound_capsule_top_artists_suffix))
+                append(" ")
+                append(songsWord)
+                append(sentenceSuffix)
             },
-        style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.SemiBold),
+        style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.SemiBold),
         color = MaterialTheme.colorScheme.onSurface,
     )
 }
@@ -650,14 +668,14 @@ private fun TopArtistRow(
     ) {
         Text(
             text = artist.rank.toString().padStart(2, '0'),
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             color = colors.secondaryAccent,
             modifier = Modifier.width(36.dp),
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = artist.name,
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
@@ -667,7 +685,7 @@ private fun TopArtistRow(
                     } else {
                         stringResource(R.string.sound_capsule_top_artist_of_month)
                     },
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = colors.mutedText,
             )
         }
@@ -676,7 +694,7 @@ private fun TopArtistRow(
             modifier =
                 Modifier
                     .padding(start = 10.dp)
-                    .size(78.dp)
+                    .size(64.dp)
                     .clip(CircleShape)
                     .background(colors.thumbnailBackground),
         ) {
@@ -685,7 +703,7 @@ private fun TopArtistRow(
                     painter = painterResource(R.drawable.person),
                     contentDescription = null,
                     tint = colors.mutedText,
-                    modifier = Modifier.size(26.dp),
+                    modifier = Modifier.size(22.dp),
                 )
             } else {
                 AsyncImage(
@@ -700,6 +718,7 @@ private fun TopArtistRow(
 
 @Composable
 private fun TopSongRow(
+    rank: Int,
     song: TopSongUi,
     modifier: Modifier = Modifier,
 ) {
@@ -708,12 +727,18 @@ private fun TopSongRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.fillMaxWidth(),
     ) {
+        Text(
+            text = rank.toString().padStart(2, '0'),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = colors.secondaryAccent,
+            modifier = Modifier.width(36.dp),
+        )
         Box(
             contentAlignment = Alignment.Center,
             modifier =
                 Modifier
-                    .size(78.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .background(colors.thumbnailBackground),
         ) {
             if (song.thumbnailUrl.isNullOrBlank()) {
@@ -721,7 +746,7 @@ private fun TopSongRow(
                     painter = painterResource(R.drawable.music_note),
                     contentDescription = null,
                     tint = colors.mutedText,
-                    modifier = Modifier.size(26.dp),
+                    modifier = Modifier.size(22.dp),
                 )
             } else {
                 AsyncImage(
@@ -732,16 +757,16 @@ private fun TopSongRow(
             }
         }
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = song.title,
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = song.subtitle ?: stringResource(R.string.sound_capsule_top_song),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = colors.mutedText,
             )
         }

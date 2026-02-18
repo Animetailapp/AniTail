@@ -80,7 +80,7 @@ fun SoundCapsuleScreen(
     ) {
         LazyColumn(
             contentPadding = PaddingValues(top = 84.dp, bottom = bottomInsets + 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -89,7 +89,7 @@ fun SoundCapsuleScreen(
             item {
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     LifetimeInsightCard(totalSongs = totalSongs)
                 }
@@ -145,7 +145,7 @@ private fun SoundCapsuleMonthSection(
 ) {
     val colors = capsuleColors()
     Column(
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier,
     ) {
         Row(
@@ -154,7 +154,7 @@ private fun SoundCapsuleMonthSection(
         ) {
             Text(
                 text = monthYearLabel(month.yearMonth),
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(modifier = Modifier.weight(1f))
@@ -207,7 +207,7 @@ private fun TimeListenedCard(
             modifier =
                 Modifier
                     .clickable(onClick = onClick)
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -220,7 +220,7 @@ private fun TimeListenedCard(
                 )
                 Text(
                     text = stringResource(R.string.sound_capsule_minutes_value, month.totalMinutes),
-                    style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.SemiBold),
                     color = colors.primaryAccent,
                 )
             }
@@ -271,7 +271,7 @@ private fun TopArtistCard(
             }
             Text(
                 text = topArtist?.name ?: stringResource(R.string.sound_capsule_no_data),
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
                 color = colors.secondaryAccent,
                 maxLines = 2,
             )
@@ -330,7 +330,7 @@ private fun TopSongCard(
             }
             Text(
                 text = topSong?.title ?: stringResource(R.string.sound_capsule_no_data),
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
                 color = colors.tertiaryAccent,
                 maxLines = 2,
             )
@@ -384,13 +384,13 @@ private fun NoMusicMonthCard() {
 private fun LifetimeInsightCard(totalSongs: Int) {
     val colors = capsuleColors()
     Card(
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             HeroPulseGraphic()
             Text(
@@ -399,12 +399,12 @@ private fun LifetimeInsightCard(totalSongs: Int) {
                         R.string.sound_capsule_lifetime_headline,
                         totalSongs,
                     ),
-                style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = stringResource(R.string.sound_capsule_lifetime_description),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = colors.mutedText,
             )
         }
@@ -414,7 +414,7 @@ private fun LifetimeInsightCard(totalSongs: Int) {
 @Composable
 private fun HeroPulseGraphic() {
     val colors = capsuleColors()
-    val barHeights = listOf(24.dp, 40.dp, 60.dp, 40.dp, 24.dp)
+    val barHeights = listOf(16.dp, 26.dp, 38.dp, 26.dp, 16.dp)
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.Bottom,
@@ -425,7 +425,7 @@ private fun HeroPulseGraphic() {
             Box(
                 modifier =
                     Modifier
-                        .width(18.dp)
+                        .width(14.dp)
                         .height(height)
                         .clip(CircleShape)
                         .background(
@@ -449,7 +449,7 @@ private fun ThumbnailCircle(
         contentAlignment = Alignment.Center,
         modifier =
             Modifier
-                .size(82.dp)
+                .size(64.dp)
                 .clip(CircleShape)
                 .background(colors.thumbnailBackground),
     ) {
@@ -458,7 +458,7 @@ private fun ThumbnailCircle(
                 painter = painterResource(fallbackIcon),
                 contentDescription = null,
                 tint = colors.mutedText,
-                modifier = Modifier.size(26.dp),
+                modifier = Modifier.size(22.dp),
             )
         } else {
             AsyncImage(
@@ -480,7 +480,7 @@ private fun ThumbnailSquare(
         contentAlignment = Alignment.Center,
         modifier =
             Modifier
-                .size(82.dp)
+                .size(64.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(colors.thumbnailBackground),
     ) {
@@ -489,7 +489,7 @@ private fun ThumbnailSquare(
                 painter = painterResource(fallbackIcon),
                 contentDescription = null,
                 tint = colors.mutedText,
-                modifier = Modifier.size(26.dp),
+                modifier = Modifier.size(22.dp),
             )
         } else {
             AsyncImage(
@@ -510,7 +510,7 @@ private fun NewBadge() {
             Modifier
                 .clip(CircleShape)
                 .background(colors.badgeBackground)
-                .padding(horizontal = 12.dp, vertical = 5.dp),
+                .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
         Text(
             text = stringResource(R.string.sound_capsule_new),
