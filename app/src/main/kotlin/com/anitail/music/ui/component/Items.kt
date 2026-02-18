@@ -44,7 +44,6 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -436,22 +435,14 @@ fun AlbumListItem(
     showLikedIcon: Boolean = true,
     badges: @Composable RowScope.() -> Unit = {
         val database = LocalDatabase.current
-        val downloadUtil = LocalDownloadUtil.current
-        val songIds by produceState(
-            initialValue = emptyList<String>(),
-            key1 = album.id,
-            key2 = album.album.lastUpdateTime
-        ) {
-            value = database.albumSongIds(album.id).first()
-        }
-        val downloadState by downloadUtil.getDownloadState(songIds)
-            .collectAsState(initial = Download.STATE_STOPPED)
+        val isAlbumFullyDownloaded by database.isAlbumFullyDownloaded(album.id)
+            .collectAsState(initial = false)
 
         if (showLikedIcon && album.album.bookmarkedAt != null) {
             Icon.Favorite()
         }
 
-        Icon.Download(downloadState)
+        Icon.Download(if (isAlbumFullyDownloaded) STATE_COMPLETED else null)
     },
     isActive: Boolean = false,
     isPlaying: Boolean = false,
@@ -484,22 +475,14 @@ fun AlbumGridItem(
     coroutineScope: CoroutineScope,
     badges: @Composable RowScope.() -> Unit = {
         val database = LocalDatabase.current
-        val downloadUtil = LocalDownloadUtil.current
-        val songIds by produceState(
-            initialValue = emptyList<String>(),
-            key1 = album.id,
-            key2 = album.album.lastUpdateTime
-        ) {
-            value = database.albumSongIds(album.id).first()
-        }
-        val downloadState by downloadUtil.getDownloadState(songIds)
-            .collectAsState(initial = Download.STATE_STOPPED)
+        val isAlbumFullyDownloaded by database.isAlbumFullyDownloaded(album.id)
+            .collectAsState(initial = false)
 
         if (album.album.bookmarkedAt != null) {
             Icon.Favorite()
         }
 
-        Icon.Download(downloadState)
+        Icon.Download(if (isAlbumFullyDownloaded) STATE_COMPLETED else null)
     },
     isActive: Boolean = false,
     isPlaying: Boolean = false,

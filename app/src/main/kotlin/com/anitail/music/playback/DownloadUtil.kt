@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
@@ -395,6 +396,7 @@ constructor(
                 calculateDownloadState(uniqueSongIds, currentDownloads)
             }
             .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
     }
 
     fun getDownloadState(songIdsFlow: Flow<List<String>>): Flow<Int> =
@@ -403,6 +405,7 @@ constructor(
             .distinctUntilChanged()
             .flatMapLatest { songIds -> getDownloadState(songIds) }
             .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
 
     fun getMediaStoreDownloads(songIds: Collection<String>): Flow<Map<String, MediaStoreDownloadManager.DownloadState>> {
         val uniqueSongIds = songIds.toSet()
@@ -421,6 +424,7 @@ constructor(
                 }
             }
             .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
     }
 
     fun getMediaStoreDownloads(songIdsFlow: Flow<List<String>>): Flow<Map<String, MediaStoreDownloadManager.DownloadState>> =
@@ -429,6 +433,26 @@ constructor(
             .distinctUntilChanged()
             .flatMapLatest { songIds -> getMediaStoreDownloads(songIds) }
             .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
+
+    fun getMediaStoreCollectionStatus(songs: Collection<Song>): Flow<MediaStoreCollectionStatus> {
+        val distinctSongs = songs
+            .groupBy { it.id }
+            .mapNotNull { (_, groupedSongs) -> groupedSongs.firstOrNull() }
+        if (distinctSongs.isEmpty()) {
+            return flowOf(MediaStoreCollectionStatus.NotDownloaded)
+        }
+
+        return getMediaStoreDownloads(distinctSongs.map { it.id })
+            .map { states ->
+                calculateMediaStoreCollectionStatus(
+                    songs = distinctSongs,
+                    states = states
+                )
+            }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
+    }
 
     fun calculateMediaStoreCollectionStatus(
         songs: List<Song>,
@@ -488,6 +512,7 @@ constructor(
         currentDownloads: Map<String, Download>,
     ): Int {
         if (songIds.isEmpty()) return Download.STATE_STOPPED
+        if (songIds.size > currentDownloads.size) return Download.STATE_STOPPED
 
         val allCompleted = songIds.all { songId ->
             currentDownloads[songId]?.state == Download.STATE_COMPLETED
@@ -542,13 +567,17 @@ constructor(
     }
 
     fun getDownload(songId: String): Flow<Download?> =
-        downloads.map { it[songId] }.distinctUntilChanged()
+        downloads
+            .map { it[songId] }
+            .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
 
     // MediaStore download methods
     fun getMediaStoreDownload(songId: String): Flow<MediaStoreDownloadManager.DownloadState?> =
         mediaStoreDownloadManager.downloadStates
             .map { it[songId] }
             .distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
 
     fun downloadToMediaStore(song: com.anitail.music.db.entities.Song, targetItag: Int? = null) {
         targetItag?.let { mediaStoreDownloadManager.setTargetItag(song.id, it) }

@@ -38,6 +38,7 @@ class MediaStoreDownloadService : Service() {
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private lateinit var notificationManager: NotificationManager
     private val songInfoCache = mutableMapOf<String, Pair<String, String>>()
+    private var lastNotificationKey: String? = null
 
     companion object {
         private const val NOTIFICATION_CHANNEL_ID = "mediastore_download"
@@ -147,8 +148,15 @@ class MediaStoreDownloadService : Service() {
         }
 
         if (activeDownloads.isEmpty()) {
+            lastNotificationKey = null
             return
         }
+
+        val notificationKey = buildNotificationKey(activeDownloads)
+        if (notificationKey == lastNotificationKey) {
+            return
+        }
+        lastNotificationKey = notificationKey
 
         val notification = if (activeDownloads.size == 1) {
             // Single download - show detailed progress
@@ -159,6 +167,33 @@ class MediaStoreDownloadService : Service() {
         }
 
         notificationManager.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun buildNotificationKey(
+        activeDownloads: List<MediaStoreDownloadManager.DownloadState>
+    ): String {
+        if (activeDownloads.size == 1) {
+            val single = activeDownloads.first()
+            return buildString {
+                append("single:")
+                append(single.songId)
+                append(':')
+                append(single.status.name)
+                append(':')
+                append((single.progress * 100f).toInt())
+            }
+        }
+
+        val downloadingCount =
+            activeDownloads.count { it.status == MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING }
+        val queuedCount =
+            activeDownloads.count { it.status == MediaStoreDownloadManager.DownloadState.Status.QUEUED }
+        val avgProgress = activeDownloads
+            .filter { it.status == MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING }
+            .map { it.progress }
+            .average()
+            .let { if (it.isNaN()) 0.0 else it }
+        return "multi:$downloadingCount:$queuedCount:${(avgProgress * 100.0).toInt()}"
     }
 
     private suspend fun createSingleDownloadNotification(

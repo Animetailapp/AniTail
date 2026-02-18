@@ -187,6 +187,25 @@ interface DatabaseDao {
     @Query("SELECT song.id FROM song JOIN song_album_map ON song.id = song_album_map.songId WHERE song_album_map.albumId = :albumId")
     fun albumSongIds(albumId: String): Flow<List<String>>
 
+    @Query(
+        """
+        SELECT CASE
+            WHEN COUNT(1) = 0 THEN 0
+            WHEN SUM(
+                CASE
+                    WHEN song.mediaStoreUri IS NOT NULL OR song.downloadUri IS NOT NULL THEN 1
+                    ELSE 0
+                END
+            ) = COUNT(1) THEN 1
+            ELSE 0
+        END
+        FROM song
+        JOIN song_album_map ON song.id = song_album_map.songId
+        WHERE song_album_map.albumId = :albumId
+        """
+    )
+    fun isAlbumFullyDownloaded(albumId: String): Flow<Boolean>
+
     @Transaction
     @Query("SELECT playlist_song_map.* FROM playlist_song_map INNER JOIN song ON playlist_song_map.songId = song.id WHERE playlistId = :playlistId ORDER BY position")
     fun playlistSongs(playlistId: String): Flow<List<PlaylistSong>>

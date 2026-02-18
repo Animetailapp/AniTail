@@ -261,6 +261,7 @@ constructor(
 
     private suspend fun enqueueSongsLocked(songs: Collection<Song>): Boolean {
         var queuedAny = false
+        val queuedStates = LinkedHashMap<String, DownloadState>()
 
         for (song in songs) {
             clearCancelRequested(song.id)
@@ -287,15 +288,16 @@ constructor(
             if (!enqueued) continue
 
             queuedAny = true
-            updateDownloadState(
-                song.id,
+            queuedStates[song.id] =
                 DownloadState(
                     songId = song.id,
                     status = DownloadState.Status.QUEUED
                 )
-            )
         }
 
+        if (queuedStates.isNotEmpty()) {
+            applyDownloadStateMutations(statesToUpsert = queuedStates)
+        }
         return queuedAny
     }
 
@@ -310,16 +312,16 @@ constructor(
         }
 
         val songsToQueue = ArrayList<Song>(uniqueSongs.size)
+        val failedStates = LinkedHashMap<String, DownloadState>()
+        val statesToClear = LinkedHashSet<String>()
         for (song in uniqueSongs) {
             if (customDownloadPathEnabled && !customPathWritable) {
-                updateDownloadState(
-                    song.id,
+                failedStates[song.id] =
                     DownloadState(
                         songId = song.id,
                         status = DownloadState.Status.FAILED,
                         error = "Custom folder is unavailable or read-only"
                     )
-                )
                 continue
             }
 
@@ -332,16 +334,14 @@ constructor(
                     sourceMediaStoreUri = song.song.mediaStoreUri
                 )
                 if (!movedToCustomPath && customDownloadPathEnabled) {
-                    updateDownloadState(
-                        song.id,
+                    failedStates[song.id] =
                         DownloadState(
                             songId = song.id,
                             status = DownloadState.Status.FAILED,
                             error = "Unable to move existing file to custom folder"
                         )
-                    )
                 } else {
-                    clearDownloadState(song.id)
+                    statesToClear += song.id
                 }
                 continue
             }
@@ -352,7 +352,7 @@ constructor(
                 if (song.song.mediaStoreUri != song.song.downloadUri) {
                     markSongAsDownloaded(song.id, song.song.downloadUri)
                 }
-                clearDownloadState(song.id)
+                statesToClear += song.id
                 continue
             }
 
@@ -364,7 +364,7 @@ constructor(
                 if (existingFile != null) {
                     Timber.Forest.d("Song ${song.song.title} already exists in MediaStore: $existingFile")
                     markSongAsDownloaded(song.id, existingFile.toString())
-                    clearDownloadState(song.id)
+                    statesToClear += song.id
                     continue
                 }
             }
@@ -372,6 +372,10 @@ constructor(
             songsToQueue += song
         }
 
+        applyDownloadStateMutations(
+            statesToUpsert = failedStates,
+            statesToClear = statesToClear
+        )
         return songsToQueue
     }
 
@@ -719,26 +723,46 @@ constructor(
      * Update the download state for a song
      */
     private fun updateDownloadState(songId: String, state: DownloadState) {
-        _downloadStates.update { currentStates ->
-            if (currentStates[songId] == state) {
-                currentStates
-            } else {
-                currentStates + (songId to state)
-            }
-        }
+        applyDownloadStateMutations(statesToUpsert = mapOf(songId to state))
     }
 
     private fun clearDownloadState(songId: String) {
-        _downloadStates.update { currentStates ->
-            if (songId in currentStates) currentStates - songId else currentStates
-        }
+        applyDownloadStateMutations(statesToClear = setOf(songId))
     }
 
     private fun clearDownloadStates(songIds: Set<String>) {
-        if (songIds.isEmpty()) return
+        applyDownloadStateMutations(statesToClear = songIds)
+    }
+
+    private fun applyDownloadStateMutations(
+        statesToUpsert: Map<String, DownloadState> = emptyMap(),
+        statesToClear: Set<String> = emptySet()
+    ) {
+        if (statesToUpsert.isEmpty() && statesToClear.isEmpty()) return
         _downloadStates.update { currentStates ->
-            val existingSongIds = songIds.filterTo(mutableSetOf()) { it in currentStates }
-            if (existingSongIds.isEmpty()) currentStates else currentStates - existingSongIds
+            var changed = false
+            val nextStates = currentStates.toMutableMap()
+
+            if (statesToClear.isNotEmpty()) {
+                statesToClear.forEach { songId ->
+                    if (nextStates.remove(songId) != null) {
+                        changed = true
+                    }
+                }
+            }
+
+            statesToUpsert.forEach { (songId, state) ->
+                if (nextStates[songId] != state) {
+                    nextStates[songId] = state
+                    changed = true
+                }
+            }
+
+            if (changed) {
+                nextStates
+            } else {
+                currentStates
+            }
         }
     }
 
