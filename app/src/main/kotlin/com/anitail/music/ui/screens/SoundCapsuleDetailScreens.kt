@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -66,6 +67,7 @@ private val CapsuleSubtleText = Color(0xFF8A8D96)
 private val CapsuleGreen = Color(0xFF1ED760)
 private val CapsuleBlue = Color(0xFF4C8EEC)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SoundCapsuleTimeListenedScreen(
     navController: NavController,
@@ -189,6 +191,7 @@ fun SoundCapsuleTimeListenedScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SoundCapsuleTopArtistsScreen(
     navController: NavController,
