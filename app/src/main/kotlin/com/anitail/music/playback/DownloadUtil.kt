@@ -288,13 +288,20 @@ constructor(
         }
 
     init {
-        // Initialize cache downloads
-        val result = mutableMapOf<String, Download>()
-        val cursor = downloadManager.downloadIndex.getDownloads()
-        while (cursor.moveToNext()) {
-            result[cursor.download.request.id] = cursor.download
+        // Initialize cache downloads off the main thread to avoid startup jank/ANR.
+        scope.launch(Dispatchers.IO) {
+            val result = mutableMapOf<String, Download>()
+            runCatching {
+                downloadManager.downloadIndex.getDownloads().use { cursor ->
+                    while (cursor.moveToNext()) {
+                        result[cursor.download.request.id] = cursor.download
+                    }
+                }
+            }.onFailure {
+                Timber.w(it, "Failed to load download index during initialization")
+            }
+            cacheDownloads.value = result
         }
-        cacheDownloads.value = result
 
         // Merge cache downloads and MediaStore downloads into unified flow
         scope.launch {

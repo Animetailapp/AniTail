@@ -525,39 +525,52 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         }
 
     if (dataStore.get(PersistentQueueKey, true)) {
-      runCatching {
-            val file = filesDir.resolve(PERSISTENT_QUEUE_FILE)
-            if (file.exists()) {
-              val json = file.readText(Charsets.UTF_8)
-              Json.decodeFromString<PersistQueue>(json)
-            } else null
+      scope.launch(Dispatchers.IO) {
+        val persistedQueue =
+            runCatching {
+                  val file = filesDir.resolve(PERSISTENT_QUEUE_FILE)
+                  if (file.exists()) {
+                    val json = file.readText(Charsets.UTF_8)
+                    Json.decodeFromString<PersistQueue>(json)
+                  } else {
+                    null
+                  }
+                }
+                .onFailure { Timber.w(it, "Failed to restore persistent queue") }
+                .getOrNull()
+
+        val persistedAutomix =
+            runCatching {
+                  val file = filesDir.resolve(PERSISTENT_AUTOMIX_FILE)
+                  if (file.exists()) {
+                    val json = file.readText(Charsets.UTF_8)
+                    Json.decodeFromString<PersistQueue>(json)
+                  } else {
+                    null
+                  }
+                }
+                .onFailure { Timber.w(it, "Failed to restore persistent automix queue") }
+                .getOrNull()
+
+        withContext(Dispatchers.Main) {
+          persistedQueue?.let { queue ->
+            playQueue(
+                queue =
+                    ListQueue(
+                        title = queue.title,
+                        items = queue.items.map { it.toMediaItem() },
+                        startIndex = queue.mediaItemIndex,
+                        position = queue.position,
+                    ),
+                playWhenReady = false,
+            )
           }
-          .onSuccess { queue ->
-            if (queue != null) {
-              playQueue(
-                  queue =
-                      ListQueue(
-                          title = queue.title,
-                          items = queue.items.map { it.toMediaItem() },
-                          startIndex = queue.mediaItemIndex,
-                          position = queue.position,
-                      ),
-                  playWhenReady = false,
-              )
-            }
+
+          persistedAutomix?.let { queue ->
+            automixItems.value = queue.items.map { it.toMediaItem() }
           }
-      runCatching {
-            val file = filesDir.resolve(PERSISTENT_AUTOMIX_FILE)
-            if (file.exists()) {
-              val json = file.readText(Charsets.UTF_8)
-              Json.decodeFromString<PersistQueue>(json)
-            } else null
-          }
-          .onSuccess { queue ->
-            if (queue != null) {
-              automixItems.value = queue.items.map { it.toMediaItem() }
-            }
-          }
+        }
+      }
     }
 
     // Save queue periodically to prevent queue loss from crash or force kill
