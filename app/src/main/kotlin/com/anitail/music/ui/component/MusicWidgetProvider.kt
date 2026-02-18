@@ -413,8 +413,8 @@ class MusicWidgetProvider : AppWidgetProvider() {
             action = "com.anitail.music.action.UPDATE_WIDGET"
         }
         try {
-            // Use PendingIntent.getForegroundService() to properly handle background execution limits
-            val pendingIntent = PendingIntent.getForegroundService(
+            // Widget refresh should not force a foreground service notification.
+            val pendingIntent = PendingIntent.getService(
                 context,
                 0,
                 serviceIntent,

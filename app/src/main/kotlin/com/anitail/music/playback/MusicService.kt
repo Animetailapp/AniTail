@@ -288,7 +288,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
     override fun onCreate() {
     super.onCreate()
-    ensureForegroundBootstrap()
     instance = this
         // Proveedor base
         val baseNotificationProvider =
@@ -1252,13 +1251,13 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
   @RequiresApi(Build.VERSION_CODES.O)
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    ensureForegroundBootstrap()
     if (intent?.action == null) {
       return super.onStartCommand(intent, flags, startId)
     }
 
     when (intent.action) {
       ACTION_PLAY_RECOMMENDATION -> {
+        ensureForegroundBootstrap()
         val songId = intent.getStringExtra(EXTRA_WIDGET_RECOMMENDATION_ID)
         if (!songId.isNullOrBlank()) {
           scope.launch(Dispatchers.IO + SupervisorJob()) {
@@ -1296,6 +1295,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         sendWidgetUpdateBroadcast()
       }
       ACTION_PLAY_PAUSE -> {
+        ensureForegroundBootstrap()
 
         val wasPlaying = player.isPlaying
 
@@ -1308,10 +1308,12 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         sendWidgetUpdateBroadcast()
       }
       ACTION_NEXT -> {
+        ensureForegroundBootstrap()
         player.seekToNext()
         player.playWhenReady = true
       }
       ACTION_PREV -> {
+        ensureForegroundBootstrap()
         player.seekToPrevious()
         player.playWhenReady = true
       }
