@@ -70,6 +70,9 @@ constructor(
     private val targetItagOverride = ConcurrentHashMap<String, Int>()
     private val pendingTargetCacheReset = ConcurrentHashMap<String, Boolean>()
     private val exportJobs = ConcurrentHashMap<String, Job>()
+    private val downloadExecutor = Executor { command ->
+        scope.launch(Dispatchers.IO) { command.run() }
+    }
 
     // Legacy cache downloads (for compatibility)
     private val cacheDownloads = MutableStateFlow<Map<String, Download>>(emptyMap())
@@ -241,7 +244,7 @@ constructor(
             databaseProvider,
             downloadCache,
             dataSourceFactory,
-            Executor { command -> command.run() }
+            downloadExecutor
         ).apply {
             maxParallelDownloads = 3
             addListener(
