@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -41,6 +42,7 @@ fun DownloadFormatDialog(
 ) {
     val recommendedItag = formats.firstOrNull { it.supportsMetadata }?.itag
         ?: formats.maxByOrNull { it.bitrate }?.itag
+
     val orderedFormats = remember(formats, recommendedItag) {
         formats.sortedWith(
             compareByDescending<AudioFormatOption> { it.itag == recommendedItag }
@@ -120,6 +122,7 @@ fun DownloadFormatDialog(
                                 )
                             }
                         }
+
                         if (orderedFormats.any { !it.supportsMetadata }) {
                             Text(
                                 text = stringResource(R.string.m4a_metadata_note),
@@ -162,7 +165,6 @@ private fun FormatItem(
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
                 .padding(horizontal = 14.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(
@@ -178,93 +180,99 @@ private fun FormatItem(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
+
                     if (isRecommended) {
                         FormatBadge(
                             text = stringResource(R.string.recommended_badge),
                             backgroundColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary,
                         )
-                        )
-                        FormatBadge(
-                            text = if (format.supportsMetadata) {
-                                stringResource(R.string.metadata_badge)
-                            } else {
-                                stringResource(R.string.audio_only_badge)
-                            },
-                            backgroundColor = if (format.supportsMetadata) {
-                                MaterialTheme.colorScheme.tertiaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surface,
-                            },
-                            contentColor = if (format.supportsMetadata) {
-                                MaterialTheme.colorScheme.onTertiaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                    )
                     }
-                    Text(
-                        text = formatCodecLabel(format),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
+
+                    FormatBadge(
                         text = if (format.supportsMetadata) {
-                            stringResource(R.string.metadata_supported_hint)
+                            stringResource(R.string.metadata_badge)
                         } else {
-                            stringResource(R.string.metadata_unsupported_hint)
+                            stringResource(R.string.audio_only_badge)
                         },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (format.supportsMetadata) {
-                            MaterialTheme.colorScheme.tertiary
+                        backgroundColor = if (format.supportsMetadata) {
+                            MaterialTheme.colorScheme.tertiaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        },
+                        contentColor = if (format.supportsMetadata) {
+                            MaterialTheme.colorScheme.onTertiaryContainer
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
-                )
-            }
-                Spacer(modifier = Modifier.size(12.dp))
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.download),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .size(18.dp),
                     )
                 }
+
+                Text(
+                    text = formatCodecLabel(format),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Text(
+                    text = if (format.supportsMetadata) {
+                        stringResource(R.string.metadata_supported_hint)
+                    } else {
+                        stringResource(R.string.metadata_unsupported_hint)
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (format.supportsMetadata) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+
+            Spacer(modifier = Modifier.size(12.dp))
+
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.download),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .size(18.dp),
+                )
             }
         }
     }
+}
 
-    @Composable
-    private fun FormatBadge(
-        text: String,
-        backgroundColor: androidx.compose.ui.graphics.Color,
-        contentColor: androidx.compose.ui.graphics.Color,
+@Composable
+private fun FormatBadge(
+    text: String,
+    backgroundColor: Color,
+    contentColor: Color,
+) {
+    Surface(
+        color = backgroundColor,
+        shape = RoundedCornerShape(999.dp),
     ) {
-        Surface(
-            color = backgroundColor,
-            shape = RoundedCornerShape(999.dp),
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelSmall,
-                color = contentColor,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            )
-        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = contentColor,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+        )
     }
+}
 
-    private fun formatCodecLabel(format: AudioFormatOption): String {
-        val extension = when {
-            format.mimeType.contains("webm", ignoreCase = true) -> ".webm"
-            format.mimeType.contains("mp4", ignoreCase = true) -> ".m4a"
-            format.mimeType.contains("mpeg", ignoreCase = true) -> ".mp3"
-            else -> ".audio"
-        }
-        return "${format.codec.uppercase()} ($extension)"
+private fun formatCodecLabel(format: AudioFormatOption): String {
+    val extension = when {
+        format.mimeType.contains("webm", ignoreCase = true) -> ".webm"
+        format.mimeType.contains("mp4", ignoreCase = true) -> ".m4a"
+        format.mimeType.contains("mpeg", ignoreCase = true) -> ".mp3"
+        else -> ".audio"
+    }
+    return "${format.codec.uppercase()} ($extension)"
 }
