@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -32,8 +33,10 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.time.LocalDateTime
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.abs
 import kotlin.math.pow
 
 /**
@@ -72,8 +75,8 @@ constructor(
 
     // Download queue
     private val downloadQueue = mutableListOf<Song>()
-    private val activeDownloads = mutableMapOf<String, Job>()
-    private val cancelRequested = mutableSetOf<String>()
+    private val activeDownloads = ConcurrentHashMap<String, Job>()
+    private val cancelRequested = ConcurrentHashMap.newKeySet<String>()
 
     companion object {
         private const val MAX_CONCURRENT_DOWNLOADS = 3
@@ -81,8 +84,8 @@ constructor(
         private const val INITIAL_RETRY_DELAY_MS = 1000L
         private const val RETRY_BACKOFF_MULTIPLIER = 2.0
         private const val UNKNOWN_ARTIST_NAME = "Unknown Artist"
-        private const val MIN_PROGRESS_UPDATE_BYTES = 256 * 1024L
-        private const val MIN_PROGRESS_UPDATE_INTERVAL_MS = 500L
+        private const val MIN_PROGRESS_UPDATE_BYTES = 512 * 1024L
+        private const val MIN_PROGRESS_UPDATE_INTERVAL_MS = 1000L
         private const val CONNECT_TIMEOUT_MS = 60_000
         private const val READ_TIMEOUT_MS = 120_000
     }
@@ -113,71 +116,21 @@ constructor(
      *
      * @param song The song to download
      */
-    fun downloadSong(song: Song) {
+    fun downloadSong(song: Song) = downloadSongs(listOf(song))
+
+    fun downloadSongs(songs: Collection<Song>) {
+        if (songs.isEmpty()) return
+
         scope.launch {
-
-            MediaStoreDownloadService.Companion.start(context)
-            downloadMutex.withLock {
-                clearCancelRequested(song.id)
-                // Check if already downloading or completed
-                val currentState = _downloadStates.value[song.id]
-                if (currentState?.status == DownloadState.Status.DOWNLOADING ||
-                    currentState?.status == DownloadState.Status.COMPLETED
-                ) {
-                    Timber.Forest.d("Song ${song.song.title} is already downloading or completed (status: ${currentState.status})")
-                    return@launch
-                }
-
-                // Check if already downloaded in database (has mediaStoreUri)
-                if (!song.song.mediaStoreUri.isNullOrEmpty()) {
-                    Timber.Forest.d("Song ${song.song.title} is already downloaded in database: ${song.song.mediaStoreUri}")
-                    updateDownloadState(
-                        song.id,
-                        DownloadState(
-                            songId = song.id,
-                            status = DownloadState.Status.COMPLETED,
-                            progress = 1f
-                        )
-                    )
-                    return@launch
-                }
-
-                // Check if already exists in MediaStore
-                val primaryArtist = resolvePrimaryArtist(song)
-
-                val existingFile = mediaStoreHelper.findExistingFile(
-                    title = song.song.title,
-                    artist = primaryArtist
-                )
-                if (existingFile != null) {
-                    Timber.Forest.d("Song ${song.song.title} already exists in MediaStore: $existingFile")
-                    updateDownloadState(
-                        song.id,
-                        DownloadState(
-                            songId = song.id,
-                            status = DownloadState.Status.COMPLETED,
-                            progress = 1f
-                        )
-                    )
-                    markSongAsDownloaded(song.id, existingFile.toString())
-                    return@launch
-                }
-
-                // Add to queue
-                synchronized(downloadQueue) {
-                    if (!downloadQueue.any { it.id == song.id }) {
-                        downloadQueue.add(song)
-                        updateDownloadState(
-                            song.id,
-                            DownloadState(
-                                songId = song.id,
-                                status = DownloadState.Status.QUEUED
-                            )
-                        )
-                    }
-                }
+            val queuedAny = downloadMutex.withLock {
+                enqueueSongsLocked(songs)
             }
-            processQueue()
+            if (!queuedAny) return@launch
+
+            MediaStoreDownloadService.start(context)
+            repeat(MAX_CONCURRENT_DOWNLOADS) {
+                processQueue()
+            }
         }
     }
 
@@ -186,45 +139,28 @@ constructor(
      *
      * @param songId The ID of the song to cancel
      */
-    fun cancelDownload(songId: String) {
+    fun cancelDownload(songId: String) = cancelDownloads(listOf(songId))
+
+    fun cancelDownloads(songIds: Collection<String>) {
+        val uniqueSongIds = songIds.toSet()
+        if (uniqueSongIds.isEmpty()) return
+
         scope.launch {
-            markCancelRequested(songId)
-
-            activeDownloads[songId]?.cancel()
-            activeDownloads.remove(songId)
-
-            synchronized(downloadQueue) {
-                downloadQueue.removeAll { it.id == songId }
-            }
-
-            removePersistedDownload(songId)
-
-            updateDownloadState(
-                songId,
-                DownloadState(
-                    songId = songId,
-                    status = DownloadState.Status.CANCELLED
-                )
-            )
+            stopAndCleanupDownloads(uniqueSongIds)
         }
     }
 
     /**
      * Remove a downloaded/cancelled song and clean up any persisted MediaStore + database state.
      */
-    fun removeDownload(songId: String) {
+    fun removeDownload(songId: String) = removeDownloads(listOf(songId))
+
+    fun removeDownloads(songIds: Collection<String>) {
+        val uniqueSongIds = songIds.toSet()
+        if (uniqueSongIds.isEmpty()) return
+
         scope.launch {
-            markCancelRequested(songId)
-
-            activeDownloads[songId]?.cancel()
-            activeDownloads.remove(songId)
-
-            synchronized(downloadQueue) {
-                downloadQueue.removeAll { it.id == songId }
-            }
-
-            removePersistedDownload(songId)
-            clearDownloadState(songId)
+            stopAndCleanupDownloads(uniqueSongIds)
         }
     }
 
@@ -233,23 +169,27 @@ constructor(
      *
      * @param songId The ID of the song to retry
      */
-    fun retryDownload(songId: String) {
+    fun retryDownload(songId: String) = retryDownloads(listOf(songId))
+
+    fun retryDownloads(songIds: Collection<String>) {
+        val uniqueSongIds = songIds.toSet()
+        if (uniqueSongIds.isEmpty()) return
+
         scope.launch {
-            val song = database.song(songId).first() ?: run {
-                Timber.Forest.e("Song not found in database: $songId")
-                return@launch
+            val songsToRetry = mutableListOf<Song>()
+
+            uniqueSongIds.forEach { songId ->
+                val song = database.song(songId).first()
+                if (song == null) {
+                    Timber.Forest.e("Song not found in database: $songId")
+                    return@forEach
+                }
+                songsToRetry += song
             }
 
-            // Reset download state
-            updateDownloadState(
-                songId,
-                DownloadState(
-                    songId = songId,
-                    status = DownloadState.Status.QUEUED
-                )
-            )
-
-            downloadSong(song)
+            if (songsToRetry.isNotEmpty()) {
+                downloadSongs(songsToRetry)
+            }
         }
     }
 
@@ -257,16 +197,16 @@ constructor(
      * Process the download queue
      */
     private fun processQueue() {
-        val song = synchronized(downloadQueue) {
-            downloadQueue.firstOrNull()
-        } ?: return
-
         if (!downloadSemaphore.tryAcquire()) {
             return
         }
 
-        synchronized(downloadQueue) {
-            downloadQueue.remove(song)
+        val song = synchronized(downloadQueue) {
+            if (downloadQueue.isNotEmpty()) downloadQueue.removeAt(0) else null
+        }
+        if (song == null) {
+            downloadSemaphore.release()
+            return
         }
 
         val job = scope.launch {
@@ -280,6 +220,82 @@ constructor(
             }
         }
         activeDownloads[song.id] = job
+    }
+
+    private suspend fun stopAndCleanupDownloads(songIds: Set<String>) {
+        songIds.forEach { songId ->
+            markCancelRequested(songId)
+            activeDownloads.remove(songId)?.cancel()
+        }
+
+        synchronized(downloadQueue) {
+            downloadQueue.removeAll { it.id in songIds }
+        }
+
+        songIds.forEach { songId ->
+            removePersistedDownload(songId)
+            clearDownloadState(songId)
+        }
+    }
+
+    private suspend fun enqueueSongsLocked(songs: Collection<Song>): Boolean {
+        var queuedAny = false
+
+        for (song in songs) {
+            clearCancelRequested(song.id)
+
+            val currentState = _downloadStates.value[song.id]
+            if (currentState?.status == DownloadState.Status.DOWNLOADING ||
+                currentState?.status == DownloadState.Status.COMPLETED ||
+                currentState?.status == DownloadState.Status.QUEUED
+            ) {
+                Timber.Forest.d(
+                    "Song ${song.song.title} is already queued/downloading/completed (status: ${currentState.status})"
+                )
+                continue
+            }
+
+            if (!song.song.mediaStoreUri.isNullOrEmpty()) {
+                Timber.Forest.d(
+                    "Song ${song.song.title} is already downloaded in database: ${song.song.mediaStoreUri}"
+                )
+                clearDownloadState(song.id)
+                continue
+            }
+
+            val primaryArtist = resolvePrimaryArtist(song)
+            val existingFile = mediaStoreHelper.findExistingFile(
+                title = song.song.title,
+                artist = primaryArtist
+            )
+            if (existingFile != null) {
+                Timber.Forest.d("Song ${song.song.title} already exists in MediaStore: $existingFile")
+                markSongAsDownloaded(song.id, existingFile.toString())
+                clearDownloadState(song.id)
+                continue
+            }
+
+            val enqueued = synchronized(downloadQueue) {
+                if (downloadQueue.any { it.id == song.id }) {
+                    false
+                } else {
+                    downloadQueue.add(song)
+                    true
+                }
+            }
+            if (!enqueued) continue
+
+            queuedAny = true
+            updateDownloadState(
+                song.id,
+                DownloadState(
+                    songId = song.id,
+                    status = DownloadState.Status.QUEUED
+                )
+            )
+        }
+
+        return queuedAny
     }
 
     /**
@@ -300,13 +316,7 @@ constructor(
         try {
             while (retryAttempt <= MAX_RETRY_ATTEMPTS) {
                 if (isCancelRequested(song.id)) {
-                    updateDownloadState(
-                        song.id,
-                        DownloadState(
-                            songId = song.id,
-                            status = DownloadState.Status.CANCELLED
-                        )
-                    )
+                    clearDownloadState(song.id)
                     return@withContext
                 }
                 try {
@@ -393,13 +403,7 @@ constructor(
                     if (uri != null) {
                         if (isCancelRequested(song.id)) {
                             mediaStoreHelper.deleteFromMediaStore(uri)
-                            updateDownloadState(
-                                song.id,
-                                DownloadState(
-                                    songId = song.id,
-                                    status = DownloadState.Status.CANCELLED
-                                )
-                            )
+                            clearDownloadState(song.id)
                             return@withContext
                         }
                         updateDownloadState(
@@ -411,28 +415,17 @@ constructor(
                             )
                         )
                         markSongAsDownloaded(song.id, uri.toString())
+                        clearDownloadState(song.id)
                         return@withContext
                     } else {
                         throw Exception("Failed to save file to MediaStore")
                     }
                 } catch (e: CancellationException) {
-                    updateDownloadState(
-                        song.id,
-                        DownloadState(
-                            songId = song.id,
-                            status = DownloadState.Status.CANCELLED
-                        )
-                    )
+                    clearDownloadState(song.id)
                     return@withContext
                 } catch (e: Exception) {
                     if (isCancelRequested(song.id)) {
-                        updateDownloadState(
-                            song.id,
-                            DownloadState(
-                                songId = song.id,
-                                status = DownloadState.Status.CANCELLED
-                            )
-                        )
+                        clearDownloadState(song.id)
                         return@withContext
                     }
                     lastError = e
@@ -477,13 +470,7 @@ constructor(
             }
 
             if (isCancelRequested(song.id)) {
-                updateDownloadState(
-                    song.id,
-                    DownloadState(
-                        songId = song.id,
-                        status = DownloadState.Status.CANCELLED
-                    )
-                )
+                clearDownloadState(song.id)
                 return@withContext
             }
 
@@ -564,6 +551,11 @@ constructor(
             var totalBytesRead = if (appendMode) startByte else 0L
             var lastProgressBytes = totalBytesRead
             var lastProgressAt = System.currentTimeMillis()
+            var lastReportedProgress = if (totalBytes != null && totalBytes > 0L) {
+                (totalBytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+            } else {
+                0f
+            }
 
             connection.getInputStream().use { input ->
                 FileOutputStream(outputFile, appendMode).use { output ->
@@ -587,16 +579,19 @@ constructor(
                             if (shouldEmitProgress) {
                                 val progress =
                                     (totalBytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
-                                updateDownloadState(
-                                    songId,
-                                    DownloadState(
-                                        songId = songId,
-                                        status = DownloadState.Status.DOWNLOADING,
-                                        progress = progress,
-                                        bytesDownloaded = totalBytesRead,
-                                        totalBytes = totalBytes
+                                if (abs(progress - lastReportedProgress) >= 0.01f) {
+                                    updateDownloadState(
+                                        songId,
+                                        DownloadState(
+                                            songId = songId,
+                                            status = DownloadState.Status.DOWNLOADING,
+                                            progress = progress,
+                                            bytesDownloaded = totalBytesRead,
+                                            totalBytes = totalBytes
+                                        )
                                     )
-                                )
+                                    lastReportedProgress = progress
+                                }
                                 lastProgressBytes = totalBytesRead
                                 lastProgressAt = now
                             }
@@ -631,11 +626,19 @@ constructor(
      * Update the download state for a song
      */
     private fun updateDownloadState(songId: String, state: DownloadState) {
-        _downloadStates.value = _downloadStates.value + (songId to state)
+        _downloadStates.update { currentStates ->
+            if (currentStates[songId] == state) {
+                currentStates
+            } else {
+                currentStates + (songId to state)
+            }
+        }
     }
 
     private fun clearDownloadState(songId: String) {
-        _downloadStates.value = _downloadStates.value - songId
+        _downloadStates.update { currentStates ->
+            if (songId in currentStates) currentStates - songId else currentStates
+        }
     }
 
     /**
@@ -682,21 +685,14 @@ constructor(
     }
 
     private fun markCancelRequested(songId: String) {
-        synchronized(cancelRequested) {
-            cancelRequested += songId
-        }
+        cancelRequested += songId
     }
 
     private fun clearCancelRequested(songId: String) {
-        synchronized(cancelRequested) {
-            cancelRequested -= songId
-        }
+        cancelRequested -= songId
     }
 
-    private fun isCancelRequested(songId: String): Boolean =
-        synchronized(cancelRequested) {
-            songId in cancelRequested
-        }
+    private fun isCancelRequested(songId: String): Boolean = songId in cancelRequested
 
     private fun resolvePrimaryArtist(song: Song): String {
         val relationArtist = song.artists.firstOrNull()?.name?.takeIf { it.isNotBlank() }

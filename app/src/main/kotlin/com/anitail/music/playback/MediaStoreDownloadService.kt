@@ -16,9 +16,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -77,7 +77,8 @@ class MediaStoreDownloadService : Service() {
         // Observe download states and update notifications
         scope.launch {
             downloadManager.downloadStates
-                .onEach { states ->
+                .conflate()
+                .collectLatest { states ->
                     updateNotification(states)
 
                     // Stop service if no active downloads
@@ -89,7 +90,6 @@ class MediaStoreDownloadService : Service() {
                         stopSelf()
                     }
                 }
-                .collect()
         }
     }
 

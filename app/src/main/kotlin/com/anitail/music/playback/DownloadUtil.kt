@@ -369,35 +369,59 @@ constructor(
         mediaStoreDownloadManager.downloadStates
 
     fun downloadToMediaStore(song: com.anitail.music.db.entities.Song) {
-        mediaStoreDownloadManager.downloadSong(song)
+        mediaStoreDownloadManager.downloadSongs(listOf(song))
+    }
+
+    fun downloadSongsToMediaStore(songs: Collection<com.anitail.music.db.entities.Song>) {
+        mediaStoreDownloadManager.downloadSongs(songs)
     }
 
     fun cancelMediaStoreDownload(songId: String) {
-        mediaStoreDownloadManager.cancelDownload(songId)
+        mediaStoreDownloadManager.cancelDownloads(listOf(songId))
+    }
+
+    fun cancelMediaStoreDownloads(songIds: Collection<String>) {
+        mediaStoreDownloadManager.cancelDownloads(songIds)
     }
 
     fun retryMediaStoreDownload(songId: String) {
-        mediaStoreDownloadManager.retryDownload(songId)
+        mediaStoreDownloadManager.retryDownloads(listOf(songId))
+    }
+
+    fun retryMediaStoreDownloads(songIds: Collection<String>) {
+        mediaStoreDownloadManager.retryDownloads(songIds)
     }
 
     fun removeDownload(songId: String) {
-        scope.launch(Dispatchers.IO) {
-            val hasInMemoryMediaStoreState =
-                mediaStoreDownloadManager.downloadStates.value[songId] != null
-            val hasPersistedMediaStoreUri = runCatching {
-                !database.getSongByIdBlocking(songId)?.song?.mediaStoreUri.isNullOrEmpty()
-            }.getOrDefault(false)
+        removeDownloads(listOf(songId))
+    }
 
-            if (hasInMemoryMediaStoreState || hasPersistedMediaStoreUri) {
-                mediaStoreDownloadManager.removeDownload(songId)
+    fun removeDownloads(songIds: Collection<String>) {
+        val uniqueSongIds = songIds.toSet()
+        if (uniqueSongIds.isEmpty()) return
+
+        scope.launch(Dispatchers.IO) {
+            val mediaStoreSongIdsToRemove = uniqueSongIds.filter { songId ->
+                val hasInMemoryMediaStoreState =
+                    mediaStoreDownloadManager.downloadStates.value[songId] != null
+                val hasPersistedMediaStoreUri = runCatching {
+                    !database.getSongByIdBlocking(songId)?.song?.mediaStoreUri.isNullOrEmpty()
+                }.getOrDefault(false)
+                hasInMemoryMediaStoreState || hasPersistedMediaStoreUri
             }
 
-            DownloadService.sendRemoveDownload(
-                context,
-                ExoDownloadService::class.java,
-                songId,
-                false,
-            )
+            if (mediaStoreSongIdsToRemove.isNotEmpty()) {
+                mediaStoreDownloadManager.removeDownloads(mediaStoreSongIdsToRemove)
+            }
+
+            uniqueSongIds.forEach { songId ->
+                DownloadService.sendRemoveDownload(
+                    context,
+                    ExoDownloadService::class.java,
+                    songId,
+                    false,
+                )
+            }
         }
     }
 }
