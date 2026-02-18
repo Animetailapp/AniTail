@@ -25,14 +25,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import com.anitail.innertube.YouTube
 import com.anitail.music.LocalDatabase
 import com.anitail.music.LocalDownloadUtil
@@ -44,7 +42,6 @@ import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.models.MediaMetadata
 import com.anitail.music.models.toMediaMetadata
-import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.DefaultDialog
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +58,6 @@ fun SelectionSongMenu(
     clearAction: () -> Unit,
     songPosition: List<PlaylistSongMap>? = emptyList(),
 ) {
-    val context = LocalContext.current
     val database = LocalDatabase.current
     val downloadUtil = LocalDownloadUtil.current
     val coroutineScope = rememberCoroutineScope()
@@ -155,12 +151,7 @@ fun SelectionSongMenu(
                     onClick = {
                         showRemoveDownloadDialog = false
                         songSelection.forEach { song ->
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.song.id,
-                                false,
-                            )
+                            downloadUtil.removeDownload(song.song.id)
                         }
                     },
                 ) {
@@ -406,7 +397,6 @@ fun SelectionMediaMetadataMenu(
     onDismiss: () -> Unit,
     clearAction: () -> Unit,
 ) {
-    val context = LocalContext.current
     val database = LocalDatabase.current
     val downloadUtil = LocalDownloadUtil.current
     val coroutineScope = rememberCoroutineScope()
@@ -480,12 +470,7 @@ fun SelectionMediaMetadataMenu(
                     onClick = {
                         showRemoveDownloadDialog = false
                         songSelection.forEach { song ->
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false,
-                            )
+                            downloadUtil.removeDownload(song.id)
                         }
                     },
                 ) {

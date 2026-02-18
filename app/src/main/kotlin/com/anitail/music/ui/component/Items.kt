@@ -257,7 +257,12 @@ fun SongListItem(
         }
         if (showDownloadIcon) {
             val download by LocalDownloadUtil.current.getDownload(song.id).collectAsState(initial = null)
-            Icon.Download(download?.state)
+            val effectiveDownloadState = download?.state ?: if (!song.song.mediaStoreUri.isNullOrEmpty()) {
+                Download.STATE_COMPLETED
+            } else {
+                null
+            }
+            Icon.Download(effectiveDownloadState)
         }
     },
     isSelected: Boolean = false,
@@ -325,7 +330,12 @@ fun SongGridItem(
         if (showDownloadIcon) {
             val download by LocalDownloadUtil.current.getDownload(song.id)
                 .collectAsState(initial = null)
-            Icon.Download(download?.state)
+            val effectiveDownloadState = download?.state ?: if (!song.song.mediaStoreUri.isNullOrEmpty()) {
+                Download.STATE_COMPLETED
+            } else {
+                null
+            }
+            Icon.Download(effectiveDownloadState)
         }
     },
     isActive: Boolean = false,

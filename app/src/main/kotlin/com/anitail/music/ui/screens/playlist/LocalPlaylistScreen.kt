@@ -98,7 +98,6 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.anitail.innertube.YouTube
@@ -124,7 +123,6 @@ import com.anitail.music.extensions.move
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.extensions.togglePlayPause
 import com.anitail.music.models.toMediaMetadata
-import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.AutoResizeText
 import com.anitail.music.ui.component.DefaultDialog
@@ -325,12 +323,7 @@ fun LocalPlaylistScreen(
                             }
                         }
                         songs.forEach { song ->
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.song.id,
-                                false
-                            )
+                            downloadUtil.removeDownload(song.song.id)
                         }
                     }
                 ) {
@@ -1238,12 +1231,7 @@ fun LocalPlaylistHeader(
                             IconButton(
                                 onClick = {
                                     songs.forEach { song ->
-                                        DownloadService.sendRemoveDownload(
-                                            context,
-                                            ExoDownloadService::class.java,
-                                            song.song.id,
-                                            false,
-                                        )
+                                        downloadUtil.removeDownload(song.song.id)
                                     }
                                 },
                                 modifier = Modifier.size(40.dp)

@@ -111,6 +111,13 @@ fun PlayerMenu(
 
     val download by downloadUtil.getDownload(mediaMetadata.id)
         .collectAsState(initial = null)
+    val librarySong by database.song(mediaMetadata.id).collectAsState(initial = null)
+    val effectiveDownloadState = download?.state
+        ?: if (!librarySong?.song?.mediaStoreUri.isNullOrEmpty()) {
+            Download.STATE_COMPLETED
+        } else {
+            null
+        }
 
     val artists =
         remember(mediaMetadata.artists) {
@@ -410,7 +417,7 @@ fun PlayerMenu(
             }
         }
         item {
-            when (download?.state) {
+            when (effectiveDownloadState) {
                 Download.STATE_COMPLETED -> {
                     ListItem(
                         headlineContent = {
@@ -426,12 +433,7 @@ fun PlayerMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                mediaMetadata.id,
-                                false,
-                            )
+                            downloadUtil.removeDownload(mediaMetadata.id)
                         }
                     )
 
@@ -445,12 +447,7 @@ fun PlayerMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                mediaMetadata.id,
-                                false,
-                            )
+                            downloadUtil.removeDownload(mediaMetadata.id)
                             showDownloadFormatDialog = true
                             isLoadingFormats = true
                             availableFormats = emptyList()
@@ -474,12 +471,7 @@ fun PlayerMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                mediaMetadata.id,
-                                false,
-                            )
+                            downloadUtil.removeDownload(mediaMetadata.id)
                         }
                     )
                 }

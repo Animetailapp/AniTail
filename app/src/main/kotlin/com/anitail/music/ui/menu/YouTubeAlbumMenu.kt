@@ -45,7 +45,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.AlbumItem
@@ -57,7 +56,6 @@ import com.anitail.music.constants.ListItemHeight
 import com.anitail.music.constants.ListThumbnailSize
 import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
-import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.YouTubeAlbumRadio
 import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.component.SongListItem
@@ -336,12 +334,7 @@ fun YouTubeAlbumMenu(
                         },
                         modifier = Modifier.clickable {
                             album?.songs?.forEach { song ->
-                                DownloadService.sendRemoveDownload(
-                                    context,
-                                    ExoDownloadService::class.java,
-                                    song.id,
-                                    false,
-                                )
+                                downloadUtil.removeDownload(song.id)
                             }
                         }
                     )
@@ -357,12 +350,7 @@ fun YouTubeAlbumMenu(
                         },
                         modifier = Modifier.clickable {
                             album?.songs?.forEach { song ->
-                                DownloadService.sendRemoveDownload(
-                                    context,
-                                    ExoDownloadService::class.java,
-                                    song.id,
-                                    false,
-                                )
+                                downloadUtil.removeDownload(song.id)
                             }
                         }
                     )

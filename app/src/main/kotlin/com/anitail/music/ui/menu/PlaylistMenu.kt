@@ -34,7 +34,6 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import com.anitail.innertube.YouTube
 import com.anitail.music.LocalDatabase
 import com.anitail.music.LocalDownloadUtil
@@ -44,7 +43,6 @@ import com.anitail.music.db.entities.Playlist
 import com.anitail.music.db.entities.PlaylistSong
 import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
-import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.MediaStoreDownloadManager
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.playback.queues.YouTubeQueue
@@ -120,7 +118,9 @@ fun PlaylistMenu(
         if (songs.isEmpty()) return@LaunchedEffect
         downloadUtil.getAllMediaStoreDownloads().collect { states ->
             val songStates = songs.mapNotNull { states[it.id] }
+            val allPersistedInMediaStore = songs.all { !it.song.mediaStoreUri.isNullOrEmpty() }
             mediaStoreDownloadState = when {
+                allPersistedInMediaStore -> PlaylistMediaStoreDownloadStatus.Completed
                 songStates.isEmpty() -> PlaylistMediaStoreDownloadStatus.NotDownloaded
                 songStates.all { it.status == MediaStoreDownloadManager.DownloadState.Status.COMPLETED } ->
                     PlaylistMediaStoreDownloadStatus.Completed
@@ -225,12 +225,7 @@ fun PlaylistMenu(
                     onClick = {
                         showRemoveDownloadDialog = false
                         songs.forEach { song ->
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false,
-                            )
+                            downloadUtil.removeDownload(song.id)
                         }
                     },
                 ) {
@@ -450,7 +445,9 @@ fun PlaylistMenu(
                                 )
                             },
                             modifier = Modifier.clickable {
-                                // TODO: Option to remove from MediaStore
+                                songs.forEach { song ->
+                                    downloadUtil.removeDownload(song.id)
+                                }
                                 onDismiss()
                             }
                         )

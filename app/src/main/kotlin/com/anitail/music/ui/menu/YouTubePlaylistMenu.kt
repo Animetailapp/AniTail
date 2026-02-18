@@ -42,7 +42,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import coil.compose.AsyncImage
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.PlaylistItem
@@ -59,7 +58,6 @@ import com.anitail.music.db.entities.PlaylistSongMap
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.models.MediaMetadata
 import com.anitail.music.models.toMediaMetadata
-import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.DefaultDialog
 import com.anitail.music.ui.component.ListDialog
@@ -219,12 +217,7 @@ fun YouTubePlaylistMenu(
                     onClick = {
                         showRemoveDownloadDialog = false
                         songs.forEach { song ->
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false
-                            )
+                            downloadUtil.removeDownload(song.id)
                         }
                     }
                 ) {

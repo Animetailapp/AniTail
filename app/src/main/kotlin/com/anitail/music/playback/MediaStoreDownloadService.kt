@@ -36,8 +36,9 @@ class MediaStoreDownloadService : Service() {
     @Inject
     lateinit var database: com.anitail.music.db.MusicDatabase
 
-    private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private val scope = CoroutineScope(Dispatchers.IO + Job())
     private lateinit var notificationManager: NotificationManager
+    private val songInfoCache = mutableMapOf<String, Pair<String, String>>()
 
     companion object {
         private const val NOTIFICATION_CHANNEL_ID = "mediastore_download"
@@ -165,10 +166,7 @@ class MediaStoreDownloadService : Service() {
     private suspend fun createSingleDownloadNotification(
         state: MediaStoreDownloadManager.DownloadState
     ): Notification {
-        // Get song info from database
-        val song = database.song(state.songId).first()
-        val title = song?.song?.title ?: "Unknown"
-        val artist = song?.artists?.firstOrNull()?.name ?: "Unknown Artist"
+        val (title, artist) = resolveSongInfo(state.songId)
 
         val progress = (state.progress * 100).toInt()
 
@@ -207,6 +205,17 @@ class MediaStoreDownloadService : Service() {
                 cancelPendingIntent
             )
             .build()
+    }
+
+    private suspend fun resolveSongInfo(songId: String): Pair<String, String> {
+        songInfoCache[songId]?.let { return it }
+
+        val song = database.song(songId).first()
+        val title = song?.song?.title ?: "Unknown"
+        val artist = song?.artists?.firstOrNull()?.name ?: "Unknown Artist"
+        val value = title to artist
+        songInfoCache[songId] = value
+        return value
     }
 
     private fun createMultipleDownloadsNotification(

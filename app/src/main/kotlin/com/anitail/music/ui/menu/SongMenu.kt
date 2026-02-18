@@ -115,6 +115,12 @@ fun SongMenu(
     val downloadUtil = LocalDownloadUtil.current
     val download by downloadUtil.getDownload(originalSong.id)
         .collectAsState(initial = null)
+    val effectiveDownloadState = download?.state
+        ?: if (!song.song.mediaStoreUri.isNullOrEmpty()) {
+            Download.STATE_COMPLETED
+        } else {
+            null
+        }
     val coroutineScope = rememberCoroutineScope()
     val syncUtils = LocalSyncUtils.current
     val scope = rememberCoroutineScope()
@@ -645,7 +651,7 @@ fun SongMenu(
             }
         }
         item {
-            when (download?.state) {
+            when (effectiveDownloadState) {
                 Download.STATE_COMPLETED -> {
                     ListItem(
                         headlineContent = {
@@ -661,12 +667,7 @@ fun SongMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false,
-                            )
+                            downloadUtil.removeDownload(song.id)
                         }
                     )
 
@@ -680,12 +681,7 @@ fun SongMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false,
-                            )
+                            downloadUtil.removeDownload(song.id)
                             showDownloadFormatDialog = true
                             isLoadingFormats = true
                             availableFormats = emptyList()
@@ -714,12 +710,7 @@ fun SongMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false,
-                            )
+                            downloadUtil.removeDownload(song.id)
                         }
                     )
                 }

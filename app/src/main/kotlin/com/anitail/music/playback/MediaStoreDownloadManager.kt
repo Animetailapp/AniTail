@@ -3,6 +3,7 @@ package com.anitail.music.playback
 import android.content.Context
 import android.net.ConnectivityManager
 import androidx.core.content.getSystemService
+import androidx.core.net.toUri
 import com.anitail.music.constants.AudioQuality
 import com.anitail.music.constants.AudioQualityKey
 import com.anitail.music.db.MusicDatabase
@@ -12,6 +13,7 @@ import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.utils.enumPreference
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -71,6 +73,7 @@ constructor(
     // Download queue
     private val downloadQueue = mutableListOf<Song>()
     private val activeDownloads = mutableMapOf<String, Job>()
+    private val cancelRequested = mutableSetOf<String>()
 
     companion object {
         private const val MAX_CONCURRENT_DOWNLOADS = 3
@@ -115,6 +118,7 @@ constructor(
 
             MediaStoreDownloadService.Companion.start(context)
             downloadMutex.withLock {
+                clearCancelRequested(song.id)
                 // Check if already downloading or completed
                 val currentState = _downloadStates.value[song.id]
                 if (currentState?.status == DownloadState.Status.DOWNLOADING ||
@@ -184,6 +188,7 @@ constructor(
      */
     fun cancelDownload(songId: String) {
         scope.launch {
+            markCancelRequested(songId)
 
             activeDownloads[songId]?.cancel()
             activeDownloads.remove(songId)
@@ -192,6 +197,8 @@ constructor(
                 downloadQueue.removeAll { it.id == songId }
             }
 
+            removePersistedDownload(songId)
+
             updateDownloadState(
                 songId,
                 DownloadState(
@@ -199,6 +206,25 @@ constructor(
                     status = DownloadState.Status.CANCELLED
                 )
             )
+        }
+    }
+
+    /**
+     * Remove a downloaded/cancelled song and clean up any persisted MediaStore + database state.
+     */
+    fun removeDownload(songId: String) {
+        scope.launch {
+            markCancelRequested(songId)
+
+            activeDownloads[songId]?.cancel()
+            activeDownloads.remove(songId)
+
+            synchronized(downloadQueue) {
+                downloadQueue.removeAll { it.id == songId }
+            }
+
+            removePersistedDownload(songId)
+            clearDownloadState(songId)
         }
     }
 
@@ -273,6 +299,16 @@ constructor(
 
         try {
             while (retryAttempt <= MAX_RETRY_ATTEMPTS) {
+                if (isCancelRequested(song.id)) {
+                    updateDownloadState(
+                        song.id,
+                        DownloadState(
+                            songId = song.id,
+                            status = DownloadState.Status.CANCELLED
+                        )
+                    )
+                    return@withContext
+                }
                 try {
                     val alreadyDownloadedBytes = tempFile.takeIf { it.exists() }?.length() ?: 0L
                     val previousState = _downloadStates.value[song.id]
@@ -355,6 +391,17 @@ constructor(
                     )
 
                     if (uri != null) {
+                        if (isCancelRequested(song.id)) {
+                            mediaStoreHelper.deleteFromMediaStore(uri)
+                            updateDownloadState(
+                                song.id,
+                                DownloadState(
+                                    songId = song.id,
+                                    status = DownloadState.Status.CANCELLED
+                                )
+                            )
+                            return@withContext
+                        }
                         updateDownloadState(
                             song.id,
                             DownloadState(
@@ -368,7 +415,26 @@ constructor(
                     } else {
                         throw Exception("Failed to save file to MediaStore")
                     }
+                } catch (e: CancellationException) {
+                    updateDownloadState(
+                        song.id,
+                        DownloadState(
+                            songId = song.id,
+                            status = DownloadState.Status.CANCELLED
+                        )
+                    )
+                    return@withContext
                 } catch (e: Exception) {
+                    if (isCancelRequested(song.id)) {
+                        updateDownloadState(
+                            song.id,
+                            DownloadState(
+                                songId = song.id,
+                                status = DownloadState.Status.CANCELLED
+                            )
+                        )
+                        return@withContext
+                    }
                     lastError = e
                     Timber.Forest.e(
                         e,
@@ -408,6 +474,17 @@ constructor(
                     delay(delayMs)
                     retryAttempt++
                 }
+            }
+
+            if (isCancelRequested(song.id)) {
+                updateDownloadState(
+                    song.id,
+                    DownloadState(
+                        songId = song.id,
+                        status = DownloadState.Status.CANCELLED
+                    )
+                )
+                return@withContext
             }
 
             updateDownloadState(
@@ -494,6 +571,9 @@ constructor(
                     var bytesRead: Int
 
                     while (input.read(buffer).also { bytesRead = it } != -1) {
+                        if (isCancelRequested(songId)) {
+                            throw CancellationException("Download cancelled: $songId")
+                        }
                         output.write(buffer, 0, bytesRead)
                         totalBytesRead += bytesRead
 
@@ -554,10 +634,19 @@ constructor(
         _downloadStates.value = _downloadStates.value + (songId to state)
     }
 
+    private fun clearDownloadState(songId: String) {
+        _downloadStates.value = _downloadStates.value - songId
+    }
+
     /**
      * Mark a song as downloaded in the database with MediaStore URI
      */
     private suspend fun markSongAsDownloaded(songId: String, mediaStoreUri: String) {
+        if (isCancelRequested(songId)) {
+            mediaStoreHelper.deleteFromMediaStore(mediaStoreUri.toUri())
+            return
+        }
+
         val song = database.song(songId).first()
         if (song != null) {
             database.query {
@@ -571,6 +660,43 @@ constructor(
             Timber.d("Marked song as downloaded: ${song.song.title}, URI: $mediaStoreUri")
         }
     }
+
+    private suspend fun removePersistedDownload(songId: String) {
+        val song = database.song(songId).first() ?: return
+        val mediaStoreUri = song.song.mediaStoreUri
+
+        if (!mediaStoreUri.isNullOrEmpty()) {
+            mediaStoreHelper.deleteFromMediaStore(mediaStoreUri.toUri())
+        }
+
+        if (!song.song.mediaStoreUri.isNullOrEmpty() || song.song.dateDownload != null) {
+            database.query {
+                database.upsert(
+                    song.song.copy(
+                        mediaStoreUri = null,
+                        dateDownload = null
+                    )
+                )
+            }
+        }
+    }
+
+    private fun markCancelRequested(songId: String) {
+        synchronized(cancelRequested) {
+            cancelRequested += songId
+        }
+    }
+
+    private fun clearCancelRequested(songId: String) {
+        synchronized(cancelRequested) {
+            cancelRequested -= songId
+        }
+    }
+
+    private fun isCancelRequested(songId: String): Boolean =
+        synchronized(cancelRequested) {
+            songId in cancelRequested
+        }
 
     private fun resolvePrimaryArtist(song: Song): String {
         val relationArtist = song.artists.firstOrNull()?.name?.takeIf { it.isNotBlank() }

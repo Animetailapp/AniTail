@@ -94,6 +94,12 @@ fun YouTubeSongMenu(
     val downloadUtil = LocalDownloadUtil.current
     val librarySong by database.song(song.id).collectAsState(initial = null)
     val download by downloadUtil.getDownload(song.id).collectAsState(initial = null)
+    val effectiveDownloadState = download?.state
+        ?: if (!librarySong?.song?.mediaStoreUri.isNullOrEmpty()) {
+            Download.STATE_COMPLETED
+        } else {
+            null
+        }
     val coroutineScope = rememberCoroutineScope()
     val syncUtils = LocalSyncUtils.current
     val artists = remember {
@@ -436,7 +442,7 @@ fun YouTubeSongMenu(
             )
         }
         item {
-            when (download?.state) {
+            when (effectiveDownloadState) {
                 Download.STATE_COMPLETED -> {
                     ListItem(
                         headlineContent = {
@@ -452,12 +458,7 @@ fun YouTubeSongMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false,
-                            )
+                            downloadUtil.removeDownload(song.id)
                         }
                     )
 
@@ -471,12 +472,7 @@ fun YouTubeSongMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false,
-                            )
+                            downloadUtil.removeDownload(song.id)
                             showDownloadFormatDialog = true
                             isLoadingFormats = true
                             availableFormats = emptyList()
@@ -500,12 +496,7 @@ fun YouTubeSongMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false,
-                            )
+                            downloadUtil.removeDownload(song.id)
                         }
                     )
                 }

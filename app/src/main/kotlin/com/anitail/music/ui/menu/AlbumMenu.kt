@@ -129,7 +129,9 @@ fun AlbumMenu(
         if (songs.isEmpty()) return@LaunchedEffect
         downloadUtil.getAllMediaStoreDownloads().collect { states ->
             val songStates = songs.mapNotNull { states[it.id] }
+            val allPersistedInMediaStore = songs.all { !it.song.mediaStoreUri.isNullOrEmpty() }
             mediaStoreDownloadState = when {
+                allPersistedInMediaStore -> AlbumMediaStoreDownloadStatus.Completed
                 songStates.isEmpty() -> AlbumMediaStoreDownloadStatus.NotDownloaded
                 songStates.all { it.status == MediaStoreDownloadManager.DownloadState.Status.COMPLETED } ->
                     AlbumMediaStoreDownloadStatus.Completed
@@ -385,7 +387,9 @@ fun AlbumMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            // TODO: Option to remove from MediaStore
+                            songs.forEach { song ->
+                                downloadUtil.removeDownload(song.id)
+                            }
                             onDismiss()
                         }
                     )

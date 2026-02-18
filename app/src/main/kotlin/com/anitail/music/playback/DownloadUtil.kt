@@ -12,6 +12,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadManager
 import androidx.media3.exoplayer.offline.DownloadNotificationHelper
+import androidx.media3.exoplayer.offline.DownloadService
 import com.anitail.innertube.YouTube
 import com.anitail.music.constants.AudioQuality
 import com.anitail.music.constants.AudioQualityKey
@@ -377,5 +378,26 @@ constructor(
 
     fun retryMediaStoreDownload(songId: String) {
         mediaStoreDownloadManager.retryDownload(songId)
+    }
+
+    fun removeDownload(songId: String) {
+        scope.launch(Dispatchers.IO) {
+            val hasInMemoryMediaStoreState =
+                mediaStoreDownloadManager.downloadStates.value[songId] != null
+            val hasPersistedMediaStoreUri = runCatching {
+                !database.getSongByIdBlocking(songId)?.song?.mediaStoreUri.isNullOrEmpty()
+            }.getOrDefault(false)
+
+            if (hasInMemoryMediaStoreState || hasPersistedMediaStoreUri) {
+                mediaStoreDownloadManager.removeDownload(songId)
+            }
+
+            DownloadService.sendRemoveDownload(
+                context,
+                ExoDownloadService::class.java,
+                songId,
+                false,
+            )
+        }
     }
 }

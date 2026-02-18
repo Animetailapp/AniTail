@@ -45,7 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -61,7 +60,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEachIndexed
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.anitail.music.LocalDatabase
@@ -73,7 +71,6 @@ import com.anitail.music.constants.AlbumThumbnailSize
 import com.anitail.music.constants.ThumbnailCornerRadius
 import com.anitail.music.db.entities.Album
 import com.anitail.music.extensions.togglePlayPause
-import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.LocalAlbumRadio
 import com.anitail.music.ui.component.AutoResizeText
 import com.anitail.music.ui.component.FontSizeRange
@@ -101,7 +98,6 @@ fun AlbumScreen(
     scrollBehavior: TopAppBarScrollBehavior,
     viewModel: AlbumViewModel = hiltViewModel(),
 ) {
-    val context = LocalContext.current
     val menuState = LocalMenuState.current
     val database = LocalDatabase.current
     val haptic = LocalHapticFeedback.current
@@ -255,12 +251,7 @@ fun AlbumScreen(
                                         IconButton(
                                             onClick = {
                                                 albumWithSongs.songs.forEach { song ->
-                                                    DownloadService.sendRemoveDownload(
-                                                        context,
-                                                        ExoDownloadService::class.java,
-                                                        song.id,
-                                                        false,
-                                                    )
+                                                    downloadUtil.removeDownload(song.id)
                                                 }
                                             },
                                         ) {
@@ -275,12 +266,7 @@ fun AlbumScreen(
                                         IconButton(
                                             onClick = {
                                                 albumWithSongs.songs.forEach { song ->
-                                                    DownloadService.sendRemoveDownload(
-                                                        context,
-                                                        ExoDownloadService::class.java,
-                                                        song.id,
-                                                        false,
-                                                    )
+                                                    downloadUtil.removeDownload(song.id)
                                                 }
                                             },
                                         ) {
