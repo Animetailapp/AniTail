@@ -2,6 +2,7 @@ package com.anitail.music.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.anitail.innertube.YouTube
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.EventWithSong
 import com.anitail.music.db.entities.Song
@@ -10,15 +11,22 @@ import com.anitail.music.ui.screens.RankedArtistUi
 import com.anitail.music.ui.screens.SoundCapsuleMonthUiState
 import com.anitail.music.ui.screens.TopArtistUi
 import com.anitail.music.ui.screens.TopSongUi
+import com.anitail.music.utils.reportException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.Clock
+import java.time.Duration
+import java.time.LocalDateTime
 import java.time.YearMonth
 import java.time.ZoneOffset
 import javax.inject.Inject
@@ -30,8 +38,11 @@ class SoundCapsuleViewModel
 constructor(
     private val database: MusicDatabase,
 ) : ViewModel() {
+    private val artistRefreshInProgress = mutableSetOf<String>()
+    private val artistRefreshVersion = MutableStateFlow(0)
+
     val monthlyCapsules =
-        database.events()
+        combine(database.events(), artistRefreshVersion) { events, _ -> events }
             .mapLatest(::buildMonthlyCapsules)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), emptyList())
 
@@ -44,6 +55,23 @@ constructor(
         monthlyCapsules.map { months ->
             months.firstOrNull { it.year == year && it.month == month }
         }
+
+    init {
+        viewModelScope.launch {
+            monthlyCapsules
+                .map { months ->
+                    months
+                        .flatMap { it.rankedArtists }
+                        .map { it.id }
+                        .distinct()
+                }
+                .collectLatest { artistIds ->
+                    artistIds.forEach { artistId ->
+                        refreshArtistThumbnailIfNeeded(artistId)
+                    }
+                }
+        }
+    }
 
     private suspend fun buildMonthlyCapsules(events: List<EventWithSong>): List<SoundCapsuleMonthUiState> {
         val currentMonth = YearMonth.now(Clock.systemUTC())
@@ -150,6 +178,7 @@ constructor(
         monthEvents: List<EventWithSong>,
         limit: Int,
     ): List<ArtistStat> {
+        val fallbackThumbnails = artistThumbnailFallback(monthEvents)
         val (fromTimestamp, toTimestamp) = month.toRoomRange()
         val queriedArtists = database.mostPlayedArtists(
             fromTimeStamp = fromTimestamp,
@@ -161,12 +190,12 @@ constructor(
                 ArtistStat(
                     id = artist.id,
                     name = artist.artist.name,
-                    thumbnailUrl = artist.artist.thumbnailUrl,
+                    thumbnailUrl = artist.artist.thumbnailUrl ?: fallbackThumbnails[artist.id],
                     playTimeMs = artist.timeListened?.toLong() ?: 0L,
                 )
             }
         }
-        return buildTopArtistsFallback(monthEvents, limit)
+        return buildTopArtistsFallback(monthEvents, limit, fallbackThumbnails)
     }
 
     private fun buildTopSongsFallback(monthEvents: List<EventWithSong>, limit: Int): List<TopSongUi> {
@@ -188,12 +217,17 @@ constructor(
             .map { (song, _) -> song }
     }
 
-    private fun buildTopArtistsFallback(monthEvents: List<EventWithSong>, limit: Int): List<ArtistStat> {
+    private fun buildTopArtistsFallback(
+        monthEvents: List<EventWithSong>,
+        limit: Int,
+        fallbackThumbnails: Map<String, String?>,
+    ): List<ArtistStat> {
         if (monthEvents.isEmpty()) return emptyList()
 
         val artistStats = linkedMapOf<String, ArtistStat>()
         monthEvents.forEach { event ->
             val playTimeMs = effectivePlayTimeMs(event)
+            val songThumbnail = event.song?.thumbnailUrl
             val artists = event.song?.artists.orEmpty()
             if (artists.isNotEmpty()) {
                 artists.forEach { artist ->
@@ -202,7 +236,7 @@ constructor(
                         ArtistStat(
                             id = artist.id,
                             name = artist.name,
-                            thumbnailUrl = artist.thumbnailUrl ?: current?.thumbnailUrl,
+                            thumbnailUrl = artist.thumbnailUrl ?: current?.thumbnailUrl ?: fallbackThumbnails[artist.id] ?: songThumbnail,
                             playTimeMs = (current?.playTimeMs ?: 0L) + playTimeMs,
                         )
                 }
@@ -220,7 +254,7 @@ constructor(
                         ArtistStat(
                             id = fallbackId,
                             name = fallbackName,
-                            thumbnailUrl = current?.thumbnailUrl,
+                            thumbnailUrl = current?.thumbnailUrl ?: songThumbnail,
                             playTimeMs = (current?.playTimeMs ?: 0L) + playTimeMs,
                         )
                 }
@@ -231,6 +265,45 @@ constructor(
             .values
             .sortedByDescending { it.playTimeMs }
             .take(limit)
+    }
+
+    private fun artistThumbnailFallback(monthEvents: List<EventWithSong>): Map<String, String?> {
+        val bestByArtist = linkedMapOf<String, Pair<Long, String?>>()
+        monthEvents.forEach { event ->
+            val playTimeMs = effectivePlayTimeMs(event)
+            val songThumbnail = event.song?.thumbnailUrl
+            event.song?.artists.orEmpty().forEach { artist ->
+                val current = bestByArtist[artist.id]
+                if (current == null || playTimeMs > current.first) {
+                    bestByArtist[artist.id] = playTimeMs to (songThumbnail ?: artist.thumbnailUrl)
+                }
+            }
+        }
+        return bestByArtist.mapValues { (_, value) -> value.second }
+    }
+
+    private suspend fun refreshArtistThumbnailIfNeeded(artistId: String) {
+        if (!artistRefreshInProgress.add(artistId)) return
+        try {
+            val localArtist = database.artist(artistId).first()?.artist ?: return
+            if (!localArtist.isYouTubeArtist) return
+
+            val shouldRefresh =
+                localArtist.thumbnailUrl.isNullOrBlank() ||
+                    Duration.between(localArtist.lastUpdateTime, LocalDateTime.now()) > Duration.ofDays(10)
+            if (!shouldRefresh) return
+
+            YouTube.artist(localArtist.id)
+                .onSuccess { artistPage ->
+                    database.query {
+                        update(localArtist, artistPage)
+                    }
+                    artistRefreshVersion.value += 1
+                }
+                .onFailure { reportException(it) }
+        } finally {
+            artistRefreshInProgress.remove(artistId)
+        }
     }
 
     private fun buildDailyPlayTime(month: YearMonth, monthEvents: List<EventWithSong>): List<Long> {
