@@ -36,9 +36,7 @@ class CachePlaylistViewModel @Inject constructor(
                 val downloadedIds = downloadCache.keys.mapNotNull { it?.toString() }.toSet()
                 val managedDownloadIds = downloadUtil.downloads.value
                     .filterValues { download ->
-                        download.state == Download.STATE_COMPLETED ||
-                            download.state == Download.STATE_QUEUED ||
-                            download.state == Download.STATE_DOWNLOADING
+                        download.state == Download.STATE_COMPLETED
                     }
                     .keys
                 val pureCacheIds = cachedIds.subtract(downloadedIds).subtract(managedDownloadIds)
@@ -51,7 +49,8 @@ class CachePlaylistViewModel @Inject constructor(
 
                 val completeSongs = songs.filter {
                     val contentLength = it.format?.contentLength
-                    contentLength != null && playerCache.isCached(it.song.id, 0, contentLength)
+                    val hasAnyCachedSpan = playerCache.getCachedSpans(it.song.id).isNotEmpty()
+                    contentLength == null || playerCache.isCached(it.song.id, 0, contentLength) || hasAnyCachedSpan
                 }
 
                 _cachedSongs.value = completeSongs

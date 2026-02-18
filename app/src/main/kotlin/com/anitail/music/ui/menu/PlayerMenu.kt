@@ -126,6 +126,11 @@ fun PlayerMenu(
             formats = availableFormats,
             onFormatSelected = { format ->
                 showDownloadFormatDialog = false
+                coroutineScope.launch(Dispatchers.IO) {
+                    database.transaction {
+                        insert(mediaMetadata)
+                    }
+                }
                 downloadUtil.setTargetItag(mediaMetadata.id, format.itag)
                 val request = DownloadRequest.Builder(mediaMetadata.id, mediaMetadata.id.toUri())
                     .setCustomCacheKey(mediaMetadata.id)

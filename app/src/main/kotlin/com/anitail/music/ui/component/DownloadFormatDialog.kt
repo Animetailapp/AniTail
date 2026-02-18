@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.anitail.music.R
@@ -52,7 +53,7 @@ fun DownloadFormatDialog(
     }
 
     AlertDialog(
-        modifier = Modifier.fillMaxWidth(0.84f),
+        modifier = Modifier.fillMaxWidth(0.82f),
         properties = DialogProperties(usePlatformDefaultWidth = false),
         onDismissRequest = onDismiss,
         title = {
@@ -176,13 +177,18 @@ private fun FormatItem(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         text = "${format.bitrateKbps} kbps",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
 
                     if (isRecommended) {
                         FormatBadge(
@@ -265,6 +271,9 @@ private fun FormatBadge(
             text = text,
             style = MaterialTheme.typography.labelSmall,
             color = contentColor,
+            softWrap = false,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
         )
     }

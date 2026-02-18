@@ -16,6 +16,7 @@ import android.provider.Settings
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
+import android.os.Build.VERSION_CODES.TIRAMISU
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -336,6 +337,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         window.decorView.layoutDirection = View.LAYOUT_DIRECTION_LTR
         WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        requestNotificationPermissionIfNeeded()
 
         // Request storage permissions at startup for MediaStore downloads
         requestStoragePermissionsIfNeeded()
@@ -1553,6 +1556,26 @@ class MainActivity : AppCompatActivity() {
                 storagePermissionCallback.launch(permissions)
                 false
             }
+        }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        notificationPermissionCallback.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    private val notificationPermissionCallback = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) {
+            Timber.w("Notification permission denied")
         }
     }
 }

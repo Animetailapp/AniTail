@@ -65,11 +65,6 @@ constructor(
     private val customDownloadPathUri by stringPreference(context, CustomDownloadPathUriKey, "")
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val downloadCallbackExecutor = Executor { command ->
-        scope.launch {
-            command.run()
-        }
-    }
 
     private val songUrlCache = ConcurrentHashMap<String, Pair<String, Long>>()
     private val targetItagOverride = ConcurrentHashMap<String, Int>()
@@ -244,7 +239,7 @@ constructor(
             databaseProvider,
             downloadCache,
             dataSourceFactory,
-            downloadCallbackExecutor
+            Executor { command -> command.run() }
         ).apply {
             maxParallelDownloads = 3
             addListener(
