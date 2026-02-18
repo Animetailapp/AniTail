@@ -66,8 +66,7 @@ constructor(
     private val downloadExportHelper: DownloadExportHelper,
 ) {
     companion object {
-        private const val MAX_PARALLEL_CACHE_DOWNLOADS_TURBO_UNMETERED = 8
-        private const val MAX_PARALLEL_CACHE_DOWNLOADS_TURBO_METERED = 3
+        private const val MAX_PARALLEL_CACHE_DOWNLOADS_TURBO = 10
         private const val MAX_PARALLEL_CACHE_DOWNLOADS_BALANCED_UNMETERED = 3
         private const val MAX_PARALLEL_CACHE_DOWNLOADS_BALANCED_METERED = 2
     }
@@ -103,12 +102,8 @@ constructor(
 
     private fun maxParallelCacheDownloadsForCurrentNetwork(): Int {
         val isMetered = runCatching { connectivityManager.isActiveNetworkMetered }.getOrDefault(true)
-        return if (maxDownloadSpeedEnabled) {
-            if (isMetered) {
-                MAX_PARALLEL_CACHE_DOWNLOADS_TURBO_METERED
-            } else {
-                MAX_PARALLEL_CACHE_DOWNLOADS_TURBO_UNMETERED
-            }
+        val parallelDownloads = if (maxDownloadSpeedEnabled) {
+            MAX_PARALLEL_CACHE_DOWNLOADS_TURBO
         } else {
             if (isMetered) {
                 MAX_PARALLEL_CACHE_DOWNLOADS_BALANCED_METERED
@@ -116,6 +111,13 @@ constructor(
                 MAX_PARALLEL_CACHE_DOWNLOADS_BALANCED_UNMETERED
             }
         }
+        Timber.d(
+            "Cache download parallelism selected: %d (maxSpeed=%s, metered=%s)",
+            parallelDownloads,
+            maxDownloadSpeedEnabled,
+            isMetered
+        )
+        return parallelDownloads
     }
 
     // Legacy cache downloads (for compatibility)

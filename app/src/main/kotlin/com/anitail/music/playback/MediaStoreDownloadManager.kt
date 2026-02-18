@@ -24,6 +24,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,9 +45,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.time.LocalDateTime
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
+import kotlin.math.min
 import kotlin.math.pow
 
 /**
@@ -76,7 +81,7 @@ constructor(
     private val customDownloadPathUri by stringPreference(context, CustomDownloadPathUriKey, "")
     private val maxDownloadSpeedEnabled by booleanPreference(context, MaxDownloadSpeedKey, true)
 
-    // Concurrent download limiter (up to 8 simultaneous downloads)
+    // Concurrent download limiter (up to 10 simultaneous downloads)
     private val downloadSemaphore = Semaphore(MAX_CONCURRENT_DOWNLOADS)
 
     // Mutex to protect against duplicate downloads from concurrent requests
@@ -93,11 +98,10 @@ constructor(
     private val targetItagOverride = ConcurrentHashMap<String, Int>()
 
     companion object {
-        private const val MAX_CONCURRENT_DOWNLOADS_TURBO_UNMETERED = 8
-        private const val MAX_CONCURRENT_DOWNLOADS_TURBO_METERED = 3
+        private const val MAX_CONCURRENT_DOWNLOADS_TURBO = 10
         private const val MAX_CONCURRENT_DOWNLOADS_BALANCED_UNMETERED = 3
         private const val MAX_CONCURRENT_DOWNLOADS_BALANCED_METERED = 2
-        private const val MAX_CONCURRENT_DOWNLOADS = MAX_CONCURRENT_DOWNLOADS_TURBO_UNMETERED
+        private const val MAX_CONCURRENT_DOWNLOADS = MAX_CONCURRENT_DOWNLOADS_TURBO
         private const val MAX_RETRY_ATTEMPTS = 3
         private const val INITIAL_RETRY_DELAY_MS = 1000L
         private const val RETRY_BACKOFF_MULTIPLIER = 2.0
@@ -105,6 +109,10 @@ constructor(
         private const val MIN_PROGRESS_UPDATE_BYTES = 2 * 1024 * 1024L
         private const val MIN_PROGRESS_UPDATE_INTERVAL_MS = 1500L
         private const val DOWNLOAD_BUFFER_SIZE_BYTES = 256 * 1024
+        private const val MIN_SEGMENT_SIZE_BYTES = 1024 * 1024L
+        private const val MIN_SEGMENTED_DOWNLOAD_SIZE_BYTES = 8 * 1024 * 1024L
+        private const val SEGMENTED_DOWNLOAD_TURBO_SEGMENTS = 8
+        private const val SEGMENTED_DOWNLOAD_BALANCED_SEGMENTS = 3
         private const val CONNECT_TIMEOUT_MS = 60_000
         private const val READ_TIMEOUT_MS = 120_000
     }
@@ -158,12 +166,8 @@ constructor(
 
     private fun maxConcurrentDownloadsForCurrentNetwork(): Int {
         val isMetered = runCatching { connectivityManager.isActiveNetworkMetered }.getOrDefault(true)
-        return if (maxDownloadSpeedEnabled) {
-            if (isMetered) {
-                MAX_CONCURRENT_DOWNLOADS_TURBO_METERED
-            } else {
-                MAX_CONCURRENT_DOWNLOADS_TURBO_UNMETERED
-            }
+        val parallelDownloads = if (maxDownloadSpeedEnabled) {
+            MAX_CONCURRENT_DOWNLOADS_TURBO
         } else {
             if (isMetered) {
                 MAX_CONCURRENT_DOWNLOADS_BALANCED_METERED
@@ -171,6 +175,13 @@ constructor(
                 MAX_CONCURRENT_DOWNLOADS_BALANCED_UNMETERED
             }
         }
+        Timber.d(
+            "Download parallelism selected: %d (maxSpeed=%s, metered=%s)",
+            parallelDownloads,
+            maxDownloadSpeedEnabled,
+            isMetered
+        )
+        return parallelDownloads
     }
 
     fun setTargetItag(songId: String, itag: Int) {
@@ -627,6 +638,30 @@ constructor(
         expectedContentLength: Long?,
     ) =
         withContext(Dispatchers.IO) {
+            val canAttemptSegmented =
+                startByte == 0L &&
+                    expectedContentLength != null &&
+                    expectedContentLength >= MIN_SEGMENTED_DOWNLOAD_SIZE_BYTES
+            if (canAttemptSegmented) {
+                try {
+                    downloadFileSegmented(
+                        url = url,
+                        outputFile = outputFile,
+                        songId = songId,
+                        expectedContentLength = expectedContentLength
+                    )
+                    return@withContext
+                } catch (cancel: CancellationException) {
+                    throw cancel
+                } catch (error: Exception) {
+                    Timber.w(
+                        error,
+                        "Segmented download failed for %s, falling back to single stream",
+                        songId
+                    )
+                }
+            }
+
             val connection = URL(url).openConnection() as HttpURLConnection
 
             // Configure connection for YouTube
@@ -644,104 +679,294 @@ constructor(
                 readTimeout = READ_TIMEOUT_MS
                 instanceFollowRedirects = true
             }
+            try {
+                connection.connect()
 
-            connection.connect()
+                // Check response code
+                val responseCode = connection.responseCode
+                if (responseCode == 416 &&
+                    expectedContentLength != null &&
+                    startByte >= expectedContentLength
+                ) {
+                    return@withContext
+                }
+                if (responseCode !in 200..299) {
+                    throw Exception("HTTP error $responseCode: ${connection.responseMessage}")
+                }
 
-            // Check response code
-            val responseCode = connection.responseCode
-            if (responseCode == 416 &&
-                expectedContentLength != null &&
-                startByte >= expectedContentLength
-            ) {
-                return@withContext
-            }
-            if (responseCode !in 200..299) {
-                throw Exception("HTTP error $responseCode: ${connection.responseMessage}")
-            }
+                val appendMode = startByte > 0L && responseCode == HttpURLConnection.HTTP_PARTIAL
+                if (startByte > 0L && !appendMode) {
+                    // Server ignored Range; restart from zero to avoid file corruption.
+                    runCatching { outputFile.delete() }
+                }
 
-            val appendMode = startByte > 0L && responseCode == HttpURLConnection.HTTP_PARTIAL
-            if (startByte > 0L && !appendMode) {
-                // Server ignored Range; restart from zero to avoid file corruption.
-                runCatching { outputFile.delete() }
-            }
+                val serverContentLength = connection.contentLengthLong.takeIf { it > 0L }
+                val totalBytes = expectedContentLength ?: serverContentLength?.let { length ->
+                    if (appendMode) startByte + length else length
+                }
+                var totalBytesRead = if (appendMode) startByte else 0L
+                var lastProgressBytes = totalBytesRead
+                var lastProgressAt = System.currentTimeMillis()
+                var lastReportedProgress = if (totalBytes != null && totalBytes > 0L) {
+                    (totalBytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                } else {
+                    0f
+                }
 
-            val serverContentLength = connection.contentLengthLong.takeIf { it > 0L }
-            val totalBytes = expectedContentLength ?: serverContentLength?.let { length ->
-                if (appendMode) startByte + length else length
-            }
-            var totalBytesRead = if (appendMode) startByte else 0L
-            var lastProgressBytes = totalBytesRead
-            var lastProgressAt = System.currentTimeMillis()
-            var lastReportedProgress = if (totalBytes != null && totalBytes > 0L) {
-                (totalBytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
-            } else {
-                0f
-            }
+                connection.getInputStream().use { input ->
+                    FileOutputStream(outputFile, appendMode).use { output ->
+                        val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE_BYTES)
+                        var bytesRead: Int
 
-            connection.getInputStream().use { input ->
-                FileOutputStream(outputFile, appendMode).use { output ->
-                    val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE_BYTES)
-                    var bytesRead: Int
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            if (isCancelRequested(songId)) {
+                                throw CancellationException("Download cancelled: $songId")
+                            }
+                            output.write(buffer, 0, bytesRead)
+                            totalBytesRead += bytesRead
 
-                    while (input.read(buffer).also { bytesRead = it } != -1) {
-                        if (isCancelRequested(songId)) {
-                            throw CancellationException("Download cancelled: $songId")
-                        }
-                        output.write(buffer, 0, bytesRead)
-                        totalBytesRead += bytesRead
+                            // Update progress
+                            if (totalBytes != null && totalBytes > 0L) {
+                                val now = System.currentTimeMillis()
+                                val shouldEmitProgress =
+                                    (totalBytesRead - lastProgressBytes) >= MIN_PROGRESS_UPDATE_BYTES ||
+                                        (now - lastProgressAt) >= MIN_PROGRESS_UPDATE_INTERVAL_MS
 
-                        // Update progress
-                        if (totalBytes != null && totalBytes > 0L) {
-                            val now = System.currentTimeMillis()
-                            val shouldEmitProgress =
-                                (totalBytesRead - lastProgressBytes) >= MIN_PROGRESS_UPDATE_BYTES ||
-                                    (now - lastProgressAt) >= MIN_PROGRESS_UPDATE_INTERVAL_MS
-
-                            if (shouldEmitProgress) {
-                                val progress =
-                                    (totalBytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
-                                if (abs(progress - lastReportedProgress) >= 0.01f) {
-                                    updateDownloadState(
-                                        songId,
-                                        DownloadState(
-                                            songId = songId,
-                                            status = DownloadState.Status.DOWNLOADING,
-                                            progress = progress,
-                                            bytesDownloaded = totalBytesRead,
-                                            totalBytes = totalBytes
+                                if (shouldEmitProgress) {
+                                    val progress =
+                                        (totalBytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                                    if (abs(progress - lastReportedProgress) >= 0.01f) {
+                                        updateDownloadState(
+                                            songId,
+                                            DownloadState(
+                                                songId = songId,
+                                                status = DownloadState.Status.DOWNLOADING,
+                                                progress = progress,
+                                                bytesDownloaded = totalBytesRead,
+                                                totalBytes = totalBytes
+                                            )
                                         )
-                                    )
-                                    lastReportedProgress = progress
+                                        lastReportedProgress = progress
+                                    }
+                                    lastProgressBytes = totalBytesRead
+                                    lastProgressAt = now
                                 }
-                                lastProgressBytes = totalBytesRead
-                                lastProgressAt = now
                             }
                         }
                     }
                 }
-            }
 
-            if (totalBytes != null && totalBytes > 0L) {
-                val finalProgress =
-                    (totalBytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
-                updateDownloadState(
-                    songId,
-                    DownloadState(
-                        songId = songId,
-                        status = DownloadState.Status.DOWNLOADING,
-                        progress = finalProgress,
-                        bytesDownloaded = totalBytesRead,
-                        totalBytes = totalBytes
+                if (totalBytes != null && totalBytes > 0L) {
+                    val finalProgress =
+                        (totalBytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                    updateDownloadState(
+                        songId,
+                        DownloadState(
+                            songId = songId,
+                            status = DownloadState.Status.DOWNLOADING,
+                            progress = finalProgress,
+                            bytesDownloaded = totalBytesRead,
+                            totalBytes = totalBytes
+                        )
                     )
-                )
-            }
+                }
 
-            if (expectedContentLength != null && totalBytesRead < expectedContentLength) {
-                throw Exception("Incomplete stream read ($totalBytesRead/$expectedContentLength bytes)")
-            }
+                if (expectedContentLength != null && totalBytesRead < expectedContentLength) {
+                    throw Exception("Incomplete stream read ($totalBytesRead/$expectedContentLength bytes)")
+                }
 
-            Timber.Forest.d("Download completed: $totalBytesRead bytes written to ${outputFile.absolutePath}")
+                Timber.Forest.d("Download completed: $totalBytesRead bytes written to ${outputFile.absolutePath}")
+            } finally {
+                connection.disconnect()
+            }
         }
+
+    private suspend fun downloadFileSegmented(
+        url: String,
+        outputFile: File,
+        songId: String,
+        expectedContentLength: Long,
+    ) = coroutineScope {
+        val totalBytes = fetchSegmentedDownloadTotalBytes(url, expectedContentLength)
+            ?: throw IllegalStateException("Segmented download unsupported for this stream")
+        if (totalBytes < MIN_SEGMENTED_DOWNLOAD_SIZE_BYTES) {
+            throw IllegalStateException("Segmented download not needed for small files")
+        }
+
+        val desiredSegments = if (maxDownloadSpeedEnabled) {
+            SEGMENTED_DOWNLOAD_TURBO_SEGMENTS
+        } else {
+            SEGMENTED_DOWNLOAD_BALANCED_SEGMENTS
+        }
+        val maxSegmentsBySize = (totalBytes / MIN_SEGMENT_SIZE_BYTES).toInt().coerceAtLeast(1)
+        val segmentCount = min(desiredSegments, maxSegmentsBySize).coerceAtLeast(1)
+        if (segmentCount <= 1) {
+            throw IllegalStateException("Segmented download has only one segment")
+        }
+
+        runCatching {
+            if (outputFile.exists()) outputFile.delete()
+        }
+        java.io.RandomAccessFile(outputFile, "rw").use { raf ->
+            raf.setLength(totalBytes)
+        }
+
+        val downloadedBytes = AtomicLong(0L)
+        val progressLock = Any()
+        var lastProgressBytes = 0L
+        var lastProgressAt = System.currentTimeMillis()
+        var lastReportedProgress = 0f
+
+        Timber.d(
+            "Starting segmented download (%d segments, %d bytes) for %s",
+            segmentCount,
+            totalBytes,
+            songId
+        )
+
+        (0 until segmentCount).map { segmentIndex ->
+            async(Dispatchers.IO) {
+                val segmentStart = (totalBytes * segmentIndex) / segmentCount
+                val segmentEnd = ((totalBytes * (segmentIndex + 1)) / segmentCount) - 1L
+                val expectedSegmentBytes = (segmentEnd - segmentStart + 1L).coerceAtLeast(0L)
+
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.apply {
+                    setRequestProperty(
+                        "User-Agent",
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    )
+                    setRequestProperty("Accept", "*/*")
+                    setRequestProperty("Accept-Language", "en-US,en;q=0.9")
+                    setRequestProperty("Range", "bytes=$segmentStart-$segmentEnd")
+                    connectTimeout = CONNECT_TIMEOUT_MS
+                    readTimeout = READ_TIMEOUT_MS
+                    instanceFollowRedirects = true
+                }
+
+                try {
+                    connection.connect()
+                    val responseCode = connection.responseCode
+                    if (responseCode != HttpURLConnection.HTTP_PARTIAL) {
+                        throw IllegalStateException("Segment response is not partial: $responseCode")
+                    }
+
+                    var segmentBytesRead = 0L
+                    connection.inputStream.use { input ->
+                        java.io.RandomAccessFile(outputFile, "rw").use { raf ->
+                            raf.seek(segmentStart)
+                            val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE_BYTES)
+                            var bytesRead: Int
+                            while (input.read(buffer).also { bytesRead = it } != -1) {
+                                if (isCancelRequested(songId)) {
+                                    throw CancellationException("Download cancelled: $songId")
+                                }
+                                raf.write(buffer, 0, bytesRead)
+                                segmentBytesRead += bytesRead
+                                val totalRead = downloadedBytes.addAndGet(bytesRead.toLong())
+                                val now = System.currentTimeMillis()
+                                synchronized(progressLock) {
+                                    val shouldEmitProgress =
+                                        (totalRead - lastProgressBytes) >= MIN_PROGRESS_UPDATE_BYTES ||
+                                            (now - lastProgressAt) >= MIN_PROGRESS_UPDATE_INTERVAL_MS
+                                    if (shouldEmitProgress) {
+                                        val progress =
+                                            (totalRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                                        if (abs(progress - lastReportedProgress) >= 0.01f) {
+                                            updateDownloadState(
+                                                songId,
+                                                DownloadState(
+                                                    songId = songId,
+                                                    status = DownloadState.Status.DOWNLOADING,
+                                                    progress = progress,
+                                                    bytesDownloaded = totalRead,
+                                                    totalBytes = totalBytes
+                                                )
+                                            )
+                                            lastReportedProgress = progress
+                                        }
+                                        lastProgressBytes = totalRead
+                                        lastProgressAt = now
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (segmentBytesRead < expectedSegmentBytes) {
+                        throw Exception(
+                            "Incomplete segment read ($segmentBytesRead/$expectedSegmentBytes bytes)"
+                        )
+                    }
+                } finally {
+                    connection.disconnect()
+                }
+            }
+        }.awaitAll()
+
+        val finalDownloadedBytes = downloadedBytes.get()
+        if (finalDownloadedBytes < totalBytes) {
+            throw Exception("Incomplete segmented download ($finalDownloadedBytes/$totalBytes bytes)")
+        }
+
+        updateDownloadState(
+            songId,
+            DownloadState(
+                songId = songId,
+                status = DownloadState.Status.DOWNLOADING,
+                progress = 1f,
+                bytesDownloaded = totalBytes,
+                totalBytes = totalBytes
+            )
+        )
+        Timber.d("Segmented download completed: $totalBytes bytes for $songId")
+    }
+
+    private fun fetchSegmentedDownloadTotalBytes(
+        url: String,
+        expectedContentLength: Long,
+    ): Long? {
+        val probeConnection = URL(url).openConnection() as HttpURLConnection
+        probeConnection.apply {
+            setRequestProperty(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
+            setRequestProperty("Accept", "*/*")
+            setRequestProperty("Accept-Language", "en-US,en;q=0.9")
+            setRequestProperty("Range", "bytes=0-0")
+            connectTimeout = CONNECT_TIMEOUT_MS
+            readTimeout = READ_TIMEOUT_MS
+            instanceFollowRedirects = true
+        }
+
+        return try {
+            probeConnection.connect()
+            if (probeConnection.responseCode != HttpURLConnection.HTTP_PARTIAL) {
+                return null
+            }
+
+            val contentRange = probeConnection.getHeaderField("Content-Range")
+            val totalFromRange = contentRange
+                ?.substringAfter("/")
+                ?.takeIf { it.isNotBlank() && it != "*" }
+                ?.toLongOrNull()
+            val totalBytes = totalFromRange ?: expectedContentLength
+            if (totalBytes <= 0L) {
+                null
+            } else {
+                totalBytes
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "Segmented download probe failed")
+            null
+        } finally {
+            runCatching {
+                probeConnection.inputStream?.close()
+            }
+            probeConnection.disconnect()
+        }
+    }
 
     /**
      * Update the download state for a song
