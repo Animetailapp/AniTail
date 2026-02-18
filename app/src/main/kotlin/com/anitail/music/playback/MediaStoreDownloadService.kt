@@ -39,13 +39,16 @@ class MediaStoreDownloadService : Service() {
     private lateinit var notificationManager: NotificationManager
     private val songInfoCache = mutableMapOf<String, Pair<String, String>>()
     private var lastNotificationKey: String? = null
+    private val activeChildNotificationIds = mutableSetOf<Int>()
 
     companion object {
         private const val NOTIFICATION_CHANNEL_ID = "mediastore_download"
         private const val NOTIFICATION_CHANNEL_NAME = "Music Downloads"
         private const val NOTIFICATION_ID = 100
+        private const val NOTIFICATION_GROUP_KEY = "mediastore_download_group"
 
         const val ACTION_CANCEL_DOWNLOAD = "com.anitail.music.CANCEL_DOWNLOAD"
+        const val ACTION_CANCEL_ALL_DOWNLOADS = "com.anitail.music.CANCEL_ALL_DOWNLOADS"
         const val EXTRA_SONG_ID = "song_id"
 
         fun start(context: Context) {
@@ -104,6 +107,18 @@ class MediaStoreDownloadService : Service() {
                     downloadManager.cancelDownload(songId)
                 }
             }
+            ACTION_CANCEL_ALL_DOWNLOADS -> {
+                val activeSongIds = downloadManager.downloadStates.value
+                    .filterValues {
+                        it.status == MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING ||
+                                it.status == MediaStoreDownloadManager.DownloadState.Status.QUEUED
+                    }
+                    .keys
+                if (activeSongIds.isNotEmpty()) {
+                    Timber.d("Cancelling all active downloads: ${activeSongIds.size}")
+                    downloadManager.cancelDownloads(activeSongIds)
+                }
+            }
         }
 
         return START_STICKY
@@ -145,28 +160,43 @@ class MediaStoreDownloadService : Service() {
         val activeDownloads = states.values.filter {
             it.status == MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING ||
                     it.status == MediaStoreDownloadManager.DownloadState.Status.QUEUED
-        }
+        }.sortedBy { it.songId }
 
         if (activeDownloads.isEmpty()) {
             lastNotificationKey = null
+            clearChildNotifications()
+            notificationManager.cancel(NOTIFICATION_ID)
             return
         }
 
-        val notificationKey = buildNotificationKey(activeDownloads)
-        if (notificationKey == lastNotificationKey) {
+        if (activeDownloads.size == 1) {
+            clearChildNotifications()
+            val singleNotification = createSingleDownloadNotification(activeDownloads.first())
+            notificationManager.notify(NOTIFICATION_ID, singleNotification)
+            lastNotificationKey = buildNotificationKey(activeDownloads)
             return
         }
-        lastNotificationKey = notificationKey
 
-        val notification = if (activeDownloads.size == 1) {
-            // Single download - show detailed progress
-            createSingleDownloadNotification(activeDownloads.first())
-        } else {
-            // Multiple downloads - show summary
-            createMultipleDownloadsNotification(activeDownloads)
+        val currentChildIds = mutableSetOf<Int>()
+        activeDownloads.forEach { downloadState ->
+            val notificationId = notificationIdForSong(downloadState.songId)
+            currentChildIds += notificationId
+            notificationManager.notify(
+                notificationId,
+                createSingleDownloadNotification(
+                    state = downloadState,
+                    asGroupChild = true
+                )
+            )
+        }
+        cancelStaleChildNotifications(currentChildIds)
+
+        val summaryKey = buildNotificationKey(activeDownloads)
+        if (summaryKey != lastNotificationKey) {
+            lastNotificationKey = summaryKey
         }
 
-        notificationManager.notify(NOTIFICATION_ID, notification)
+        notificationManager.notify(NOTIFICATION_ID, createMultipleDownloadsNotification(activeDownloads))
     }
 
     private fun buildNotificationKey(
@@ -197,7 +227,8 @@ class MediaStoreDownloadService : Service() {
     }
 
     private suspend fun createSingleDownloadNotification(
-        state: MediaStoreDownloadManager.DownloadState
+        state: MediaStoreDownloadManager.DownloadState,
+        asGroupChild: Boolean = false
     ): Notification {
         val (title, artist) = resolveSongInfo(state.songId)
 
@@ -221,7 +252,7 @@ class MediaStoreDownloadService : Service() {
             else -> ""
         }
 
-        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle(title)
             .setContentText("$artist • $statusText")
             .setSmallIcon(R.drawable.download)
@@ -237,7 +268,15 @@ class MediaStoreDownloadService : Service() {
                 "Cancel",
                 cancelPendingIntent
             )
-            .build()
+            .setOnlyAlertOnce(true)
+
+        if (asGroupChild) {
+            builder
+                .setGroup(NOTIFICATION_GROUP_KEY)
+                .setGroupSummary(false)
+        }
+
+        return builder.build()
     }
 
     private suspend fun resolveSongInfo(songId: String): Pair<String, String> {
@@ -278,13 +317,47 @@ class MediaStoreDownloadService : Service() {
             .let { if (it.isNaN()) 0.0 else it }
             .toFloat()
 
+        val cancelAllIntent = Intent(this, MediaStoreDownloadService::class.java).apply {
+            action = ACTION_CANCEL_ALL_DOWNLOADS
+        }
+        val cancelAllPendingIntent = PendingIntent.getService(
+            this,
+            0,
+            cancelAllIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setContentTitle(title)
-            .setContentText("Music downloads in progress")
+            .setContentText("Expand to manage each download")
             .setSmallIcon(R.drawable.download)
             .setProgress(100, (avgProgress * 100).toInt(), avgProgress == 0f)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setGroup(NOTIFICATION_GROUP_KEY)
+            .setGroupSummary(true)
+            .setOnlyAlertOnce(true)
+            .addAction(
+                R.drawable.close,
+                "Cancel all",
+                cancelAllPendingIntent
+            )
             .build()
+    }
+
+    private fun notificationIdForSong(songId: String): Int {
+        val positiveHash = songId.hashCode() and Int.MAX_VALUE
+        return 1_000 + (positiveHash % 1_000_000)
+    }
+
+    private fun clearChildNotifications() {
+        cancelStaleChildNotifications(emptySet())
+    }
+
+    private fun cancelStaleChildNotifications(currentChildIds: Set<Int>) {
+        val staleIds = activeChildNotificationIds.filter { it !in currentChildIds }
+        staleIds.forEach { notificationManager.cancel(it) }
+        activeChildNotificationIds.clear()
+        activeChildNotificationIds.addAll(currentChildIds)
     }
 }
