@@ -39,7 +39,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -175,9 +174,9 @@ fun AutoPlaylistScreen(
     val (sortDescending, onSortDescendingChange) = rememberPreference(SongSortDescendingKey, true)
 
     val downloadUtil = LocalDownloadUtil.current
-    var downloadState by remember {
-        mutableIntStateOf(Download.STATE_STOPPED)
-    }
+    val playlistSongIds = remember(songs) { songs?.map { it.song.id }.orEmpty() }
+    val downloadState by downloadUtil.getDownloadState(playlistSongIds)
+        .collectAsState(initial = Download.STATE_STOPPED)
 
     LaunchedEffect(Unit) {
         if (ytmSync) {
@@ -191,22 +190,6 @@ fun AutoPlaylistScreen(
         mutableSongs.apply {
             clear()
             songs?.let { addAll(it) }
-        }
-        if (songs?.isEmpty() == true) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs?.all { downloads[it.song.id]?.state == Download.STATE_COMPLETED } == true) {
-                    Download.STATE_COMPLETED
-                } else if (songs?.all {
-                        downloads[it.song.id]?.state == Download.STATE_QUEUED ||
-                                downloads[it.song.id]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it.song.id]?.state == Download.STATE_COMPLETED
-                    } == true
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
         }
     }
 
@@ -234,9 +217,7 @@ fun AutoPlaylistScreen(
                 TextButton(
                     onClick = {
                         showRemoveDownloadDialog = false
-                        songs!!.forEach { song ->
-                            downloadUtil.removeDownload(song.song.id)
-                        }
+                        downloadUtil.removeDownloads(songs!!.map { it.song.id })
                     },
                 ) {
                     Text(text = stringResource(android.R.string.ok))
@@ -344,9 +325,7 @@ fun AutoPlaylistScreen(
                                                 Download.STATE_DOWNLOADING -> {
                                                     IconButton(
                                                         onClick = {
-                                                            songs!!.forEach { song ->
-                                                                downloadUtil.removeDownload(song.song.id)
-                                                            }
+                                                            downloadUtil.removeDownloads(songs!!.map { it.song.id })
                                                         },
                                                     ) {
                                                         CircularProgressIndicator(
@@ -359,11 +338,7 @@ fun AutoPlaylistScreen(
                                                 else -> {
                                                     IconButton(
                                                         onClick = {
-                                                            songs!!.forEach { song ->
-                                                                downloadUtil.downloadToMediaStore(
-                                                                    song
-                                                                )
-                                                            }
+                                                            downloadUtil.downloadSongsToMediaStore(songs!!)
                                                         },
                                                     ) {
                                                         Icon(

@@ -128,29 +128,11 @@ fun AlbumScreen(
     }
 
     val downloadUtil = LocalDownloadUtil.current
-    var downloadState by remember {
-        mutableStateOf(Download.STATE_STOPPED)
+    val albumSongIds = remember(albumWithSongs) {
+        albumWithSongs?.songs?.map { it.id }.orEmpty()
     }
-
-    LaunchedEffect(albumWithSongs) {
-        val songs = albumWithSongs?.songs?.map { it.id }
-        if (songs.isNullOrEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs.all { downloads[it]?.state == Download.STATE_COMPLETED }) {
-                    Download.STATE_COMPLETED
-                } else if (songs.all {
-                        downloads[it]?.state == Download.STATE_QUEUED ||
-                                downloads[it]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it]?.state == Download.STATE_COMPLETED
-                    }
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
-        }
-    }
+    val downloadState by downloadUtil.getDownloadState(albumSongIds)
+        .collectAsState(initial = Download.STATE_STOPPED)
 
     LazyColumn(
         contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
@@ -250,9 +232,7 @@ fun AlbumScreen(
                                     Download.STATE_COMPLETED -> {
                                         IconButton(
                                             onClick = {
-                                                albumWithSongs.songs.forEach { song ->
-                                                    downloadUtil.removeDownload(song.id)
-                                                }
+                                                downloadUtil.removeDownloads(albumWithSongs.songs.map { it.id })
                                             },
                                         ) {
                                             Icon(
@@ -265,9 +245,7 @@ fun AlbumScreen(
                                     Download.STATE_DOWNLOADING -> {
                                         IconButton(
                                             onClick = {
-                                                albumWithSongs.songs.forEach { song ->
-                                                    downloadUtil.removeDownload(song.id)
-                                                }
+                                                downloadUtil.removeDownloads(albumWithSongs.songs.map { it.id })
                                             },
                                         ) {
                                             CircularProgressIndicator(
@@ -280,9 +258,7 @@ fun AlbumScreen(
                                     else -> {
                                         IconButton(
                                             onClick = {
-                                                albumWithSongs.songs.forEach { song ->
-                                                    downloadUtil.downloadToMediaStore(song)
-                                                }
+                                                downloadUtil.downloadSongsToMediaStore(albumWithSongs.songs)
                                             },
                                         ) {
                                             Icon(

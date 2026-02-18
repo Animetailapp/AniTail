@@ -28,7 +28,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -95,28 +94,9 @@ fun YouTubeAlbumMenu(
         }
     }
 
-    var downloadState by remember {
-        mutableIntStateOf(Download.STATE_STOPPED)
-    }
-
-    LaunchedEffect(album) {
-        val songs = album?.songs?.map { it.id } ?: return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs.all { downloads[it]?.state == Download.STATE_COMPLETED }) {
-                    Download.STATE_COMPLETED
-                } else if (songs.all {
-                        downloads[it]?.state == Download.STATE_QUEUED ||
-                                downloads[it]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it]?.state == Download.STATE_COMPLETED
-                    }
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
-        }
-    }
+    val albumSongIds = remember(album) { album?.songs?.map { it.id }.orEmpty() }
+    val downloadState by downloadUtil.getDownloadState(albumSongIds)
+        .collectAsState(initial = Download.STATE_STOPPED)
 
     var showChoosePlaylistDialog by rememberSaveable {
         mutableStateOf(false)
@@ -333,9 +313,7 @@ fun YouTubeAlbumMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            album?.songs?.forEach { song ->
-                                downloadUtil.removeDownload(song.id)
-                            }
+                            downloadUtil.removeDownloads(album?.songs?.map { it.id }.orEmpty())
                         }
                     )
                 }
@@ -349,9 +327,7 @@ fun YouTubeAlbumMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            album?.songs?.forEach { song ->
-                                downloadUtil.removeDownload(song.id)
-                            }
+                            downloadUtil.removeDownloads(album?.songs?.map { it.id }.orEmpty())
                         }
                     )
                 }
@@ -365,9 +341,7 @@ fun YouTubeAlbumMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            album?.songs?.forEach { song ->
-                                downloadUtil.downloadToMediaStore(song)
-                            }
+                            downloadUtil.downloadSongsToMediaStore(album?.songs.orEmpty())
                         }
                     )
                 }

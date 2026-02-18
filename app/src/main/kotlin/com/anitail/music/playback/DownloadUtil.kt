@@ -36,6 +36,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -60,6 +63,11 @@ constructor(
     val mediaStoreDownloadManager: MediaStoreDownloadManager,
     private val downloadExportHelper: DownloadExportHelper,
 ) {
+    private data class CachedMediaStoreDownload(
+        val state: MediaStoreDownloadManager.DownloadState,
+        val download: Download,
+    )
+
     private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
     private val customDownloadPathEnabled by booleanPreference(context, CustomDownloadPathEnabledKey, false)
@@ -71,6 +79,7 @@ constructor(
     private val targetItagOverride = ConcurrentHashMap<String, Int>()
     private val pendingTargetCacheReset = ConcurrentHashMap<String, Boolean>()
     private val exportJobs = ConcurrentHashMap<String, Job>()
+    private val mediaStoreDownloadCache = ConcurrentHashMap<String, CachedMediaStoreDownload>()
     private val downloadExecutor = Executor { command ->
         scope.launch(Dispatchers.IO) { command.run() }
     }
@@ -318,13 +327,124 @@ constructor(
 
                 // Add MediaStore downloads as fake Download objects
                 mediaStore.forEach { (songId, downloadState) ->
-                    merged[songId] = downloadState.toDownload()
+                    merged[songId] = getOrCreateMediaStoreDownload(songId, downloadState)
+                }
+                val cacheIterator = mediaStoreDownloadCache.keys.iterator()
+                while (cacheIterator.hasNext()) {
+                    val cachedSongId = cacheIterator.next()
+                    if (!mediaStore.containsKey(cachedSongId)) {
+                        cacheIterator.remove()
+                    }
                 }
 
                 merged.toMap()
             }.collect { mergedDownloads ->
-                downloads.value = mergedDownloads
+                downloads.update { currentDownloads ->
+                    if (hasSameDownloadReferences(currentDownloads, mergedDownloads)) {
+                        currentDownloads
+                    } else {
+                        mergedDownloads
+                    }
+                }
             }
+        }
+    }
+
+    private fun getOrCreateMediaStoreDownload(
+        songId: String,
+        state: MediaStoreDownloadManager.DownloadState,
+    ): Download {
+        val cached = mediaStoreDownloadCache[songId]
+        if (cached != null && cached.state == state) {
+            return cached.download
+        }
+
+        val download = state.toDownload()
+        mediaStoreDownloadCache[songId] = CachedMediaStoreDownload(state, download)
+        return download
+    }
+
+    private fun hasSameDownloadReferences(
+        current: Map<String, Download>,
+        next: Map<String, Download>,
+    ): Boolean {
+        if (current.size != next.size) return false
+        current.forEach { (songId, download) ->
+            if (next[songId] !== download) return false
+        }
+        return true
+    }
+
+    fun getDownloadState(songIds: Collection<String>): Flow<Int> {
+        val uniqueSongIds = songIds.toSet()
+        if (uniqueSongIds.isEmpty()) {
+            return flowOf(Download.STATE_STOPPED)
+        }
+
+        return downloads
+            .map { currentDownloads ->
+                calculateDownloadState(uniqueSongIds, currentDownloads)
+            }
+            .distinctUntilChanged()
+    }
+
+    fun getDownloadState(songIdsFlow: Flow<List<String>>): Flow<Int> =
+        songIdsFlow
+            .map { it.toSet() }
+            .distinctUntilChanged()
+            .flatMapLatest { songIds -> getDownloadState(songIds) }
+            .distinctUntilChanged()
+
+    fun getMediaStoreDownloads(songIds: Collection<String>): Flow<Map<String, MediaStoreDownloadManager.DownloadState>> {
+        val uniqueSongIds = songIds.toSet()
+        if (uniqueSongIds.isEmpty()) {
+            return flowOf(emptyMap())
+        }
+
+        return mediaStoreDownloadManager.downloadStates
+            .map { currentStates ->
+                buildMap(uniqueSongIds.size) {
+                    uniqueSongIds.forEach { songId ->
+                        currentStates[songId]?.let { state ->
+                            put(songId, state)
+                        }
+                    }
+                }
+            }
+            .distinctUntilChanged()
+    }
+
+    fun getMediaStoreDownloads(songIdsFlow: Flow<List<String>>): Flow<Map<String, MediaStoreDownloadManager.DownloadState>> =
+        songIdsFlow
+            .map { it.toSet() }
+            .distinctUntilChanged()
+            .flatMapLatest { songIds -> getMediaStoreDownloads(songIds) }
+            .distinctUntilChanged()
+
+    private fun calculateDownloadState(
+        songIds: Set<String>,
+        currentDownloads: Map<String, Download>,
+    ): Int {
+        if (songIds.isEmpty()) return Download.STATE_STOPPED
+
+        val allCompleted = songIds.all { songId ->
+            currentDownloads[songId]?.state == Download.STATE_COMPLETED
+        }
+        if (allCompleted) return Download.STATE_COMPLETED
+
+        val allQueuedOrDownloadingOrCompleted = songIds.all { songId ->
+            when (currentDownloads[songId]?.state) {
+                Download.STATE_QUEUED,
+                Download.STATE_DOWNLOADING,
+                Download.STATE_COMPLETED -> true
+
+                else -> false
+            }
+        }
+        return if (allQueuedOrDownloadingOrCompleted) {
+            Download.STATE_DOWNLOADING
+        } else {
+            Download.STATE_STOPPED
         }
     }
 
@@ -359,11 +479,14 @@ constructor(
         )
     }
 
-    fun getDownload(songId: String): Flow<Download?> = downloads.map { it[songId] }
+    fun getDownload(songId: String): Flow<Download?> =
+        downloads.map { it[songId] }.distinctUntilChanged()
 
     // MediaStore download methods
     fun getMediaStoreDownload(songId: String): Flow<MediaStoreDownloadManager.DownloadState?> =
-        mediaStoreDownloadManager.downloadStates.map { it[songId] }
+        mediaStoreDownloadManager.downloadStates
+            .map { it[songId] }
+            .distinctUntilChanged()
 
     fun getAllMediaStoreDownloads(): StateFlow<Map<String, MediaStoreDownloadManager.DownloadState>> =
         mediaStoreDownloadManager.downloadStates

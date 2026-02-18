@@ -26,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -172,25 +171,9 @@ fun YouTubePlaylistMenu(
     )
     HorizontalDivider()
 
-    var downloadState by remember {
-        mutableStateOf(Download.STATE_STOPPED)
-    }
-    LaunchedEffect(songs) {
-        if (songs.isEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs.all { downloads[it.id]?.state == Download.STATE_COMPLETED })
-                    Download.STATE_COMPLETED
-                else if (songs.all {
-                        downloads[it.id]?.state == Download.STATE_QUEUED
-                                || downloads[it.id]?.state == Download.STATE_DOWNLOADING
-                                || downloads[it.id]?.state == Download.STATE_COMPLETED
-                    })
-                    Download.STATE_DOWNLOADING
-                else
-                    Download.STATE_STOPPED
-        }
-    }
+    val playlistSongIds = remember(songs) { songs.map { it.id } }
+    val downloadState by downloadUtil.getDownloadState(playlistSongIds)
+        .collectAsState(initial = Download.STATE_STOPPED)
     var showRemoveDownloadDialog by remember {
         mutableStateOf(false)
     }
@@ -216,9 +199,7 @@ fun YouTubePlaylistMenu(
                 TextButton(
                     onClick = {
                         showRemoveDownloadDialog = false
-                        songs.forEach { song ->
-                            downloadUtil.removeDownload(song.id)
-                        }
+                        downloadUtil.removeDownloads(songs.map { it.id })
                     }
                 ) {
                     Text(text = stringResource(android.R.string.ok))
@@ -478,15 +459,14 @@ fun YouTubePlaylistMenu(
                             },
                             modifier = Modifier.clickable {
                                 coroutineScope.launch(Dispatchers.IO) {
-                                    songs.forEach { song ->
-                                        database.transaction {
-                                            insert(song.toMediaMetadata())
-                                        }
-                                        val dbSong = database.song(song.id).first()
-                                        dbSong?.let {
-                                            downloadUtil.downloadToMediaStore(it)
-                                        }
+                                    val mediaMetadataSongs = songs.map { it.toMediaMetadata() }
+                                    database.transaction {
+                                        mediaMetadataSongs.forEach(::insert)
                                     }
+                                    val songsToDownload = songs.mapNotNull { song ->
+                                        database.song(song.id).first()
+                                    }
+                                    downloadUtil.downloadSongsToMediaStore(songsToDownload)
                                 }
                             }
                         )

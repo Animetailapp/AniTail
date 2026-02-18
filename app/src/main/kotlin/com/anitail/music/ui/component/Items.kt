@@ -44,6 +44,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -436,30 +437,15 @@ fun AlbumListItem(
     badges: @Composable RowScope.() -> Unit = {
         val database = LocalDatabase.current
         val downloadUtil = LocalDownloadUtil.current
-        var songs by remember {
-            mutableStateOf(emptyList<Song>())
+        val songIds by produceState(
+            initialValue = emptyList<String>(),
+            key1 = album.id,
+            key2 = album.album.lastUpdateTime
+        ) {
+            value = database.albumSongIds(album.id).first()
         }
-
-        LaunchedEffect(Unit) {
-            database.albumSongs(album.id).collect {
-                songs = it
-            }
-        }
-
-        var downloadState by remember {
-            mutableStateOf(Download.STATE_STOPPED)
-        }
-
-        LaunchedEffect(songs) {
-            if (songs.isEmpty()) return@LaunchedEffect
-            downloadUtil.downloads.collect { downloads ->
-                downloadState = when {
-                    songs.all { downloads[it.id]?.state == STATE_COMPLETED } -> STATE_COMPLETED
-                    songs.all { downloads[it.id]?.state in listOf(STATE_QUEUED, STATE_DOWNLOADING, STATE_COMPLETED) } -> STATE_DOWNLOADING
-                    else -> Download.STATE_STOPPED
-                }
-            }
-        }
+        val downloadState by downloadUtil.getDownloadState(songIds)
+            .collectAsState(initial = Download.STATE_STOPPED)
 
         if (showLikedIcon && album.album.bookmarkedAt != null) {
             Icon.Favorite()
@@ -499,30 +485,15 @@ fun AlbumGridItem(
     badges: @Composable RowScope.() -> Unit = {
         val database = LocalDatabase.current
         val downloadUtil = LocalDownloadUtil.current
-        var songs by remember {
-            mutableStateOf(emptyList<Song>())
+        val songIds by produceState(
+            initialValue = emptyList<String>(),
+            key1 = album.id,
+            key2 = album.album.lastUpdateTime
+        ) {
+            value = database.albumSongIds(album.id).first()
         }
-
-        LaunchedEffect(Unit) {
-            database.albumSongs(album.id).collect {
-                songs = it
-            }
-        }
-
-        var downloadState by remember {
-            mutableStateOf(Download.STATE_STOPPED)
-        }
-
-        LaunchedEffect(songs) {
-            if (songs.isEmpty()) return@LaunchedEffect
-            downloadUtil.downloads.collect { downloads ->
-                downloadState = when {
-                    songs.all { downloads[it.id]?.state == STATE_COMPLETED } -> STATE_COMPLETED
-                    songs.all { downloads[it.id]?.state in listOf(STATE_QUEUED, STATE_DOWNLOADING, STATE_COMPLETED) } -> STATE_DOWNLOADING
-                    else -> Download.STATE_STOPPED
-                }
-            }
-        }
+        val downloadState by downloadUtil.getDownloadState(songIds)
+            .collectAsState(initial = Download.STATE_STOPPED)
 
         if (album.album.bookmarkedAt != null) {
             Icon.Favorite()

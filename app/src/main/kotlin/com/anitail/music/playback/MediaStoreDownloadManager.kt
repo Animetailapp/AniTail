@@ -122,8 +122,11 @@ constructor(
         if (songs.isEmpty()) return
 
         scope.launch {
+            val songsToQueue = preprocessSongsForQueue(songs)
+            if (songsToQueue.isEmpty()) return@launch
+
             val queuedAny = downloadMutex.withLock {
-                enqueueSongsLocked(songs)
+                enqueueSongsLocked(songsToQueue)
             }
             if (!queuedAny) return@launch
 
@@ -232,10 +235,8 @@ constructor(
             downloadQueue.removeAll { it.id in songIds }
         }
 
-        songIds.forEach { songId ->
-            removePersistedDownload(songId)
-            clearDownloadState(songId)
-        }
+        removePersistedDownloads(songIds)
+        clearDownloadStates(songIds)
     }
 
     private suspend fun enqueueSongsLocked(songs: Collection<Song>): Boolean {
@@ -252,26 +253,6 @@ constructor(
                 Timber.Forest.d(
                     "Song ${song.song.title} is already queued/downloading/completed (status: ${currentState.status})"
                 )
-                continue
-            }
-
-            if (!song.song.mediaStoreUri.isNullOrEmpty()) {
-                Timber.Forest.d(
-                    "Song ${song.song.title} is already downloaded in database: ${song.song.mediaStoreUri}"
-                )
-                clearDownloadState(song.id)
-                continue
-            }
-
-            val primaryArtist = resolvePrimaryArtist(song)
-            val existingFile = mediaStoreHelper.findExistingFile(
-                title = song.song.title,
-                artist = primaryArtist
-            )
-            if (existingFile != null) {
-                Timber.Forest.d("Song ${song.song.title} already exists in MediaStore: $existingFile")
-                markSongAsDownloaded(song.id, existingFile.toString())
-                clearDownloadState(song.id)
                 continue
             }
 
@@ -296,6 +277,38 @@ constructor(
         }
 
         return queuedAny
+    }
+
+    private suspend fun preprocessSongsForQueue(songs: Collection<Song>): List<Song> {
+        val uniqueSongs = songs
+            .groupBy { it.id }
+            .mapNotNull { (_, sameIdSongs) -> sameIdSongs.firstOrNull() }
+
+        val songsToQueue = ArrayList<Song>(uniqueSongs.size)
+        for (song in uniqueSongs) {
+            if (!song.song.mediaStoreUri.isNullOrEmpty()) {
+                Timber.Forest.d(
+                    "Song ${song.song.title} is already downloaded in database: ${song.song.mediaStoreUri}"
+                )
+                clearDownloadState(song.id)
+                continue
+            }
+
+            val existingFile = mediaStoreHelper.findExistingFile(
+                title = song.song.title,
+                artist = resolvePrimaryArtist(song)
+            )
+            if (existingFile != null) {
+                Timber.Forest.d("Song ${song.song.title} already exists in MediaStore: $existingFile")
+                markSongAsDownloaded(song.id, existingFile.toString())
+                clearDownloadState(song.id)
+                continue
+            }
+
+            songsToQueue += song
+        }
+
+        return songsToQueue
     }
 
     /**
@@ -641,6 +654,14 @@ constructor(
         }
     }
 
+    private fun clearDownloadStates(songIds: Set<String>) {
+        if (songIds.isEmpty()) return
+        _downloadStates.update { currentStates ->
+            val existingSongIds = songIds.filterTo(mutableSetOf()) { it in currentStates }
+            if (existingSongIds.isEmpty()) currentStates else currentStates - existingSongIds
+        }
+    }
+
     /**
      * Mark a song as downloaded in the database with MediaStore URI
      */
@@ -664,22 +685,31 @@ constructor(
         }
     }
 
-    private suspend fun removePersistedDownload(songId: String) {
-        val song = database.song(songId).first() ?: return
-        val mediaStoreUri = song.song.mediaStoreUri
+    private suspend fun removePersistedDownloads(songIds: Set<String>) {
+        if (songIds.isEmpty()) return
 
-        if (!mediaStoreUri.isNullOrEmpty()) {
-            mediaStoreHelper.deleteFromMediaStore(mediaStoreUri.toUri())
+        val songs = database.songsByIds(songIds.toList())
+        val songsToPersist = mutableListOf<com.anitail.music.db.entities.SongEntity>()
+        songs.forEach { song ->
+            val mediaStoreUri = song.song.mediaStoreUri
+
+            if (!mediaStoreUri.isNullOrEmpty()) {
+                mediaStoreHelper.deleteFromMediaStore(mediaStoreUri.toUri())
+            }
+
+            if (!song.song.mediaStoreUri.isNullOrEmpty() || song.song.dateDownload != null) {
+                songsToPersist += song.song.copy(
+                    mediaStoreUri = null,
+                    dateDownload = null
+                )
+            }
         }
 
-        if (!song.song.mediaStoreUri.isNullOrEmpty() || song.song.dateDownload != null) {
+        if (songsToPersist.isNotEmpty()) {
             database.query {
-                database.upsert(
-                    song.song.copy(
-                        mediaStoreUri = null,
-                        dateDownload = null
-                    )
-                )
+                songsToPersist.forEach { songEntity ->
+                    database.upsert(songEntity)
+                }
             }
         }
     }

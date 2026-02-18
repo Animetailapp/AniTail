@@ -16,9 +16,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -80,28 +79,9 @@ fun SelectionSongMenu(
         )
     }
 
-    var downloadState by remember {
-        mutableIntStateOf(Download.STATE_STOPPED)
-    }
-
-    LaunchedEffect(songSelection) {
-        if (songSelection.isEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songSelection.all { downloads[it.id]?.state == Download.STATE_COMPLETED }) {
-                    Download.STATE_COMPLETED
-                } else if (songSelection.all {
-                        downloads[it.id]?.state == Download.STATE_QUEUED ||
-                                downloads[it.id]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it.id]?.state == Download.STATE_COMPLETED
-                    }
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
-        }
-    }
+    val selectedSongIds = remember(songSelection) { songSelection.map { it.id } }
+    val downloadState by downloadUtil.getDownloadState(selectedSongIds)
+        .collectAsState(initial = Download.STATE_STOPPED)
 
     var showChoosePlaylistDialog by rememberSaveable {
         mutableStateOf(false)
@@ -150,9 +130,7 @@ fun SelectionSongMenu(
                 TextButton(
                     onClick = {
                         showRemoveDownloadDialog = false
-                        songSelection.forEach { song ->
-                            downloadUtil.removeDownload(song.song.id)
-                        }
+                        downloadUtil.removeDownloads(songSelection.map { it.song.id })
                     },
                 ) {
                     Text(text = stringResource(android.R.string.ok))
@@ -321,9 +299,7 @@ fun SelectionSongMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            songSelection.forEach { song ->
-                                downloadUtil.downloadToMediaStore(song)
-                            }
+                            downloadUtil.downloadSongsToMediaStore(songSelection)
                         }
                     )
                 }
@@ -420,28 +396,9 @@ fun SelectionMediaMetadataMenu(
         onDismiss = { showChoosePlaylistDialog = false }
     )
 
-    var downloadState by remember {
-        mutableIntStateOf(Download.STATE_STOPPED)
-    }
-
-    LaunchedEffect(songSelection) {
-        if (songSelection.isEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songSelection.all { downloads[it.id]?.state == Download.STATE_COMPLETED }) {
-                    Download.STATE_COMPLETED
-                } else if (songSelection.all {
-                        downloads[it.id]?.state == Download.STATE_QUEUED ||
-                                downloads[it.id]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it.id]?.state == Download.STATE_COMPLETED
-                    }
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
-        }
-    }
+    val selectedMetadataSongIds = remember(songSelection) { songSelection.map { it.id } }
+    val downloadState by downloadUtil.getDownloadState(selectedMetadataSongIds)
+        .collectAsState(initial = Download.STATE_STOPPED)
 
     var showRemoveDownloadDialog by remember {
         mutableStateOf(false)
@@ -469,9 +426,7 @@ fun SelectionMediaMetadataMenu(
                 TextButton(
                     onClick = {
                         showRemoveDownloadDialog = false
-                        songSelection.forEach { song ->
-                            downloadUtil.removeDownload(song.id)
-                        }
+                        downloadUtil.removeDownloads(songSelection.map { it.id })
                     },
                 ) {
                     Text(text = stringResource(android.R.string.ok))

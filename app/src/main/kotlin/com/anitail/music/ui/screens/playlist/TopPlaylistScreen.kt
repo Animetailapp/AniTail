@@ -147,28 +147,14 @@ fun TopPlaylistScreen(
     val name = stringResource(R.string.my_top) + " $maxSize"
 
     val downloadUtil = LocalDownloadUtil.current
-    var downloadState by remember { mutableStateOf(Download.STATE_STOPPED) }
+    val playlistSongIds = remember(songs) { songs?.map { it.song.id }.orEmpty() }
+    val downloadState by downloadUtil.getDownloadState(playlistSongIds)
+        .collectAsState(initial = Download.STATE_STOPPED)
 
     LaunchedEffect(songs) {
         mutableSongs.apply {
             clear()
             songs?.let { addAll(it) }
-        }
-        if (songs?.isEmpty() == true) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs?.all { downloads[it.song.id]?.state == Download.STATE_COMPLETED } == true) {
-                    Download.STATE_COMPLETED
-                } else if (songs?.all {
-                        downloads[it.song.id]?.state == Download.STATE_QUEUED ||
-                                downloads[it.song.id]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it.song.id]?.state == Download.STATE_COMPLETED
-                    } == true
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
         }
     }
 
@@ -194,9 +180,7 @@ fun TopPlaylistScreen(
                 TextButton(
                     onClick = {
                         showRemoveDownloadDialog = false
-                        songs!!.forEach { song ->
-                            downloadUtil.removeDownload(song.song.id)
-                        }
+                        downloadUtil.removeDownloads(songs!!.map { it.song.id })
                     },
                 ) {
                     Text(text = stringResource(android.R.string.ok))
@@ -302,9 +286,7 @@ fun TopPlaylistScreen(
                                                 Download.STATE_DOWNLOADING -> {
                                                     IconButton(
                                                         onClick = {
-                                                            songs!!.forEach { song ->
-                                                                downloadUtil.removeDownload(song.song.id)
-                                                            }
+                                                            downloadUtil.removeDownloads(songs!!.map { it.song.id })
                                                         },
                                                     ) {
                                                         CircularProgressIndicator(
@@ -317,11 +299,7 @@ fun TopPlaylistScreen(
                                                 else -> {
                                                     IconButton(
                                                         onClick = {
-                                                            songs!!.forEach { song ->
-                                                                downloadUtil.downloadToMediaStore(
-                                                                    song
-                                                                )
-                                                            }
+                                                            downloadUtil.downloadSongsToMediaStore(songs!!)
                                                         },
                                                     ) {
                                                         Icon(

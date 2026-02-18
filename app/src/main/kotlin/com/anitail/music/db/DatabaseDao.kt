@@ -173,8 +173,15 @@ interface DatabaseDao {
     suspend fun songByMediaStoreUri(mediaStoreUri: String): Song?
 
     @Transaction
+    @Query("SELECT * FROM song WHERE id IN (:songIds)")
+    suspend fun songsByIds(songIds: List<String>): List<Song>
+
+    @Transaction
     @Query("SELECT song.* FROM song JOIN song_album_map ON song.id = song_album_map.songId WHERE song_album_map.albumId = :albumId")
     fun albumSongs(albumId: String): Flow<List<Song>>
+
+    @Query("SELECT song.id FROM song JOIN song_album_map ON song.id = song_album_map.songId WHERE song_album_map.albumId = :albumId")
+    fun albumSongIds(albumId: String): Flow<List<String>>
 
     @Transaction
     @Query("SELECT playlist_song_map.* FROM playlist_song_map INNER JOIN song ON playlist_song_map.songId = song.id WHERE playlistId = :playlistId ORDER BY position")

@@ -48,10 +48,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.media3.exoplayer.offline.Download.STATE_COMPLETED
-import androidx.media3.exoplayer.offline.Download.STATE_DOWNLOADING
-import androidx.media3.exoplayer.offline.Download.STATE_QUEUED
-import androidx.media3.exoplayer.offline.Download.STATE_STOPPED
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.anitail.innertube.YouTube
@@ -99,39 +95,14 @@ fun AlbumMenu(
         }
     }
 
-    var downloadState by remember {
-        mutableStateOf(STATE_STOPPED)
-    }
-
-    LaunchedEffect(songs) {
-        if (songs.isEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            val nextState =
-                if (songs.all { downloads[it.id]?.state == STATE_COMPLETED }) {
-                    STATE_COMPLETED
-                } else if (songs.all {
-                        downloads[it.id]?.state == STATE_QUEUED ||
-                                downloads[it.id]?.state == STATE_DOWNLOADING ||
-                                downloads[it.id]?.state == STATE_COMPLETED
-                    }
-                ) {
-                    STATE_DOWNLOADING
-                } else {
-                    STATE_STOPPED
-                }
-            if (nextState != downloadState) {
-                downloadState = nextState
-            }
-        }
-    }
-
     var mediaStoreDownloadState by remember {
         mutableStateOf<AlbumMediaStoreDownloadStatus>(AlbumMediaStoreDownloadStatus.NotDownloaded)
     }
 
     LaunchedEffect(songs) {
         if (songs.isEmpty()) return@LaunchedEffect
-        downloadUtil.getAllMediaStoreDownloads().collect { states ->
+        val songIds = songs.map { it.id }
+        downloadUtil.getMediaStoreDownloads(songIds).collect { states ->
             val nextStatus = withContext(Dispatchers.Default) {
                 calculateAlbumMediaStoreDownloadStatus(songs = songs, states = states)
             }
