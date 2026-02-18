@@ -3,10 +3,13 @@
 package com.anitail.music.playback
 
 import android.annotation.SuppressLint
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.database.SQLException
 import android.media.MediaMetadataRetriever
 import android.media.audiofx.AudioEffect
@@ -17,6 +20,7 @@ import android.os.Build
 import android.os.Looper
 import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.app.NotificationCompat
 import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
 import androidx.media3.cast.CastPlayer
@@ -281,9 +285,11 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   val automixItems = MutableStateFlow<List<MediaItem>>(emptyList())
     private var consecutivePlaybackErr = 0
     private var lastWidgetUpdateAt: Long = 0L
+    private var foregroundBootstrapStarted = false
 
     override fun onCreate() {
     super.onCreate()
+    ensureForegroundBootstrap()
     instance = this
         // Proveedor base
         val baseNotificationProvider =
@@ -1247,6 +1253,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
   @RequiresApi(Build.VERSION_CODES.O)
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    ensureForegroundBootstrap()
     if (intent?.action == null) {
       return super.onStartCommand(intent, flags, startId)
     }
@@ -1312,6 +1319,49 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     }
 
     return super.onStartCommand(intent, flags, startId)
+  }
+
+  private fun ensureForegroundBootstrap() {
+    if (foregroundBootstrapStarted) return
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      val channel =
+          NotificationChannel(
+              CHANNEL_ID,
+              getString(R.string.music_player),
+              NotificationManager.IMPORTANCE_LOW,
+          ).apply {
+            setShowBadge(false)
+            description = getString(R.string.music_player)
+          }
+      notificationManager.createNotificationChannel(channel)
+    }
+
+    val notification =
+        NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_ani)
+            .setContentTitle(getString(R.string.music_player))
+            .setContentText(getString(R.string.app_name))
+            .setOngoing(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+
+    runCatching {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        startForeground(
+            NOTIFICATION_ID,
+            notification,
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+        )
+      } else {
+        startForeground(NOTIFICATION_ID, notification)
+      }
+      foregroundBootstrapStarted = true
+    }.onFailure { error ->
+      Timber.w(error, "Failed to bootstrap foreground state for MusicService")
+    }
   }
 
   fun toggleLike() {

@@ -286,11 +286,7 @@ class MainActivity : AppCompatActivity() {
     private fun startMusicServiceSafely() {
         val serviceIntent = Intent(this, MusicService::class.java)
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                ContextCompat.startForegroundService(this, serviceIntent)
-            } else {
-                startService(serviceIntent)
-            }
+            startService(serviceIntent)
         } catch (e: IllegalStateException) {
             Timber.w(
                 e,
