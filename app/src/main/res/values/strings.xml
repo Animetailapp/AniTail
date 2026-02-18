@@ -924,10 +924,10 @@
     <string name="sound_capsule_new">New</string>
     <string name="sound_capsule_no_data">No data yet</string>
     <string name="sound_capsule_musicless_title">This was a music-less month.</string>
-    <string name="sound_capsule_musicless_subtitle">Don't worry, it happens.</string>
+    <string name="sound_capsule_musicless_subtitle">Don\'t worry, it happens.</string>
     <string name="sound_capsule_minutes_value">%1$d minutes</string>
     <string name="sound_capsule_minutes_short">%1$d min</string>
-    <string name="sound_capsule_lifetime_headline">You listened to %1$,d songs since joining AniTail</string>
+    <string name="sound_capsule_lifetime_headline">You listened to %1$d songs since joining AniTail</string>
     <string name="sound_capsule_lifetime_description">Keep listening to unlock richer monthly insights about your music habits.</string>
     <string name="sound_capsule_daily_average">Daily average: %1$d min</string>
     <string name="sound_capsule_time_prefix">You listened to music for </string>
