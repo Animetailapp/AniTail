@@ -272,6 +272,7 @@ object SettingsSearchOptions {
 
     private fun storage(context: Context): List<SettingOptionData> = listOf(
         option(context, "downloaded_songs", R.string.downloaded_songs),
+        option(context, "max_download_speed", R.string.max_download_speed),
         option(context, "song_cache", R.string.song_cache),
         option(context, "image_cache", R.string.image_cache),
         option(context, "max_cache_size", R.string.max_cache_size),

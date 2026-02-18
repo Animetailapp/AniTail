@@ -72,6 +72,7 @@ import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.constants.CustomDownloadPathEnabledKey
 import com.anitail.music.constants.CustomDownloadPathUriKey
+import com.anitail.music.constants.MaxDownloadSpeedKey
 import com.anitail.music.constants.MaxDownloadSizeKey
 import com.anitail.music.constants.MaxImageCacheSizeKey
 import com.anitail.music.constants.MaxSongCacheSizeKey
@@ -117,6 +118,10 @@ fun StorageSettings(
     val (maxDownloadSize, onMaxDownloadSizeChange) = rememberPreference(
         key = MaxDownloadSizeKey,
         defaultValue = -1
+    )
+    val (maxDownloadSpeedEnabled, onMaxDownloadSpeedEnabledChange) = rememberPreference(
+        key = MaxDownloadSpeedKey,
+        defaultValue = true
     )
     val (maxSongCacheSize, onMaxSongCacheSizeChange) = rememberPreference(
         key = MaxSongCacheSizeKey,
@@ -356,6 +361,19 @@ fun StorageSettings(
                         onMaxDownloadSizeChange(it)
                         refreshCacheInfo()
                     },
+                )
+
+                SwitchPreference(
+                    title = { Text(text = stringResource(R.string.max_download_speed)) },
+                    description = stringResource(R.string.max_download_speed_desc),
+                    icon = {
+                        Icon(
+                            painter = painterResource(R.drawable.fast_forward),
+                            contentDescription = null,
+                        )
+                    },
+                    checked = maxDownloadSpeedEnabled,
+                    onCheckedChange = onMaxDownloadSpeedEnabledChange,
                 )
 
                 SwitchPreference(

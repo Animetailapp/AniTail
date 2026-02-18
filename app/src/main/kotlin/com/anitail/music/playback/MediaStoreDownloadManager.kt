@@ -10,6 +10,7 @@ import com.anitail.music.constants.AudioQuality
 import com.anitail.music.constants.AudioQualityKey
 import com.anitail.music.constants.CustomDownloadPathEnabledKey
 import com.anitail.music.constants.CustomDownloadPathUriKey
+import com.anitail.music.constants.MaxDownloadSpeedKey
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.Song
 import com.anitail.music.utils.DownloadExportHelper
@@ -52,7 +53,7 @@ import kotlin.math.pow
  * Features:
  * - Downloads audio streams from YouTube via InnerTube API
  * - Saves files using MediaStore for Android 10+ compatibility
- * - Supports concurrent downloads (max 3 simultaneous)
+ * - Supports configurable download speed profiles (Balanced/Turbo)
  * - Retry logic with exponential backoff
  * - Progress tracking with StateFlow
  * - Download queue management
@@ -73,8 +74,9 @@ constructor(
     private val customDownloadPathEnabled by
         booleanPreference(context, CustomDownloadPathEnabledKey, false)
     private val customDownloadPathUri by stringPreference(context, CustomDownloadPathUriKey, "")
+    private val maxDownloadSpeedEnabled by booleanPreference(context, MaxDownloadSpeedKey, true)
 
-    // Concurrent download limiter (max 3 simultaneous downloads)
+    // Concurrent download limiter (up to 8 simultaneous downloads)
     private val downloadSemaphore = Semaphore(MAX_CONCURRENT_DOWNLOADS)
 
     // Mutex to protect against duplicate downloads from concurrent requests
@@ -91,13 +93,18 @@ constructor(
     private val targetItagOverride = ConcurrentHashMap<String, Int>()
 
     companion object {
-        private const val MAX_CONCURRENT_DOWNLOADS = 3
+        private const val MAX_CONCURRENT_DOWNLOADS_TURBO_UNMETERED = 8
+        private const val MAX_CONCURRENT_DOWNLOADS_TURBO_METERED = 3
+        private const val MAX_CONCURRENT_DOWNLOADS_BALANCED_UNMETERED = 3
+        private const val MAX_CONCURRENT_DOWNLOADS_BALANCED_METERED = 2
+        private const val MAX_CONCURRENT_DOWNLOADS = MAX_CONCURRENT_DOWNLOADS_TURBO_UNMETERED
         private const val MAX_RETRY_ATTEMPTS = 3
         private const val INITIAL_RETRY_DELAY_MS = 1000L
         private const val RETRY_BACKOFF_MULTIPLIER = 2.0
         private const val UNKNOWN_ARTIST_NAME = "Unknown Artist"
-        private const val MIN_PROGRESS_UPDATE_BYTES = 512 * 1024L
-        private const val MIN_PROGRESS_UPDATE_INTERVAL_MS = 1000L
+        private const val MIN_PROGRESS_UPDATE_BYTES = 2 * 1024 * 1024L
+        private const val MIN_PROGRESS_UPDATE_INTERVAL_MS = 1500L
+        private const val DOWNLOAD_BUFFER_SIZE_BYTES = 256 * 1024
         private const val CONNECT_TIMEOUT_MS = 60_000
         private const val READ_TIMEOUT_MS = 120_000
     }
@@ -143,8 +150,25 @@ constructor(
             if (!queuedAny) return@launch
 
             MediaStoreDownloadService.start(context)
-            repeat(MAX_CONCURRENT_DOWNLOADS) {
+            repeat(maxConcurrentDownloadsForCurrentNetwork()) {
                 processQueue()
+            }
+        }
+    }
+
+    private fun maxConcurrentDownloadsForCurrentNetwork(): Int {
+        val isMetered = runCatching { connectivityManager.isActiveNetworkMetered }.getOrDefault(true)
+        return if (maxDownloadSpeedEnabled) {
+            if (isMetered) {
+                MAX_CONCURRENT_DOWNLOADS_TURBO_METERED
+            } else {
+                MAX_CONCURRENT_DOWNLOADS_TURBO_UNMETERED
+            }
+        } else {
+            if (isMetered) {
+                MAX_CONCURRENT_DOWNLOADS_BALANCED_METERED
+            } else {
+                MAX_CONCURRENT_DOWNLOADS_BALANCED_UNMETERED
             }
         }
     }
@@ -656,7 +680,7 @@ constructor(
 
             connection.getInputStream().use { input ->
                 FileOutputStream(outputFile, appendMode).use { output ->
-                    val buffer = ByteArray(64 * 1024)
+                    val buffer = ByteArray(DOWNLOAD_BUFFER_SIZE_BYTES)
                     var bytesRead: Int
 
                     while (input.read(buffer).also { bytesRead = it } != -1) {

@@ -18,6 +18,7 @@ import com.anitail.music.constants.AudioQuality
 import com.anitail.music.constants.AudioQualityKey
 import com.anitail.music.constants.CustomDownloadPathEnabledKey
 import com.anitail.music.constants.CustomDownloadPathUriKey
+import com.anitail.music.constants.MaxDownloadSpeedKey
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.FormatEntity
 import com.anitail.music.db.entities.Song
@@ -64,6 +65,13 @@ constructor(
     val mediaStoreDownloadManager: MediaStoreDownloadManager,
     private val downloadExportHelper: DownloadExportHelper,
 ) {
+    companion object {
+        private const val MAX_PARALLEL_CACHE_DOWNLOADS_TURBO_UNMETERED = 8
+        private const val MAX_PARALLEL_CACHE_DOWNLOADS_TURBO_METERED = 3
+        private const val MAX_PARALLEL_CACHE_DOWNLOADS_BALANCED_UNMETERED = 3
+        private const val MAX_PARALLEL_CACHE_DOWNLOADS_BALANCED_METERED = 2
+    }
+
     sealed class MediaStoreCollectionStatus {
         object NotDownloaded : MediaStoreCollectionStatus()
         object Completed : MediaStoreCollectionStatus()
@@ -80,6 +88,7 @@ constructor(
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
     private val customDownloadPathEnabled by booleanPreference(context, CustomDownloadPathEnabledKey, false)
     private val customDownloadPathUri by stringPreference(context, CustomDownloadPathUriKey, "")
+    private val maxDownloadSpeedEnabled by booleanPreference(context, MaxDownloadSpeedKey, true)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -90,6 +99,23 @@ constructor(
     private val mediaStoreDownloadCache = ConcurrentHashMap<String, CachedMediaStoreDownload>()
     private val downloadExecutor = Executor { command ->
         scope.launch(Dispatchers.IO) { command.run() }
+    }
+
+    private fun maxParallelCacheDownloadsForCurrentNetwork(): Int {
+        val isMetered = runCatching { connectivityManager.isActiveNetworkMetered }.getOrDefault(true)
+        return if (maxDownloadSpeedEnabled) {
+            if (isMetered) {
+                MAX_PARALLEL_CACHE_DOWNLOADS_TURBO_METERED
+            } else {
+                MAX_PARALLEL_CACHE_DOWNLOADS_TURBO_UNMETERED
+            }
+        } else {
+            if (isMetered) {
+                MAX_PARALLEL_CACHE_DOWNLOADS_BALANCED_METERED
+            } else {
+                MAX_PARALLEL_CACHE_DOWNLOADS_BALANCED_UNMETERED
+            }
+        }
     }
 
     // Legacy cache downloads (for compatibility)
@@ -266,7 +292,7 @@ constructor(
             dataSourceFactory,
             downloadExecutor
         ).apply {
-            maxParallelDownloads = 3
+            maxParallelDownloads = maxParallelCacheDownloadsForCurrentNetwork()
             addListener(
                 object : DownloadManager.Listener {
                     override fun onDownloadChanged(

@@ -711,6 +711,8 @@
     <string name="no_folder_selected">No folder selected</string>
     <string name="custom_download_path">Custom download path</string>
     <string name="custom_download_path_desc">Save downloads to a custom folder (e.g., SD card)</string>
+    <string name="max_download_speed">Maximum download speed</string>
+    <string name="max_download_speed_desc">When enabled: Turbo mode (faster downloads, higher battery/data usage).</string>
     <string name="select_download_folder">Select download folder</string>
     <string name="reset_download_path">Reset to default (internal cache)</string>
     <string name="current_path">Current path: %s</string>
