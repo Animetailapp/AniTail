@@ -1,8 +1,19 @@
 package com.anitail.music.ui.screens
 
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +32,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -33,13 +44,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -54,11 +71,16 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.R
 import com.anitail.music.ui.component.IconButton as AppIconButton
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.viewmodels.SoundCapsuleViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import java.time.YearMonth
 import java.util.Locale
 
@@ -68,6 +90,9 @@ fun SoundCapsuleScreen(
     navController: NavController,
     viewModel: SoundCapsuleViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
+    val playerConnection = LocalPlayerConnection.current
+    val coroutineScope = rememberCoroutineScope()
     val months by viewModel.monthlyCapsules.collectAsState()
     val totalSongs by viewModel.totalSongsSinceJoining.collectAsState()
     val bottomInsets =
@@ -92,28 +117,53 @@ fun SoundCapsuleScreen(
                     .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Top)),
         ) {
             item {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    LifetimeInsightCard(totalSongs = totalSongs)
+                StaggeredEntry(index = 0) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        LifetimeInsightCard(totalSongs = totalSongs)
+                    }
                 }
             }
 
-            items(items = months, key = { month -> month.monthKey }) { month ->
-                SoundCapsuleMonthSection(
-                    month = month,
-                    onTimeListenedClick = {
-                        navController.navigate("stats/time/${month.year}/${month.month}")
-                    },
-                    onTopArtistsClick = {
-                        navController.navigate("stats/top-artists/${month.year}/${month.month}")
-                    },
-                    onTopSongsClick = {
-                        navController.navigate("stats/top-songs/${month.year}/${month.month}")
-                    },
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
+            itemsIndexed(items = months, key = { _, month -> month.monthKey }) { index, month ->
+                StaggeredEntry(index = index + 1) {
+                    SoundCapsuleMonthSection(
+                        month = month,
+                        onTimeListenedClick = {
+                            navController.navigate("stats/time/${month.year}/${month.month}")
+                        },
+                        onTopArtistsClick = {
+                            navController.navigate("stats/top-artists/${month.year}/${month.month}")
+                        },
+                        onTopSongsClick = {
+                            navController.navigate("stats/top-songs/${month.year}/${month.month}")
+                        },
+                        onShareClick = {
+                            context.shareSoundCapsuleMonth(month)
+                        },
+                        onOpenArtistClick = { artistId, artistName ->
+                            navController.openArtistOrSearch(artistId = artistId, artistName = artistName)
+                        },
+                        onPlaySongClick = { songId ->
+                            coroutineScope.launch {
+                                val mediaItem = viewModel.mediaItemForSong(songId)
+                                if (mediaItem == null) {
+                                    Toast.makeText(context, R.string.sound_capsule_no_data, Toast.LENGTH_SHORT).show()
+                                    return@launch
+                                }
+                                playerConnection?.playQueue(
+                                    ListQueue(
+                                        title = context.getString(R.string.top_songs),
+                                        items = listOf(mediaItem),
+                                    ),
+                                )
+                            }
+                        },
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
             }
         }
 
@@ -146,6 +196,9 @@ private fun SoundCapsuleMonthSection(
     onTimeListenedClick: () -> Unit,
     onTopArtistsClick: () -> Unit,
     onTopSongsClick: () -> Unit,
+    onShareClick: () -> Unit,
+    onOpenArtistClick: (artistId: String, artistName: String) -> Unit,
+    onPlaySongClick: (songId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = capsuleColors()
@@ -169,7 +222,8 @@ private fun SoundCapsuleMonthSection(
                     Modifier
                         .size(30.dp)
                         .clip(CircleShape)
-                        .background(colors.thumbnailBackground),
+                        .background(colors.thumbnailBackground)
+                        .premiumClickable(onClick = onShareClick),
             ) {
                 Icon(
                     painter = painterResource(R.drawable.share),
@@ -198,11 +252,13 @@ private fun SoundCapsuleMonthSection(
                 TopArtistInsightRow(
                     month = month,
                     onClick = onTopArtistsClick,
+                    onOpenArtistClick = onOpenArtistClick,
                 )
                 HorizontalDivider(color = colors.divider, thickness = 0.8.dp)
                 TopSongInsightRow(
                     month = month,
                     onClick = onTopSongsClick,
+                    onPlaySongClick = onPlaySongClick,
                 )
             }
         }
@@ -269,6 +325,7 @@ private fun TimeInsightRow(
 private fun TopArtistInsightRow(
     month: SoundCapsuleMonthUiState,
     onClick: () -> Unit,
+    onOpenArtistClick: (artistId: String, artistName: String) -> Unit,
 ) {
     val colors = capsuleColors()
     val topArtist = month.topArtist
@@ -283,6 +340,9 @@ private fun TopArtistInsightRow(
             imageUrl = topArtist?.thumbnailUrl,
             fallbackIcon = R.drawable.person,
             size = 50.dp,
+            onClick = {
+                topArtist?.let { artist -> onOpenArtistClick(artist.id, artist.name) }
+            },
         )
         Spacer(modifier = Modifier.width(10.dp))
         Column(
@@ -321,6 +381,7 @@ private fun TopArtistInsightRow(
 private fun TopSongInsightRow(
     month: SoundCapsuleMonthUiState,
     onClick: () -> Unit,
+    onPlaySongClick: (songId: String) -> Unit,
 ) {
     val colors = capsuleColors()
     val topSong = month.topSong
@@ -335,6 +396,7 @@ private fun TopSongInsightRow(
             imageUrl = topSong?.thumbnailUrl,
             fallbackIcon = R.drawable.music_note,
             size = 50.dp,
+            onClick = { topSong?.let { song -> onPlaySongClick(song.id) } },
         )
         Spacer(modifier = Modifier.width(10.dp))
         Column(
@@ -518,6 +580,7 @@ private fun ThumbnailCircle(
     imageUrl: String?,
     fallbackIcon: Int,
     size: Dp = 64.dp,
+    onClick: (() -> Unit)? = null,
 ) {
     val colors = capsuleColors()
     Box(
@@ -543,6 +606,15 @@ private fun ThumbnailCircle(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+
+        if (onClick != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .premiumClickable(onClick = onClick),
+            )
+        }
     }
 }
 
@@ -551,6 +623,7 @@ private fun ThumbnailSquare(
     imageUrl: String?,
     fallbackIcon: Int,
     size: Dp = 64.dp,
+    onClick: (() -> Unit)? = null,
 ) {
     val colors = capsuleColors()
     Box(
@@ -574,6 +647,15 @@ private fun ThumbnailSquare(
                 model = imageUrl,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        if (onClick != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .premiumClickable(onClick = onClick),
             )
         }
     }
@@ -627,3 +709,85 @@ private fun dailyAverageForMonth(month: SoundCapsuleMonthUiState): Int {
 }
 
 private fun formatCount(value: Int): String = "%,d".format(Locale.getDefault(), value)
+
+@Composable
+private fun Modifier.premiumClickable(onClick: () -> Unit): Modifier {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(stiffness = 520f, dampingRatio = 0.82f),
+        label = "capsule_press_scale",
+    )
+    return this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .clickable(
+            interactionSource = interactionSource,
+            indication = null,
+            onClick = onClick,
+        )
+}
+
+@Composable
+private fun StaggeredEntry(
+    index: Int,
+    content: @Composable () -> Unit,
+) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(index) {
+        delay((index * 45L).coerceAtMost(320L))
+        visible = true
+    }
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(durationMillis = 360)) + slideInVertically(initialOffsetY = { it / 6 }),
+    ) {
+        content()
+    }
+}
+
+private fun NavController.openArtistOrSearch(
+    artistId: String,
+    artistName: String,
+) {
+    if (artistId.startsWith("local:")) {
+        navigate("search/${Uri.encode(artistName)}")
+    } else {
+        navigate("artist/${Uri.encode(artistId)}")
+    }
+}
+
+private fun android.content.Context.shareSoundCapsuleMonth(month: SoundCapsuleMonthUiState) {
+    val artist = month.topArtist?.name ?: getString(R.string.sound_capsule_no_data)
+    val song = month.topSong?.title ?: getString(R.string.sound_capsule_no_data)
+    val text =
+        buildString {
+            append(getString(R.string.sound_capsule_title))
+            append(" - ")
+            append(month.yearMonth.month.name.lowercase().replaceFirstChar { it.uppercase() })
+            append(" ")
+            append(month.year)
+            append("\n")
+            append(getString(R.string.time_listened))
+            append(": ")
+            append(getString(R.string.sound_capsule_minutes_value, month.totalMinutes))
+            append("\n")
+            append(getString(R.string.sound_capsule_top_artist))
+            append(": ")
+            append(artist)
+            append("\n")
+            append(getString(R.string.sound_capsule_top_song))
+            append(": ")
+            append(song)
+        }
+
+    val intent =
+        Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+    startActivity(Intent.createChooser(intent, getString(R.string.share)))
+}

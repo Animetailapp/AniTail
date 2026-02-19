@@ -935,6 +935,11 @@
     <string name="sound_capsule_period_suffix"> are when you listened most.</string>
     <string name="sound_capsule_music_for_right_now">Music for right now</string>
     <string name="sound_capsule_on_repeat">On Repeat</string>
+    <string name="sound_capsule_quick_pick">Quick pick</string>
+    <string name="sound_capsule_quick_mix">Top 5 mix</string>
+    <string name="sound_capsule_play_top_song">Play top song</string>
+    <string name="sound_capsule_open_top_artist">Open top artist</string>
+    <string name="sound_capsule_active_days">Active days this month: %1$d</string>
     <string name="sound_capsule_top_artists_title">Top artists</string>
     <string name="sound_capsule_top_artists_prefix">You listened to </string>
     <string name="sound_capsule_top_artists_suffix"> this month.</string>

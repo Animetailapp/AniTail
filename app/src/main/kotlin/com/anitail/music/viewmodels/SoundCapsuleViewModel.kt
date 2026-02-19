@@ -2,10 +2,12 @@ package com.anitail.music.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.MediaItem
 import com.anitail.innertube.YouTube
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.EventWithSong
 import com.anitail.music.db.entities.Song
+import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.ui.screens.ListeningPeriod
 import com.anitail.music.ui.screens.RankedArtistUi
 import com.anitail.music.ui.screens.SoundCapsuleMonthUiState
@@ -361,6 +363,17 @@ constructor(
             current = current.minusMonths(1)
         }
         return months
+    }
+
+    suspend fun mediaItemForSong(songId: String): MediaItem? {
+        if (songId.isBlank()) return null
+        return database.getSongById(songId)?.toMediaItem()
+    }
+
+    suspend fun mediaItemsForSongs(songIds: List<String>): List<MediaItem> {
+        val validIds = songIds.filter { it.isNotBlank() }.distinct()
+        if (validIds.isEmpty()) return emptyList()
+        return database.getSongsByIds(validIds).map { it.toMediaItem() }
     }
 }
 
