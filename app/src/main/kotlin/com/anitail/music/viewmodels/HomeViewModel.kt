@@ -37,6 +37,8 @@ import com.anitail.music.utils.reportException
 import com.my.kizzy.rpc.KizzyRPC
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -91,6 +93,7 @@ class HomeViewModel @Inject constructor(
 
     val allLocalItems = MutableStateFlow<List<LocalItem>>(emptyList())
     val allYtItems = MutableStateFlow<List<YTItem>>(emptyList())
+    private var deferredHomeContentJob: Job? = null
 
         // Account display info
     val accountName = MutableStateFlow("Guest")
@@ -149,6 +152,14 @@ class HomeViewModel @Inject constructor(
             (localSongs + homeItems + similarItems + dailyItems + communityItems)
                 .distinctBy { it.id }
                 .take(26)
+    }
+
+    private fun rebuildAllYtItems() {
+        allYtItems.value =
+            similarRecommendations.value?.flatMap { it.items }.orEmpty() +
+                homePage.value?.sections?.flatMap { it.items }.orEmpty() +
+                dailyDiscover.value?.map { it.recommendation }.orEmpty() +
+                communityPlaylists.value?.map { it.playlist }.orEmpty()
     }
 
     private suspend fun getDailyDiscover() {
@@ -233,63 +244,38 @@ class HomeViewModel @Inject constructor(
         communityPlaylists.value = playlists.shuffled().ifEmpty { null }
     }
 
-    private suspend fun load() {
-        isLoading.value = true
+    private suspend fun updateAccountSnapshot() {
+        if (YouTube.cookie == null) return
 
-        val hideExplicit = context.dataStore.get(HideExplicitKey, false)
-
-        getQuickPicks()
-        getDailyDiscover()
-        getCommunityPlaylists()
-
-        forgottenFavorites.value = database.forgottenFavorites()
-            .first().shuffled().take(20)
-
-        val fromTimeStamp = System.currentTimeMillis() - 86400000 * 7 * 2
-
-        val keepListeningSongs = database.mostPlayedSongs(fromTimeStamp, limit = 15, offset = 5)
-            .first().shuffled().take(10)
-
-        val keepListeningAlbums = database.mostPlayedAlbums(fromTimeStamp, limit = 8, offset = 2)
-            .first().filter { it.album.thumbnailUrl != null }.shuffled().take(5)
-
-        val keepListeningArtists = database.mostPlayedArtists(fromTimeStamp)
-            .first().filter { it.artist.isYouTubeArtist && it.artist.thumbnailUrl != null }
-            .shuffled().take(5)
-
-        keepListening.value =
-            (keepListeningSongs + keepListeningAlbums + keepListeningArtists).shuffled()
-
-        allLocalItems.value =
-            (quickPicks.value.orEmpty() + forgottenFavorites.value.orEmpty() + keepListening.value.orEmpty())
-                .filter { it is Song || it is Album }
-
-        if (YouTube.cookie != null) {
-            YouTube.accountInfo().onSuccess { info ->
-                val name = info.name
-                val image = info.thumbnailUrl
-                accountName.value = name
-                accountImageUrl.value = image
-                try {
-                    context.dataStore.edit { prefs ->
-                        prefs[AccountNameKey] = name
-                        if (!image.isNullOrBlank()) prefs[AccountImageUrlKey] = image else prefs.remove(AccountImageUrlKey)
-                    }
-                } catch (_: Exception) {
+        YouTube.accountInfo().onSuccess { info ->
+            val name = info.name
+            val image = info.thumbnailUrl
+            accountName.value = name
+            accountImageUrl.value = image
+            try {
+                context.dataStore.edit { prefs ->
+                    prefs[AccountNameKey] = name
+                    if (!image.isNullOrBlank()) prefs[AccountImageUrlKey] = image else prefs.remove(AccountImageUrlKey)
                 }
-            }.onFailure {
-                reportException(it)
+            } catch (_: Exception) {
             }
-
-            YouTube.library("FEmusic_liked_playlists").completed().onSuccess {
-                val lists = it.items.filterIsInstance<PlaylistItem>()
-                    .filterNot { it.id == "SE" }
-                accountPlaylists.value = lists
-            }.onFailure {
-                reportException(it)
-            }
+        }.onFailure {
+            reportException(it)
         }
 
+        YouTube.library("FEmusic_liked_playlists").completed().onSuccess {
+            val lists = it.items.filterIsInstance<PlaylistItem>()
+                .filterNot { it.id == "SE" }
+            accountPlaylists.value = lists
+        }.onFailure {
+            reportException(it)
+        }
+    }
+
+    private suspend fun getSimilarRecommendations(
+        hideExplicit: Boolean,
+        fromTimeStamp: Long,
+    ): List<SimilarRecommendation> {
         val artistRecommendations = database.mostPlayedArtists(fromTimeStamp, limit = 10).first()
             .filter { it.artist.isYouTubeArtist }
             .shuffled().take(3)
@@ -325,32 +311,105 @@ class HomeViewModel @Inject constructor(
                 )
             }
 
-        similarRecommendations.value = (artistRecommendations + songRecommendations).shuffled()
+        return (artistRecommendations + songRecommendations).shuffled()
+    }
 
-        YouTube.home().onSuccess { page ->
-            homePage.value = page.copy(
-                sections = page.sections.map { section ->
-                    section.copy(items = section.items.filterExplicit(hideExplicit))
+    private fun startDeferredHomeContentLoad(
+        hideExplicit: Boolean,
+        fromTimeStamp: Long,
+    ) {
+        deferredHomeContentJob?.cancel()
+        deferredHomeContentJob = viewModelScope.launch(Dispatchers.IO) {
+            supervisorScope {
+                launch {
+                    updateAccountSnapshot()
                 }
-            )
-        }.onFailure {
-            reportException(it)
+                launch {
+                    getDailyDiscover()
+                    rebuildAllYtItems()
+                    rebuildSpeedDialItems()
+                }
+                launch {
+                    getCommunityPlaylists()
+                    rebuildAllYtItems()
+                    rebuildSpeedDialItems()
+                }
+                launch {
+                    similarRecommendations.value = getSimilarRecommendations(
+                        hideExplicit = hideExplicit,
+                        fromTimeStamp = fromTimeStamp,
+                    )
+                    rebuildAllYtItems()
+                    rebuildSpeedDialItems()
+                }
+            }
         }
+    }
 
-        YouTube.explore().onSuccess { page ->
-            explorePage.value = page
-        }.onFailure {
-            reportException(it)
+    private suspend fun load() {
+        deferredHomeContentJob?.cancel()
+        isLoading.value = true
+
+        try {
+            val hideExplicit = context.dataStore.get(HideExplicitKey, false)
+            val fromTimeStamp = System.currentTimeMillis() - 86400000 * 7 * 2
+
+            supervisorScope {
+                val quickPicksTask = async {
+                    getQuickPicks()
+                }
+                val forgottenFavoritesTask = async {
+                    database.forgottenFavorites().first().shuffled().take(20)
+                }
+                val keepListeningTask = async {
+                    val keepListeningSongs = database.mostPlayedSongs(fromTimeStamp, limit = 15, offset = 5)
+                        .first().shuffled().take(10)
+                    val keepListeningAlbums = database.mostPlayedAlbums(fromTimeStamp, limit = 8, offset = 2)
+                        .first().filter { it.album.thumbnailUrl != null }.shuffled().take(5)
+                    val keepListeningArtists = database.mostPlayedArtists(fromTimeStamp)
+                        .first().filter { it.artist.isYouTubeArtist && it.artist.thumbnailUrl != null }
+                        .shuffled().take(5)
+                    (keepListeningSongs + keepListeningAlbums + keepListeningArtists).shuffled()
+                }
+                val homePageTask = async {
+                    val page = YouTube.home().onFailure {
+                        reportException(it)
+                    }.getOrNull()
+                    page?.copy(
+                        sections = page.sections.map { section ->
+                            section.copy(items = section.items.filterExplicit(hideExplicit))
+                        }
+                    )
+                }
+                val explorePageTask = async {
+                    YouTube.explore().onFailure {
+                        reportException(it)
+                    }.getOrNull()
+                }
+
+                quickPicksTask.await()
+                forgottenFavorites.value = forgottenFavoritesTask.await()
+                keepListening.value = keepListeningTask.await()
+
+                allLocalItems.value =
+                    (quickPicks.value.orEmpty() + forgottenFavorites.value.orEmpty() + keepListening.value.orEmpty())
+                        .filter { it is Song || it is Album }
+
+                isLoading.value = false
+                startDeferredHomeContentLoad(
+                    hideExplicit = hideExplicit,
+                    fromTimeStamp = fromTimeStamp,
+                )
+
+                homePage.value = homePageTask.await()
+                explorePage.value = explorePageTask.await()
+
+                rebuildAllYtItems()
+                rebuildSpeedDialItems()
+            }
+        } finally {
+            if (isLoading.value) isLoading.value = false
         }
-
-        allYtItems.value =
-            similarRecommendations.value?.flatMap { it.items }.orEmpty() +
-                homePage.value?.sections?.flatMap { it.items }.orEmpty() +
-                dailyDiscover.value?.map { it.recommendation }.orEmpty() +
-                communityPlaylists.value?.map { it.playlist }.orEmpty()
-
-        rebuildSpeedDialItems()
-        isLoading.value = false
     }
 
     private suspend fun songLoad(){
@@ -382,6 +441,7 @@ class HomeViewModel @Inject constructor(
                     section.copy(items = section.items.filterExplicit(hideExplicit))
                 }
             )
+            rebuildAllYtItems()
             rebuildSpeedDialItems()
             _isLoadingMore.value = false
         }
@@ -392,6 +452,8 @@ class HomeViewModel @Inject constructor(
             homePage.value = previousHomePage.value
             previousHomePage.value = null
             selectedChip.value = null
+            rebuildAllYtItems()
+            rebuildSpeedDialItems()
             return
         }
 
@@ -410,6 +472,7 @@ class HomeViewModel @Inject constructor(
                 }
             )
             selectedChip.value = chip
+            rebuildAllYtItems()
             rebuildSpeedDialItems()
         }
     }
