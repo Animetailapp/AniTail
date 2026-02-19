@@ -237,11 +237,25 @@ jobs:
           cp -a "$SRC_DIR/bin" "$APPDIR/usr/"
           cp -a "$SRC_DIR/lib" "$APPDIR/usr/"
 
+          APP_EXEC_PATH="$(find "$SRC_DIR/bin" -maxdepth 1 -type f -name "$APP_NAME" -print -quit || true)"
+          if [ -z "$APP_EXEC_PATH" ]; then
+            APP_EXEC_PATH="$(find "$SRC_DIR/bin" -maxdepth 1 -type f -executable -print -quit || true)"
+          fi
+          if [ -z "$APP_EXEC_PATH" ]; then
+            APP_EXEC_PATH="$(find "$SRC_DIR/bin" -maxdepth 1 -type f -print -quit || true)"
+          fi
+          if [ -z "$APP_EXEC_PATH" ]; then
+            echo "Could not find launcher inside $SRC_DIR/bin"
+            find "$SRC_DIR/bin" -maxdepth 2 -print | sed -n '1,200p'
+            exit 1
+          fi
+          APP_EXEC_NAME="$(basename "$APP_EXEC_PATH")"
+
           cat > "$APPDIR/${APP_NAME}.desktop" << EOF
           [Desktop Entry]
           Type=Application
           Name=${APP_NAME}
-          Exec=${APP_NAME}
+          Exec=${APP_EXEC_NAME}
           Icon=${APP_NAME}
           Categories=AudioVideo;Player;
           Terminal=false
@@ -256,11 +270,10 @@ jobs:
             fi
           fi
 
-          cat > "$APPDIR/AppRun" << 'EOF'
+          cat > "$APPDIR/AppRun" << EOF
           #!/bin/sh
           HERE="$(dirname "$(readlink -f "$0")")"
-          APP_NAME="$(basename "$HERE" .AppDir)"
-          exec "$HERE/usr/bin/$APP_NAME" "$@"
+          exec "\$HERE/usr/bin/${APP_EXEC_NAME}" "\$@"
           EOF
           chmod +x "$APPDIR/AppRun"
 
