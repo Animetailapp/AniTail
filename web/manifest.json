@@ -1,0 +1,17 @@
+{
+  "name": "AniTail Music",
+  "short_name": "AniTail",
+  "description": "Reproductor de música ligero y elegante inspirado en AniTail.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "theme_color": "#130d12",
+  "background_color": "#130d12",
+  "icons": [
+    {
+      "src": "assets/icon.png",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

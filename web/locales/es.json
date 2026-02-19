@@ -1,0 +1,189 @@
+{
+  "meta": {
+    "title": "AniTail - Music Player",
+    "description": "AniTail es un cliente de YouTube Music para Android con interfaz elegante, letras en tiempo real y descargas inteligentes."
+  },
+  "skip": {
+    "content": "Saltar al contenido"
+  },
+  "brand": {
+    "tag": "Music player",
+    "logoAlt": "AniTail Logo"
+  },
+  "nav": {
+    "primaryAria": "Navegacion principal",
+    "openMenu": "Abrir menu",
+    "closeMenu": "Cerrar menu",
+    "screens": "Pantallas",
+    "desktop": "Desktop",
+    "features": "Funciones",
+    "downloads": "Descargas",
+    "languageAria": "Seleccionar idioma"
+  },
+  "theme": {
+    "lightMode": "Modo claro",
+    "darkMode": "Modo oscuro"
+  },
+  "hero": {
+    "eyebrow": "Now playing",
+    "title": "Un reproductor que se siente intimo, potente y moderno.",
+    "lead": "AniTail combina letras en vivo, descargas inteligentes y un diseno inspirado en la experiencia musical mas elegante para Android.",
+    "downloadNow": "Descargar ahora",
+    "viewFeatures": "Ver funciones",
+    "statsFeatures": "Funciones premium",
+    "statsOpenSource": "Open source",
+    "colorDemo": "Prueba Dynamic Color:"
+  },
+  "colors": {
+    "rose": "Tema rosa",
+    "cyan": "Tema cian",
+    "amber": "Tema ambar",
+    "emerald": "Tema esmeralda",
+    "violet": "Tema violeta"
+  },
+  "mini": {
+    "quickPicks": "Quick picks",
+    "keepListening": "Keep listening"
+  },
+  "screens": {
+    "eyebrow": "Pantallas destacadas",
+    "title": "Una interfaz oscura o clara con colores dinamicos.",
+    "gallery": {
+      "nowPlayingAlt": "Pantalla Now playing de AniTail mostrando letras sincronizadas",
+      "nowPlayingCaption": "Now playing",
+      "lyricsAlt": "Letras sincronizadas en AniTail",
+      "lyricsCaption": "Letras",
+      "quickPicksAlt": "Quick picks y listas recomendadas",
+      "quickPicksCaption": "Quick picks",
+      "searchAlt": "Resultados de busqueda en AniTail",
+      "searchCaption": "Busqueda",
+      "libraryAlt": "Biblioteca con listas y descargas",
+      "libraryCaption": "Biblioteca",
+      "audioAlt": "Ajustes de audio y reproduccion",
+      "audioCaption": "Audio",
+      "contentAlt": "Ajustes de contenido y letras",
+      "contentCaption": "Contenido",
+      "accountAlt": "Pantalla de cuenta e integraciones",
+      "accountCaption": "Cuenta",
+      "contributorsAlt": "Pantalla de contribuyentes y comunidad",
+      "contributorsCaption": "Comunidad"
+    },
+    "cards": {
+      "nowPlayingTitle": "Now playing",
+      "nowPlayingDesc": "Letras centradas, control rapido y una barra de progreso suave.",
+      "quickPicksTitle": "Quick picks",
+      "quickPicksDesc": "Recomendaciones rapidas con portadas grandes y navegacion clara.",
+      "settingsTitle": "Configuracion",
+      "settingsDesc": "Opciones de audio, idioma, proxy y proveedores de letras.",
+      "communityTitle": "Cuenta y comunidad",
+      "communityDesc": "Integraciones con Discord, Spotify y gestion de avatar."
+    }
+  },
+  "desktop": {
+    "eyebrow": "Desktop",
+    "title": "AniTail Desktop: tu musica en pantalla grande.",
+    "lead": "Una experiencia de escritorio con navegacion rapida, sincronizacion y control completo.",
+    "panel": {
+      "title": "Hecho para productividad musical",
+      "desc": "Organiza tu biblioteca, controla la reproduccion con teclado y disfruta letras en una interfaz optimizada para PC."
+    },
+    "platforms": {
+      "windows": "Windows",
+      "mac": "macOS",
+      "linux": "Linux"
+    },
+    "actions": {
+      "download": "Descargar Desktop",
+      "android": "Ver Android"
+    },
+    "gallery": {
+      "image1Alt": "Vista desktop de AniTail 1",
+      "image1Caption": "Inicio",
+      "image2Alt": "Vista desktop de AniTail 2",
+      "image2Caption": "Reproductor",
+      "image3Alt": "Vista desktop de AniTail 3",
+      "image3Caption": "Letras",
+      "image4Alt": "Vista desktop de AniTail 4",
+      "image4Caption": "Cola",
+      "image5Alt": "Vista desktop de AniTail 5",
+      "image5Caption": "Ajustes"
+    }
+  },
+  "features": {
+    "eyebrow": "Funciones",
+    "title": "Todo lo que tu musica necesita, en un solo lugar.",
+    "items": [
+      "Reproduce cualquier cancion o video desde YouTube Music",
+      "Reproduccion en segundo plano",
+      "Sugerencias rapidas personalizadas",
+      "Gestion avanzada de la biblioteca",
+      "Descarga y cache de canciones para reproduccion sin conexion",
+      "Busqueda de canciones, albumes, artistas, videos y listas",
+      "Letras en tiempo real sincronizadas",
+      "Modo Karaoke integrado",
+      "Inicio de sesion con cuenta de YouTube Music",
+      "Sincronizacion bidireccional de contenido",
+      "Copia de seguridad con Google Drive",
+      "Omitir silencios en las pistas",
+      "Importacion de listas de reproduccion",
+      "Normalizacion de audio",
+      "Ajuste de tempo y tono",
+      "Gestion de listas locales",
+      "Reordenar canciones en cola",
+      "Temas: Claro, Oscuro, Negro y Dinamico",
+      "Temporizador de apagado",
+      "Integracion con Last.fm",
+      "Discord Rich Presence",
+      "Interfaz Material You (Material 3)"
+    ]
+  },
+  "downloads": {
+    "eyebrow": "Descargas",
+    "title": "Instala AniTail en tu Android favorito.",
+    "loading": "Buscando ultima version disponible...",
+    "loadingError": "Error al cargar la version.",
+    "openGithub": "Ver en GitHub",
+    "versionLabel": "Version:",
+    "latestLabel": "ultima",
+    "publishedOn": "Publicado el",
+    "installFiles": "Archivos de instalacion",
+    "downloadPrefix": "Descargar",
+    "assetUniversal": "Universal",
+    "assetArm64": "ARM64",
+    "assetApk": "APK",
+    "fdroidName": "Repositorio F-Droid",
+    "fdroidSource": "IzzyOnDroid"
+  },
+  "desktopDownloads": {
+    "eyebrow": "Descargas Desktop",
+    "title": "Instala AniTail Desktop en tu PC.",
+    "loading": "Buscando ultima version desktop disponible...",
+    "loadingError": "Error al cargar la version desktop.",
+    "openGithub": "Ver en GitHub",
+    "versionLabel": "Version:",
+    "latestLabel": "ultima",
+    "publishedOn": "Publicado el",
+    "installFiles": "Archivos de instalacion",
+    "downloadPrefix": "Descargar",
+    "assetWindows": "Windows",
+    "assetMac": "macOS",
+    "assetLinux": "Linux",
+    "assetDesktop": "Desktop"
+  },
+  "cta": {
+    "eyebrow": "Lista para ti",
+    "title": "Haz que cada reproduccion cuente con AniTail.",
+    "desc": "Descarga la app y vive la musica con una interfaz premium, completamente gratis y open source.",
+    "startNow": "Empezar ahora"
+  },
+  "footer": {
+    "about": "Un proyecto open source para amantes de la musica. Creado con pasion por la comunidad.",
+    "features": "Funciones",
+    "downloads": "Descargas",
+    "rights": "Todos los derechos reservados."
+  },
+  "carousel": {
+    "previousImage": "Imagen anterior",
+    "nextImage": "Imagen siguiente"
+  }
+}
