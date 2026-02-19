@@ -5,7 +5,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -89,9 +91,11 @@ import com.anitail.music.db.entities.Artist
 import com.anitail.music.db.entities.LocalItem
 import com.anitail.music.db.entities.Playlist
 import com.anitail.music.db.entities.Song
+import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.extensions.togglePlayPause
 import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.queues.LocalAlbumRadio
+import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.playback.queues.YouTubeAlbumRadio
 import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.AlbumGridItem
@@ -148,12 +152,14 @@ fun HomeScreen(
     val similarRecommendations by viewModel.similarRecommendations.collectAsState()
     val accountPlaylists by viewModel.accountPlaylists.collectAsState()
     val homePage by viewModel.homePage.collectAsState()
+    val explorePage by viewModel.explorePage.collectAsState()
 
     val allLocalItems by viewModel.allLocalItems.collectAsState()
     val allYtItems by viewModel.allYtItems.collectAsState()
     val selectedChip by viewModel.selectedChip.collectAsState()
 
     val isLoading: Boolean by viewModel.isLoading.collectAsState()
+    val isMoodAndGenresLoading = isLoading && explorePage?.moodAndGenres == null
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
     val syncStatus by viewModel.syncStatus.collectAsState()
@@ -392,6 +398,27 @@ fun HomeScreen(
                         viewModel.toggleChip(it)
                     }
                 )
+            }
+            if (isLoading && homePage?.chips.isNullOrEmpty()) {
+                item(key = "chips_shimmer") {
+                    ShimmerHost {
+                        LazyRow(
+                            contentPadding = WindowInsets.systemBars
+                                .only(WindowInsetsSides.Horizontal)
+                                .asPaddingValues(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        ) {
+                            items(5) {
+                                TextPlaceholder(
+                                    height = 30.dp,
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier.width(72.dp),
+                                )
+                            }
+                        }
+                    }
+                }
             }
             quickPicks?.takeIf { it.isNotEmpty() }?.let { quickPicks ->
                 item {
@@ -685,15 +712,80 @@ fun HomeScreen(
                 }
             }
 
-            homePage?.sections?.forEach {
+            explorePage?.moodAndGenres?.let { moodAndGenres ->
+                item(key = "mood_and_genres_title") {
+                    NavigationTitle(
+                        title = stringResource(R.string.mood_and_genres),
+                        onClick = {
+                            navController.navigate("mood_and_genres")
+                        },
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+                item(key = "mood_and_genres_list") {
+                    LazyHorizontalGrid(
+                        rows = GridCells.Fixed(4),
+                        contentPadding = PaddingValues(6.dp),
+                        modifier = Modifier
+                            .height((MoodAndGenresButtonHeight + 12.dp) * 4 + 12.dp)
+                            .animateItem(),
+                    ) {
+                        items(moodAndGenres) {
+                            MoodAndGenresButton(
+                                title = it.title,
+                                onClick = {
+                                    navController.navigate("youtube_browse/${it.endpoint.browseId}?params=${it.endpoint.params}")
+                                },
+                                modifier = Modifier
+                                    .padding(6.dp)
+                                    .width(180.dp),
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (isMoodAndGenresLoading) {
+                item(key = "mood_and_genres_shimmer") {
+                    ShimmerHost(
+                        modifier = Modifier.animateItem(),
+                    ) {
+                        TextPlaceholder(
+                            height = 36.dp,
+                            modifier = Modifier
+                                .padding(vertical = 12.dp, horizontal = 12.dp)
+                                .width(250.dp),
+                        )
+
+                        repeat(4) {
+                            Row {
+                                repeat(2) {
+                                    TextPlaceholder(
+                                        height = MoodAndGenresButtonHeight,
+                                        shape = RoundedCornerShape(6.dp),
+                                        modifier = Modifier
+                                            .padding(horizontal = 12.dp)
+                                            .width(200.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            homePage?.sections?.forEach { section ->
+                val sectionSongs = section.items.filterIsInstance<SongItem>()
+                val hasPlayableSongs = sectionSongs.isNotEmpty()
+
                 item {
                     NavigationTitle(
-                        title = it.title,
-                        label = it.label,
-                        thumbnail = it.thumbnail?.let { thumbnailUrl ->
+                        title = section.title,
+                        label = section.label,
+                        thumbnail = section.thumbnail?.let { thumbnailUrl ->
                             {
                                 val shape =
-                                    if (it.endpoint?.isArtistEndpoint == true) CircleShape else RoundedCornerShape(
+                                    if (section.endpoint?.isArtistEndpoint == true) CircleShape else RoundedCornerShape(
                                         ThumbnailCornerRadius
                                     )
                                 AsyncImage(
@@ -705,7 +797,7 @@ fun HomeScreen(
                                 )
                             }
                         },
-                        onClick = it.endpoint?.browseId?.let { browseId ->
+                        onClick = section.endpoint?.browseId?.let { browseId ->
                             if (homePage != null) {
                                 {
                                     when (browseId) {
@@ -718,6 +810,18 @@ fun HomeScreen(
                                 null
                             }
                         },
+                        onPlayAllClick = if (hasPlayableSongs) {
+                            {
+                                playerConnection.playQueue(
+                                    ListQueue(
+                                        title = section.title,
+                                        items = sectionSongs.map { it.toMediaItem() }
+                                    )
+                                )
+                            }
+                        } else {
+                            null
+                        },
                         modifier = Modifier.animateItem()
                     )
                 }
@@ -729,7 +833,7 @@ fun HomeScreen(
                             .asPaddingValues(),
                         modifier = Modifier.animateItem()
                     ) {
-                        items(it.items) { item ->
+                        items(section.items) { item ->
                             ytGridItem(item)
                         }
                     }
@@ -737,19 +841,25 @@ fun HomeScreen(
             }
 
             if (isLoading || homePage?.continuation != null && homePage?.sections?.isNotEmpty() == true) {
-                item {
+                item(key = "loading_shimmer") {
                     ShimmerHost(
                         modifier = Modifier.animateItem()
                     ) {
-                        TextPlaceholder(
-                            height = 36.dp,
-                            modifier = Modifier
-                                .padding(12.dp)
-                                .width(250.dp),
-                        )
-                        LazyRow {
-                            items(4) {
-                                GridItemPlaceHolder()
+                        repeat(3) {
+                            TextPlaceholder(
+                                height = 36.dp,
+                                modifier = Modifier
+                                    .padding(12.dp)
+                                    .width(250.dp),
+                            )
+                            LazyRow(
+                                contentPadding = WindowInsets.systemBars
+                                    .only(WindowInsetsSides.Horizontal)
+                                    .asPaddingValues(),
+                            ) {
+                                items(4) {
+                                    GridItemPlaceHolder()
+                                }
                             }
                         }
                     }
