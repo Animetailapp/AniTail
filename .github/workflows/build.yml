@@ -173,15 +173,12 @@ jobs:
         with:
           cache-cleanup: on-success
 
-      - name: Set up Android SDK (Windows ARM64)
-        if: matrix.os == 'windows-11-arm'
-        uses: android-actions/setup-android@v3
-
       - name: Configure Android SDK path for Gradle (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $candidates = @(
+            "$env:USERPROFILE\.android\sdk",
             $env:ANDROID_HOME,
             $env:ANDROID_SDK_ROOT,
             "$env:LOCALAPPDATA\Android\Sdk",
