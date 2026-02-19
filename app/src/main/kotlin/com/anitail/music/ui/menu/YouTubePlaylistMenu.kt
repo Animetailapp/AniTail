@@ -26,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,7 +41,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import coil.compose.AsyncImage
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.PlaylistItem
@@ -59,7 +57,6 @@ import com.anitail.music.db.entities.PlaylistSongMap
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.models.MediaMetadata
 import com.anitail.music.models.toMediaMetadata
-import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.DefaultDialog
 import com.anitail.music.ui.component.ListDialog
@@ -174,25 +171,9 @@ fun YouTubePlaylistMenu(
     )
     HorizontalDivider()
 
-    var downloadState by remember {
-        mutableStateOf(Download.STATE_STOPPED)
-    }
-    LaunchedEffect(songs) {
-        if (songs.isEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs.all { downloads[it.id]?.state == Download.STATE_COMPLETED })
-                    Download.STATE_COMPLETED
-                else if (songs.all {
-                        downloads[it.id]?.state == Download.STATE_QUEUED
-                                || downloads[it.id]?.state == Download.STATE_DOWNLOADING
-                                || downloads[it.id]?.state == Download.STATE_COMPLETED
-                    })
-                    Download.STATE_DOWNLOADING
-                else
-                    Download.STATE_STOPPED
-        }
-    }
+    val playlistSongIds = remember(songs) { songs.map { it.id } }
+    val downloadState by downloadUtil.getDownloadState(playlistSongIds)
+        .collectAsState(initial = Download.STATE_STOPPED)
     var showRemoveDownloadDialog by remember {
         mutableStateOf(false)
     }
@@ -218,14 +199,7 @@ fun YouTubePlaylistMenu(
                 TextButton(
                     onClick = {
                         showRemoveDownloadDialog = false
-                        songs.forEach { song ->
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false
-                            )
-                        }
+                        downloadUtil.removeDownloads(songs.map { it.id })
                     }
                 ) {
                     Text(text = stringResource(android.R.string.ok))
@@ -485,15 +459,14 @@ fun YouTubePlaylistMenu(
                             },
                             modifier = Modifier.clickable {
                                 coroutineScope.launch(Dispatchers.IO) {
-                                    songs.forEach { song ->
-                                        database.transaction {
-                                            insert(song.toMediaMetadata())
-                                        }
-                                        val dbSong = database.song(song.id).first()
-                                        dbSong?.let {
-                                            downloadUtil.downloadToMediaStore(it)
-                                        }
+                                    val mediaMetadataSongs = songs.map { it.toMediaMetadata() }
+                                    database.transaction {
+                                        mediaMetadataSongs.forEach(::insert)
                                     }
+                                    val songsToDownload = songs.mapNotNull { song ->
+                                        database.song(song.id).first()
+                                    }
+                                    downloadUtil.downloadSongsToMediaStore(songsToDownload)
                                 }
                             }
                         )

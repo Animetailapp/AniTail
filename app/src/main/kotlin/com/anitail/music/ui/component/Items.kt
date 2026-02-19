@@ -257,7 +257,12 @@ fun SongListItem(
         }
         if (showDownloadIcon) {
             val download by LocalDownloadUtil.current.getDownload(song.id).collectAsState(initial = null)
-            Icon.Download(download?.state)
+            val effectiveDownloadState = download?.state ?: if (!song.song.mediaStoreUri.isNullOrEmpty()) {
+                Download.STATE_COMPLETED
+            } else {
+                null
+            }
+            Icon.Download(effectiveDownloadState)
         }
     },
     isSelected: Boolean = false,
@@ -325,7 +330,12 @@ fun SongGridItem(
         if (showDownloadIcon) {
             val download by LocalDownloadUtil.current.getDownload(song.id)
                 .collectAsState(initial = null)
-            Icon.Download(download?.state)
+            val effectiveDownloadState = download?.state ?: if (!song.song.mediaStoreUri.isNullOrEmpty()) {
+                Download.STATE_COMPLETED
+            } else {
+                null
+            }
+            Icon.Download(effectiveDownloadState)
         }
     },
     isActive: Boolean = false,
@@ -425,37 +435,14 @@ fun AlbumListItem(
     showLikedIcon: Boolean = true,
     badges: @Composable RowScope.() -> Unit = {
         val database = LocalDatabase.current
-        val downloadUtil = LocalDownloadUtil.current
-        var songs by remember {
-            mutableStateOf(emptyList<Song>())
-        }
-
-        LaunchedEffect(Unit) {
-            database.albumSongs(album.id).collect {
-                songs = it
-            }
-        }
-
-        var downloadState by remember {
-            mutableStateOf(Download.STATE_STOPPED)
-        }
-
-        LaunchedEffect(songs) {
-            if (songs.isEmpty()) return@LaunchedEffect
-            downloadUtil.downloads.collect { downloads ->
-                downloadState = when {
-                    songs.all { downloads[it.id]?.state == STATE_COMPLETED } -> STATE_COMPLETED
-                    songs.all { downloads[it.id]?.state in listOf(STATE_QUEUED, STATE_DOWNLOADING, STATE_COMPLETED) } -> STATE_DOWNLOADING
-                    else -> Download.STATE_STOPPED
-                }
-            }
-        }
+        val isAlbumFullyDownloaded by database.isAlbumFullyDownloaded(album.id)
+            .collectAsState(initial = false)
 
         if (showLikedIcon && album.album.bookmarkedAt != null) {
             Icon.Favorite()
         }
 
-        Icon.Download(downloadState)
+        Icon.Download(if (isAlbumFullyDownloaded) STATE_COMPLETED else null)
     },
     isActive: Boolean = false,
     isPlaying: Boolean = false,
@@ -488,37 +475,14 @@ fun AlbumGridItem(
     coroutineScope: CoroutineScope,
     badges: @Composable RowScope.() -> Unit = {
         val database = LocalDatabase.current
-        val downloadUtil = LocalDownloadUtil.current
-        var songs by remember {
-            mutableStateOf(emptyList<Song>())
-        }
-
-        LaunchedEffect(Unit) {
-            database.albumSongs(album.id).collect {
-                songs = it
-            }
-        }
-
-        var downloadState by remember {
-            mutableStateOf(Download.STATE_STOPPED)
-        }
-
-        LaunchedEffect(songs) {
-            if (songs.isEmpty()) return@LaunchedEffect
-            downloadUtil.downloads.collect { downloads ->
-                downloadState = when {
-                    songs.all { downloads[it.id]?.state == STATE_COMPLETED } -> STATE_COMPLETED
-                    songs.all { downloads[it.id]?.state in listOf(STATE_QUEUED, STATE_DOWNLOADING, STATE_COMPLETED) } -> STATE_DOWNLOADING
-                    else -> Download.STATE_STOPPED
-                }
-            }
-        }
+        val isAlbumFullyDownloaded by database.isAlbumFullyDownloaded(album.id)
+            .collectAsState(initial = false)
 
         if (album.album.bookmarkedAt != null) {
             Icon.Favorite()
         }
 
-        Icon.Download(downloadState)
+        Icon.Download(if (isAlbumFullyDownloaded) STATE_COMPLETED else null)
     },
     isActive: Boolean = false,
     isPlaying: Boolean = false,
@@ -722,8 +686,10 @@ fun YouTubeListItem(
             Icon.Library()
         }
         if (item is SongItem) {
-            val downloads by LocalDownloadUtil.current.downloads.collectAsState()
-            Icon.Download(downloads[item.id]?.state)
+            val download by LocalDownloadUtil.current.getDownload(item.id).collectAsState(initial = null)
+            val effectiveDownloadState = download?.state
+                ?: if (!song?.song?.mediaStoreUri.isNullOrEmpty()) Download.STATE_COMPLETED else null
+            Icon.Download(effectiveDownloadState)
         }
     },
 ) {
@@ -786,8 +752,10 @@ fun YouTubeGridItem(
         if (item.explicit) Icon.Explicit()
         if (item is SongItem && song?.song?.inLibrary != null) Icon.Library()
         if (item is SongItem) {
-            val downloads by LocalDownloadUtil.current.downloads.collectAsState()
-            Icon.Download(downloads[item.id]?.state)
+            val download by LocalDownloadUtil.current.getDownload(item.id).collectAsState(initial = null)
+            val effectiveDownloadState = download?.state
+                ?: if (!song?.song?.mediaStoreUri.isNullOrEmpty()) Download.STATE_COMPLETED else null
+            Icon.Download(effectiveDownloadState)
         }
     },
     thumbnailRatio: Float = if (item is SongItem) 16f / 9 else 1f,

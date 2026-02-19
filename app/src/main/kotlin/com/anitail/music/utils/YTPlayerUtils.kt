@@ -67,6 +67,7 @@ object YTPlayerUtils {
         playlistId: String? = null,
         audioQuality: AudioQuality,
         connectivityManager: ConnectivityManager,
+        targetItag: Int = 0,
     ): Result<PlaybackData> = runCatching {
         Timber.tag(logTag).d("Fetching player response for videoId: $videoId, playlistId: $playlistId")
         /**
@@ -137,6 +138,7 @@ object YTPlayerUtils {
                         streamPlayerResponse,
                         audioQuality,
                         connectivityManager,
+                        targetItag,
                     )
 
                 if (format == null) {
@@ -236,7 +238,17 @@ object YTPlayerUtils {
         playerResponse: PlayerResponse,
         audioQuality: AudioQuality,
         connectivityManager: ConnectivityManager,
+        targetItag: Int = 0,
     ): PlayerResponse.StreamingData.Format? {
+        if (targetItag > 0) {
+            val exactFormat = playerResponse.streamingData?.adaptiveFormats?.find { it.itag == targetItag }
+            if (exactFormat != null) {
+                Timber.tag(logTag).d("Using exact format itag: $targetItag")
+                return exactFormat
+            }
+            Timber.tag(logTag).w("Requested itag $targetItag not found, falling back to auto")
+        }
+
         Timber.tag(logTag).d("Finding format with audioQuality: $audioQuality, network metered: ${connectivityManager.isActiveNetworkMetered}")
 
         val format = playerResponse.streamingData?.adaptiveFormats
@@ -257,6 +269,73 @@ object YTPlayerUtils {
 
         return format
     }
+
+    data class AudioFormatOption(
+        val itag: Int,
+        val bitrate: Int,
+        val bitrateKbps: Int,
+        val mimeType: String,
+        val codec: String,
+    ) {
+        val displayName: String
+            get() = "${bitrateKbps}kbps ${codec.uppercase()}"
+
+        val isM4a: Boolean
+            get() = codec.equals("M4A", ignoreCase = true) || mimeType.contains("mp4a")
+
+        val supportsMetadata: Boolean
+            get() = isM4a && bitrateKbps >= 128
+    }
+
+    suspend fun getAllAvailableAudioFormats(
+        videoId: String,
+    ): Result<List<AudioFormatOption>> = runCatching {
+        val isLoggedIn = YouTube.cookie != null
+        val signatureTimestamp = getSignatureTimestampOrNull(videoId)
+
+        val allClients = listOf(MAIN_CLIENT) + STREAM_FALLBACK_CLIENTS.toList()
+        val uniqueFormats = linkedMapOf<Int, AudioFormatOption>()
+
+        allClients.forEach { client ->
+            if (client.loginRequired && !isLoggedIn && YouTube.cookie == null) return@forEach
+
+            val response = YouTube.player(
+                videoId = videoId,
+                client = client,
+                signatureTimestamp = if (client.useSignatureTimestamp) signatureTimestamp else null,
+            ).getOrNull() ?: return@forEach
+
+            if (response.playabilityStatus.status != "OK") return@forEach
+
+            response.streamingData?.adaptiveFormats
+                ?.asSequence()
+                ?.filter { it.isAudio }
+                ?.forEach { format ->
+                    if (uniqueFormats.containsKey(format.itag)) return@forEach
+
+                    val codec = when {
+                        format.mimeType.contains("opus", ignoreCase = true) -> "OPUS"
+                        format.mimeType.contains("mp4a", ignoreCase = true) -> "M4A"
+                        else -> format.mimeType.substringAfter("audio/").substringBefore(";").uppercase()
+                    }
+
+                    uniqueFormats[format.itag] = AudioFormatOption(
+                        itag = format.itag,
+                        bitrate = format.bitrate,
+                        bitrateKbps = format.bitrate / 1000,
+                        mimeType = format.mimeType,
+                        codec = codec,
+                    )
+                }
+        }
+
+        uniqueFormats.values
+            .sortedWith(
+                compareByDescending<AudioFormatOption> { it.bitrate }
+                    .thenBy { it.codec }
+            )
+    }
+
     /**
      * Checks if the stream url returns a successful status.
      * If this returns true the url is likely to work.

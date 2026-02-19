@@ -209,7 +209,10 @@ internal fun AutoBackupSettingsScreen(
                                         DesktopGoogleDriveSyncService.downloadLatestBackup(path)
                                     },
                                     uploadBackup = { path ->
-                                        DesktopGoogleDriveSyncService.uploadBackup(path)
+                                        DesktopGoogleDriveSyncService.uploadBackupReplacingByName(
+                                            backupFile = path,
+                                            remoteName = DesktopGoogleDriveSyncService.CLOUD_SYNC_REMOTE_BACKUP_NAME,
+                                        )
                                     },
                                 )
                             }
@@ -242,7 +245,10 @@ internal fun AutoBackupSettingsScreen(
                             withContext(Dispatchers.IO) {
                                 val tempUpload = Files.createTempFile("anitail_drive_upload_", ".backup")
                                 backupService.backupTo(tempUpload)
-                                val uploadedId = DesktopGoogleDriveSyncService.uploadBackup(tempUpload).getOrThrow()
+                                val uploadedId = DesktopGoogleDriveSyncService.uploadBackupReplacingByName(
+                                    backupFile = tempUpload,
+                                    remoteName = DesktopGoogleDriveSyncService.MANUAL_REMOTE_BACKUP_NAME,
+                                ).getOrThrow()
                                 Files.deleteIfExists(tempUpload)
                                 uploadedId
                             }

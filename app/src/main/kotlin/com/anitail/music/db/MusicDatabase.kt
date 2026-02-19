@@ -105,7 +105,7 @@ class MusicDatabase(
         SortedSongAlbumMap::class,
         PlaylistSongMapPreview::class,
     ],
-    version = 27,
+    version = 28,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 2, to = 3),
@@ -132,7 +132,8 @@ class MusicDatabase(
         AutoMigration(from = 23, to = 24),
         AutoMigration(from = 24, to = 25),
         AutoMigration(from = 25, to = 26),
-        AutoMigration(from = 26, to = 27)
+        AutoMigration(from = 26, to = 27),
+        AutoMigration(from = 27, to = 28)
     ],
 )
 @TypeConverters(Converters::class)

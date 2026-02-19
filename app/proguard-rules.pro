@@ -237,3 +237,11 @@
 -keepclassmembers class com.anitail.music.recognition.VibraSignature {
     native <methods>;
 }
+
+## CoverArt Native JNI and metadata embedding
+-keep class com.anitail.music.utils.CoverArtNative { *; }
+-keepclassmembers class com.anitail.music.utils.CoverArtNative {
+    native <methods>;
+}
+-keep class com.anitail.music.utils.CoverArtEmbedder { *; }
+-keep class com.anitail.music.utils.DownloadExportHelper { *; }

@@ -18,10 +18,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.FileNotFoundException
+import java.time.ZoneOffset
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -62,6 +64,11 @@ class DownloadLibraryRepository @Inject constructor(
         scope.launch {
             refreshDownloads()
         }
+        scope.launch {
+            database.songsWithMediaStoreUriFlow().collectLatest {
+                refreshDownloads()
+            }
+        }
         contentResolver.registerContentObserver(
             mediaStoreHelper.audioCollectionUri(),
             true,
@@ -82,28 +89,21 @@ class DownloadLibraryRepository @Inject constructor(
         songs.forEach { song ->
             val uriString = song.song.mediaStoreUri ?: return@forEach
             val uri = uriString.toUri()
-            val exists = runCatching {
-                contentResolver.openFileDescriptor(uri, "r")?.use { }
-                true
-            }.getOrElse { throwable ->
-                if (throwable is FileNotFoundException) {
-                    false
-                } else {
-                    Timber.w(throwable, "Unable to verify MediaStore entry for ${song.song.id}")
-                    true
-                }
-            }
+            val exists = isUriReadable(uriString)
 
             if (!exists) {
-                val deleted = runCatching { contentResolver.delete(uri, null, null) }
-                    .onFailure { Timber.w(it, "Failed to delete orphaned MediaStore entry: $uri") }
-                    .getOrDefault(0)
-                if (deleted > 0) removedMediaStore += deleted
+                if (isMediaStoreUri(uriString)) {
+                    val deleted = runCatching { contentResolver.delete(uri, null, null) }
+                        .onFailure { Timber.w(it, "Failed to delete orphaned MediaStore entry: $uri") }
+                        .getOrDefault(0)
+                    if (deleted > 0) removedMediaStore += deleted
+                }
 
                 database.query {
                     upsert(
                         song.song.copy(
                             mediaStoreUri = null,
+                            downloadUri = null,
                             dateDownload = null
                         )
                     )
@@ -125,6 +125,13 @@ class DownloadLibraryRepository @Inject constructor(
     }
 
     private suspend fun queryDownloads(): List<DownloadedTrack> = withContext(Dispatchers.IO) {
+        val songsWithUris = runCatching {
+            database.songsWithMediaStoreUri()
+        }.onFailure {
+            Timber.e(it, "Failed to load songs with mediaStoreUri from database")
+        }.getOrDefault(emptyList())
+        val songsByUri = songsWithUris.associateBy { it.song.mediaStoreUri }
+
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.DISPLAY_NAME,
@@ -190,15 +197,8 @@ class DownloadLibraryRepository @Inject constructor(
         // Deduplicate by mediaStoreId in case of duplicates from MediaStore query
         val uniqueResults = result.distinctBy { it.mediaStoreId }
 
-        // First attempt: match by mediaStoreUri field in database
-        val songsByUri = runCatching {
-            database.songsWithMediaStoreUri().associateBy { it.song.mediaStoreUri }
-        }.onFailure {
-            Timber.e(it, "Failed to load songs with mediaStoreUri from database")
-        }.getOrDefault(emptyMap())
-
         // Map tracks to songs
-        uniqueResults.map { track ->
+        val mappedTracks = uniqueResults.map { track ->
             var song = songsByUri[track.mediaUri.toString()]
 
             // If not found by URI, try to find by extracting ID from URI
@@ -208,6 +208,49 @@ class DownloadLibraryRepository @Inject constructor(
             }
 
             track.copy(song = song)
+        }
+
+        val mappedUris = mappedTracks.mapTo(mutableSetOf()) { it.mediaUri.toString() }
+        val customOnlyTracks = songsWithUris.mapNotNull { song ->
+            val uriString = song.song.mediaStoreUri ?: return@mapNotNull null
+            if (uriString in mappedUris) return@mapNotNull null
+            if (!isUriReadable(uriString)) return@mapNotNull null
+
+            val uri = uriString.toUri()
+            DownloadedTrack(
+                mediaStoreId = null,
+                mediaUri = uri,
+                displayName = song.song.title,
+                title = song.song.title,
+                artist = song.song.artistName,
+                album = song.album?.title ?: song.song.albumName,
+                durationMs = song.song.duration.takeIf { it > 0 }?.times(1000L),
+                sizeBytes = null,
+                dateAddedSeconds = song.song.dateDownload?.toEpochSecond(ZoneOffset.UTC),
+                song = song
+            )
+        }
+
+        (mappedTracks + customOnlyTracks)
+            .sortedByDescending { it.dateAddedSeconds ?: 0L }
+    }
+
+    private fun isMediaStoreUri(uriString: String): Boolean {
+        return uriString.startsWith("content://media/")
+    }
+
+    private fun isUriReadable(uriString: String): Boolean {
+        val uri = runCatching { uriString.toUri() }.getOrNull() ?: return false
+        return runCatching {
+            contentResolver.openFileDescriptor(uri, "r")?.use { }
+            true
+        }.getOrElse { throwable ->
+            if (throwable is FileNotFoundException) {
+                false
+            } else {
+                Timber.w(throwable, "Unable to verify persisted entry: %s", uriString)
+                true
+            }
         }
     }
 

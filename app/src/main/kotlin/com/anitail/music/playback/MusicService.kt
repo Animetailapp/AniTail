@@ -3,10 +3,13 @@
 package com.anitail.music.playback
 
 import android.annotation.SuppressLint
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.database.SQLException
 import android.media.MediaMetadataRetriever
 import android.media.audiofx.AudioEffect
@@ -17,6 +20,7 @@ import android.os.Build
 import android.os.Looper
 import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.app.NotificationCompat
 import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
 import androidx.media3.cast.CastPlayer
@@ -525,39 +529,52 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         }
 
     if (dataStore.get(PersistentQueueKey, true)) {
-      runCatching {
-            val file = filesDir.resolve(PERSISTENT_QUEUE_FILE)
-            if (file.exists()) {
-              val json = file.readText(Charsets.UTF_8)
-              Json.decodeFromString<PersistQueue>(json)
-            } else null
+      scope.launch(Dispatchers.IO) {
+        val persistedQueue =
+            runCatching {
+                  val file = filesDir.resolve(PERSISTENT_QUEUE_FILE)
+                  if (file.exists()) {
+                    val json = file.readText(Charsets.UTF_8)
+                    Json.decodeFromString<PersistQueue>(json)
+                  } else {
+                    null
+                  }
+                }
+                .onFailure { Timber.w(it, "Failed to restore persistent queue") }
+                .getOrNull()
+
+        val persistedAutomix =
+            runCatching {
+                  val file = filesDir.resolve(PERSISTENT_AUTOMIX_FILE)
+                  if (file.exists()) {
+                    val json = file.readText(Charsets.UTF_8)
+                    Json.decodeFromString<PersistQueue>(json)
+                  } else {
+                    null
+                  }
+                }
+                .onFailure { Timber.w(it, "Failed to restore persistent automix queue") }
+                .getOrNull()
+
+        withContext(Dispatchers.Main) {
+          persistedQueue?.let { queue ->
+            playQueue(
+                queue =
+                    ListQueue(
+                        title = queue.title,
+                        items = queue.items.map { it.toMediaItem() },
+                        startIndex = queue.mediaItemIndex,
+                        position = queue.position,
+                    ),
+                playWhenReady = false,
+            )
           }
-          .onSuccess { queue ->
-            if (queue != null) {
-              playQueue(
-                  queue =
-                      ListQueue(
-                          title = queue.title,
-                          items = queue.items.map { it.toMediaItem() },
-                          startIndex = queue.mediaItemIndex,
-                          position = queue.position,
-                      ),
-                  playWhenReady = false,
-              )
-            }
+
+          persistedAutomix?.let { queue ->
+            automixItems.value = queue.items.map { it.toMediaItem() }
           }
-      runCatching {
-            val file = filesDir.resolve(PERSISTENT_AUTOMIX_FILE)
-            if (file.exists()) {
-              val json = file.readText(Charsets.UTF_8)
-              Json.decodeFromString<PersistQueue>(json)
-            } else null
-          }
-          .onSuccess { queue ->
-            if (queue != null) {
-              automixItems.value = queue.items.map { it.toMediaItem() }
-            }
-          }
+        }
+      }
     }
 
     // Save queue periodically to prevent queue loss from crash or force kill
@@ -1240,6 +1257,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
     when (intent.action) {
       ACTION_PLAY_RECOMMENDATION -> {
+        ensureForegroundBootstrap()
         val songId = intent.getStringExtra(EXTRA_WIDGET_RECOMMENDATION_ID)
         if (!songId.isNullOrBlank()) {
           scope.launch(Dispatchers.IO + SupervisorJob()) {
@@ -1277,6 +1295,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         sendWidgetUpdateBroadcast()
       }
       ACTION_PLAY_PAUSE -> {
+        ensureForegroundBootstrap()
 
         val wasPlaying = player.isPlaying
 
@@ -1289,16 +1308,58 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         sendWidgetUpdateBroadcast()
       }
       ACTION_NEXT -> {
+        ensureForegroundBootstrap()
         player.seekToNext()
         player.playWhenReady = true
       }
       ACTION_PREV -> {
+        ensureForegroundBootstrap()
         player.seekToPrevious()
         player.playWhenReady = true
       }
     }
 
     return super.onStartCommand(intent, flags, startId)
+  }
+
+  private fun ensureForegroundBootstrap() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      val channel =
+          NotificationChannel(
+              CHANNEL_ID,
+              getString(R.string.music_player),
+              NotificationManager.IMPORTANCE_LOW,
+          ).apply {
+            setShowBadge(false)
+            description = getString(R.string.music_player)
+          }
+      notificationManager.createNotificationChannel(channel)
+    }
+
+    val notification =
+        NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_ani)
+            .setContentTitle(getString(R.string.music_player))
+            .setContentText(getString(R.string.app_name))
+            .setOngoing(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+
+    runCatching {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        startForeground(
+            NOTIFICATION_ID,
+            notification,
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+        )
+      } else {
+        startForeground(NOTIFICATION_ID, notification)
+      }
+    }.onFailure { error ->
+      Timber.w(error, "Failed to bootstrap foreground state for MusicService")
+    }
   }
 
   fun toggleLike() {

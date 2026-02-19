@@ -51,7 +51,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -66,7 +65,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastSumBy
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.anitail.music.LocalDownloadUtil
@@ -79,7 +77,6 @@ import com.anitail.music.constants.ThumbnailCornerRadius
 import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.extensions.togglePlayPause
-import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.AutoResizeText
 import com.anitail.music.ui.component.DefaultDialog
@@ -104,7 +101,6 @@ fun TopPlaylistScreen(
     scrollBehavior: TopAppBarScrollBehavior,
     viewModel: TopPlaylistViewModel = hiltViewModel(),
 ) {
-    val context = LocalContext.current
     val menuState = LocalMenuState.current
     val haptic = LocalHapticFeedback.current
     val focusManager = LocalFocusManager.current
@@ -151,28 +147,14 @@ fun TopPlaylistScreen(
     val name = stringResource(R.string.my_top) + " $maxSize"
 
     val downloadUtil = LocalDownloadUtil.current
-    var downloadState by remember { mutableStateOf(Download.STATE_STOPPED) }
+    val playlistSongIds = remember(songs) { songs?.map { it.song.id }.orEmpty() }
+    val downloadState by downloadUtil.getDownloadState(playlistSongIds)
+        .collectAsState(initial = Download.STATE_STOPPED)
 
     LaunchedEffect(songs) {
         mutableSongs.apply {
             clear()
             songs?.let { addAll(it) }
-        }
-        if (songs?.isEmpty() == true) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs?.all { downloads[it.song.id]?.state == Download.STATE_COMPLETED } == true) {
-                    Download.STATE_COMPLETED
-                } else if (songs?.all {
-                        downloads[it.song.id]?.state == Download.STATE_QUEUED ||
-                                downloads[it.song.id]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it.song.id]?.state == Download.STATE_COMPLETED
-                    } == true
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
         }
     }
 
@@ -198,14 +180,7 @@ fun TopPlaylistScreen(
                 TextButton(
                     onClick = {
                         showRemoveDownloadDialog = false
-                        songs!!.forEach { song ->
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.song.id,
-                                false,
-                            )
-                        }
+                        downloadUtil.removeDownloads(songs!!.map { it.song.id })
                     },
                 ) {
                     Text(text = stringResource(android.R.string.ok))
@@ -311,14 +286,7 @@ fun TopPlaylistScreen(
                                                 Download.STATE_DOWNLOADING -> {
                                                     IconButton(
                                                         onClick = {
-                                                            songs!!.forEach { song ->
-                                                                DownloadService.sendRemoveDownload(
-                                                                    context,
-                                                                    ExoDownloadService::class.java,
-                                                                    song.song.id,
-                                                                    false,
-                                                                )
-                                                            }
+                                                            downloadUtil.removeDownloads(songs!!.map { it.song.id })
                                                         },
                                                     ) {
                                                         CircularProgressIndicator(
@@ -331,11 +299,7 @@ fun TopPlaylistScreen(
                                                 else -> {
                                                     IconButton(
                                                         onClick = {
-                                                            songs!!.forEach { song ->
-                                                                downloadUtil.downloadToMediaStore(
-                                                                    song
-                                                                )
-                                                            }
+                                                            downloadUtil.downloadSongsToMediaStore(songs!!)
                                                         },
                                                     ) {
                                                         Icon(

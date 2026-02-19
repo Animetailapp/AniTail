@@ -16,23 +16,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import com.anitail.innertube.YouTube
 import com.anitail.music.LocalDatabase
 import com.anitail.music.LocalDownloadUtil
@@ -44,7 +41,6 @@ import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.models.MediaMetadata
 import com.anitail.music.models.toMediaMetadata
-import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.DefaultDialog
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +57,6 @@ fun SelectionSongMenu(
     clearAction: () -> Unit,
     songPosition: List<PlaylistSongMap>? = emptyList(),
 ) {
-    val context = LocalContext.current
     val database = LocalDatabase.current
     val downloadUtil = LocalDownloadUtil.current
     val coroutineScope = rememberCoroutineScope()
@@ -84,28 +79,9 @@ fun SelectionSongMenu(
         )
     }
 
-    var downloadState by remember {
-        mutableIntStateOf(Download.STATE_STOPPED)
-    }
-
-    LaunchedEffect(songSelection) {
-        if (songSelection.isEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songSelection.all { downloads[it.id]?.state == Download.STATE_COMPLETED }) {
-                    Download.STATE_COMPLETED
-                } else if (songSelection.all {
-                        downloads[it.id]?.state == Download.STATE_QUEUED ||
-                                downloads[it.id]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it.id]?.state == Download.STATE_COMPLETED
-                    }
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
-        }
-    }
+    val selectedSongIds = remember(songSelection) { songSelection.map { it.id } }
+    val downloadState by downloadUtil.getDownloadState(selectedSongIds)
+        .collectAsState(initial = Download.STATE_STOPPED)
 
     var showChoosePlaylistDialog by rememberSaveable {
         mutableStateOf(false)
@@ -154,14 +130,7 @@ fun SelectionSongMenu(
                 TextButton(
                     onClick = {
                         showRemoveDownloadDialog = false
-                        songSelection.forEach { song ->
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.song.id,
-                                false,
-                            )
-                        }
+                        downloadUtil.removeDownloads(songSelection.map { it.song.id })
                     },
                 ) {
                     Text(text = stringResource(android.R.string.ok))
@@ -330,9 +299,7 @@ fun SelectionSongMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            songSelection.forEach { song ->
-                                downloadUtil.downloadToMediaStore(song)
-                            }
+                            downloadUtil.downloadSongsToMediaStore(songSelection)
                         }
                     )
                 }
@@ -406,7 +373,6 @@ fun SelectionMediaMetadataMenu(
     onDismiss: () -> Unit,
     clearAction: () -> Unit,
 ) {
-    val context = LocalContext.current
     val database = LocalDatabase.current
     val downloadUtil = LocalDownloadUtil.current
     val coroutineScope = rememberCoroutineScope()
@@ -430,28 +396,9 @@ fun SelectionMediaMetadataMenu(
         onDismiss = { showChoosePlaylistDialog = false }
     )
 
-    var downloadState by remember {
-        mutableIntStateOf(Download.STATE_STOPPED)
-    }
-
-    LaunchedEffect(songSelection) {
-        if (songSelection.isEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songSelection.all { downloads[it.id]?.state == Download.STATE_COMPLETED }) {
-                    Download.STATE_COMPLETED
-                } else if (songSelection.all {
-                        downloads[it.id]?.state == Download.STATE_QUEUED ||
-                                downloads[it.id]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it.id]?.state == Download.STATE_COMPLETED
-                    }
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
-        }
-    }
+    val selectedMetadataSongIds = remember(songSelection) { songSelection.map { it.id } }
+    val downloadState by downloadUtil.getDownloadState(selectedMetadataSongIds)
+        .collectAsState(initial = Download.STATE_STOPPED)
 
     var showRemoveDownloadDialog by remember {
         mutableStateOf(false)
@@ -479,14 +426,7 @@ fun SelectionMediaMetadataMenu(
                 TextButton(
                     onClick = {
                         showRemoveDownloadDialog = false
-                        songSelection.forEach { song ->
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.id,
-                                false,
-                            )
-                        }
+                        downloadUtil.removeDownloads(songSelection.map { it.id })
                     },
                 ) {
                     Text(text = stringResource(android.R.string.ok))

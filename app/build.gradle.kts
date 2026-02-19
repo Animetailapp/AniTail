@@ -49,12 +49,10 @@ android {
     }
     // Native vibrafp build is optional. Enable by passing -PenableVibrafp=true
     val enableVibrafp = (project.findProperty("enableVibrafp") as? String)?.toBoolean() ?: false
-    if (enableVibrafp) {
-        externalNativeBuild {
-            cmake {
-                path("src/main/cpp/vibrafp/lib/CMakeLists.txt")
-                version = "3.22.1"
-            }
+    externalNativeBuild {
+        cmake {
+            path("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
         }
     }
 
@@ -125,6 +123,7 @@ android {
                 externalNativeBuild {
                     cmake {
                         arguments += listOf(
+                            "-DENABLE_VIBRAFP=ON",
                             "-DENABLE_LTO=ON",
                             "-DCMAKE_BUILD_TYPE=Release"
                         )
@@ -147,6 +146,7 @@ android {
                 externalNativeBuild {
                     cmake {
                         arguments += listOf(
+                            "-DENABLE_VIBRAFP=ON",
                             "-DENABLE_LTO=OFF",
                             "-DCMAKE_BUILD_TYPE=Debug"
                         )
@@ -219,6 +219,7 @@ dependencies {
     implementation(libs.navigation)
     implementation(libs.hilt.navigation)
     implementation(libs.datastore)
+    implementation("androidx.documentfile:documentfile:1.1.0")
 
     implementation(libs.compose.runtime)
     implementation(libs.compose.foundation)

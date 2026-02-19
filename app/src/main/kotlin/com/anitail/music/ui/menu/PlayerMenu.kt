@@ -2,6 +2,7 @@ package com.anitail.music.ui.menu
 
 import android.content.Intent
 import android.media.audiofx.AudioEffect
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
@@ -59,7 +60,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.WatchEndpoint
@@ -69,15 +69,17 @@ import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.constants.ListItemHeight
 import com.anitail.music.models.MediaMetadata
-import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.BigSeekBar
 import com.anitail.music.ui.component.BottomSheetState
+import com.anitail.music.ui.component.DownloadFormatDialog
 import com.anitail.music.ui.component.ListDialog
+import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.utils.makeTimeString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.log2
 import kotlin.math.pow
 import kotlin.math.round
@@ -106,11 +108,45 @@ fun PlayerMenu(
 
     val download by downloadUtil.getDownload(mediaMetadata.id)
         .collectAsState(initial = null)
+    val librarySong by database.song(mediaMetadata.id).collectAsState(initial = null)
+    val effectiveDownloadState = download?.state
+        ?: if (!librarySong?.song?.mediaStoreUri.isNullOrEmpty()) {
+            Download.STATE_COMPLETED
+        } else {
+            null
+        }
 
     val artists =
         remember(mediaMetadata.artists) {
             mediaMetadata.artists.filter { it.id != null }
         }
+    var showDownloadFormatDialog by rememberSaveable { mutableStateOf(false) }
+    var isLoadingFormats by remember { mutableStateOf(false) }
+    var availableFormats by remember { mutableStateOf<List<YTPlayerUtils.AudioFormatOption>>(emptyList()) }
+
+    if (showDownloadFormatDialog) {
+        DownloadFormatDialog(
+            isLoading = isLoadingFormats,
+            formats = availableFormats,
+            onFormatSelected = { format ->
+                showDownloadFormatDialog = false
+                coroutineScope.launch {
+                    val songToDownload = withContext(Dispatchers.IO) {
+                        database.insert(mediaMetadata)
+                        database.song(mediaMetadata.id).first()
+                    }
+                    if (songToDownload != null) {
+                        downloadUtil.downloadToMediaStore(songToDownload, targetItag = format.itag)
+                        Toast.makeText(context, R.string.downloading, Toast.LENGTH_SHORT).show()
+                        onDismiss()
+                    } else {
+                        Toast.makeText(context, R.string.download_failed, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onDismiss = { showDownloadFormatDialog = false },
+        )
+    }
 
     var showChoosePlaylistDialog by rememberSaveable {
         mutableStateOf(false)
@@ -373,7 +409,7 @@ fun PlayerMenu(
             }
         }
         item {
-            when (download?.state) {
+            when (effectiveDownloadState) {
                 Download.STATE_COMPLETED -> {
                     ListItem(
                         headlineContent = {
@@ -389,12 +425,31 @@ fun PlayerMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                mediaMetadata.id,
-                                false,
+                            downloadUtil.removeDownload(mediaMetadata.id)
+                        }
+                    )
+
+                    ListItem(
+                        headlineContent = { Text(text = stringResource(R.string.swap_download)) },
+                        supportingContent = { Text(text = stringResource(R.string.swap_download_desc)) },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.sync),
+                                contentDescription = null,
                             )
+                        },
+                        modifier = Modifier.clickable {
+                            downloadUtil.removeDownload(mediaMetadata.id)
+                            showDownloadFormatDialog = true
+                            isLoadingFormats = true
+                            availableFormats = emptyList()
+                            coroutineScope.launch {
+                                val formats = withContext(Dispatchers.IO) {
+                                    YTPlayerUtils.getAllAvailableAudioFormats(mediaMetadata.id).getOrDefault(emptyList())
+                                }
+                                availableFormats = formats
+                                isLoadingFormats = false
+                            }
                         }
                     )
                 }
@@ -408,12 +463,7 @@ fun PlayerMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                mediaMetadata.id,
-                                false,
-                            )
+                            downloadUtil.removeDownload(mediaMetadata.id)
                         }
                     )
                 }
@@ -427,14 +477,18 @@ fun PlayerMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            coroutineScope.launch(Dispatchers.IO) {
+                            showDownloadFormatDialog = true
+                            isLoadingFormats = true
+                            availableFormats = emptyList()
+                            coroutineScope.launch {
                                 database.transaction {
                                     insert(mediaMetadata)
                                 }
-                                val song = database.song(mediaMetadata.id).first()
-                                song?.let {
-                                    downloadUtil.downloadToMediaStore(it)
+                                val formats = withContext(Dispatchers.IO) {
+                                    YTPlayerUtils.getAllAvailableAudioFormats(mediaMetadata.id).getOrDefault(emptyList())
                                 }
+                                availableFormats = formats
+                                isLoadingFormats = false
                             }
                         }
                     )

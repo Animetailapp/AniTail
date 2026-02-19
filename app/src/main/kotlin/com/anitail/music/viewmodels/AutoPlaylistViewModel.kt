@@ -4,13 +4,14 @@ import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.media3.exoplayer.offline.Download
 import com.anitail.music.constants.SongSortDescendingKey
 import com.anitail.music.constants.SongSortType
 import com.anitail.music.constants.SongSortTypeKey
 import com.anitail.music.db.MusicDatabase
-import com.anitail.music.downloads.DownloadLibraryRepository
 import com.anitail.music.extensions.reversed
 import com.anitail.music.extensions.toEnum
+import com.anitail.music.playback.DownloadUtil
 import com.anitail.music.utils.SyncUtils
 import com.anitail.music.utils.dataStore
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -34,7 +35,7 @@ class AutoPlaylistViewModel
 constructor(
     @ApplicationContext context: Context,
     database: MusicDatabase,
-    downloadLibraryRepository: DownloadLibraryRepository,
+    downloadUtil: DownloadUtil,
     savedStateHandle: SavedStateHandle,
     private val syncUtils: SyncUtils,
 ) : ViewModel() {
@@ -51,19 +52,14 @@ constructor(
             .flatMapLatest { (sortType, descending) ->
                 when (playlist) {
                     "liked" -> database.likedSongs(sortType, descending)
-                    "downloaded" -> downloadLibraryRepository.observeDownloads()
+                    "downloaded" -> downloadUtil.downloads
                         .flatMapLatest { downloads ->
-                            // Get only the downloads that have a Song mapped in the database
-                            val downloadedUris =
-                                downloads.mapNotNull { it.song?.song?.mediaStoreUri }.toSet()
-                        
-                        database.allSongs()
+                            database.allSongs()
                             .flowOn(Dispatchers.IO)
                             .map { allSongs ->
-                                // Filter songs that have mediaStoreUri in the downloads list
-                                // Also deduplicate by song ID in case Room returns duplicates
                                 allSongs.filter { song ->
-                                    song.song.mediaStoreUri != null && song.song.mediaStoreUri in downloadedUris
+                                    downloads[song.id]?.state == Download.STATE_COMPLETED ||
+                                        !song.song.mediaStoreUri.isNullOrEmpty()
                                 }.distinctBy { it.id }
                             }
                             .map { songs ->

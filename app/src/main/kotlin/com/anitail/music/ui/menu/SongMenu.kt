@@ -1,8 +1,7 @@
 package com.anitail.music.ui.menu
 
 import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -61,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.media3.exoplayer.offline.Download
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.anitail.innertube.YouTube
@@ -78,19 +78,20 @@ import com.anitail.music.db.entities.Song
 import com.anitail.music.db.entities.SongArtistMap
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.models.toMediaMetadata
-import com.anitail.music.playback.MediaStoreDownloadManager
 import com.anitail.music.playback.queues.YouTubeQueue
+import com.anitail.music.ui.component.DownloadFormatDialog
 import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.component.LocalBottomSheetPageState
 import com.anitail.music.ui.component.SongListItem
 import com.anitail.music.ui.component.TextFieldDialog
 import com.anitail.music.ui.utils.ShowMediaInfo
-import com.anitail.music.utils.PermissionHelper
+import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.viewmodels.CachePlaylistViewModel
 import com.anitail.music.viewmodels.LastFmViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 
 @Composable
 fun SongMenu(
@@ -108,8 +109,14 @@ fun SongMenu(
     val songState = database.song(originalSong.id).collectAsState(initial = originalSong)
     val song = songState.value ?: originalSong
     val downloadUtil = LocalDownloadUtil.current
-    val mediaStoreDownload by downloadUtil.getMediaStoreDownload(originalSong.id)
+    val download by downloadUtil.getDownload(originalSong.id)
         .collectAsState(initial = null)
+    val effectiveDownloadState = download?.state
+        ?: if (!song.song.mediaStoreUri.isNullOrEmpty()) {
+            Download.STATE_COMPLETED
+        } else {
+            null
+        }
     val coroutineScope = rememberCoroutineScope()
     val syncUtils = LocalSyncUtils.current
     val scope = rememberCoroutineScope()
@@ -118,23 +125,22 @@ fun SongMenu(
     val cacheViewModel = viewModel<CachePlaylistViewModel>()
     val lastFmViewModel: LastFmViewModel = hiltViewModel()
     val lastFmUiState by lastFmViewModel.uiState.collectAsStateWithLifecycle()
+    var showDownloadFormatDialog by rememberSaveable { mutableStateOf(false) }
+    var isLoadingFormats by remember { mutableStateOf(false) }
+    var availableFormats by remember { mutableStateOf<List<YTPlayerUtils.AudioFormatOption>>(emptyList()) }
 
-    // Permission launcher for storage access
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        if (permissions.values.all { it }) {
-            // All permissions granted, proceed with download
-            downloadUtil.downloadToMediaStore(song)
-            onDismiss()
-        } else {
-            // Permissions denied - show error message
-            android.widget.Toast.makeText(
-                context,
-                context.getString(R.string.storage_permission_required),
-                android.widget.Toast.LENGTH_LONG
-            ).show()
-        }
+    if (showDownloadFormatDialog) {
+        DownloadFormatDialog(
+            isLoading = isLoadingFormats,
+            formats = availableFormats,
+            onFormatSelected = { format ->
+                showDownloadFormatDialog = false
+                downloadUtil.downloadToMediaStore(song, targetItag = format.itag)
+                Toast.makeText(context, R.string.downloading, Toast.LENGTH_SHORT).show()
+                onDismiss()
+            },
+            onDismiss = { showDownloadFormatDialog = false },
+        )
     }
 
     val rotationAnimation by animateFloatAsState(
@@ -631,73 +637,66 @@ fun SongMenu(
             }
         }
         item {
-            when (mediaStoreDownload?.status) {
-                MediaStoreDownloadManager.DownloadState.Status.COMPLETED -> {
+            when (effectiveDownloadState) {
+                Download.STATE_COMPLETED -> {
                     ListItem(
                         headlineContent = {
                             Text(
-                                text = stringResource(R.string.downloaded_to_device),
-                                color = MaterialTheme.colorScheme.primary
+                                text = stringResource(R.string.remove_download),
+                                color = MaterialTheme.colorScheme.error,
                             )
                         },
                         leadingContent = {
                             Icon(
-                                painter = painterResource(R.drawable.download),
+                                painter = painterResource(R.drawable.offline),
                                 contentDescription = null,
                             )
                         },
                         modifier = Modifier.clickable {
-                            // TODO: Option to remove from MediaStore
-                            onDismiss()
+                            downloadUtil.removeDownload(song.id)
+                        }
+                    )
+
+                    ListItem(
+                        headlineContent = { Text(text = stringResource(R.string.swap_download)) },
+                        supportingContent = { Text(text = stringResource(R.string.swap_download_desc)) },
+                        leadingContent = {
+                            Icon(
+                                painter = painterResource(R.drawable.sync),
+                                contentDescription = null,
+                            )
+                        },
+                        modifier = Modifier.clickable {
+                            downloadUtil.removeDownload(song.id)
+                            showDownloadFormatDialog = true
+                            isLoadingFormats = true
+                            availableFormats = emptyList()
+                            coroutineScope.launch {
+                                val formats = withContext(Dispatchers.IO) {
+                                    YTPlayerUtils.getAllAvailableAudioFormats(song.id)
+                                        .getOrElse {
+                                            Timber.tag("SongMenu").e(it, "Failed to load download formats")
+                                            emptyList()
+                                        }
+                                }
+                                availableFormats = formats
+                                isLoadingFormats = false
+                            }
                         }
                     )
                 }
 
-                MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING,
-                MediaStoreDownloadManager.DownloadState.Status.QUEUED -> {
-                    val downloadState = mediaStoreDownload!!
+                Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
                     ListItem(
-                        headlineContent = {
-                            Text(text = stringResource(R.string.downloading_to_device))
-                        },
-                        supportingContent = {
-                            Text(text = "${(downloadState.progress * 100).toInt()}%")
-                        },
+                        headlineContent = { Text(text = stringResource(R.string.downloading)) },
                         leadingContent = {
                             CircularProgressIndicator(
-                                progress = { downloadState.progress },
                                 modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
+                                strokeWidth = 2.dp,
                             )
                         },
                         modifier = Modifier.clickable {
-                            downloadUtil.cancelMediaStoreDownload(song.id)
-                            onDismiss()
-                        }
-                    )
-                }
-
-                MediaStoreDownloadManager.DownloadState.Status.FAILED -> {
-                    val downloadState = mediaStoreDownload!!
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                text = stringResource(R.string.download_failed),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        },
-                        supportingContent = {
-                            Text(text = downloadState.error ?: "Unknown error")
-                        },
-                        leadingContent = {
-                            Icon(
-                                painter = painterResource(R.drawable.info),
-                                contentDescription = null,
-                            )
-                        },
-                        modifier = Modifier.clickable {
-                            downloadUtil.retryMediaStoreDownload(song.id)
-                            onDismiss()
+                            downloadUtil.removeDownload(song.id)
                         }
                     )
                 }
@@ -712,12 +711,19 @@ fun SongMenu(
                             )
                         },
                         modifier = Modifier.clickable {
-                            if (PermissionHelper.hasMediaStoreWritePermission(context)) {
-                                downloadUtil.downloadToMediaStore(song)
-                                onDismiss()
-                            } else {
-                                val permissions = PermissionHelper.getRequiredWritePermissions()
-                                permissionLauncher.launch(permissions)
+                            showDownloadFormatDialog = true
+                            isLoadingFormats = true
+                            availableFormats = emptyList()
+                            coroutineScope.launch {
+                                val formats = withContext(Dispatchers.IO) {
+                                    YTPlayerUtils.getAllAvailableAudioFormats(song.id)
+                                        .getOrElse {
+                                            Timber.tag("SongMenu").e(it, "Failed to load download formats")
+                                            emptyList()
+                                        }
+                                }
+                                availableFormats = formats
+                                isLoadingFormats = false
                             }
                         }
                     )

@@ -69,44 +69,6 @@ fun DraggableScrollbar(
         modifier = modifier
             .width(trackWidth)
             .fillMaxHeight()
-            .pointerInput(scrollState) {
-                detectDragGestures(
-                    onDragStart = {
-                        isDragging = true
-                        lastTargetIndex = -1 // reset
-                        lastTargetOffset = -1
-                    },
-                    onDragEnd = { isDragging = false },
-                    onDragCancel = { isDragging = false }
-                ) { change, _ ->
-                    val layoutInfo = scrollState.layoutInfo
-                    val visibleItems = layoutInfo.visibleItemsInfo
-                    if (visibleItems.isEmpty()) return@detectDragGestures
-
-                    val totalContentItems = layoutInfo.totalItemsCount - headerItems
-                    val maxScrollIndex = max(1, totalContentItems - visibleItems.size)
-
-                    if (maxScrollIndex > minScrollRangeForDrag) {
-                        val touchProgress = (change.position.y / size.height).coerceIn(0f, 1f)
-                        val targetFractionalIndex = touchProgress * maxScrollIndex
-                        val targetIndex = headerItems + targetFractionalIndex.toInt()
-                        val targetFraction = targetFractionalIndex - targetFractionalIndex.toInt()
-
-                        val avgItemHeightPx = visibleItems.first().size
-                        val targetOffset = (targetFraction * avgItemHeightPx).toInt()
-                        val clampedIndex =
-                            targetIndex.coerceIn(headerItems, layoutInfo.totalItemsCount - 1)
-
-                        if (clampedIndex != lastTargetIndex || targetOffset != lastTargetOffset) {
-                            lastTargetIndex = clampedIndex
-                            lastTargetOffset = targetOffset
-                            coroutineScope.launch {
-                                scrollState.scrollToItem(clampedIndex)
-                            }
-                        }
-                    }
-                }
-            }
     ) {
         val viewportHeight = with(density) { this@BoxWithConstraints.maxHeight.toPx() }
         val constThumbHeight = with(density) { thumbHeight.toPx() }
@@ -152,6 +114,44 @@ fun DraggableScrollbar(
                 .width(thumbWidth)
                 .fillMaxHeight()
                 .align(Alignment.CenterEnd)
+                .pointerInput(scrollState) {
+                    detectDragGestures(
+                        onDragStart = {
+                            isDragging = true
+                            lastTargetIndex = -1
+                            lastTargetOffset = -1
+                        },
+                        onDragEnd = { isDragging = false },
+                        onDragCancel = { isDragging = false }
+                    ) { change, _ ->
+                        val layoutInfo = scrollState.layoutInfo
+                        val visibleItems = layoutInfo.visibleItemsInfo
+                        if (visibleItems.isEmpty()) return@detectDragGestures
+
+                        val totalContentItems = layoutInfo.totalItemsCount - headerItems
+                        val maxScrollIndex = max(1, totalContentItems - visibleItems.size)
+
+                        if (maxScrollIndex > minScrollRangeForDrag) {
+                            val touchProgress = (change.position.y / size.height).coerceIn(0f, 1f)
+                            val targetFractionalIndex = touchProgress * maxScrollIndex
+                            val targetIndex = headerItems + targetFractionalIndex.toInt()
+                            val targetFraction = targetFractionalIndex - targetFractionalIndex.toInt()
+
+                            val avgItemHeightPx = visibleItems.first().size
+                            val targetOffset = (targetFraction * avgItemHeightPx).toInt()
+                            val clampedIndex =
+                                targetIndex.coerceIn(headerItems, layoutInfo.totalItemsCount - 1)
+
+                            if (clampedIndex != lastTargetIndex || targetOffset != lastTargetOffset) {
+                                lastTargetIndex = clampedIndex
+                                lastTargetOffset = targetOffset
+                                coroutineScope.launch {
+                                    scrollState.scrollToItem(clampedIndex)
+                                }
+                            }
+                        }
+                    }
+                }
         ) {
             val color = if (isDragging) thumbColorActive else thumbColor
 

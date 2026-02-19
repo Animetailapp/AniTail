@@ -16,6 +16,7 @@ import android.provider.Settings
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
+import android.os.Build.VERSION_CODES.TIRAMISU
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -285,11 +286,7 @@ class MainActivity : AppCompatActivity() {
     private fun startMusicServiceSafely() {
         val serviceIntent = Intent(this, MusicService::class.java)
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                ContextCompat.startForegroundService(this, serviceIntent)
-            } else {
-                startService(serviceIntent)
-            }
+            startService(serviceIntent)
         } catch (e: IllegalStateException) {
             Timber.w(
                 e,
@@ -337,6 +334,8 @@ class MainActivity : AppCompatActivity() {
         window.decorView.layoutDirection = View.LAYOUT_DIRECTION_LTR
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        requestNotificationPermissionIfNeeded()
+
         // Request storage permissions at startup for MediaStore downloads
         requestStoragePermissionsIfNeeded()
 
@@ -354,14 +353,6 @@ class MainActivity : AppCompatActivity() {
                         window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
                     }
                 }
-        }
-
-        lifecycleScope.launch {
-            try {
-                checkAndRequestStoragePermissions()
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to check backup permissions")
-            }
         }
 
         lifecycleScope.launch(Dispatchers.IO) {
@@ -1553,6 +1544,26 @@ class MainActivity : AppCompatActivity() {
                 storagePermissionCallback.launch(permissions)
                 false
             }
+        }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        notificationPermissionCallback.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    private val notificationPermissionCallback = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) {
+            Timber.w("Notification permission denied")
         }
     }
 }
