@@ -201,11 +201,24 @@ jobs:
         shell: pwsh
         run: |
           $ext = ".${{ matrix.ext }}"
-          $files = Get-ChildItem -Path "desktop/build/compose/binaries" -Recurse -File |
-            Where-Object { $_.Extension -ieq $ext }
+          $allFiles = Get-ChildItem -Path "desktop/build/compose/binaries" -Recurse -File
+
+          if ("${{ matrix.ext }}" -ieq "AppImage") {
+            $files = $allFiles | Where-Object {
+              $_.Extension -ieq ".AppImage" -or
+              $_.Extension -ieq ".appimage" -or
+              $_.Name -match "AppImage$" -or
+              $_.Name -match "\.appimage$"
+            }
+          } else {
+            $files = $allFiles | Where-Object { $_.Extension -ieq $ext }
+          }
 
           if (-not $files) {
-            throw "No package found with extension $ext"
+            Write-Host "No package found with extension $ext"
+            Write-Host "Files found under desktop/build/compose/binaries:"
+            $allFiles | Sort-Object FullName | ForEach-Object { Write-Host $_.FullName }
+            throw "No package found for ${{ matrix.label }}"
           }
 
           $latest = $files | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
