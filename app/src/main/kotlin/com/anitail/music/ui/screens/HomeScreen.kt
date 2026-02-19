@@ -55,6 +55,7 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -73,6 +74,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -142,6 +144,35 @@ import kotlinx.coroutines.withContext
 import kotlin.math.min
 import kotlin.random.Random
 
+@Composable
+private fun PagerDots(
+    pageCount: Int,
+    currentPage: Int,
+    modifier: Modifier = Modifier,
+) {
+    if (pageCount <= 1) return
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = modifier,
+    ) {
+        repeat(pageCount) { index ->
+            Box(
+                modifier = Modifier
+                    .size(if (index == currentPage) 11.dp else 10.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (index == currentPage) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.95f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                        },
+                    ),
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SpeedDialTile(
@@ -151,7 +182,7 @@ private fun SpeedDialTile(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(10.dp))
             .combinedClickable(onClick = onClick),
     ) {
         AsyncImage(
@@ -167,7 +198,7 @@ private fun SpeedDialTile(
                     Brush.verticalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            Color.Black.copy(alpha = 0.55f),
+                            Color.Black.copy(alpha = 0.72f),
                         ),
                     ),
                 ),
@@ -175,11 +206,122 @@ private fun SpeedDialTile(
         Text(
             text = item.title,
             color = Color.White,
+            style = MaterialTheme.typography.titleLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SpeedDialSurpriseTile(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFF6A5D82))
+            .combinedClickable(onClick = onClick),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+                repeat(2) {
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE2D8F3)),
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE2D8F3)),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+                repeat(2) {
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE2D8F3)),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistCollage(
+    thumbnails: List<String?>,
+    modifier: Modifier = Modifier,
+) {
+    val cells = remember(thumbnails) {
+        val prepared = thumbnails.filterNotNull().toMutableList()
+        if (prepared.isEmpty()) prepared += ""
+        while (prepared.size < 4) prepared += prepared.last()
+        prepared.take(4)
+    }
+
+    Column(
+        modifier = modifier
+            .size(104.dp)
+            .clip(RoundedCornerShape(14.dp)),
+    ) {
+        repeat(2) { rowIndex ->
+            Row(modifier = Modifier.weight(1f)) {
+                repeat(2) { columnIndex ->
+                    val index = rowIndex * 2 + columnIndex
+                    AsyncImage(
+                        model = cells[index],
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxSize(),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun CommunityActionButton(
+    iconRes: Int,
+    emphasized: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(68.dp)
+            .clip(CircleShape)
+            .background(
+                if (emphasized) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.28f)
+                },
+            )
+            .combinedClickable(onClick = onClick),
+    ) {
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            tint = if (emphasized) Color.White else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(32.dp),
         )
     }
 }
@@ -188,26 +330,23 @@ private fun SpeedDialTile(
 @Composable
 private fun CommunityPlaylistCard(
     item: CommunityPlaylistItem,
-    onClick: () -> Unit,
+    onOpenPlaylist: () -> Unit,
     onSongClick: (SongItem) -> Unit,
+    onPlayAllClick: () -> Unit,
+    onRadioClick: () -> Unit,
+    onAddClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
         modifier = modifier
-            .width(320.dp)
-            .combinedClickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            .combinedClickable(onClick = onOpenPlaylist),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1828)),
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                AsyncImage(
-                    model = item.playlist.thumbnail,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(88.dp)
-                        .clip(RoundedCornerShape(12.dp)),
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                PlaylistCollage(
+                    thumbnails = item.songs.take(4).map { it.thumbnail } + item.playlist.thumbnail,
                 )
                 Column(
                     verticalArrangement = Arrangement.Center,
@@ -215,39 +354,32 @@ private fun CommunityPlaylistCard(
                 ) {
                     Text(
                         text = item.playlist.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = item.playlist.author?.name.orEmpty(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = item.playlist.songCountText ?: "",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White.copy(alpha = 0.72f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    item.playlist.songCountText?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             item.songs.take(3).forEach { song ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .padding(vertical = 6.dp)
+                        .clip(RoundedCornerShape(12.dp))
                         .combinedClickable(onClick = { onSongClick(song) }),
                 ) {
                     AsyncImage(
@@ -255,24 +387,47 @@ private fun CommunityPlaylistCard(
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(8.dp)),
+                            .size(70.dp)
+                            .clip(RoundedCornerShape(14.dp)),
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = song.title,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleLarge,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             text = song.artists.joinToString(", ") { it.name },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = Color.White.copy(alpha = 0.68f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                CommunityActionButton(
+                    iconRes = R.drawable.play,
+                    emphasized = true,
+                    onClick = onPlayAllClick,
+                )
+                CommunityActionButton(
+                    iconRes = R.drawable.radio,
+                    onClick = onRadioClick,
+                )
+                CommunityActionButton(
+                    iconRes = R.drawable.playlist_add,
+                    onClick = onAddClick,
+                )
             }
         }
     }
@@ -287,10 +442,10 @@ private fun DailyDiscoverCard(
 ) {
     Card(
         modifier = modifier
-            .clip(RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(34.dp))
             .combinedClickable(onClick = onClick),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(34.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1828)),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
@@ -305,39 +460,195 @@ private fun DailyDiscoverCard(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color.Black.copy(alpha = 0.2f),
+                                Color.Black.copy(alpha = 0.55f),
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.85f),
+                                Color.Black.copy(alpha = 0.78f),
                             ),
                         ),
                     ),
             )
             Column(
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(14.dp),
+                    .fillMaxSize()
+                    .padding(18.dp),
             ) {
                 Text(
                     text = item.recommendation.title,
                     color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.displaySmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = item.recommendation.artists.joinToString(", ") { it.name },
-                    color = Color.White.copy(alpha = 0.85f),
-                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.84f),
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = stringResource(R.string.daily_discover_based_on, item.seed.title),
+                    color = Color.White.copy(alpha = 0.84f),
+                    style = MaterialTheme.typography.headlineSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = stringResource(R.string.daily_discover_based_on, item.seed.title),
-                    color = Color.White.copy(alpha = 0.75f),
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpeedDialSection(
+    items: List<YTItem>,
+    maxWidth: Dp,
+    onItemClick: (YTItem) -> Unit,
+    onSurpriseClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val displayItems = remember(items) {
+        val prepared = items.map { it as YTItem? }.toMutableList()
+        prepared.add(min(8, prepared.size), null)
+        prepared
+    }
+    val pages = remember(displayItems) { displayItems.chunked(9) }
+    val pagerState = rememberLazyListState()
+    val currentPage by remember(pagerState, pages.size) {
+        derivedStateOf { pagerState.firstVisibleItemIndex.coerceAtMost((pages.size - 1).coerceAtLeast(0)) }
+    }
+    val pageWidth = maxWidth - 32.dp
+    val tileSize = (pageWidth - 16.dp) / 3
+
+    Column(modifier = modifier) {
+        LazyRow(
+            state = pagerState,
+            flingBehavior = rememberSnapFlingBehavior(pagerState),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(pages.size, key = { "speed_dial_page_$it" }) { pageIndex ->
+                val pageItems = pages[pageIndex]
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.width(pageWidth),
+                ) {
+                    repeat(3) { rowIndex ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            repeat(3) { columnIndex ->
+                                val tileIndex = rowIndex * 3 + columnIndex
+                                if (tileIndex >= pageItems.size) {
+                                    Spacer(modifier = Modifier.size(tileSize))
+                                } else {
+                                    val pageItem = pageItems[tileIndex]
+                                    if (pageItem == null) {
+                                        SpeedDialSurpriseTile(
+                                            onClick = onSurpriseClick,
+                                            modifier = Modifier.size(tileSize),
+                                        )
+                                    } else {
+                                        SpeedDialTile(
+                                            item = pageItem,
+                                            onClick = { onItemClick(pageItem) },
+                                            modifier = Modifier.size(tileSize),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        PagerDots(
+            pageCount = pages.size,
+            currentPage = currentPage,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+    }
+}
+
+@Composable
+private fun CommunityPlaylistsSection(
+    playlists: List<CommunityPlaylistItem>,
+    maxWidth: Dp,
+    onOpenPlaylist: (CommunityPlaylistItem) -> Unit,
+    onSongClick: (SongItem) -> Unit,
+    onPlayAllClick: (CommunityPlaylistItem) -> Unit,
+    onRadioClick: (CommunityPlaylistItem) -> Unit,
+    onAddClick: (CommunityPlaylistItem) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val rowState = rememberLazyListState()
+    val cardWidth = maxWidth - 72.dp
+
+    LazyRow(
+        state = rowState,
+        flingBehavior = rememberSnapFlingBehavior(rowState),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = modifier,
+    ) {
+        items(
+            items = playlists,
+            key = { it.playlist.id },
+        ) { playlistItem ->
+            CommunityPlaylistCard(
+                item = playlistItem,
+                onOpenPlaylist = { onOpenPlaylist(playlistItem) },
+                onSongClick = onSongClick,
+                onPlayAllClick = { onPlayAllClick(playlistItem) },
+                onRadioClick = { onRadioClick(playlistItem) },
+                onAddClick = { onAddClick(playlistItem) },
+                modifier = Modifier.width(cardWidth),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DailyDiscoverSection(
+    discoverItems: List<DailyDiscoverItem>,
+    maxWidth: Dp,
+    onItemClick: (DailyDiscoverItem) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val rowState = rememberLazyListState()
+    val currentPage by remember(rowState, discoverItems.size) {
+        derivedStateOf {
+            rowState.firstVisibleItemIndex.coerceAtMost((discoverItems.size - 1).coerceAtLeast(0))
+        }
+    }
+    val cardWidth = maxWidth - 92.dp
+
+    Column(modifier = modifier) {
+        PagerDots(
+            pageCount = discoverItems.size,
+            currentPage = currentPage,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(bottom = 10.dp),
+        )
+
+        LazyRow(
+            state = rowState,
+            flingBehavior = rememberSnapFlingBehavior(rowState),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(
+                items = discoverItems,
+                key = { it.recommendation.id },
+            ) { discoverItem ->
+                DailyDiscoverCard(
+                    item = discoverItem,
+                    onClick = { onItemClick(discoverItem) },
+                    modifier = Modifier
+                        .width(cardWidth)
+                        .height(470.dp),
                 )
             }
         }
@@ -937,44 +1248,43 @@ fun HomeScreen(
                     )
                 }
 
-                item(key = "speed_dial_list") {
-                    val itemSize = (maxWidth - 48.dp) / 3
-                    LazyHorizontalGrid(
-                        rows = GridCells.Fixed(3),
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(itemSize * 3 + 16.dp)
-                            .animateItem(),
-                    ) {
-                        items(
-                            items = speedDialList.take(9),
-                            key = { it.id },
-                        ) { item ->
-                            SpeedDialTile(
-                                item = item,
-                                onClick = {
-                                    when (item) {
-                                        is SongItem -> playerConnection.playQueue(
-                                            YouTubeQueue(
-                                                item.endpoint ?: WatchEndpoint(videoId = item.id),
-                                                item.toMediaMetadata(),
-                                            ),
-                                        )
+                item(key = "speed_dial_content") {
+                    SpeedDialSection(
+                        items = speedDialList,
+                        maxWidth = maxWidth,
+                        onItemClick = { item ->
+                            when (item) {
+                                is SongItem -> playerConnection.playQueue(
+                                    YouTubeQueue(
+                                        item.endpoint ?: WatchEndpoint(videoId = item.id),
+                                        item.toMediaMetadata(),
+                                    ),
+                                )
 
-                                        is AlbumItem -> navController.navigate("album/${item.id}")
-                                        is ArtistItem -> navController.navigate("artist/${item.id}")
-                                        is PlaylistItem -> navController.navigate("online_playlist/${item.id.removePrefix("VL")}")
-                                    }
-                                },
-                                modifier = Modifier
-                                    .width(itemSize)
-                                    .height(itemSize),
-                            )
-                        }
-                    }
+                                is AlbumItem -> navController.navigate("album/${item.id}")
+                                is ArtistItem -> navController.navigate("artist/${item.id}")
+                                is PlaylistItem -> navController.navigate("online_playlist/${item.id.removePrefix("VL")}")
+                            }
+                        },
+                        onSurpriseClick = {
+                            val luckyItem = speedDialList.randomOrNull()
+                            if (luckyItem != null) {
+                                when (luckyItem) {
+                                    is SongItem -> playerConnection.playQueue(
+                                        YouTubeQueue(
+                                            luckyItem.endpoint ?: WatchEndpoint(videoId = luckyItem.id),
+                                            luckyItem.toMediaMetadata(),
+                                        ),
+                                    )
+
+                                    is AlbumItem -> navController.navigate("album/${luckyItem.id}")
+                                    is ArtistItem -> navController.navigate("artist/${luckyItem.id}")
+                                    is PlaylistItem -> navController.navigate("online_playlist/${luckyItem.id.removePrefix("VL")}")
+                                }
+                            }
+                        },
+                        modifier = Modifier.animateItem(),
+                    )
                 }
             }
 
@@ -987,31 +1297,41 @@ fun HomeScreen(
                 }
 
                 item(key = "community_playlists_content") {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.animateItem(),
-                    ) {
-                        items(
-                            items = playlists,
-                            key = { it.playlist.id },
-                        ) { playlistItem ->
-                            CommunityPlaylistCard(
-                                item = playlistItem,
-                                onClick = {
-                                    navController.navigate("online_playlist/${playlistItem.playlist.id.removePrefix("VL")}")
-                                },
-                                onSongClick = { song ->
-                                    playerConnection.playQueue(
-                                        YouTubeQueue(
-                                            song.endpoint ?: WatchEndpoint(videoId = song.id),
-                                            song.toMediaMetadata(),
-                                        ),
-                                    )
-                                },
+                    CommunityPlaylistsSection(
+                        playlists = playlists,
+                        maxWidth = maxWidth,
+                        onOpenPlaylist = { playlistItem ->
+                            navController.navigate("online_playlist/${playlistItem.playlist.id.removePrefix("VL")}")
+                        },
+                        onSongClick = { song ->
+                            playerConnection.playQueue(
+                                YouTubeQueue(
+                                    song.endpoint ?: WatchEndpoint(videoId = song.id),
+                                    song.toMediaMetadata(),
+                                ),
                             )
-                        }
-                    }
+                        },
+                        onPlayAllClick = { playlistItem ->
+                            playerConnection.playQueue(
+                                ListQueue(
+                                    title = playlistItem.playlist.title,
+                                    items = playlistItem.songs.map { it.toMediaItem() },
+                                ),
+                            )
+                        },
+                        onRadioClick = { playlistItem ->
+                            val radioEndpoint = playlistItem.playlist.radioEndpoint
+                            if (radioEndpoint != null) {
+                                playerConnection.playQueue(YouTubeQueue(radioEndpoint))
+                            } else {
+                                navController.navigate("online_playlist/${playlistItem.playlist.id.removePrefix("VL")}")
+                            }
+                        },
+                        onAddClick = { playlistItem ->
+                            navController.navigate("online_playlist/${playlistItem.playlist.id.removePrefix("VL")}")
+                        },
+                        modifier = Modifier.animateItem(),
+                    )
                 }
             }
 
@@ -1022,33 +1342,21 @@ fun HomeScreen(
                         modifier = Modifier.animateItem(),
                     )
                 }
-                item(key = "daily_discover_list") {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        modifier = Modifier.animateItem(),
-                    ) {
-                        items(
-                            items = discoverList,
-                            key = { it.recommendation.id },
-                        ) { discoverItem ->
-                            DailyDiscoverCard(
-                                item = discoverItem,
-                                onClick = {
-                                    playerConnection.playQueue(
-                                        YouTubeQueue(
-                                            discoverItem.recommendation.endpoint
-                                                ?: WatchEndpoint(videoId = discoverItem.recommendation.id),
-                                            discoverItem.recommendation.toMediaMetadata(),
-                                        ),
-                                    )
-                                },
-                                modifier = Modifier
-                                    .width(320.dp)
-                                    .height(300.dp),
+                item(key = "daily_discover_content") {
+                    DailyDiscoverSection(
+                        discoverItems = discoverList,
+                        maxWidth = maxWidth,
+                        onItemClick = { discoverItem ->
+                            playerConnection.playQueue(
+                                YouTubeQueue(
+                                    discoverItem.recommendation.endpoint
+                                        ?: WatchEndpoint(videoId = discoverItem.recommendation.id),
+                                    discoverItem.recommendation.toMediaMetadata(),
+                                ),
                             )
-                        }
-                    }
+                        },
+                        modifier = Modifier.animateItem(),
+                    )
                 }
             }
 
