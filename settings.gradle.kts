@@ -29,7 +29,19 @@ plugins {
 }
 
 rootProject.name = "AniTail"
-include(":android")
+
+val requestedTasks = gradle.startParameter.taskNames
+val desktopOnlyByTask =
+    requestedTasks.isNotEmpty() && requestedTasks.all { task ->
+        task.contains("desktop", ignoreCase = true)
+    }
+val desktopOnlyByEnv =
+    System.getenv("ANITAIL_DESKTOP_ONLY")?.equals("true", ignoreCase = true) == true
+val includeAndroidProject = !(desktopOnlyByTask || desktopOnlyByEnv)
+
+if (includeAndroidProject) {
+    include(":android")
+}
 include(":common")
 include(":desktop")
 include(":innertube")
@@ -40,7 +52,9 @@ include(":betterlyrics")
 include(":simpmusic")
 include(":shazamkit")
 
-project(":android").projectDir = file("app")
+if (includeAndroidProject) {
+    project(":android").projectDir = file("app")
+}
 
 // Use a local copy of NewPipe Extractor by uncommenting the lines below.
 // We assume, that AniTail and NewPipe Extractor have the same parent directory.

@@ -25,6 +25,10 @@
     <string name="similar_to">Similar a</string>
     <string name="keep_listening">Seguir escuchando</string>
     <string name="your_ytb_playlists">Tu cuenta de YouTube</string>
+    <string name="speed_dial">Marcación rápida</string>
+    <string name="from_the_community">Desde la comunidad</string>
+    <string name="daily_discover">Descubrimiento diario</string>
+    <string name="daily_discover_based_on">Basado en %1$s</string>
 
     <!-- Historial -->
     <string name="today">Hoy</string>
@@ -62,7 +66,7 @@
     <string name="filter_playlists">Listas de reproducción</string>
     <string name="filter_community_playlists">Listas de la comunidad</string>
     <string name="filter_featured_playlists">Listas destacadas</string>
-    <string name="mixes">Mixes</string>
+    <string name="mixes">Mezclas</string>
     <string name="library_empty_title">Tu biblioteca está vacía</string>
     <string name="library_empty_subtitle">Busca música y añádela a tu biblioteca</string>
     <string name="library_songs_empty_title">No hay canciones</string>
@@ -103,6 +107,7 @@
 
     <!-- Botones -->
     <string name="radio">Radio</string>
+    <string name="play_all">Reproducir todo</string>
     <string name="shuffle">Aleatorio</string>
     <string name="reset">Restablecer</string>
 
@@ -168,7 +173,7 @@
     <string name="lyrics_auto_scroll">Desplazamiento automático de la letra</string>
     <string name="lyrics_font_size">Tamaño de la fuente de la letra</string>
     <string name="lyrics_custom_font">Estilo de la fuente de la letra</string>
-    <string name="lyrics_glow_effect">Enable glowing lyrics effect</string>
+    <string name="lyrics_glow_effect">Activar efecto de brillo en letras</string>
     <string name="use_system_font">Usar fuente del sistema</string>
     <string name="smooth_lyrics_animation">Animación suave de la letra</string>
     <string name="font_size_preview">Texto de la letra de muestra para vista previa</string>
@@ -385,7 +390,7 @@
     <string name="audio_quality_high">Alta</string>
     <string name="audio_quality_low">Baja</string>
     <string name="audio_quality_medium">Media</string>
-    <string name="crossfade">Crossfade</string>
+    <string name="crossfade">Cruzado de Canciones</string>
     <string name="queue">Cola</string>
     <string name="persistent_queue">Cola persistente</string>
     <string name="persistent_queue_desc">Restaurar tu última cola cuando la aplicación se inicia</string>
@@ -575,7 +580,7 @@
     <string name="lastfm_profile_picture">Foto de perfil de Last.fm</string>
     <string name="syncing_scrobbles">Sincronizando scrobbles…</string>
     <string name="recent_tracks">Tracks Recientes</string>
-    <string name="top_tracks">Top Tracks</string>
+    <string name="top_tracks">Canciones principales</string>
     <string name="top_artists">Top Artistas</string>
     <string name="no_top_tracks_data">No hay datos de pistas principales. ¡Escucha más música para ver tus estadísticas!</string>
     <string name="no_recent_tracks_data">No hay datos de pistas recientes.</string>
@@ -789,7 +794,15 @@
     <string name="share_selected">Compartir seleccionados</string>
     <string name="confirm">Confirmar</string>
     <string name="lyrics_animation_style">Estilo de animación de letras</string>
+    <string name="lyrics_animation_none">Ninguna</string>
+    <string name="lyrics_animation_fade">Desvanecer</string>
+    <string name="lyrics_animation_glow">Brillo</string>
+    <string name="lyrics_animation_slide">Deslizar</string>
+    <string name="lyrics_animation_karaoke">Karaoke</string>
+    <string name="lyrics_animation_apple">Apple Music</string>
     <string name="enable_betterlyrics">Habilitar el proveedor de letras BetterLyrics</string>
+    <string name="lyrics_provider_betterlyrics">BetterLyrics</string>
+    <string name="lyrics_provider_simpmusic">SimpMusic</string>
     <string name="discord_connection_state">Conexión</string>
     <string name="discord_last_sync">Última sincronización</string>
     <string name="discord_last_sync_never">Nunca</string>
@@ -800,6 +813,84 @@
     <string name="discord_status_connecting">Conectando...</string>
     <string name="discord_status_connected">Conectado</string>
     <string name="discord_status_reconnecting">Reconectando...</string>
+    <string name="discord_status_error">Error de pasarela</string>
+    <string name="discord_error_format">Error: %1$s</string>
+    <string name="swap_download">Cambiar descarga</string>
+    <string name="swap_download_desc">Volver a descargar con distinta calidad</string>
+    <string name="choose_download_quality">Elegir calidad de descarga</string>
+    <string name="download_quality_dialog_subtitle">La mejor calidad aparece primero. Elige el formato que quieres conservar sin conexión.</string>
+    <string name="loading_formats">Cargando calidades disponibles…</string>
+    <string name="no_formats_available">No hay formatos disponibles</string>
+    <string name="recommended_badge">Recomendado</string>
+    <string name="metadata_badge">+ Metadatos</string>
+    <string name="audio_only_badge">Solo audio</string>
+    <string name="metadata_supported_hint">Incluye portada y etiquetas integradas</string>
+    <string name="metadata_unsupported_hint">Sin metadatos integrados</string>
+    <string name="m4a_metadata_note">Los archivos M4A de 128 kbps o más incluyen portada y metadatos integrados. Los M4A de menor bitrate y los archivos OPUS no incluirán metadatos integrados.</string>
+    <string name="custom_download_path">Ruta de descarga personalizada</string>
+    <string name="custom_download_path_desc">Guarda descargas en una carpeta personalizada (p. ej., tarjeta SD)</string>
+    <string name="max_download_speed">Velocidad máxima de descarga</string>
+    <string name="max_download_speed_desc">Al activar: modo turbo (descargas más rápidas, mayor uso de batería/datos).</string>
+    <string name="select_download_folder">Seleccionar carpeta de descargas</string>
+    <string name="reset_download_path">Restablecer predeterminado (caché interna)</string>
+    <string name="current_path">Ruta actual: %s</string>
+    <string name="permission_lost_warning">Se perdió el permiso de la carpeta. Vuelve a seleccionarla.</string>
+    <string name="crash_title">La app se cerró inesperadamente</string>
+    <string name="crash_description">Ocurrió un error inesperado. Comparte el informe de fallo para ayudarnos a solucionarlo.</string>
+    <string name="crash_share_logs">Compartir registros</string>
+    <string name="crash_share_title">Compartir informe de fallo</string>
+    <string name="crash_report_subject">Informe de fallo de AniTail</string>
+    <string name="crash_close">Cerrar</string>
+    <string name="crash_no_log">No hay registro de fallo disponible</string>
+    <string name="recognize_music">Reconocer música</string>
+    <string name="recognition_history">Historial de reconocimiento</string>
+    <string name="tap_to_recognize">Toca para reconocer</string>
+    <string name="listening">Escuchando…</string>
+    <string name="processing">Procesando…</string>
+    <string name="play_on_app">Reproducir en la app</string>
+    <string name="re_listen">Volver a escuchar</string>
+    <string name="no_match_found">No se encontró coincidencia</string>
+    <string name="recognition_no_match_tip">Consejo: acércate al altavoz y evita el ruido de fondo.</string>
+    <string name="try_again">Intentar de nuevo</string>
+    <string name="recognition_error">Error de reconocimiento</string>
+    <string name="recognition_error_tip">Consejo: revisa tu conexión a internet e inténtalo de nuevo.</string>
+    <string name="recognition_share_template">Reconocí "%1$s" de %2$s en AniTail Music.%3$s</string>
+    <string name="recognition_share_link_template">\nAbrir en AniTail: %1$s</string>
+    <string name="clear_recognition_history">Borrar historial de reconocimiento</string>
+    <string name="clear_recognition_history_confirm">¿Seguro que quieres borrar el historial de reconocimiento?</string>
+    <string name="delete_from_history">Eliminar del historial</string>
+    <string name="sound_capsule_title">Tu cápsula musical</string>
+    <string name="time_listened">Tiempo escuchado</string>
+    <string name="sound_capsule_top_artist">Artista principal</string>
+    <string name="sound_capsule_top_song">Canción principal</string>
+    <string name="sound_capsule_new">Nuevo</string>
+    <string name="sound_capsule_no_data">Aún no hay datos</string>
+    <string name="sound_capsule_musicless_title">Este fue un mes sin música.</string>
+    <string name="sound_capsule_musicless_subtitle">No te preocupes, pasa.</string>
+    <string name="sound_capsule_minutes_value">%1$d minutos</string>
+    <string name="sound_capsule_minutes_short">%1$d min</string>
+    <string name="sound_capsule_lifetime_headline">Escuchaste %1$d canciones desde que te uniste a AniTail</string>
+    <string name="sound_capsule_lifetime_description">Sigue escuchando para desbloquear estadísticas mensuales más completas sobre tus hábitos musicales.</string>
+    <string name="sound_capsule_daily_average">Promedio diario: %1$d min</string>
+    <string name="sound_capsule_time_prefix">Escuchaste música durante </string>
+    <string name="sound_capsule_time_suffix"> este mes.</string>
+    <string name="sound_capsule_period_suffix"> es cuando más escuchas.</string>
+    <string name="sound_capsule_music_for_right_now">Música para ahora mismo</string>
+    <string name="sound_capsule_on_repeat">En repetición</string>
+    <string name="sound_capsule_quick_pick">Selección rápida</string>
+    <string name="sound_capsule_quick_mix">Mezcla top 5</string>
+    <string name="sound_capsule_play_top_song">Reproducir canción principal</string>
+    <string name="sound_capsule_open_top_artist">Abrir artista principal</string>
+    <string name="sound_capsule_active_days">Días activos este mes: %1$d</string>
+    <string name="sound_capsule_top_artists_title">Artistas principales</string>
+    <string name="sound_capsule_top_artists_prefix">Escuchaste </string>
+    <string name="sound_capsule_top_artists_suffix"> este mes.</string>
+    <string name="sound_capsule_new_to_top_five">Nuevo en el top 5</string>
+    <string name="sound_capsule_top_artist_of_month">Artista del mes</string>
+    <string name="sound_capsule_period_morning">Mañana</string>
+    <string name="sound_capsule_period_afternoon">Tarde</string>
+    <string name="sound_capsule_period_evening">Noche</string>
+    <string name="sound_capsule_period_night">Madrugada</string>
 
     <!-- Desktop supplemental -->
     <string name="downloads">Descargas</string>
@@ -826,7 +917,7 @@
     <string name="error_loading_artist">Error al cargar artista</string>
     <string name="song">Canción</string>
     <string name="album">Álbum</string>
-    <string name="playlist">Playlist</string>
+    <string name="playlist">Lista de reproducción</string>
     <string name="all">Todo</string>
     <string name="use_suggestion">Usar sugerencia</string>
     <string name="repeat">Repetir</string>
@@ -869,5 +960,9 @@
     <plurals name="queue_items_removed">
         <item quantity="one">%d canción eliminada</item>
         <item quantity="other">%d canciones eliminadas</item>
+    </plurals>
+    <plurals name="backup_count">
+        <item quantity="one">%d copia de seguridad</item>
+        <item quantity="other">%d copias de seguridad</item>
     </plurals>
 </resources>

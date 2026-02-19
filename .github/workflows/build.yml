@@ -206,6 +206,7 @@ jobs:
       - name: Build Desktop Release Package
         run: ${{ matrix.gradle_cmd }} ${{ matrix.gradle_task }}
         env:
+          ANITAIL_DESKTOP_ONLY: 'true'
           GITHUB_EVENT_NAME: ${{ github.event_name }}
 
       - name: Upload Desktop Release Artifact

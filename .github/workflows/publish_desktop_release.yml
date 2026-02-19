@@ -187,6 +187,8 @@ jobs:
 
       - name: Build desktop package
         run: ${{ matrix.gradle_cmd }} ${{ matrix.gradle_task }}
+        env:
+          ANITAIL_DESKTOP_ONLY: 'true'
 
       - name: Prepare release asset
         shell: pwsh
