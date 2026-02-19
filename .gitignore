@@ -95,7 +95,6 @@ output-metadata.json
 *.keystore
 *.jks
 .maestro/
-docs/
 .tmp/
 client_secret.json
 client_secret_*.json
