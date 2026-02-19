@@ -148,7 +148,7 @@ class HomeViewModel @Inject constructor(
         speedDialItems.value =
             (localSongs + homeItems + similarItems + dailyItems + communityItems)
                 .distinctBy { it.id }
-                .take(27)
+                .take(26)
     }
 
     private suspend fun getDailyDiscover() {
@@ -159,7 +159,7 @@ class HomeViewModel @Inject constructor(
             return
         }
 
-        val seeds = likedSongs.shuffled().distinctBy { it.id }.take(5)
+        val seeds = likedSongs.shuffled().distinctBy { it.id }.take(3)
         val results = mutableListOf<DailyDiscoverItem>()
 
         seeds.forEach { seed ->

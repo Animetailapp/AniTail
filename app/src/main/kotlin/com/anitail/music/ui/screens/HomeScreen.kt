@@ -76,6 +76,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -132,6 +133,7 @@ import com.anitail.music.ui.menu.YouTubePlaylistMenu
 import com.anitail.music.ui.menu.YouTubeSongMenu
 import com.anitail.music.ui.utils.SnapLayoutInfoProvider
 import com.anitail.music.ui.utils.isScrollingUp
+import com.anitail.music.ui.utils.resize
 import com.anitail.music.utils.rememberPreference
 import com.anitail.music.viewmodels.CommunityPlaylistItem
 import com.anitail.music.viewmodels.DailyDiscoverItem
@@ -143,6 +145,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.min
 import kotlin.random.Random
+
+private fun highResThumbnail(
+    url: String?,
+    width: Int,
+    height: Int,
+): String? {
+    if (url == null) return null
+    val resized = url.replace(Regex("=w\\d+-h\\d+"), "=w$width-h$height")
+    return resized.resize(width, height)
+}
 
 @Composable
 private fun PagerDots(
@@ -173,6 +185,24 @@ private fun PagerDots(
     }
 }
 
+@Composable
+private fun HomeSectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = title,
+        color = MaterialTheme.colorScheme.primary,
+        style = MaterialTheme.typography.headlineMedium.copy(
+            fontWeight = FontWeight.Medium,
+            fontSize = 22.sp,
+        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SpeedDialTile(
@@ -186,7 +216,7 @@ private fun SpeedDialTile(
             .combinedClickable(onClick = onClick),
     ) {
         AsyncImage(
-            model = item.thumbnail,
+            model = highResThumbnail(item.thumbnail, 544, 544) ?: item.thumbnail,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
@@ -206,7 +236,10 @@ private fun SpeedDialTile(
         Text(
             text = item.title,
             color = Color.White,
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            ),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
@@ -283,7 +316,7 @@ private fun PlaylistCollage(
                 repeat(2) { columnIndex ->
                     val index = rowIndex * 2 + columnIndex
                     AsyncImage(
-                        model = cells[index],
+                        model = highResThumbnail(cells[index], 544, 544) ?: cells[index],
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -354,7 +387,10 @@ private fun CommunityPlaylistCard(
                 ) {
                     Text(
                         text = item.playlist.title,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
                         color = Color.White,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -362,7 +398,7 @@ private fun CommunityPlaylistCard(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = item.playlist.songCountText ?: "",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
                         color = Color.White.copy(alpha = 0.72f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -383,7 +419,7 @@ private fun CommunityPlaylistCard(
                         .combinedClickable(onClick = { onSongClick(song) }),
                 ) {
                     AsyncImage(
-                        model = song.thumbnail,
+                        model = highResThumbnail(song.thumbnail, 544, 544) ?: song.thumbnail,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -394,13 +430,16 @@ private fun CommunityPlaylistCard(
                         Text(
                             text = song.title,
                             color = Color.White,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                            ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
                             text = song.artists.joinToString(", ") { it.name },
-                            style = MaterialTheme.typography.headlineSmall,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
                             color = Color.White.copy(alpha = 0.68f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -442,14 +481,15 @@ private fun DailyDiscoverCard(
 ) {
     Card(
         modifier = modifier
-            .clip(RoundedCornerShape(34.dp))
+            .clip(RoundedCornerShape(30.dp))
             .combinedClickable(onClick = onClick),
-        shape = RoundedCornerShape(34.dp),
+        shape = RoundedCornerShape(30.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1828)),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
-                model = item.recommendation.thumbnail,
+                model = highResThumbnail(item.recommendation.thumbnail, 1200, 1200)
+                    ?: item.recommendation.thumbnail,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
@@ -475,14 +515,17 @@ private fun DailyDiscoverCard(
                 Text(
                     text = item.recommendation.title,
                     color = Color.White,
-                    style = MaterialTheme.typography.displaySmall,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = item.recommendation.artists.joinToString(", ") { it.name },
                     color = Color.White.copy(alpha = 0.84f),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 13.sp),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -490,7 +533,7 @@ private fun DailyDiscoverCard(
                 Text(
                     text = stringResource(R.string.daily_discover_based_on, item.seed.title),
                     color = Color.White.copy(alpha = 0.84f),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 10.sp),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -616,17 +659,18 @@ private fun DailyDiscoverSection(
     onItemClick: (DailyDiscoverItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val visibleDiscoverItems = remember(discoverItems) { discoverItems.take(3) }
     val rowState = rememberLazyListState()
-    val currentPage by remember(rowState, discoverItems.size) {
+    val currentPage by remember(rowState, visibleDiscoverItems.size) {
         derivedStateOf {
-            rowState.firstVisibleItemIndex.coerceAtMost((discoverItems.size - 1).coerceAtLeast(0))
+            rowState.firstVisibleItemIndex.coerceAtMost((visibleDiscoverItems.size - 1).coerceAtLeast(0))
         }
     }
     val cardWidth = maxWidth - 92.dp
 
     Column(modifier = modifier) {
         PagerDots(
-            pageCount = discoverItems.size,
+            pageCount = visibleDiscoverItems.size,
             currentPage = currentPage,
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
@@ -640,7 +684,7 @@ private fun DailyDiscoverSection(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(
-                items = discoverItems,
+                items = visibleDiscoverItems,
                 key = { it.recommendation.id },
             ) { discoverItem ->
                 DailyDiscoverCard(
@@ -1242,7 +1286,7 @@ fun HomeScreen(
 
             speedDialItems.takeIf { it.isNotEmpty() }?.let { speedDialList ->
                 item(key = "speed_dial_title") {
-                    NavigationTitle(
+                    HomeSectionHeader(
                         title = stringResource(R.string.speed_dial),
                         modifier = Modifier.animateItem(),
                     )
@@ -1290,7 +1334,7 @@ fun HomeScreen(
 
             communityPlaylists?.takeIf { it.isNotEmpty() }?.let { playlists ->
                 item(key = "community_playlists_title") {
-                    NavigationTitle(
+                    HomeSectionHeader(
                         title = stringResource(R.string.from_the_community),
                         modifier = Modifier.animateItem(),
                     )
@@ -1337,7 +1381,7 @@ fun HomeScreen(
 
             dailyDiscover?.takeIf { it.isNotEmpty() }?.let { discoverList ->
                 item(key = "daily_discover_title") {
-                    NavigationTitle(
+                    HomeSectionHeader(
                         title = stringResource(R.string.daily_discover),
                         modifier = Modifier.animateItem(),
                     )
