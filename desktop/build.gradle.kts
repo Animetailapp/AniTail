@@ -112,7 +112,7 @@ compose.desktop {
             }
             targetFormats(*formats.toTypedArray())
             packageName = "AniTail"
-            packageVersion = "1.0.2"
+            packageVersion = "1.0.3"
             macOS {
                 iconFile.set(project.file("src/main/resources/drawable/ic_anitail.icns"))
                 bundleID = "com.anitail.desktop"
