@@ -35,7 +35,13 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -56,6 +62,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -63,6 +71,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -121,6 +131,8 @@ import com.anitail.music.ui.menu.YouTubeSongMenu
 import com.anitail.music.ui.utils.SnapLayoutInfoProvider
 import com.anitail.music.ui.utils.isScrollingUp
 import com.anitail.music.utils.rememberPreference
+import com.anitail.music.viewmodels.CommunityPlaylistItem
+import com.anitail.music.viewmodels.DailyDiscoverItem
 import com.anitail.music.viewmodels.HomeViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -129,6 +141,208 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.min
 import kotlin.random.Random
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SpeedDialTile(
+    item: YTItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .combinedClickable(onClick = onClick),
+    ) {
+        AsyncImage(
+            model = item.thumbnail,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.55f),
+                        ),
+                    ),
+                ),
+        )
+        Text(
+            text = item.title,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun CommunityPlaylistCard(
+    item: CommunityPlaylistItem,
+    onClick: () -> Unit,
+    onSongClick: (SongItem) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier
+            .width(320.dp)
+            .combinedClickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AsyncImage(
+                    model = item.playlist.thumbnail,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(88.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                )
+                Column(
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        text = item.playlist.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = item.playlist.author?.name.orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    item.playlist.songCountText?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            item.songs.take(3).forEach { song ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .combinedClickable(onClick = { onSongClick(song) }),
+                ) {
+                    AsyncImage(
+                        model = song.thumbnail,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = song.title,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = song.artists.joinToString(", ") { it.name },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DailyDiscoverCard(
+    item: DailyDiscoverItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier
+            .clip(RoundedCornerShape(22.dp))
+            .combinedClickable(onClick = onClick),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            AsyncImage(
+                model = item.recommendation.thumbnail,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.2f),
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.85f),
+                            ),
+                        ),
+                    ),
+            )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(14.dp),
+            ) {
+                Text(
+                    text = item.recommendation.title,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = item.recommendation.artists.joinToString(", ") { it.name },
+                    color = Color.White.copy(alpha = 0.85f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.daily_discover_based_on, item.seed.title),
+                    color = Color.White.copy(alpha = 0.75f),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -151,6 +365,9 @@ fun HomeScreen(
     val keepListening by viewModel.keepListening.collectAsState()
     val similarRecommendations by viewModel.similarRecommendations.collectAsState()
     val accountPlaylists by viewModel.accountPlaylists.collectAsState()
+    val dailyDiscover by viewModel.dailyDiscover.collectAsState()
+    val communityPlaylists by viewModel.communityPlaylists.collectAsState()
+    val speedDialItems by viewModel.speedDialItems.collectAsState()
     val homePage by viewModel.homePage.collectAsState()
     val explorePage by viewModel.explorePage.collectAsState()
 
@@ -707,6 +924,129 @@ fun HomeScreen(
                     ) {
                         items(it.items) { item ->
                             ytGridItem(item)
+                        }
+                    }
+                }
+            }
+
+            speedDialItems.takeIf { it.isNotEmpty() }?.let { speedDialList ->
+                item(key = "speed_dial_title") {
+                    NavigationTitle(
+                        title = stringResource(R.string.speed_dial),
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+
+                item(key = "speed_dial_list") {
+                    val itemSize = (maxWidth - 48.dp) / 3
+                    LazyHorizontalGrid(
+                        rows = GridCells.Fixed(3),
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(itemSize * 3 + 16.dp)
+                            .animateItem(),
+                    ) {
+                        items(
+                            items = speedDialList.take(9),
+                            key = { it.id },
+                        ) { item ->
+                            SpeedDialTile(
+                                item = item,
+                                onClick = {
+                                    when (item) {
+                                        is SongItem -> playerConnection.playQueue(
+                                            YouTubeQueue(
+                                                item.endpoint ?: WatchEndpoint(videoId = item.id),
+                                                item.toMediaMetadata(),
+                                            ),
+                                        )
+
+                                        is AlbumItem -> navController.navigate("album/${item.id}")
+                                        is ArtistItem -> navController.navigate("artist/${item.id}")
+                                        is PlaylistItem -> navController.navigate("online_playlist/${item.id.removePrefix("VL")}")
+                                    }
+                                },
+                                modifier = Modifier
+                                    .width(itemSize)
+                                    .height(itemSize),
+                            )
+                        }
+                    }
+                }
+            }
+
+            communityPlaylists?.takeIf { it.isNotEmpty() }?.let { playlists ->
+                item(key = "community_playlists_title") {
+                    NavigationTitle(
+                        title = stringResource(R.string.from_the_community),
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+
+                item(key = "community_playlists_content") {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.animateItem(),
+                    ) {
+                        items(
+                            items = playlists,
+                            key = { it.playlist.id },
+                        ) { playlistItem ->
+                            CommunityPlaylistCard(
+                                item = playlistItem,
+                                onClick = {
+                                    navController.navigate("online_playlist/${playlistItem.playlist.id.removePrefix("VL")}")
+                                },
+                                onSongClick = { song ->
+                                    playerConnection.playQueue(
+                                        YouTubeQueue(
+                                            song.endpoint ?: WatchEndpoint(videoId = song.id),
+                                            song.toMediaMetadata(),
+                                        ),
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+
+            dailyDiscover?.takeIf { it.isNotEmpty() }?.let { discoverList ->
+                item(key = "daily_discover_title") {
+                    NavigationTitle(
+                        title = stringResource(R.string.daily_discover),
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+                item(key = "daily_discover_list") {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.animateItem(),
+                    ) {
+                        items(
+                            items = discoverList,
+                            key = { it.recommendation.id },
+                        ) { discoverItem ->
+                            DailyDiscoverCard(
+                                item = discoverItem,
+                                onClick = {
+                                    playerConnection.playQueue(
+                                        YouTubeQueue(
+                                            discoverItem.recommendation.endpoint
+                                                ?: WatchEndpoint(videoId = discoverItem.recommendation.id),
+                                            discoverItem.recommendation.toMediaMetadata(),
+                                        ),
+                                    )
+                                },
+                                modifier = Modifier
+                                    .width(320.dp)
+                                    .height(300.dp),
+                            )
                         }
                     }
                 }

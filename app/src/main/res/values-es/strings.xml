@@ -25,6 +25,10 @@
     <string name="similar_to">Similar a</string>
     <string name="keep_listening">Seguir escuchando</string>
     <string name="your_ytb_playlists">Tu cuenta de YouTube</string>
+    <string name="speed_dial">Marcación rápida</string>
+    <string name="from_the_community">Desde la comunidad</string>
+    <string name="daily_discover">Descubrimiento diario</string>
+    <string name="daily_discover_based_on">Basado en %1$s</string>
 
     <!-- Historial -->
     <string name="today">Hoy</string>

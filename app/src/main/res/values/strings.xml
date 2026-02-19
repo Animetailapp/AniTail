@@ -28,6 +28,10 @@
     <string name="similar_to">Similar to</string>
     <string name="keep_listening">Keep listening</string>
     <string name="your_ytb_playlists">Your YouTube account</string>
+    <string name="speed_dial">Speed dial</string>
+    <string name="from_the_community">From the community</string>
+    <string name="daily_discover">Daily discover</string>
+    <string name="daily_discover_based_on">Based on %1$s</string>
 
     <!-- History -->
     <string name="today">Today</string>

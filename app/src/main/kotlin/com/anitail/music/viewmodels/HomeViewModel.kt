@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.BrowseEndpoint
+import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.innertube.models.YTItem
 import com.anitail.innertube.models.filterExplicit
@@ -45,6 +47,17 @@ import kotlinx.coroutines.supervisorScope
 import timber.log.Timber
 import javax.inject.Inject
 
+data class DailyDiscoverItem(
+    val seed: Song,
+    val recommendation: SongItem,
+    val relatedEndpoint: BrowseEndpoint?,
+)
+
+data class CommunityPlaylistItem(
+    val playlist: PlaylistItem,
+    val songs: List<SongItem>,
+)
+
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     @ApplicationContext val context: Context,
@@ -61,10 +74,13 @@ class HomeViewModel @Inject constructor(
     }.distinctUntilChanged()
 
     val quickPicks = MutableStateFlow<List<Song>?>(null)
+    val dailyDiscover = MutableStateFlow<List<DailyDiscoverItem>?>(null)
     val forgottenFavorites = MutableStateFlow<List<Song>?>(null)
     val keepListening = MutableStateFlow<List<LocalItem>?>(null)
     val similarRecommendations = MutableStateFlow<List<SimilarRecommendation>?>(null)
     val accountPlaylists = MutableStateFlow<List<PlaylistItem>?>(null)
+    val communityPlaylists = MutableStateFlow<List<CommunityPlaylistItem>?>(null)
+    val speedDialItems = MutableStateFlow<List<YTItem>>(emptyList())
     val homePage = MutableStateFlow<HomePage?>(null)
     val selectedChip = MutableStateFlow<HomePage.Chip?>(null)
     private val previousHomePage = MutableStateFlow<HomePage?>(null)
@@ -106,12 +122,125 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun Song.toSongItemOrNull(): SongItem? {
+        val thumb = thumbnailUrl ?: return null
+        return SongItem(
+            id = id,
+            title = title,
+            artists = artists.map { com.anitail.innertube.models.Artist(name = it.name, id = it.id) },
+            album = album?.let { com.anitail.innertube.models.Album(name = it.title, id = it.id) },
+            duration = song.duration,
+            thumbnail = thumb,
+            endpoint = WatchEndpoint(videoId = id),
+        )
+    }
+
+    private fun rebuildSpeedDialItems() {
+        val localSongs = buildList<YTItem> {
+            addAll(quickPicks.value.orEmpty().mapNotNull { it.toSongItemOrNull() })
+            addAll(keepListening.value.orEmpty().mapNotNull { (it as? Song)?.toSongItemOrNull() })
+        }
+        val homeItems = homePage.value?.sections?.flatMap { it.items }.orEmpty()
+        val similarItems = similarRecommendations.value?.flatMap { it.items }.orEmpty()
+        val dailyItems = dailyDiscover.value?.map { it.recommendation }.orEmpty()
+        val communityItems = communityPlaylists.value?.map { it.playlist }.orEmpty()
+
+        speedDialItems.value =
+            (localSongs + homeItems + similarItems + dailyItems + communityItems)
+                .distinctBy { it.id }
+                .take(27)
+    }
+
+    private suspend fun getDailyDiscover() {
+        val hideExplicit = context.dataStore.get(HideExplicitKey, false)
+        val likedSongs = database.likedSongsByCreateDateAsc().first()
+        if (likedSongs.isEmpty()) {
+            dailyDiscover.value = null
+            return
+        }
+
+        val seeds = likedSongs.shuffled().distinctBy { it.id }.take(5)
+        val results = mutableListOf<DailyDiscoverItem>()
+
+        seeds.forEach { seed ->
+            val endpoint = YouTube.next(WatchEndpoint(videoId = seed.id)).getOrNull()?.relatedEndpoint ?: return@forEach
+            val recommendation = YouTube.related(endpoint).getOrNull()
+                ?.songs
+                ?.firstOrNull { song -> (!hideExplicit || !song.explicit) && song.id != seed.id }
+
+            if (recommendation != null) {
+                results += DailyDiscoverItem(
+                    seed = seed,
+                    recommendation = recommendation,
+                    relatedEndpoint = endpoint,
+                )
+            }
+        }
+
+        dailyDiscover.value = results.distinctBy { it.recommendation.id }.ifEmpty { null }
+    }
+
+    private suspend fun getCommunityPlaylists() {
+        val fromTimeStamp = System.currentTimeMillis() - 86400000L * 7 * 4
+        val artistSeeds = database.mostPlayedArtists(fromTimeStamp, limit = 10).first()
+            .filter { it.artist.isYouTubeArtist }
+            .shuffled()
+            .take(3)
+        val songSeeds = database.mostPlayedSongs(fromTimeStamp, limit = 5).first()
+            .shuffled()
+            .take(2)
+
+        val candidatePlaylists = mutableListOf<PlaylistItem>()
+        val blockedAuthors = setOf("YouTube Music", "YouTube", "Playlist")
+
+        artistSeeds.forEach { seed ->
+            YouTube.artist(seed.id).onSuccess { page ->
+                page.sections.forEach { section ->
+                    candidatePlaylists += section.items
+                        .filterIsInstance<PlaylistItem>()
+                        .filter { playlist ->
+                            val authorName = playlist.author?.name ?: ""
+                            authorName.isNotBlank() && authorName !in blockedAuthors
+                        }
+                }
+            }
+        }
+
+        songSeeds.forEach { seed ->
+            val endpoint = YouTube.next(WatchEndpoint(videoId = seed.id)).getOrNull()?.relatedEndpoint ?: return@forEach
+            YouTube.related(endpoint).onSuccess { page ->
+                candidatePlaylists += page.playlists
+                    .filter { playlist ->
+                        val authorName = playlist.author?.name ?: ""
+                        authorName.isNotBlank() && authorName !in blockedAuthors
+                    }
+            }
+        }
+
+        val playlists = mutableListOf<CommunityPlaylistItem>()
+        candidatePlaylists.distinctBy { it.id }.shuffled().take(5).forEach { playlist ->
+            YouTube.playlist(playlist.id).onSuccess { page ->
+                val songs = page.songs.take(10)
+                if (songs.isNotEmpty()) {
+                    playlists += CommunityPlaylistItem(
+                        playlist = playlist.copy(songCountText = page.playlist.songCountText ?: playlist.songCountText),
+                        songs = songs,
+                    )
+                }
+            }
+        }
+
+        communityPlaylists.value = playlists.shuffled().ifEmpty { null }
+    }
+
     private suspend fun load() {
         isLoading.value = true
 
         val hideExplicit = context.dataStore.get(HideExplicitKey, false)
 
         getQuickPicks()
+        getDailyDiscover()
+        getCommunityPlaylists()
 
         forgottenFavorites.value = database.forgottenFavorites()
             .first().shuffled().take(20)
@@ -214,9 +343,13 @@ class HomeViewModel @Inject constructor(
             reportException(it)
         }
 
-        allYtItems.value = similarRecommendations.value?.flatMap { it.items }.orEmpty() +
-                homePage.value?.sections?.flatMap { it.items }.orEmpty()
+        allYtItems.value =
+            similarRecommendations.value?.flatMap { it.items }.orEmpty() +
+                homePage.value?.sections?.flatMap { it.items }.orEmpty() +
+                dailyDiscover.value?.map { it.recommendation }.orEmpty() +
+                communityPlaylists.value?.map { it.playlist }.orEmpty()
 
+        rebuildSpeedDialItems()
         isLoading.value = false
     }
 
@@ -249,6 +382,7 @@ class HomeViewModel @Inject constructor(
                     section.copy(items = section.items.filterExplicit(hideExplicit))
                 }
             )
+            rebuildSpeedDialItems()
             _isLoadingMore.value = false
         }
     }
@@ -276,6 +410,7 @@ class HomeViewModel @Inject constructor(
                 }
             )
             selectedChip.value = chip
+            rebuildSpeedDialItems()
         }
     }
 
