@@ -308,7 +308,7 @@ private fun PlaylistCollage(
 
     Column(
         modifier = modifier
-            .size(104.dp)
+            .size(90.dp)
             .clip(RoundedCornerShape(14.dp)),
     ) {
         repeat(2) { rowIndex ->
@@ -339,7 +339,7 @@ private fun CommunityActionButton(
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(68.dp)
+            .size(56.dp)
             .clip(CircleShape)
             .background(
                 if (emphasized) {
@@ -354,7 +354,7 @@ private fun CommunityActionButton(
             painter = painterResource(iconRes),
             contentDescription = null,
             tint = if (emphasized) Color.White else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(32.dp),
+            modifier = Modifier.size(24.dp),
         )
     }
 }
@@ -373,11 +373,11 @@ private fun CommunityPlaylistCard(
     Card(
         modifier = modifier
             .combinedClickable(onClick = onOpenPlaylist),
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1828)),
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PlaylistCollage(
                     thumbnails = item.songs.take(4).map { it.thumbnail } + item.playlist.thumbnail,
                 )
@@ -406,7 +406,7 @@ private fun CommunityPlaylistCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             item.songs.take(3).forEach { song ->
                 Row(
@@ -414,7 +414,7 @@ private fun CommunityPlaylistCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 6.dp)
+                        .padding(vertical = 4.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .combinedClickable(onClick = { onSongClick(song) }),
                 ) {
@@ -423,8 +423,8 @@ private fun CommunityPlaylistCard(
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .size(70.dp)
-                            .clip(RoundedCornerShape(14.dp)),
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(12.dp)),
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -448,7 +448,7 @@ private fun CommunityPlaylistCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
@@ -626,7 +626,7 @@ private fun CommunityPlaylistsSection(
     modifier: Modifier = Modifier,
 ) {
     val rowState = rememberLazyListState()
-    val cardWidth = maxWidth - 72.dp
+    val cardWidth = maxWidth - 90.dp
 
     LazyRow(
         state = rowState,
@@ -666,7 +666,7 @@ private fun DailyDiscoverSection(
             rowState.firstVisibleItemIndex.coerceAtMost((visibleDiscoverItems.size - 1).coerceAtLeast(0))
         }
     }
-    val cardWidth = maxWidth - 92.dp
+    val cardWidth = maxWidth - 110.dp
 
     Column(modifier = modifier) {
         PagerDots(
@@ -692,7 +692,7 @@ private fun DailyDiscoverSection(
                     onClick = { onItemClick(discoverItem) },
                     modifier = Modifier
                         .width(cardWidth)
-                        .height(470.dp),
+                        .height(360.dp),
                 )
             }
         }
