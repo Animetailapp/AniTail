@@ -2,9 +2,11 @@ package com.anitail.music.ui.screens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.painterResource
@@ -210,7 +213,7 @@ fun SoundCapsuleTopArtistsScreen(
     ) {
         LazyColumn(
             contentPadding = PaddingValues(top = 68.dp, bottom = bottomInsets + 24.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -238,17 +241,15 @@ fun SoundCapsuleTopArtistsScreen(
                 }
             } else {
                 itemsIndexed(items = state.rankedArtists, key = { _, artist -> artist.id }) { index, artist ->
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    DetailSurface(
+                        accent = rankAccent(index + 1, colors),
+                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.padding(horizontal = 16.dp),
                     ) {
                         TopArtistRow(
                             artist = artist,
-                            modifier = Modifier.padding(vertical = 2.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                         )
-                        if (index < state.rankedArtists.lastIndex) {
-                            HorizontalDivider(color = colors.divider, thickness = 0.6.dp)
-                        }
                     }
                 }
             }
@@ -302,7 +303,7 @@ fun SoundCapsuleTopSongsScreen(
     ) {
         LazyColumn(
             contentPadding = PaddingValues(top = 68.dp, bottom = bottomInsets + 24.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -330,18 +331,16 @@ fun SoundCapsuleTopSongsScreen(
                 }
             } else {
                 itemsIndexed(items = state.rankedSongs, key = { _, song -> song.id }) { index, song ->
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    DetailSurface(
+                        accent = rankAccent(index + 1, colors),
+                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.padding(horizontal = 16.dp),
                     ) {
                         TopSongRow(
                             rank = index + 1,
                             song = song,
-                            modifier = Modifier.padding(vertical = 2.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                         )
-                        if (index < state.rankedSongs.lastIndex) {
-                            HorizontalDivider(color = colors.divider, thickness = 0.6.dp)
-                        }
                     }
                 }
             }
@@ -380,41 +379,51 @@ private fun DetailSummaryCard(
     modifier: Modifier = Modifier,
 ) {
     val colors = detailColors()
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
+    DetailSurface(
+        accent = accentColor,
+        shape = RoundedCornerShape(22.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-        ) {
-            Text(
-                text = monthLabel,
-                style = MaterialTheme.typography.titleSmall,
-                color = colors.mutedText,
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .size(98.dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.12f)),
             )
-            Row(
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
             ) {
                 Text(
-                    text = metricValue,
-                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = accentColor,
+                    text = monthLabel,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = colors.mutedText,
                 )
+                Row(
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = metricValue,
+                        style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+                        color = accentColor,
+                    )
+                    Text(
+                        text = metricLabel.lowercase(Locale.getDefault()),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 2.dp),
+                    )
+                }
                 Text(
-                    text = metricLabel.lowercase(Locale.getDefault()),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = 2.dp),
+                    text = supportingText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.subtleText,
                 )
             }
-            Text(
-                text = supportingText,
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.subtleText,
-            )
         }
     }
 }
@@ -430,9 +439,9 @@ private fun DailyMinutesChart(
     val maxMinutes = dailyMinutes.maxOrNull()?.coerceAtLeast(1f) ?: 1f
     val chartMax = maxOf(maxMinutes, averageMinutes.toFloat(), 1f)
 
-    Card(
+    DetailSurface(
+        accent = colors.primaryAccent,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -533,9 +542,9 @@ private fun PeriodBreakdownCard(
         }
     val maxMinutes = periodMinutes.maxOfOrNull { (_, value) -> value }?.coerceAtLeast(1) ?: 1
 
-    Card(
+    DetailSurface(
+        accent = colors.primaryAccent,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -606,21 +615,21 @@ private fun PeriodBreakdownCard(
 @Composable
 private fun MusicForNowCard() {
     val colors = detailColors()
-    Card(
+    DetailSurface(
+        accent = colors.secondaryAccent,
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier.padding(12.dp),
         ) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier =
                     Modifier
-                        .size(84.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .size(78.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(colors.secondaryAccent.copy(alpha = 0.85f)),
             ) {
                 Icon(
@@ -635,12 +644,12 @@ private fun MusicForNowCard() {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.playlist),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.labelLarge,
                     color = colors.mutedText,
                 )
                 Text(
                     text = stringResource(R.string.sound_capsule_on_repeat),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             }
@@ -655,11 +664,53 @@ private fun MusicForNowCard() {
 }
 
 @Composable
+private fun DetailSurface(
+    accent: Color,
+    modifier: Modifier = Modifier,
+    shape: RoundedCornerShape = RoundedCornerShape(16.dp),
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = detailColors()
+    Card(
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        modifier =
+            modifier
+                .border(1.dp, colors.outline, shape)
+                .clip(shape)
+                .background(
+                    Brush.linearGradient(
+                        colors =
+                            listOf(
+                                colors.cardBackground,
+                                colors.cardBackground.copy(alpha = 0.92f),
+                                accent.copy(alpha = 0.11f),
+                            ),
+                    ),
+                ),
+    ) {
+        Column(content = content)
+    }
+}
+
+private fun rankAccent(
+    rank: Int,
+    colors: DetailColors,
+): Color =
+    when (rank) {
+        1 -> colors.primaryAccent
+        2 -> colors.secondaryAccent
+        3 -> colors.primaryAccent.copy(alpha = 0.75f)
+        else -> colors.secondaryAccent.copy(alpha = 0.45f)
+    }
+
+@Composable
 private fun TopArtistRow(
     artist: RankedArtistUi,
     modifier: Modifier = Modifier,
 ) {
     val colors = detailColors()
+    val rankColor = rankAccent(artist.rank, colors)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
@@ -672,12 +723,12 @@ private fun TopArtistRow(
                 Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(colors.thumbnailBackground),
+                    .background(rankColor.copy(alpha = 0.18f)),
         ) {
             Text(
                 text = artist.rank.toString().padStart(2, '0'),
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                color = colors.secondaryAccent,
+                color = rankColor,
             )
         }
         Spacer(modifier = Modifier.width(10.dp))
@@ -709,7 +760,8 @@ private fun TopArtistRow(
                     .padding(start = 8.dp)
                     .size(50.dp)
                     .clip(CircleShape)
-                    .background(colors.thumbnailBackground),
+                    .background(colors.thumbnailBackground)
+                    .border(1.dp, colors.outline, CircleShape),
         ) {
             if (artist.thumbnailUrl.isNullOrBlank()) {
                 Icon(
@@ -736,6 +788,7 @@ private fun TopSongRow(
     modifier: Modifier = Modifier,
 ) {
     val colors = detailColors()
+    val rankColor = rankAccent(rank, colors)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
@@ -748,12 +801,12 @@ private fun TopSongRow(
                 Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(colors.thumbnailBackground),
+                    .background(rankColor.copy(alpha = 0.18f)),
         ) {
             Text(
                 text = rank.toString().padStart(2, '0'),
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                color = colors.secondaryAccent,
+                color = rankColor,
             )
         }
         Spacer(modifier = Modifier.width(10.dp))
@@ -763,7 +816,8 @@ private fun TopSongRow(
                 Modifier
                     .size(50.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(colors.thumbnailBackground),
+                    .background(colors.thumbnailBackground)
+                    .border(1.dp, colors.outline, RoundedCornerShape(10.dp)),
         ) {
             if (song.thumbnailUrl.isNullOrBlank()) {
                 Icon(
@@ -844,6 +898,7 @@ private data class DetailColors(
     val mutedText: Color,
     val subtleText: Color,
     val divider: Color,
+    val outline: Color,
     val primaryAccent: Color,
     val secondaryAccent: Color,
 )
@@ -858,6 +913,7 @@ private fun detailColors(): DetailColors {
         mutedText = scheme.onSurfaceVariant,
         subtleText = scheme.onSurfaceVariant.copy(alpha = 0.75f),
         divider = scheme.outlineVariant.copy(alpha = 0.7f),
+        outline = scheme.outlineVariant.copy(alpha = 0.45f),
         primaryAccent = scheme.primary,
         secondaryAccent = scheme.secondary,
     )

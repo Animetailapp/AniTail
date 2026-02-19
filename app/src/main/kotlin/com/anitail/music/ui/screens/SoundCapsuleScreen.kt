@@ -1,10 +1,12 @@
 package com.anitail.music.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -161,12 +163,21 @@ private fun SoundCapsuleMonthSection(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(modifier = Modifier.weight(1f))
-            Icon(
-                painter = painterResource(R.drawable.share),
-                contentDescription = null,
-                tint = colors.mutedText,
-                modifier = Modifier.size(20.dp),
-            )
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier =
+                    Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(colors.thumbnailBackground),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.share),
+                    contentDescription = null,
+                    tint = colors.mutedText,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
 
         if (month.totalSongsPlayed <= 0) {
@@ -174,9 +185,8 @@ private fun SoundCapsuleMonthSection(
             return@Column
         }
 
-        Card(
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
+        CapsuleSurface(
+            accent = colors.primaryAccent,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column {
@@ -210,7 +220,7 @@ private fun TimeInsightRow(
         modifier =
             Modifier
                 .clickable(onClick = onClick)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(horizontal = 14.dp, vertical = 14.dp),
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -223,7 +233,7 @@ private fun TimeInsightRow(
             )
             Text(
                 text = stringResource(R.string.sound_capsule_minutes_value, month.totalMinutes),
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = colors.primaryAccent,
             )
             Text(
@@ -232,6 +242,21 @@ private fun TimeInsightRow(
                 color = colors.mutedText,
             )
         }
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(colors.primaryAccent.copy(alpha = 0.15f))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+        ) {
+            Text(
+                text = "${formatCount(month.totalSongsPlayed)} ${stringResource(R.string.songs).lowercase(Locale.getDefault())}",
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.primaryAccent,
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
         Icon(
             painter = painterResource(R.drawable.navigate_next),
             contentDescription = null,
@@ -257,7 +282,7 @@ private fun TopArtistInsightRow(
         ThumbnailCircle(
             imageUrl = topArtist?.thumbnailUrl,
             fallbackIcon = R.drawable.person,
-            size = 44.dp,
+            size = 50.dp,
         )
         Spacer(modifier = Modifier.width(10.dp))
         Column(
@@ -271,7 +296,7 @@ private fun TopArtistInsightRow(
             )
             Text(
                 text = topArtist?.name ?: stringResource(R.string.sound_capsule_no_data),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -309,7 +334,7 @@ private fun TopSongInsightRow(
         ThumbnailSquare(
             imageUrl = topSong?.thumbnailUrl,
             fallbackIcon = R.drawable.music_note,
-            size = 44.dp,
+            size = 50.dp,
         )
         Spacer(modifier = Modifier.width(10.dp))
         Column(
@@ -323,7 +348,7 @@ private fun TopSongInsightRow(
             )
             Text(
                 text = topSong?.title ?: stringResource(R.string.sound_capsule_no_data),
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -335,6 +360,13 @@ private fun TopSongInsightRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (topSong?.isNew == true) {
+                Text(
+                    text = stringResource(R.string.sound_capsule_new),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.primaryAccent,
+                )
+            }
         }
         Icon(
             painter = painterResource(R.drawable.navigate_next),
@@ -347,9 +379,9 @@ private fun TopSongInsightRow(
 @Composable
 private fun NoMusicMonthCard() {
     val colors = capsuleColors()
-    Card(
+    CapsuleSurface(
+        accent = colors.secondaryAccent,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -376,30 +408,49 @@ private fun NoMusicMonthCard() {
 @Composable
 private fun LifetimeInsightCard(totalSongs: Int) {
     val colors = capsuleColors()
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
+    CapsuleSurface(
+        accent = colors.primaryAccent,
+        shape = RoundedCornerShape(24.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-        ) {
-            HeroPulseGraphic()
-            Text(
-                text =
-                    stringResource(
-                        R.string.sound_capsule_lifetime_headline,
-                        totalSongs,
-                    ),
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onSurface,
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .size(136.dp)
+                        .clip(CircleShape)
+                        .background(colors.primaryAccent.copy(alpha = 0.12f)),
             )
-            Text(
-                text = stringResource(R.string.sound_capsule_lifetime_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.mutedText,
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 54.dp, end = 54.dp)
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(colors.secondaryAccent.copy(alpha = 0.10f)),
             )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+            ) {
+                HeroPulseGraphic()
+                Text(
+                    text =
+                        stringResource(
+                            R.string.sound_capsule_lifetime_headline,
+                            totalSongs,
+                        ),
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = stringResource(R.string.sound_capsule_lifetime_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.mutedText,
+                )
+            }
         }
     }
 }
@@ -433,6 +484,36 @@ private fun HeroPulseGraphic() {
 }
 
 @Composable
+private fun CapsuleSurface(
+    accent: Color,
+    modifier: Modifier = Modifier,
+    shape: RoundedCornerShape = RoundedCornerShape(18.dp),
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val colors = capsuleColors()
+    Card(
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        modifier =
+            modifier
+                .border(1.dp, colors.outline, shape)
+                .clip(shape)
+                .background(
+                    Brush.linearGradient(
+                        colors =
+                            listOf(
+                                colors.cardBackground,
+                                colors.cardBackground.copy(alpha = 0.92f),
+                                accent.copy(alpha = 0.12f),
+                            ),
+                    ),
+                ),
+    ) {
+        Column(content = content)
+    }
+}
+
+@Composable
 private fun ThumbnailCircle(
     imageUrl: String?,
     fallbackIcon: Int,
@@ -445,7 +526,8 @@ private fun ThumbnailCircle(
             Modifier
                 .size(size)
                 .clip(CircleShape)
-                .background(colors.thumbnailBackground),
+                .background(colors.thumbnailBackground)
+                .border(1.dp, colors.outline, CircleShape),
     ) {
         if (imageUrl.isNullOrBlank()) {
             Icon(
@@ -477,7 +559,8 @@ private fun ThumbnailSquare(
             Modifier
                 .size(size)
                 .clip(RoundedCornerShape(8.dp))
-                .background(colors.thumbnailBackground),
+                .background(colors.thumbnailBackground)
+                .border(1.dp, colors.outline, RoundedCornerShape(8.dp)),
     ) {
         if (imageUrl.isNullOrBlank()) {
             Icon(
@@ -517,6 +600,7 @@ private data class CapsuleColors(
     val mutedText: Color,
     val subtleText: Color,
     val divider: Color,
+    val outline: Color,
     val primaryAccent: Color,
     val secondaryAccent: Color,
 )
@@ -531,6 +615,7 @@ private fun capsuleColors(): CapsuleColors {
         mutedText = scheme.onSurfaceVariant,
         subtleText = scheme.onSurfaceVariant.copy(alpha = 0.75f),
         divider = scheme.outlineVariant.copy(alpha = 0.7f),
+        outline = scheme.outlineVariant.copy(alpha = 0.45f),
         primaryAccent = scheme.primary,
         secondaryAccent = scheme.secondary,
     )
@@ -540,3 +625,5 @@ private fun dailyAverageForMonth(month: SoundCapsuleMonthUiState): Int {
     val days = month.yearMonth.lengthOfMonth().coerceAtLeast(1)
     return month.totalMinutes / days
 }
+
+private fun formatCount(value: Int): String = "%,d".format(Locale.getDefault(), value)
