@@ -137,6 +137,12 @@ jobs:
             gradle_task: :desktop:packageReleaseRpm
             artifact_name: desktop-rpm-release
             java_arch: x64
+          - os: ubuntu-latest
+            label: Linux AppImage
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageReleaseAppImage
+            artifact_name: desktop-appimage-release
+            java_arch: x64
           - os: macos-latest
             label: macOS DMG
             gradle_cmd: ./gradlew

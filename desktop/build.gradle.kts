@@ -108,7 +108,7 @@ compose.desktop {
             val formats = when {
                 os.isMacOsX -> listOf(TargetFormat.Dmg)
                 os.isWindows -> listOf(TargetFormat.Msi)
-                else -> listOf(TargetFormat.Deb, TargetFormat.Rpm)
+                else -> listOf(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.AppImage)
             }
             targetFormats(*formats.toTypedArray())
             packageName = "AniTail"

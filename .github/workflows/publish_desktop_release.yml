@@ -119,6 +119,13 @@ jobs:
             java_arch: x64
             ext: rpm
             asset_suffix: linux-x64
+          - runs_on: ubuntu-latest
+            label: Linux AppImage
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageReleaseAppImage
+            java_arch: x64
+            ext: AppImage
+            asset_suffix: linux-x64
           - runs_on: macos-latest
             label: macOS DMG
             gradle_cmd: ./gradlew
@@ -306,6 +313,11 @@ jobs:
                   {
                     "name": "📦 Linux RPM",
                     "value": "[⬇️ Descargar RPM](REPO_URL/releases/download/RELEASE_TAG/AniTail-Desktop-RELEASE_TAG-linux-x64.rpm)",
+                    "inline": false
+                  },
+                  {
+                    "name": "📦 Linux AppImage",
+                    "value": "[⬇️ Descargar AppImage](REPO_URL/releases/download/RELEASE_TAG/AniTail-Desktop-RELEASE_TAG-linux-x64.AppImage)",
                     "inline": false
                   },
                   {
