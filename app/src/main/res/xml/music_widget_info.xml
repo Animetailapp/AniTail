@@ -4,6 +4,7 @@
     android:minHeight="60dp"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_music_small"
+    android:previewLayout="@layout/widget_music"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen|keyguard"
-    android:previewImage="@mipmap/ic_launcher_foreground" />
+    android:previewImage="@drawable/widget_preview" />

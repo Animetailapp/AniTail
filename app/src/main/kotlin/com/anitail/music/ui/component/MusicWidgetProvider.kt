@@ -624,16 +624,19 @@ class MusicWidgetProvider : AppWidgetProvider() {
         val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
         val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
         val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
+        val maxWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, minWidth)
         val maxHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0)
-        val ratio = if (minHeight > 0) minWidth.toFloat() / minHeight.toFloat() else 1f
+        val effectiveWidth = maxOf(minWidth, maxWidth)
+        val effectiveHeight = maxOf(minHeight, maxHeight)
+        val ratio = if (effectiveHeight > 0) effectiveWidth.toFloat() / effectiveHeight.toFloat() else 1f
 
-        // MIUI and other launchers report different minHeight values while resizing.
-        // Prefer width + ratio guards so large widgets do not fallback to square visuals.
-        val layoutRes = if (minHeight < 110 || (ratio >= 2.05f && minHeight < 170)) {
+        // Some launchers (notably MIUI) can report stale min sizes while resizing.
+        // Use effective dimensions (max of min/max) to avoid selecting square on large widgets.
+        val layoutRes = if (effectiveHeight < 110 || (ratio >= 2.05f && effectiveHeight < 170)) {
             R.layout.widget_music_small
         } else if (
-            minWidth >= 250 ||
-            (minHeight >= 145 && ratio >= 1.35f)
+            effectiveWidth >= 250 ||
+            (effectiveHeight >= 145 && ratio >= 1.35f)
         ) {
             R.layout.widget_music
         } else {
@@ -641,7 +644,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         }
 
         Timber.tag(TAG).d(
-            "Widget #%d layout=%s minWidth=%d minHeight=%d maxHeight=%d ratio=%.2f",
+            "Widget #%d layout=%s minWidth=%d minHeight=%d maxWidth=%d maxHeight=%d effectiveWidth=%d effectiveHeight=%d ratio=%.2f",
             appWidgetId,
             when (layoutRes) {
                 R.layout.widget_music -> "wide"
@@ -650,7 +653,10 @@ class MusicWidgetProvider : AppWidgetProvider() {
             },
             minWidth,
             minHeight,
+            maxWidth,
             maxHeight,
+            effectiveWidth,
+            effectiveHeight,
             ratio
         )
         return layoutRes
