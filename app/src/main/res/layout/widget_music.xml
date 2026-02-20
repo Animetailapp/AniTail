@@ -57,6 +57,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:layout_margin="6dp"
+                    android:background="@drawable/widget_cover_mask"
                     android:clipToOutline="true"
                     android:scaleType="centerCrop"
                     android:src="@drawable/ic_music_placeholder"
@@ -86,7 +87,7 @@
                     android:shadowRadius="2"
                     android:text=""
                     android:textColor="#FFFFFF"
-                    android:textSize="35sp"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
 
                 <TextView

@@ -264,6 +264,8 @@
                 android:id="@+id/widget_cover"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                android:background="@drawable/widget_cover_mask"
+                android:clipToOutline="true"
                 android:src="@drawable/ic_music_placeholder"
                 tools:ignore="ContentDescription" />
         </FrameLayout>
