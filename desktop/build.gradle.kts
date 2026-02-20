@@ -89,16 +89,6 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 }
 
-configurations.all {
-    resolutionStrategy {
-        // Force CM version to match plugin to avoid Skiko UnsatisfiedLinkError
-        force("org.jetbrains.compose.runtime:runtime:1.11.0-SNAPSHOT+ok-check-kotlin-2-3-20")
-        force("org.jetbrains.compose.ui:ui:1.11.0-SNAPSHOT+ok-check-kotlin-2-3-20")
-        force("org.jetbrains.compose.foundation:foundation:1.11.0-SNAPSHOT+ok-check-kotlin-2-3-20")
-        force("org.jetbrains.compose.material3:material3:1.11.0-SNAPSHOT+ok-check-kotlin-2-3-20")
-    }
-}
-
 compose.desktop {
     application {
         mainClass = "com.anitail.desktop.MainKt"
