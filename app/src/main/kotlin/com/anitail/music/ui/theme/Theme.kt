@@ -39,6 +39,7 @@ fun AnitailTheme(
     darkMode: DarkMode = DarkMode.AUTO,
     pureBlack: Boolean = false,
     themeColor: Color = DefaultThemeColor,
+    preferFidelityStyle: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -65,7 +66,7 @@ fun AnitailTheme(
             seedColor = themeColor, // themeColor is guaranteed non-default here
             isDark = useDarkTheme,
             specVersion = ColorSpec.SpecVersion.SPEC_2025,
-            style = PaletteStyle.TonalSpot // Keep existing style
+            style = if (preferFidelityStyle) PaletteStyle.Fidelity else PaletteStyle.TonalSpot
         )
     }
 

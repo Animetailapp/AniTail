@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="meta.title">AniTail - Music Player</title>
+    <meta
+      id="metaDescription"
+      name="description"
+      content="AniTail es un cliente de YouTube Music para Android con interfaz elegante, letras en tiempo real y descargas inteligentes."
+      data-i18n-content="meta.description"
+    />
+
+    <meta property="og:type" content="website" />
+    <meta
+      id="ogTitle"
+      property="og:title"
+      content="AniTail - Music Player"
+      data-i18n-content="meta.title"
+    />
+    <meta
+      id="ogDescription"
+      property="og:description"
+      content="AniTail es un cliente de YouTube Music para Android con interfaz elegante, letras en tiempo real y descargas inteligentes."
+      data-i18n-content="meta.description"
+    />
+    <meta property="og:image" content="assets/now-playing.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      id="twitterTitle"
+      name="twitter:title"
+      content="AniTail - Music Player"
+      data-i18n-content="meta.title"
+    />
+    <meta
+      id="twitterDescription"
+      name="twitter:description"
+      content="AniTail es un cliente de YouTube Music para Android con interfaz elegante, letras en tiempo real y descargas inteligentes."
+      data-i18n-content="meta.description"
+    />
+    <meta name="twitter:image" content="assets/now-playing.png" />
+
+    <meta name="theme-color" content="#0d090c" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="assets/icon.png" />
+    <link rel="apple-touch-icon" href="assets/icon.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main" data-i18n="skip.content">Saltar al contenido</a>
+
+    <div class="ambient" aria-hidden="true">
+      <span class="ambient__glow ambient__glow--top"></span>
+      <span class="ambient__glow ambient__glow--bottom"></span>
+    </div>
+
+    <header class="site-header">
+      <nav class="nav" role="navigation" aria-label="Navegacion principal" data-i18n-aria-label="nav.primaryAria">
+        <a href="#" class="brand">
+          <div class="brand__icon">
+            <img src="assets/icon.png" alt="AniTail Logo" data-i18n-alt="brand.logoAlt" />
+          </div>
+          <div>
+            <span class="brand__name">AniTail Music</span>
+            <span class="brand__tag" data-i18n="brand.tag">Music player</span>
+          </div>
+        </a>
+
+        <button
+          class="nav__toggle"
+          aria-label="Abrir menu"
+          aria-expanded="false"
+          aria-controls="primary-nav"
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+
+        <div class="nav__links" data-nav-links id="primary-nav">
+          <a href="#screens" data-i18n="nav.screens">Pantallas</a>
+          <a href="#desktop" data-i18n="nav.desktop">Desktop</a>
+          <a href="#features" data-i18n="nav.features">Funciones</a>
+          <a href="#downloads" data-i18n="nav.downloads">Descargas</a>
+          <select
+            class="pill pill--select"
+            id="languageSelect"
+            aria-label="Seleccionar idioma"
+            data-i18n-aria-label="nav.languageAria"
+          >
+            <option value="es">ES</option>
+            <option value="en">EN</option>
+            <option value="it">IT</option>
+            <option value="fr">FR</option>
+          </select>
+          <button class="pill" id="themeToggle" type="button" aria-pressed="false">
+            Modo claro
+          </button>
+        </div>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero reveal-group">
+        <div class="hero__copy">
+          <p class="eyebrow reveal-child" data-i18n="hero.eyebrow">Now playing</p>
+          <h1 class="reveal-child" data-i18n="hero.title">
+            Un reproductor que se siente intimo, potente y moderno.
+          </h1>
+          <p class="hero__lead reveal-child" data-i18n="hero.lead">
+            AniTail combina letras en vivo, descargas inteligentes y un diseno inspirado en la experiencia musical mas elegante para Android.
+          </p>
+          <div class="hero__actions reveal-child">
+            <a class="button" href="#downloads">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M5 20h14v-2H5v2zm7-18L5.33 9h4.17v6h5V9h4.17L12 2z" />
+              </svg>
+              <span data-i18n="hero.downloadNow">Descargar ahora</span>
+            </a>
+            <a class="button button--ghost" href="#features" data-i18n="hero.viewFeatures">Ver funciones</a>
+          </div>
+          <div class="hero__stats reveal-child">
+            <div>
+              <strong>+20</strong>
+              <span data-i18n="hero.statsFeatures">Funciones premium</span>
+            </div>
+            <div>
+              <strong>100%</strong>
+              <span data-i18n="hero.statsOpenSource">Open source</span>
+            </div>
+          </div>
+          <div class="hero__color-demo reveal-child">
+            <span data-i18n="hero.colorDemo">Prueba Dynamic Color:</span>
+            <div class="color-picker" id="colorPicker">
+              <div class="color-picker__options">
+                <button
+                  class="color-picker__btn is-active"
+                  data-color="rose"
+                  aria-label="Tema rosa"
+                  data-i18n-aria-label="colors.rose"
+                  title="Tema rosa"
+                  data-i18n-title="colors.rose"
+                ></button>
+                <button
+                  class="color-picker__btn"
+                  data-color="cyan"
+                  aria-label="Tema cian"
+                  data-i18n-aria-label="colors.cyan"
+                  title="Tema cian"
+                  data-i18n-title="colors.cyan"
+                ></button>
+                <button
+                  class="color-picker__btn"
+                  data-color="amber"
+                  aria-label="Tema ambar"
+                  data-i18n-aria-label="colors.amber"
+                  title="Tema ambar"
+                  data-i18n-title="colors.amber"
+                ></button>
+                <button
+                  class="color-picker__btn"
+                  data-color="emerald"
+                  aria-label="Tema esmeralda"
+                  data-i18n-aria-label="colors.emerald"
+                  title="Tema esmeralda"
+                  data-i18n-title="colors.emerald"
+                ></button>
+                <button
+                  class="color-picker__btn"
+                  data-color="violet"
+                  aria-label="Tema violeta"
+                  data-i18n-aria-label="colors.violet"
+                  title="Tema violeta"
+                  data-i18n-title="colors.violet"
+                ></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero__visual reveal-child">
+          <figure class="device-shot">
+            <img
+              src="assets/now-playing.png"
+              alt="Pantalla Now playing de AniTail mostrando letras sincronizadas"
+              data-i18n-alt="screens.gallery.nowPlayingAlt"
+              loading="eager"
+            />
+          </figure>
+          <div class="mini">
+            <div class="mini__item">
+              <span data-i18n="mini.quickPicks">Quick picks</span>
+              <strong>Tu no lo amas</strong>
+              <em>3:34</em>
+            </div>
+            <div class="mini__item">
+              <span data-i18n="mini.keepListening">Keep listening</span>
+              <strong>Yan Block</strong>
+              <em>5:03</em>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal-on-scroll" id="screens">
+        <div class="section__heading">
+          <p class="eyebrow" data-i18n="screens.eyebrow">Pantallas destacadas</p>
+          <h2 data-i18n="screens.title">Una interfaz oscura o clara con colores dinamicos.</h2>
+        </div>
+
+        <div class="screens__wrapper" id="screensCarousel" data-carousel>
+          <div class="screens__gallery">
+            <figure>
+              <img
+                src="assets/now-playing.png"
+                alt="Now playing con caratula y controles"
+                data-i18n-alt="screens.gallery.nowPlayingAlt"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption data-i18n="screens.gallery.nowPlayingCaption">Now playing</figcaption>
+            </figure>
+            <figure>
+              <img
+                src="assets/lyrics.png"
+                alt="Letras sincronizadas en AniTail"
+                data-i18n-alt="screens.gallery.lyricsAlt"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption data-i18n="screens.gallery.lyricsCaption">Letras</figcaption>
+            </figure>
+            <figure>
+              <img
+                src="assets/quick-picks.png"
+                alt="Quick picks y listas recomendadas"
+                data-i18n-alt="screens.gallery.quickPicksAlt"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption data-i18n="screens.gallery.quickPicksCaption">Quick picks</figcaption>
+            </figure>
+            <figure>
+              <img
+                src="assets/search.png"
+                alt="Resultados de busqueda en AniTail"
+                data-i18n-alt="screens.gallery.searchAlt"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption data-i18n="screens.gallery.searchCaption">Busqueda</figcaption>
+            </figure>
+            <figure>
+              <img
+                src="assets/library.png"
+                alt="Biblioteca con listas y descargas"
+                data-i18n-alt="screens.gallery.libraryAlt"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption data-i18n="screens.gallery.libraryCaption">Biblioteca</figcaption>
+            </figure>
+            <figure>
+              <img
+                src="assets/player-audio.png"
+                alt="Ajustes de audio y reproduccion"
+                data-i18n-alt="screens.gallery.audioAlt"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption data-i18n="screens.gallery.audioCaption">Audio</figcaption>
+            </figure>
+            <figure>
+              <img
+                src="assets/content-settings.png"
+                alt="Ajustes de contenido y letras"
+                data-i18n-alt="screens.gallery.contentAlt"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption data-i18n="screens.gallery.contentCaption">Contenido</figcaption>
+            </figure>
+            <figure>
+              <img
+                src="assets/account.png"
+                alt="Pantalla de cuenta e integraciones"
+                data-i18n-alt="screens.gallery.accountAlt"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption data-i18n="screens.gallery.accountCaption">Cuenta</figcaption>
+            </figure>
+            <figure>
+              <img
+                src="assets/contributors.png"
+                alt="Pantalla de contribuyentes y comunidad"
+                data-i18n-alt="screens.gallery.contributorsAlt"
+                loading="lazy"
+                decoding="async"
+              />
+              <figcaption data-i18n="screens.gallery.contributorsCaption">Comunidad</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <div class="screens reveal-group reveal-on-scroll">
+          <article class="reveal-child">
+            <h3 data-i18n="screens.cards.nowPlayingTitle">Now playing</h3>
+            <p data-i18n="screens.cards.nowPlayingDesc">
+              Letras centradas, control rapido y una barra de progreso suave.
+            </p>
+          </article>
+          <article class="reveal-child">
+            <h3 data-i18n="screens.cards.quickPicksTitle">Quick picks</h3>
+            <p data-i18n="screens.cards.quickPicksDesc">
+              Recomendaciones rapidas con portadas grandes y navegacion clara.
+            </p>
+          </article>
+          <article class="reveal-child">
+            <h3 data-i18n="screens.cards.settingsTitle">Configuracion</h3>
+            <p data-i18n="screens.cards.settingsDesc">
+              Opciones de audio, idioma, proxy y proveedores de letras.
+            </p>
+          </article>
+          <article class="reveal-child">
+            <h3 data-i18n="screens.cards.communityTitle">Cuenta y comunidad</h3>
+            <p data-i18n="screens.cards.communityDesc">
+              Integraciones con Discord, Spotify y gestion de avatar.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section section--desktop reveal-on-scroll" id="desktop">
+        <div class="section__heading">
+          <p class="eyebrow" data-i18n="desktop.eyebrow">Desktop</p>
+          <h2 data-i18n="desktop.title">AniTail Desktop: tu musica en pantalla grande.</h2>
+          <p data-i18n="desktop.lead">
+            Una experiencia de escritorio con navegacion rapida, sincronizacion y control completo.
+          </p>
+        </div>
+
+        <div class="desktop__layout">
+          <article class="desktop__panel">
+            <h3 data-i18n="desktop.panel.title">Hecho para productividad musical</h3>
+            <p data-i18n="desktop.panel.desc">
+              Organiza tu biblioteca, controla la reproduccion con teclado y disfruta letras en una interfaz optimizada para PC.
+            </p>
+            <ul class="desktop__badges">
+              <li data-i18n="desktop.platforms.windows">Windows</li>
+              <li data-i18n="desktop.platforms.mac">macOS</li>
+              <li data-i18n="desktop.platforms.linux">Linux</li>
+            </ul>
+            <div class="desktop__actions">
+              <a
+                class="button"
+                href="#desktop-downloads"
+                data-i18n="desktop.actions.download"
+                >Descargar Desktop</a
+              >
+              <a class="button button--ghost" href="#downloads" data-i18n="desktop.actions.android"
+                >Ver Android</a
+              >
+            </div>
+          </article>
+
+          <div class="screens__wrapper desktop__wrapper" id="desktopCarousel" data-carousel>
+            <div class="screens__gallery desktop__gallery">
+              <figure>
+                <img
+                  src="assets/pc/1.jpeg"
+                  alt="Vista desktop de AniTail 1"
+                  data-i18n-alt="desktop.gallery.image1Alt"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <figcaption data-i18n="desktop.gallery.image1Caption">Inicio</figcaption>
+              </figure>
+              <figure>
+                <img
+                  src="assets/pc/2.jpeg"
+                  alt="Vista desktop de AniTail 2"
+                  data-i18n-alt="desktop.gallery.image2Alt"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <figcaption data-i18n="desktop.gallery.image2Caption">Player</figcaption>
+              </figure>
+              <figure>
+                <img
+                  src="assets/pc/3.jpeg"
+                  alt="Vista desktop de AniTail 3"
+                  data-i18n-alt="desktop.gallery.image3Alt"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <figcaption data-i18n="desktop.gallery.image3Caption">Letras</figcaption>
+              </figure>
+              <figure>
+                <img
+                  src="assets/pc/4.jpeg"
+                  alt="Vista desktop de AniTail 4"
+                  data-i18n-alt="desktop.gallery.image4Alt"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <figcaption data-i18n="desktop.gallery.image4Caption">Cola</figcaption>
+              </figure>
+              <figure>
+                <img
+                  src="assets/pc/5.jpeg"
+                  alt="Vista desktop de AniTail 5"
+                  data-i18n-alt="desktop.gallery.image5Alt"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <figcaption data-i18n="desktop.gallery.image5Caption">Ajustes</figcaption>
+              </figure>
+            </div>
+          </div>
+        </div>
+
+        <div class="desktop-downloads" id="desktop-downloads">
+          <div class="section__heading desktop-downloads__heading">
+            <p class="eyebrow" data-i18n="desktopDownloads.eyebrow">Descargas Desktop</p>
+            <h2 data-i18n="desktopDownloads.title">Instala AniTail Desktop en tu PC.</h2>
+          </div>
+          <div id="github-release-desktop" class="release-container">
+            <div class="release-loading">
+              <div class="spinner"></div>
+              <p data-i18n="desktopDownloads.loading">Buscando ultima version desktop disponible...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--alt reveal-on-scroll" id="features">
+        <div class="section__heading">
+          <p class="eyebrow" data-i18n="features.eyebrow">Funciones</p>
+          <h2 data-i18n="features.title">Todo lo que tu musica necesita, en un solo lugar.</h2>
+        </div>
+        <div class="features">
+          <ul class="feature-list">
+            <li data-i18n="features.items.0">Reproduce cualquier cancion o video desde YouTube Music</li>
+            <li data-i18n="features.items.1">Reproduccion en segundo plano</li>
+            <li data-i18n="features.items.2">Sugerencias rapidas personalizadas</li>
+            <li data-i18n="features.items.3">Gestion avanzada de la biblioteca</li>
+            <li data-i18n="features.items.4">Descarga y cache de canciones para reproduccion sin conexion</li>
+            <li data-i18n="features.items.5">Busqueda de canciones, albumes, artistas, videos y listas</li>
+            <li data-i18n="features.items.6">Letras en tiempo real sincronizadas</li>
+            <li data-i18n="features.items.7">Modo Karaoke integrado</li>
+            <li data-i18n="features.items.8">Inicio de sesion con cuenta de YouTube Music</li>
+            <li data-i18n="features.items.9">Sincronizacion bidireccional de contenido</li>
+            <li data-i18n="features.items.10">Copia de seguridad con Google Drive</li>
+            <li data-i18n="features.items.11">Omitir silencios en las pistas</li>
+            <li data-i18n="features.items.12">Importacion de listas de reproduccion</li>
+            <li data-i18n="features.items.13">Normalizacion de audio</li>
+            <li data-i18n="features.items.14">Ajuste de tempo y tono</li>
+            <li data-i18n="features.items.15">Gestion de listas locales</li>
+            <li data-i18n="features.items.16">Reordenar canciones en cola</li>
+            <li data-i18n="features.items.17">Temas: Claro, Oscuro, Negro y Dinamico</li>
+            <li data-i18n="features.items.18">Temporizador de apagado</li>
+            <li data-i18n="features.items.19">Integracion con Last.fm</li>
+            <li data-i18n="features.items.20">Discord Rich Presence</li>
+            <li data-i18n="features.items.21">Interfaz Material You (Material 3)</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section reveal-on-scroll" id="downloads">
+        <div class="section__heading">
+          <p class="eyebrow" data-i18n="downloads.eyebrow">Descargas</p>
+          <h2 data-i18n="downloads.title">Instala AniTail en tu Android favorito.</h2>
+        </div>
+        <div id="github-release" class="release-container">
+          <div class="release-loading">
+            <div class="spinner"></div>
+            <p data-i18n="downloads.loading">Buscando ultima version disponible...</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="cta reveal-on-scroll">
+        <div>
+          <p class="eyebrow" data-i18n="cta.eyebrow">Lista para ti</p>
+          <h2 data-i18n="cta.title">Haz que cada reproduccion cuente con AniTail.</h2>
+          <p data-i18n="cta.desc">
+            Descarga la app y vive la musica con una interfaz premium, completamente gratis y open source.
+          </p>
+        </div>
+        <a class="button" href="#downloads" data-i18n="cta.startNow">Empezar ahora</a>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div>
+        <a href="#" class="brand">
+          <div class="brand__icon">
+            <img src="assets/icon.png" alt="AniTail Logo" data-i18n-alt="brand.logoAlt" />
+          </div>
+          <span class="brand__name">AniTail</span>
+        </a>
+        <p data-i18n="footer.about">
+          Un proyecto open source para amantes de la musica. Creado con pasion por la comunidad.
+        </p>
+      </div>
+      <div class="footer__links">
+        <a href="#features" data-i18n="footer.features">Funciones</a>
+        <a href="#downloads" data-i18n="footer.downloads">Descargas</a>
+        <a href="https://github.com/Animetailapp/AniTail" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <div class="footer__meta">
+        <span>&copy; <span id="year"></span> AniTail. <span data-i18n="footer.rights">Todos los derechos reservados.</span></span>
+      </div>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

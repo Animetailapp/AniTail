@@ -15,13 +15,13 @@ plugins {
 android {
     namespace = "com.anitail.music"
     compileSdk = 36
-    ndkVersion = "25.1.8937393"
+    ndkVersion = "27.0.12077973"
     defaultConfig {
         applicationId = "com.anitail.music"
         minSdk = 23
         targetSdk = 36
-        versionCode = 16
-        versionName = "1.13.1"
+        versionCode = 17
+        versionName = "1.14.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         
@@ -41,6 +41,19 @@ android {
             
         buildConfigField("String", "LASTFM_API_KEY", "\"$lastfmApiKey\"")
         buildConfigField("String", "LASTFM_API_SECRET", "\"$lastfmApiSecret\"")
+        
+        // NDK configuration for vibra_fp library
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+        }
+    }
+    // Native vibrafp build is optional. Enable by passing -PenableVibrafp=true
+    val enableVibrafp = (project.findProperty("enableVibrafp") as? String)?.toBoolean() ?: false
+    externalNativeBuild {
+        cmake {
+            path("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     flavorDimensions += "abi"
@@ -106,6 +119,20 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (enableVibrafp) {
+                externalNativeBuild {
+                    cmake {
+                        arguments += listOf(
+                            "-DENABLE_VIBRAFP=ON",
+                            "-DENABLE_LTO=ON",
+                            "-DCMAKE_BUILD_TYPE=Release"
+                        )
+                    }
+                }
+            }
+            ndk {
+                debugSymbolLevel = "NONE"
+            }
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -114,6 +141,20 @@ android {
                 signingConfigs.getByName("debug")
             } else {
                 signingConfigs.getByName("persistentDebug")
+            }
+            if (enableVibrafp) {
+                externalNativeBuild {
+                    cmake {
+                        arguments += listOf(
+                            "-DENABLE_VIBRAFP=ON",
+                            "-DENABLE_LTO=OFF",
+                            "-DCMAKE_BUILD_TYPE=Debug"
+                        )
+                    }
+                }
+            }
+            ndk {
+                debugSymbolLevel = "FULL"
             }
         }
     }
@@ -178,6 +219,7 @@ dependencies {
     implementation(libs.navigation)
     implementation(libs.hilt.navigation)
     implementation(libs.datastore)
+    implementation("androidx.documentfile:documentfile:1.1.0")
 
     implementation(libs.compose.runtime)
     implementation(libs.compose.foundation)
@@ -223,6 +265,8 @@ dependencies {
     implementation(projects.kizzy)
     implementation(projects.betterlyrics)
     implementation(projects.simpmusic)
+    implementation(project(":shazamkit"))
+    implementation(projects.common)
 
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.serialization.json)
@@ -232,6 +276,8 @@ dependencies {
     implementation(libs.timber)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
+    // Ensure Android dispatcher is available at runtime to avoid coroutine runtime mismatches
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation(libs.compose.icons.extended)
     implementation(libs.work.runtime.ktx)
     implementation(libs.hilt.work)    // OneSignal Push Notifications

@@ -16,6 +16,7 @@ import android.provider.Settings
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
+import android.os.Build.VERSION_CODES.TIRAMISU
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -129,9 +130,12 @@ import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.music.constants.AppBarHeight
 import com.anitail.music.constants.DarkModeKey
+import com.anitail.music.constants.CustomThemeSeedColorKey
 import com.anitail.music.constants.DefaultOpenTabKey
 import com.anitail.music.constants.DisableScreenshotKey
+import com.anitail.music.constants.DynamicIconKey
 import com.anitail.music.constants.DynamicThemeKey
+import com.anitail.music.constants.HighRefreshRateKey
 import com.anitail.music.constants.MiniPlayerBottomSpacing
 import com.anitail.music.constants.MiniPlayerHeight
 import com.anitail.music.constants.NavigationBarAnimationSpec
@@ -143,6 +147,8 @@ import com.anitail.music.constants.SearchSourceKey
 import com.anitail.music.constants.SlimNavBarHeight
 import com.anitail.music.constants.SlimNavBarKey
 import com.anitail.music.constants.StopMusicOnTaskClearKey
+import com.anitail.music.constants.ThemePalette
+import com.anitail.music.constants.ThemePaletteKey
 import com.anitail.music.constants.UseNewMiniPlayerDesignKey
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.SearchHistory
@@ -174,8 +180,10 @@ import com.anitail.music.ui.screens.settings.NavigationTab
 import com.anitail.music.ui.theme.AnitailTheme
 import com.anitail.music.ui.theme.ColorSaver
 import com.anitail.music.ui.theme.DefaultThemeColor
+import com.anitail.music.ui.theme.ThemePreviewState
 import com.anitail.music.ui.theme.extractThemeColor
 import com.anitail.music.ui.utils.LocalIsTelevision
+import com.anitail.music.ui.theme.seedColor
 import com.anitail.music.ui.utils.appBarScrollBehavior
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.ui.utils.rememberIsTelevision
@@ -270,12 +278,24 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        startService(Intent(this, MusicService::class.java))
+        startMusicServiceSafely()
         bindService(
             Intent(this, MusicService::class.java),
             serviceConnection,
             BIND_AUTO_CREATE
         )
+    }
+
+    private fun startMusicServiceSafely() {
+        val serviceIntent = Intent(this, MusicService::class.java)
+        try {
+            startService(serviceIntent)
+        } catch (e: IllegalStateException) {
+            Timber.w(
+                e,
+                "MusicService start deferred due background start restriction; binding will proceed"
+            )
+        }
     }
 
     override fun onStop() {
@@ -317,6 +337,8 @@ class MainActivity : AppCompatActivity() {
         window.decorView.layoutDirection = View.LAYOUT_DIRECTION_LTR
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        requestNotificationPermissionIfNeeded()
+
         // Request storage permissions at startup for MediaStore downloads
         requestStoragePermissionsIfNeeded()
 
@@ -334,14 +356,6 @@ class MainActivity : AppCompatActivity() {
                         window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
                     }
                 }
-        }
-
-        lifecycleScope.launch {
-            try {
-                checkAndRequestStoragePermissions()
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to check backup permissions")
-            }
         }
 
         lifecycleScope.launch(Dispatchers.IO) {
@@ -385,13 +399,37 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            val dynamicIconEnabled by rememberPreference(
+                DynamicIconKey,
+                defaultValue = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+            )
+            val highRefreshRateEnabled by rememberPreference(
+                HighRefreshRateKey,
+                defaultValue = false
+            )
             val enableDynamicTheme by rememberPreference(DynamicThemeKey, defaultValue = true)
+            val selectedThemePalette by rememberEnumPreference(
+                ThemePaletteKey,
+                defaultValue = ThemePalette.LAVENDER
+            )
+            val customThemeSeedColorInt by rememberPreference(
+                CustomThemeSeedColorKey,
+                defaultValue = 0xFFB39DDB.toInt()
+            )
+            val customThemePreviewColorInt = ThemePreviewState.customSeedPreviewColorInt
+            val isPaletteCustomizationPreviewActive = ThemePreviewState.isPaletteCustomizationActive
             val darkTheme by rememberEnumPreference(DarkModeKey, defaultValue = DarkMode.AUTO)
             val isSystemInDarkTheme = isSystemInDarkTheme()
             val useDarkTheme =
                 remember(darkTheme, isSystemInDarkTheme) {
                     if (darkTheme == DarkMode.AUTO) isSystemInDarkTheme else darkTheme == DarkMode.ON
                 }
+            LaunchedEffect(dynamicIconEnabled) {
+                applyDynamicLauncherIcon(dynamicIconEnabled)
+            }
+            LaunchedEffect(highRefreshRateEnabled) {
+                applyHighRefreshRate(highRefreshRateEnabled)
+            }
             LaunchedEffect(useDarkTheme) {
                 setSystemBarAppearance(useDarkTheme)
             }
@@ -402,9 +440,31 @@ class MainActivity : AppCompatActivity() {
                 mutableStateOf(DefaultThemeColor)
             }
 
-            LaunchedEffect(playerConnection, enableDynamicTheme, isSystemInDarkTheme) {
+            LaunchedEffect(
+                playerConnection,
+                enableDynamicTheme,
+                selectedThemePalette,
+                customThemeSeedColorInt,
+                customThemePreviewColorInt,
+                isPaletteCustomizationPreviewActive,
+                isSystemInDarkTheme
+            ) {
                 val playerConnection = playerConnection
-                if (!enableDynamicTheme || playerConnection == null) {
+                val previewColor = customThemePreviewColorInt
+                    ?.takeIf { isPaletteCustomizationPreviewActive }
+                    ?.let { Color(it.toLong() and 0xFFFFFFFF) }
+
+                if (previewColor != null) {
+                    themeColor = previewColor
+                    return@LaunchedEffect
+                }
+                if (!enableDynamicTheme) {
+                    themeColor = selectedThemePalette.seedColor(
+                        customSeed = Color(customThemeSeedColorInt.toLong() and 0xFFFFFFFF)
+                    )
+                    return@LaunchedEffect
+                }
+                if (playerConnection == null) {
                     themeColor = DefaultThemeColor
                     return@LaunchedEffect
                 }
@@ -445,7 +505,9 @@ class MainActivity : AppCompatActivity() {
                     darkMode = darkTheme,
                     pureBlack = pureBlack,
                     themeColor = themeColor,
-                ) {
+                    preferFidelityStyle = isPaletteCustomizationPreviewActive ||
+                    (!enableDynamicTheme && selectedThemePalette == ThemePalette.CUSTOM),
+            ) {
                     BoxWithConstraints(
                         modifier =
                             Modifier
@@ -564,6 +626,11 @@ class MainActivity : AppCompatActivity() {
                             collapsedBound = bottomInset + getNavPadding() + (if (useNewMiniPlayerDesign) MiniPlayerBottomSpacing else 0.dp) + MiniPlayerHeight,
                             expandedBound = maxHeight,
                         )
+                    val activePlayerFlow =
+                        remember(playerConnection) { playerConnection?.service?.playerFlow }
+                    val activePlayer by
+                    (activePlayerFlow?.collectAsState(initial = playerConnection?.player)
+                        ?: remember { mutableStateOf<Player?>(null) })
 
                     val playerAwareWindowInsets =
                         remember(
@@ -645,8 +712,8 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
-                    LaunchedEffect(playerConnection) {
-                        val player = playerConnection?.player ?: return@LaunchedEffect
+                    LaunchedEffect(activePlayer) {
+                        val player = activePlayer ?: return@LaunchedEffect
                         if (player.currentMediaItem == null) {
                             if (!playerBottomSheetState.isDismissed) {
                                 playerBottomSheetState.dismiss()
@@ -657,9 +724,8 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     }
-                    DisposableEffect(playerConnection, playerBottomSheetState) {
-                        val player =
-                            playerConnection?.player ?: return@DisposableEffect onDispose { }
+                    DisposableEffect(activePlayer, playerBottomSheetState) {
+                        val player = activePlayer ?: return@DisposableEffect onDispose { }
                         val listener =
                             object : Player.Listener {
                                 override fun onPlaybackStateChanged(state: Int) {
@@ -1274,6 +1340,16 @@ class MainActivity : AppCompatActivity() {
         val uri = intent.data ?: intent.extras?.getString(Intent.EXTRA_TEXT)?.toUri() ?: return
         val coroutineScope = lifecycleScope
 
+        if (uri.scheme.equals("anitail", ignoreCase = true)) {
+            val deepLinkQuery = uri.getQueryParameter("q")
+                ?.takeIf { it.isNotBlank() }
+                ?: uri.getQueryParameter("query")?.takeIf { it.isNotBlank() }
+            if (uri.host.equals("search", ignoreCase = true) && !deepLinkQuery.isNullOrBlank()) {
+                navController.navigate("search/${URLEncoder.encode(deepLinkQuery, "UTF-8")}")
+            }
+            return
+        }
+
         when (val path = uri.pathSegments.firstOrNull()) {
             "playlist" -> uri.getQueryParameter("list")?.let { playlistId ->
                 if (playlistId.startsWith("OLAK5uy_")) {
@@ -1345,10 +1421,67 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun applyDynamicLauncherIcon(enabled: Boolean) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+        val dynamicComponent = ComponentName(this, "$packageName$DYNAMIC_LAUNCHER_ALIAS_SUFFIX")
+        val defaultComponent = ComponentName(this, "$packageName$DEFAULT_LAUNCHER_ALIAS_SUFFIX")
+        val dynamicState = if (enabled) {
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+        } else {
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        }
+        val defaultState = if (enabled) {
+            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        } else {
+            PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+        }
+
+        runCatching {
+            packageManager.setComponentEnabledSetting(
+                dynamicComponent,
+                dynamicState,
+                PackageManager.DONT_KILL_APP
+            )
+            packageManager.setComponentEnabledSetting(
+                defaultComponent,
+                defaultState,
+                PackageManager.DONT_KILL_APP
+            )
+        }.onFailure {
+            Timber.w(it, "Failed to apply launcher icon mode")
+        }
+    }
+
+    private fun applyHighRefreshRate(enabled: Boolean) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+
+        val activeDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display
+        } else {
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay
+        } ?: return
+
+        val preferredModeId = if (enabled) {
+            activeDisplay.supportedModes.maxByOrNull { it.refreshRate }?.modeId ?: 0
+        } else {
+            0
+        }
+
+        val params = window.attributes
+        if (params.preferredDisplayModeId != preferredModeId) {
+            params.preferredDisplayModeId = preferredModeId
+            window.attributes = params
+        }
+    }
+
     companion object {
         const val ACTION_SEARCH = "com.anitail.music.action.SEARCH"
         const val ACTION_EXPLORE = "com.anitail.music.action.EXPLORE"
         const val ACTION_LIBRARY = "com.anitail.music.action.LIBRARY"
+        private const val DEFAULT_LAUNCHER_ALIAS_SUFFIX = ".MainActivityLauncherDefault"
+        private const val DYNAMIC_LAUNCHER_ALIAS_SUFFIX = ".MainActivityLauncherDynamic"
     }
 
     @RequiresApi(Build.VERSION_CODES.M)
@@ -1420,6 +1553,26 @@ class MainActivity : AppCompatActivity() {
                 storagePermissionCallback.launch(permissions)
                 false
             }
+        }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        notificationPermissionCallback.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    private val notificationPermissionCallback = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) {
+            Timber.w("Notification permission denied")
         }
     }
 }

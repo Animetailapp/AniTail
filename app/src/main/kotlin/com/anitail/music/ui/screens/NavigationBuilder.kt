@@ -22,6 +22,8 @@ import com.anitail.music.ui.screens.playlist.CachePlaylistScreen
 import com.anitail.music.ui.screens.playlist.LocalPlaylistScreen
 import com.anitail.music.ui.screens.playlist.OnlinePlaylistScreen
 import com.anitail.music.ui.screens.playlist.TopPlaylistScreen
+import com.anitail.music.ui.screens.recognition.RecognitionHistoryScreen
+import com.anitail.music.ui.screens.recognition.RecognitionScreen
 import com.anitail.music.ui.screens.search.OnlineSearchResult
 import com.anitail.music.ui.screens.settings.AboutScreen
 import com.anitail.music.ui.screens.settings.AccountSettings
@@ -33,11 +35,13 @@ import com.anitail.music.ui.screens.settings.DiscordLoginScreen
 import com.anitail.music.ui.screens.settings.DiscordSettings
 import com.anitail.music.ui.screens.settings.JamSettingsScreen
 import com.anitail.music.ui.screens.settings.LastFmSettingsScreen
+import com.anitail.music.ui.screens.settings.PaletteCustomizationSettings
 import com.anitail.music.ui.screens.settings.PlayerSettings
 import com.anitail.music.ui.screens.settings.PrivacySettings
 import com.anitail.music.ui.screens.settings.RomanizationSettings
 import com.anitail.music.ui.screens.settings.SettingsScreen
 import com.anitail.music.ui.screens.settings.StorageSettings
+import com.anitail.music.ui.screens.settings.ThemeColorsSettings
 import com.anitail.music.ui.screens.settings.UpdateSettings
 import com.anitail.music.ui.screens.settings.import_from_spotify.ImportFromSpotifyScreen
 
@@ -61,8 +65,53 @@ fun NavGraphBuilder.navigationBuilder(
     composable("history") {
         HistoryScreen(navController)
     }
+    composable("recognition") {
+        RecognitionScreen(navController)
+    }
+    composable("recognition_history") {
+        RecognitionHistoryScreen(navController)
+    }
     composable("stats") {
         StatsScreen(navController)
+    }
+    composable(
+        route = "stats/time/{year}/{month}",
+        arguments = listOf(
+            navArgument("year") { type = NavType.IntType },
+            navArgument("month") { type = NavType.IntType },
+        ),
+    ) { backStackEntry ->
+        StatsTimeListenedScreen(
+            navController = navController,
+            year = backStackEntry.arguments?.getInt("year") ?: 1970,
+            month = backStackEntry.arguments?.getInt("month") ?: 1,
+        )
+    }
+    composable(
+        route = "stats/top-artists/{year}/{month}",
+        arguments = listOf(
+            navArgument("year") { type = NavType.IntType },
+            navArgument("month") { type = NavType.IntType },
+        ),
+    ) { backStackEntry ->
+        StatsTopArtistsScreen(
+            navController = navController,
+            year = backStackEntry.arguments?.getInt("year") ?: 1970,
+            month = backStackEntry.arguments?.getInt("month") ?: 1,
+        )
+    }
+    composable(
+        route = "stats/top-songs/{year}/{month}",
+        arguments = listOf(
+            navArgument("year") { type = NavType.IntType },
+            navArgument("month") { type = NavType.IntType },
+        ),
+    ) { backStackEntry ->
+        StatsTopSongsScreen(
+            navController = navController,
+            year = backStackEntry.arguments?.getInt("year") ?: 1970,
+            month = backStackEntry.arguments?.getInt("month") ?: 1,
+        )
     }
     composable("mood_and_genres") {
         MoodAndGenresScreen(navController, scrollBehavior)
@@ -259,6 +308,12 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable("settings/appearance") {
         AppearanceSettings(navController, scrollBehavior)
+    }
+    composable("settings/theme_colors") {
+        ThemeColorsSettings(navController, scrollBehavior)
+    }
+    composable("settings/palette_customization") {
+        PaletteCustomizationSettings(navController, scrollBehavior)
     }
     composable("settings/account") {
         AccountSettings(navController, scrollBehavior)

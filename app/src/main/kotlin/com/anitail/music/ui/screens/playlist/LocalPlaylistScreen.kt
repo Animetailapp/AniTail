@@ -57,7 +57,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -96,7 +95,6 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.offline.Download
-import androidx.media3.exoplayer.offline.DownloadService
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.anitail.innertube.YouTube
@@ -122,7 +120,6 @@ import com.anitail.music.extensions.move
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.extensions.togglePlayPause
 import com.anitail.music.models.toMediaMetadata
-import com.anitail.music.playback.ExoDownloadService
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.AutoResizeText
 import com.anitail.music.ui.component.DefaultDialog
@@ -235,9 +232,11 @@ fun LocalPlaylistScreen(
     }
 
     val downloadUtil = LocalDownloadUtil.current
-    var downloadState by remember {
-        mutableStateOf(Download.STATE_STOPPED)
+    val playlistSongIds = remember(songs) {
+        songs.map { it.song.id }
     }
+    val downloadState by downloadUtil.getDownloadState(playlistSongIds)
+        .collectAsState(initial = Download.STATE_STOPPED)
 
     val editable: Boolean = playlist?.playlist?.isEditable == true
 
@@ -245,22 +244,6 @@ fun LocalPlaylistScreen(
         mutableSongs.apply {
             clear()
             addAll(songs)
-        }
-        if (songs.isEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs.all { downloads[it.song.id]?.state == Download.STATE_COMPLETED }) {
-                    Download.STATE_COMPLETED
-                } else if (songs.all {
-                        downloads[it.song.id]?.state == Download.STATE_QUEUED ||
-                                downloads[it.song.id]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it.song.id]?.state == Download.STATE_COMPLETED
-                    }
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
         }
     }
 
@@ -324,14 +307,7 @@ fun LocalPlaylistScreen(
                                 playlist?.id?.let { clearPlaylist(it) }
                             }
                         }
-                        songs.forEach { song ->
-                            DownloadService.sendRemoveDownload(
-                                context,
-                                ExoDownloadService::class.java,
-                                song.song.id,
-                                false
-                            )
-                        }
+                        downloadUtil.removeDownloads(songs.map { it.song.id })
                     }
                 ) {
                     Text(text = stringResource(android.R.string.ok))
@@ -1024,31 +1000,14 @@ fun LocalPlaylistHeader(
         }
 
     val downloadUtil = LocalDownloadUtil.current
-    var downloadState by remember {
-        mutableIntStateOf(Download.STATE_STOPPED)
+    val playlistSongIds = remember(songs) {
+        songs.map { it.song.id }
     }
+    val downloadState by downloadUtil.getDownloadState(playlistSongIds)
+        .collectAsState(initial = Download.STATE_STOPPED)
 
     val liked = playlist.playlist.bookmarkedAt != null
     val editable: Boolean = playlist.playlist.isEditable
-
-    LaunchedEffect(songs) {
-        if (songs.isEmpty()) return@LaunchedEffect
-        downloadUtil.downloads.collect { downloads ->
-            downloadState =
-                if (songs.all { downloads[it.song.id]?.state == Download.STATE_COMPLETED }) {
-                    Download.STATE_COMPLETED
-                } else if (songs.all {
-                        downloads[it.song.id]?.state == Download.STATE_QUEUED ||
-                                downloads[it.song.id]?.state == Download.STATE_DOWNLOADING ||
-                                downloads[it.song.id]?.state == Download.STATE_COMPLETED
-                    }
-                ) {
-                    Download.STATE_DOWNLOADING
-                } else {
-                    Download.STATE_STOPPED
-                }
-        }
-    }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1237,14 +1196,7 @@ fun LocalPlaylistHeader(
                         Download.STATE_DOWNLOADING -> {
                             IconButton(
                                 onClick = {
-                                    songs.forEach { song ->
-                                        DownloadService.sendRemoveDownload(
-                                            context,
-                                            ExoDownloadService::class.java,
-                                            song.song.id,
-                                            false,
-                                        )
-                                    }
+                                    downloadUtil.removeDownloads(songs.map { it.song.id })
                                 },
                                 modifier = Modifier.size(40.dp)
                             ) {
@@ -1258,9 +1210,7 @@ fun LocalPlaylistHeader(
                         else -> {
                             IconButton(
                                 onClick = {
-                                    songs.forEach { song ->
-                                        downloadUtil.downloadToMediaStore(song.song)
-                                    }
+                                    downloadUtil.downloadSongsToMediaStore(songs.map { it.song })
                                 },
                                 modifier = Modifier.size(40.dp)
                             ) {

@@ -10,6 +10,7 @@ import androidx.media3.common.Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM
 import androidx.media3.common.Player.REPEAT_MODE_OFF
 import androidx.media3.common.Player.STATE_ENDED
 import androidx.media3.common.Timeline
+import androidx.media3.exoplayer.ExoPlayer
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.extensions.currentMetadata
 import com.anitail.music.extensions.getCurrentQueueIndex
@@ -37,7 +38,9 @@ class PlayerConnection(
     private val coroutineScope: CoroutineScope,
 ) : Player.Listener {
     val service = binder.service
-    val player = service.player
+    private var attachedPlayer: ExoPlayer = service.player
+    val player: ExoPlayer
+        get() = attachedPlayer
 
     val playbackState = MutableStateFlow(player.playbackState)
     private val playWhenReady = MutableStateFlow(player.playWhenReady)
@@ -78,17 +81,31 @@ class PlayerConnection(
     val discordPresence = service.discordPresence
 
     init {
-        player.addListener(this)
+        attachPlayer(attachedPlayer)
+        coroutineScope.launch {
+            service.playerFlow.collect { nextPlayer ->
+                if (nextPlayer != null && nextPlayer !== attachedPlayer) {
+                    attachPlayer(nextPlayer)
+                }
+            }
+        }
+    }
 
-        playbackState.value = player.playbackState
-        playWhenReady.value = player.playWhenReady
-        mediaMetadata.value = player.currentMetadata
+    private fun attachPlayer(newPlayer: ExoPlayer) {
+        attachedPlayer.removeListener(this)
+        attachedPlayer = newPlayer
+        attachedPlayer.addListener(this)
+
+        playbackState.value = attachedPlayer.playbackState
+        playWhenReady.value = attachedPlayer.playWhenReady
+        mediaMetadata.value = attachedPlayer.currentMetadata
         queueTitle.value = service.queueTitle
-        queueWindows.value = player.getQueueWindows()
-        currentWindowIndex.value = player.getCurrentQueueIndex()
-        currentMediaItemIndex.value = player.currentMediaItemIndex
-        shuffleModeEnabled.value = player.shuffleModeEnabled
-        repeatMode.value = player.repeatMode
+        queueWindows.value = attachedPlayer.getQueueWindows()
+        currentWindowIndex.value = attachedPlayer.getCurrentQueueIndex()
+        currentMediaItemIndex.value = attachedPlayer.currentMediaItemIndex
+        shuffleModeEnabled.value = attachedPlayer.shuffleModeEnabled
+        repeatMode.value = attachedPlayer.repeatMode
+        updateCanSkipPreviousAndNext()
     }
 
     /**
@@ -248,6 +265,6 @@ class PlayerConnection(
     }
 
     fun dispose() {
-        player.removeListener(this)
+        attachedPlayer.removeListener(this)
     }
 }

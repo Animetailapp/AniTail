@@ -84,107 +84,116 @@ class DatabaseMerger @Inject constructor(
     }
 
     private fun mergeFavorites(db: SupportSQLiteDatabase) {
-        // 1. Update local songs to be favorite if they are favorite in remote
-        // syntax: INSERT OR IGNORE / UPDATE
+        val hasLiked = hasColumn(db, "remote_db", "song", "liked")
+        val hasLikedDate = hasColumn(db, "remote_db", "song", "likedDate")
+        val hasInLibrary = hasColumn(db, "remote_db", "song", "inLibrary")
 
-        // Strategy:
-        // A. Insert songs that exist in REMOTE but NOT LOCAL (only if liked)
-        // Songs are complex, we should try to copy all columns.
-        val insertMissingSongsQuery = """
-            INSERT OR IGNORE INTO main.song 
-            SELECT * FROM remote_db.song 
-            WHERE liked = 1 OR inLibrary IS NOT NULL
-        """
-        db.execSQL(insertMissingSongsQuery)
+        val conditions = mutableListOf<String>()
+        if (hasLiked) conditions += "liked = 1"
+        if (hasInLibrary) conditions += "inLibrary IS NOT NULL"
+
+        if (conditions.isNotEmpty()) {
+            insertOrIgnoreBySharedColumns(
+                db = db,
+                table = "song",
+                whereClause = conditions.joinToString(" OR ")
+            )
+        }
 
         // B. Update existing local songs if remote has them as liked/inLibrary (and local doesn't)
         // We prioritize "True" over "False". combining dates using earlier date if possible or remote date
         // Note: SQLite update with join from another DB is tricky in standard SQL.
         // We use a subquery approach or just `UPDATE song SET liked = 1 WHERE id IN (SELECT id FROM remote_db.song WHERE liked = 1)`
-        val updateLikedQuery = """
-            UPDATE song 
-            SET liked = 1, 
-                likedDate = COALESCE(likedDate, (SELECT likedDate FROM remote_db.song WHERE remote_db.song.id = main.song.id))
-            WHERE id IN (SELECT id FROM remote_db.song WHERE liked = 1) AND liked = 0
-        """
-        db.execSQL(updateLikedQuery)
+        if (hasLiked) {
+            val updateLikedQuery = if (hasLikedDate) {
+                """
+                UPDATE song 
+                SET liked = 1, 
+                    likedDate = COALESCE(likedDate, (SELECT likedDate FROM remote_db.song WHERE remote_db.song.id = main.song.id))
+                WHERE id IN (SELECT id FROM remote_db.song WHERE liked = 1) AND liked = 0
+            """
+            } else {
+                """
+                UPDATE song 
+                SET liked = 1
+                WHERE id IN (SELECT id FROM remote_db.song WHERE liked = 1) AND liked = 0
+            """
+            }
+            db.execSQL(updateLikedQuery)
+        }
 
-        val updateLibraryQuery = """
-            UPDATE song 
-            SET inLibrary = COALESCE(inLibrary, (SELECT inLibrary FROM remote_db.song WHERE remote_db.song.id = main.song.id))
-            WHERE id IN (SELECT id FROM remote_db.song WHERE inLibrary IS NOT NULL) AND inLibrary IS NULL
-        """
-        db.execSQL(updateLibraryQuery)
+        if (hasInLibrary) {
+            val updateLibraryQuery = """
+                UPDATE song 
+                SET inLibrary = COALESCE(inLibrary, (SELECT inLibrary FROM remote_db.song WHERE remote_db.song.id = main.song.id))
+                WHERE id IN (SELECT id FROM remote_db.song WHERE inLibrary IS NOT NULL) AND inLibrary IS NULL
+            """
+            db.execSQL(updateLibraryQuery)
+        }
     }
 
     private fun mergePlaylists(db: SupportSQLiteDatabase) {
-        // 1. Insert playlists that don't exist locally
-        // We exclude auto-generated or special playlists if necessary, but syncing all is better
-        val insertPlaylistsQuery = """
-            INSERT OR IGNORE INTO main.playlist 
-            SELECT * FROM remote_db.playlist
-        """
-        db.execSQL(insertPlaylistsQuery)
+        insertOrIgnoreBySharedColumns(db, "playlist")
     }
 
     private fun mergePlaylistItems(db: SupportSQLiteDatabase) {
-        val insertItemsQuery = """
-            INSERT OR IGNORE INTO main.playlist_song_map 
-            SELECT * FROM remote_db.playlist_song_map
-        """
-        db.execSQL(insertItemsQuery)
+        insertOrIgnoreBySharedColumns(db, "playlist_song_map")
     }
 
     private fun mergeHistory(db: SupportSQLiteDatabase) {
         // First, insert artists that are referenced by songs in remote events
         // This must happen before inserting songs to avoid foreign key issues
-        val insertArtistsForEventsQuery = """
-            INSERT OR IGNORE INTO main.artist
-            SELECT a.* FROM remote_db.artist a
-            WHERE a.id IN (
-                SELECT DISTINCT sam.artistId FROM remote_db.song_artist_map sam
-                WHERE sam.songId IN (SELECT DISTINCT songId FROM remote_db.event)
-            )
-        """
-        db.execSQL(insertArtistsForEventsQuery)
+        insertOrIgnoreBySharedColumns(
+            db = db,
+            table = "artist",
+            sourceAlias = "a",
+            whereClause = """
+                a.id IN (
+                    SELECT DISTINCT sam.artistId FROM remote_db.song_artist_map sam
+                    WHERE sam.songId IN (SELECT DISTINCT songId FROM remote_db.event)
+                )
+            """.trimIndent()
+        )
 
         // Insert albums that are referenced by songs in remote events
-        val insertAlbumsForEventsQuery = """
-            INSERT OR IGNORE INTO main.album
-            SELECT a.* FROM remote_db.album a
-            WHERE a.id IN (
-                SELECT DISTINCT s.albumId FROM remote_db.song s
-                WHERE s.id IN (SELECT DISTINCT songId FROM remote_db.event)
-                AND s.albumId IS NOT NULL
-            )
-        """
-        db.execSQL(insertAlbumsForEventsQuery)
+        insertOrIgnoreBySharedColumns(
+            db = db,
+            table = "album",
+            sourceAlias = "a",
+            whereClause = """
+                a.id IN (
+                    SELECT DISTINCT s.albumId FROM remote_db.song s
+                    WHERE s.id IN (SELECT DISTINCT songId FROM remote_db.event)
+                    AND s.albumId IS NOT NULL
+                )
+            """.trimIndent()
+        )
 
         // Insert songs that are referenced in remote events but don't exist locally
         // This ensures we can insert the history events without foreign key violations
-        val insertMissingSongsForEventsQuery = """
-            INSERT OR IGNORE INTO main.song 
-            SELECT s.* FROM remote_db.song s
-            WHERE s.id IN (SELECT DISTINCT songId FROM remote_db.event)
-            AND s.id NOT IN (SELECT id FROM main.song)
-        """
-        db.execSQL(insertMissingSongsForEventsQuery)
+        insertOrIgnoreBySharedColumns(
+            db = db,
+            table = "song",
+            sourceAlias = "s",
+            whereClause = """
+                s.id IN (SELECT DISTINCT songId FROM remote_db.event)
+                AND s.id NOT IN (SELECT id FROM main.song)
+            """.trimIndent()
+        )
 
         // Also need to insert related artist mappings for those songs
-        val insertArtistMappingsQuery = """
-            INSERT OR IGNORE INTO main.song_artist_map
-            SELECT * FROM remote_db.song_artist_map
-            WHERE songId IN (SELECT DISTINCT songId FROM remote_db.event)
-        """
-        db.execSQL(insertArtistMappingsQuery)
+        insertOrIgnoreBySharedColumns(
+            db = db,
+            table = "song_artist_map",
+            whereClause = "songId IN (SELECT DISTINCT songId FROM remote_db.event)"
+        )
 
         // Insert song-album mappings for those songs
-        val insertAlbumMappingsQuery = """
-            INSERT OR IGNORE INTO main.song_album_map
-            SELECT * FROM remote_db.song_album_map
-            WHERE songId IN (SELECT DISTINCT songId FROM remote_db.event)
-        """
-        db.execSQL(insertAlbumMappingsQuery)
+        insertOrIgnoreBySharedColumns(
+            db = db,
+            table = "song_album_map",
+            whereClause = "songId IN (SELECT DISTINCT songId FROM remote_db.event)"
+        )
         
         // Insert events that don't exist locally.
         val insertHistoryQuery = """
@@ -213,11 +222,7 @@ class DatabaseMerger @Inject constructor(
 
     private fun mergeArtists(db: SupportSQLiteDatabase) {
         // Insert artists that exist in remote but not locally
-        val insertArtistsQuery = """
-            INSERT OR IGNORE INTO main.artist 
-            SELECT * FROM remote_db.artist
-        """
-        db.execSQL(insertArtistsQuery)
+        insertOrIgnoreBySharedColumns(db, "artist")
 
         // Update bookmarkedAt for artists that are bookmarked in remote but not local
         val updateBookmarkedQuery = """
@@ -231,11 +236,7 @@ class DatabaseMerger @Inject constructor(
 
     private fun mergeAlbums(db: SupportSQLiteDatabase) {
         // Insert albums that exist in remote but not locally
-        val insertAlbumsQuery = """
-            INSERT OR IGNORE INTO main.album 
-            SELECT * FROM remote_db.album
-        """
-        db.execSQL(insertAlbumsQuery)
+        insertOrIgnoreBySharedColumns(db, "album")
 
         // Update bookmarkedAt for albums that are bookmarked in remote but not local
         val updateBookmarkedQuery = """
@@ -249,28 +250,72 @@ class DatabaseMerger @Inject constructor(
 
     private fun mergeSearchHistory(db: SupportSQLiteDatabase) {
         // Insert search history entries that don't exist locally
-        val insertSearchHistoryQuery = """
-            INSERT OR IGNORE INTO main.search_history 
-            SELECT * FROM remote_db.search_history
-        """
-        db.execSQL(insertSearchHistoryQuery)
+        insertOrIgnoreBySharedColumns(db, "search_history")
     }
 
     private fun mergeLyrics(db: SupportSQLiteDatabase) {
         // Insert lyrics for songs that don't have lyrics locally but have them in remote
-        val insertLyricsQuery = """
-            INSERT OR IGNORE INTO main.lyrics 
-            SELECT * FROM remote_db.lyrics
-        """
-        db.execSQL(insertLyricsQuery)
+        insertOrIgnoreBySharedColumns(db, "lyrics")
     }
 
     private fun mergeFormats(db: SupportSQLiteDatabase) {
         // Insert format entries that don't exist locally
-        val insertFormatsQuery = """
-            INSERT OR IGNORE INTO main.format 
-            SELECT * FROM remote_db.format
-        """
-        db.execSQL(insertFormatsQuery)
+        insertOrIgnoreBySharedColumns(db, "format")
+    }
+
+    private fun insertOrIgnoreBySharedColumns(
+        db: SupportSQLiteDatabase,
+        table: String,
+        whereClause: String? = null,
+        sourceAlias: String? = null,
+    ) {
+        val mainColumns = tableColumns(db, "main", table)
+        val remoteColumns = tableColumns(db, "remote_db", table).toSet()
+        val sharedColumns = mainColumns.filter { it in remoteColumns }
+
+        if (sharedColumns.isEmpty()) {
+            Timber.w("Skipping merge for %s: no shared columns found", table)
+            return
+        }
+
+        val quotedColumns = sharedColumns.joinToString(", ") { "`$it`" }
+        val selectColumns = if (sourceAlias.isNullOrBlank()) {
+            sharedColumns.joinToString(", ") { "`$it`" }
+        } else {
+            sharedColumns.joinToString(", ") { "$sourceAlias.`$it`" }
+        }
+        val sourceTable = if (sourceAlias.isNullOrBlank()) {
+            "remote_db.`$table`"
+        } else {
+            "remote_db.`$table` $sourceAlias"
+        }
+        val whereSql = whereClause?.trim()?.takeIf { it.isNotEmpty() }?.let { " WHERE $it" } ?: ""
+        val sql = """
+            INSERT OR IGNORE INTO main.`$table` ($quotedColumns)
+            SELECT $selectColumns FROM $sourceTable$whereSql
+        """.trimIndent()
+        db.execSQL(sql)
+    }
+
+    private fun hasColumn(
+        db: SupportSQLiteDatabase,
+        schema: String,
+        table: String,
+        column: String,
+    ): Boolean = tableColumns(db, schema, table).any { it == column }
+
+    private fun tableColumns(
+        db: SupportSQLiteDatabase,
+        schema: String,
+        table: String,
+    ): List<String> {
+        val columns = mutableListOf<String>()
+        db.query("PRAGMA $schema.table_info($table)").use { cursor ->
+            val nameIndex = cursor.getColumnIndex("name")
+            while (cursor.moveToNext()) {
+                columns += cursor.getString(nameIndex)
+            }
+        }
+        return columns
     }
 }

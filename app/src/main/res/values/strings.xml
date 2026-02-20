@@ -1,8 +1,12 @@
 <resources>
+    <!-- App -->
+    <string name="app_name">AniTail Music</string>
+
     <!-- Bottom navigation -->
     <string name="home">Home</string>
     <string name="songs">Songs</string>
     <string name="artists">Artists</string>
+    <string name="artist">Artist</string>
     <string name="albums">Albums</string>
     <string name="playlists">Playlists</string>
     <string name="explore">Explore</string>
@@ -24,6 +28,10 @@
     <string name="similar_to">Similar to</string>
     <string name="keep_listening">Keep listening</string>
     <string name="your_ytb_playlists">Your YouTube account</string>
+    <string name="speed_dial">Speed dial</string>
+    <string name="from_the_community">From the community</string>
+    <string name="daily_discover">Daily discover</string>
+    <string name="daily_discover_based_on">Based on %1$s</string>
 
     <!-- History -->
     <string name="today">Today</string>
@@ -61,6 +69,19 @@
     <string name="filter_playlists">Playlists</string>
     <string name="filter_community_playlists">Community playlists</string>
     <string name="filter_featured_playlists">Featured playlists</string>
+    <string name="mixes">Mixes</string>
+    <string name="library_empty_title">Your library is empty</string>
+    <string name="library_empty_subtitle">Search for music and add it to your library</string>
+    <string name="library_songs_empty_title">No songs</string>
+    <string name="library_songs_empty_subtitle">Saved songs will appear here</string>
+    <string name="library_albums_empty_title">No albums</string>
+    <string name="library_albums_empty_subtitle">Saved albums will appear here</string>
+    <string name="library_downloads_empty_title">No downloads</string>
+    <string name="library_downloads_empty_subtitle">Downloads will be available on Desktop soon</string>
+    <string name="library_playlists_empty_title">No playlists saved</string>
+    <string name="library_artists_empty_title">No artists saved</string>
+    <string name="library_albums_unavailable">Albums will appear here when available on Desktop</string>
+    <string name="library_downloads_unavailable">Local downloads are not available on Desktop yet</string>
     <string name="no_results_found">No results found</string>
 
     <!-- Artist screen -->
@@ -70,6 +91,7 @@
 
     <!-- Library -->
     <string name="liked">Liked</string>
+    <string name="in_library">In library</string>
     <string name="offline">Downloaded</string>
     <string name="my_top">My Top</string>
     <string name="cached_playlist">Cached</string>
@@ -94,9 +116,11 @@
 
     <!-- Menu -->
     <string name="details">Details</string>
+    <string name="open">Open</string>
     <string name="edit">Edit</string>
     <string name="start_radio">Start radio</string>
     <string name="play">Play</string>
+    <string name="play_all">Play all</string>
     <string name="play_next">Play next</string>
 
     <string name="add_to_queue">Add to queue</string>
@@ -107,6 +131,18 @@
     <string name="download">Download</string>
     <string name="downloading">Downloading</string>
     <string name="remove_download">Remove download</string>
+    <string name="swap_download">Swap download</string>
+    <string name="swap_download_desc">Re-download with different quality</string>
+    <string name="choose_download_quality">Choose download quality</string>
+    <string name="download_quality_dialog_subtitle">Best quality is listed first. Pick the format you want to keep offline.</string>
+    <string name="loading_formats">Loading available qualities…</string>
+    <string name="no_formats_available">No formats available</string>
+    <string name="recommended_badge">Recommended</string>
+    <string name="metadata_badge">+ Metadata</string>
+    <string name="audio_only_badge">Audio only</string>
+    <string name="metadata_supported_hint">Includes embedded cover art and tags</string>
+    <string name="metadata_unsupported_hint">No embedded metadata</string>
+    <string name="m4a_metadata_note">M4A 128kbps+ includes embedded cover art and metadata. Lower bitrate M4A and OPUS files will not have embedded metadata.</string>
 
     <!-- MediaStore downloads -->
     <string name="downloading_to_device">Downloading</string>
@@ -287,7 +323,20 @@
 
     <string name="appearance">Appearance</string>
     <string name="theme">Theme</string>
+    <string name="enable_dynamic_icon">Enable dynamic icon</string>
+    <string name="enable_dynamic_icon_desc">Enable Android themed launcher icon support</string>
+    <string name="dynamic_icon_not_supported_desc">Requires Android 13 or newer</string>
+    <string name="enable_high_refresh_rate">Enable high refresh rate</string>
+    <string name="enable_high_refresh_rate_desc">Force the display to run at the highest supported refresh rate (e.g. 120Hz)</string>
+    <string name="customize_app_theme">Customize your app theme</string>
+    <string name="theme_and_colors">Theme &amp; Colors</string>
+    <string name="theme_mode">Theme Mode</string>
+    <string name="color_palette">Color Palette</string>
+    <string name="palette_customization">Palette Customization</string>
+    <string name="design_your_own_palette">Design your own palette</string>
+    <string name="confirm_color">Confirm color</string>
     <string name="enable_dynamic_theme">Enable dynamic theme</string>
+    <string name="enable_dynamic_theme_desc">Use colors from the current cover art</string>
     <string name="dark_theme">Dark theme</string>
     <string name="dark_theme_on">On</string>
     <string name="dark_theme_off">Off</string>
@@ -303,6 +352,7 @@
     <string name="enable_swipe_thumbnail">Enable swipe to change song</string>
     <string name="swipe_song_to_add">Swipe song to right for play next or left for adding to queue</string>
     <string name="pure_black">Pure black</string>
+    <string name="pure_black_desc">Use pure black in dark mode (OLED)</string>
     <string name="player">Player</string>
     <string name="lyrics_text_position">Lyrics text position</string>
     <string name="left">Left</string>
@@ -331,7 +381,7 @@
     <string name="display_density_summary">Fine-tune how large UI elements appear</string>
     <string name="display_density_custom_label">Custom (%1$d%%)</string>
     <string name="custom_density_title">Custom display density</string>
-    <string name="custom_density_summary">Enter a value between 50% and 120%. Lower values show more content, higher values make everything larger.</string>
+    <string name="custom_density_summary" formatted="false">Enter a value between 50% and 120%. Lower values show more content, higher values make everything larger.</string>
     <string name="default_">Default</string>
     <string name="squiggly">Squiggly</string>
     <string name="slim">Slim</string>
@@ -356,10 +406,14 @@
     <string name="token_hidden">Tap to show token</string>
     <string name="token_shown">Tap again to copy or edit</string>
     <string name="token_adv_login_description">This is an ADVANCED login method. As an alternative to the web portal, you may directly enter or update your login token here. For example, this can speed up logging in on multiple devices. Please note that any invalid token formats the app fails to parse will not be accepted</string>
+    <string name="login_requires_cookie">YouTube cookie missing. Paste the full advanced token.</string>
+    <string name="login_not_available_desktop">Not available on desktop. Use advanced login.</string>
     <string name="ytm_sync">Automatically sync with your YouTube Music account</string>
     <string name="general">General</string>
     <string name="content_language">Default content language</string>
     <string name="content_country">Default content country</string>
+    <string name="hide_explicit">Hide explicit content</string>
+    <string name="hide_explicit_desc">Filter songs with explicit content</string>
     <string name="system_default">System default</string>
     <string name="proxy">Proxy</string>
     <string name="enable_proxy">Enable proxy</string>
@@ -386,11 +440,15 @@
     <string name="audio_quality_auto">Auto</string>
     <string name="audio_quality_high">High</string>
     <string name="audio_quality_low">Low</string>
+    <string name="audio_quality_medium">Medium</string>
+    <string name="crossfade">Crossfade</string>
     <string name="queue">Queue</string>
     <string name="persistent_queue">Persistent queue</string>
     <string name="persistent_queue_desc">Restore your last queue when the app starts</string>
     <string name="auto_load_more">Auto load more songs</string>
     <string name="auto_load_more_desc">Automatically add more songs when the end of the queue is reached, if possible</string>
+    <string name="auto_start_radio">Auto start radio</string>
+    <string name="auto_start_radio_desc">Start radio when the queue ends</string>
     <string name="enable_similar_content">Enable Similar Content</string>
     <string name="similar_content_desc">Automatically add more similar songs when the end of the queue is reached</string>
     <string name="skip_silence">Skip silence</string>
@@ -405,11 +463,17 @@
     <string name="auto_download_lyrics_desc">Automatically download lyrics for downloaded songs</string>
 
     <string name="storage">Storage</string>
+    <string name="download_as_mp3">Download as MP3</string>
+    <string name="download_as_mp3_desc">Requires FFmpeg installed on the system</string>
     <string name="image_cache">Image Cache</string>
     <string name="song_cache">Song Cache</string>
     <string name="max_cache_size">Max cache size</string>
     <string name="unlimited">Unlimited</string>
     <string name="clear_all_downloads">Clear all downloads</string>
+    <string name="clear_cache">Clear cache</string>
+    <string name="clear_cache_desc">Free space by removing temporary files</string>
+    <string name="clear_cache_confirm_title">Clear cache?</string>
+    <string name="clear_cache_confirm_desc">Images and cached data will be removed. Downloaded songs will not be affected.</string>
     <string name="clear_image_cache">Clear image cache</string>
     <string name="clear_song_cache">Clear song cache</string>
     <string name="size_used">%s used</string>
@@ -417,6 +481,9 @@
 
 
     <string name="privacy">Privacy</string>
+    <string name="search_settings_placeholder">Search settings...</string>
+    <string name="no_settings_found">No settings found</string>
+    <string name="back">Back</string>
     <string name="listen_history">Listen History</string>
     <string name="search_history">Search History</string>
     <string name="pause_listen_history">Pause listen history</string>
@@ -425,8 +492,16 @@
     <string name="pause_search_history">Pause search history</string>
     <string name="clear_search_history">Clear search history</string>
     <string name="clear_search_history_confirm">Are you sure you want to clear all search history?</string>
+    <string name="security">Security</string>
+    <string name="clear_sensitive_data">Clear sensitive data</string>
+    <string name="clear_sensitive_data_description">Remove tokens, cookies, and private credentials from this device.</string>
+    <string name="clear_sensitive_data_confirm">This will remove saved account credentials and tokens. Continue?</string>
+    <string name="reset_app_keep_downloads">Reset app (keep downloads)</string>
+    <string name="reset_app_keep_downloads_description">Reset local app data and settings without deleting downloaded songs.</string>
+    <string name="reset_app_keep_downloads_confirm">All local app data will be reset. Downloaded songs will be preserved.</string>
     <string name="disable_screenshot">Disable screenshot</string>
     <string name="disable_screenshot_desc">When this option is on, screenshots and the app\'s view in Recents are disabled.</string>
+    <string name="disable_screenshot_not_supported_desktop">Not supported on desktop.</string>
 
 
     <string name="backup_restore">Backup and restore</string>
@@ -438,6 +513,18 @@
     <string name="discord_integration">Discord Integration</string>
     <string name="discord_information">AniTail uses the KizzyRPC library to set your Discord account\'s status. This involves using the Discord Gateway connection, which may be considered a violation of Discord\'s TOS. However, there are no known cases of user accounts being suspended for this reason. Use at your own risk.\n\nAnitail will only extract your token, and everything else is stored locally.</string>
     <string name="dismiss">Dismiss</string>
+    <string name="open_link">Open link</string>
+
+    <string name="desktop_edition">Desktop Edition</string>
+    <string name="about_build">Build</string>
+    <string name="about_version_title">Version</string>
+    <string name="about_device">Device</string>
+    <string name="about_kotlin">Kotlin</string>
+    <string name="about_compose_desktop">Compose Desktop</string>
+    <string name="about_source_code">Source code</string>
+    <string name="about_source_code_desc">View on GitHub</string>
+    <string name="about_licenses">Licenses</string>
+    <string name="about_licenses_desc">Open-source libraries</string>
     <string name="options">Options</string>
     <string name="preview">Preview</string>
     <string name="not_logged_in_youtube">Not logged in to YouTube</string>
@@ -627,6 +714,14 @@
     <string name="auto_backup_custom_location_desc">Select a custom folder for auto backups</string>
     <string name="select_folder">Select folder</string>
     <string name="no_folder_selected">No folder selected</string>
+    <string name="custom_download_path">Custom download path</string>
+    <string name="custom_download_path_desc">Save downloads to a custom folder (e.g., SD card)</string>
+    <string name="max_download_speed">Maximum download speed</string>
+    <string name="max_download_speed_desc">When enabled: Turbo mode (faster downloads, higher battery/data usage).</string>
+    <string name="select_download_folder">Select download folder</string>
+    <string name="reset_download_path">Reset to default (internal cache)</string>
+    <string name="current_path">Current path: %s</string>
+    <string name="permission_lost_warning">Folder permission lost. Please re-select.</string>
     <string name="backups_location_info">Default location: Downloads/AniTail/AutoBackup</string>
     <string name="backup_permission_error">Backup permission error</string>
     <string name="backup_fallback_to_internal">Custom location unavailable, falling back to internal storage</string>
@@ -673,6 +768,7 @@
     <string name="love_tracks_description">Automatically love/unlove tracks when you like/unlike them</string>
     <string name="about_lastfm">About Last.fm</string>
     <string name="about_lastfm_description">Learn more about Last.fm music discovery and recommendations</string>
+    <string name="show_lastfm_avatar">Show Last.fm avatar</string>
     <string name="username">Username</string>
     <string name="password">Password</string>
 
@@ -692,6 +788,7 @@
     <string name="no_top_artists_data">No top artists data available. Listen to more music to see your statistics!</string>
     <string name="retry_pending_scrobbles">Retry pending scrobbles</string>
     <string name="clear_pending_scrobbles">Clear pending scrobbles</string>
+    <string name="lastfm_api_keys_missing">Last.fm API keys are missing.</string>
    <string name="lyrics_romanize_japanese">Romanize Japanese Lyrics</string>
     <string name="lyrics_romanize_korean">Romanize Korean Lyrics</string>
     <string name="new_player_design">New player design</string>
@@ -758,4 +855,123 @@
     <string name="crash_report_subject">Anitail Crash Report</string>
     <string name="crash_close">Close</string>
     <string name="crash_no_log">No crash log available</string>
+
+    <!-- Desktop supplemental -->
+    <string name="downloads">Downloads</string>
+    <string name="downloads_active">Active (%d)</string>
+    <string name="downloads_completed">Completed (%d)</string>
+    <string name="downloads_failed">Failed</string>
+    <string name="downloads_no_active">No active downloads</string>
+    <string name="downloads_storage_usage">%1$.1f MB used • %2$d songs</string>
+    <string name="download_queued">Queued…</string>
+    <string name="download_paused">Paused</string>
+    <string name="resume">Resume</string>
+    <string name="pause">Pause</string>
+    <string name="remove_download_confirm">Remove "%s" from downloads?</string>
+    <string name="remove_downloads">Remove downloads</string>
+    <string name="remove_downloads_confirmation">Selected downloads will be removed.</string>
+    <string name="open_in_browser">Open in browser</string>
+    <string name="remove_from_queue">Remove from queue</string>
+    <string name="close_selection">Close selection</string>
+    <string name="deselect_all">Deselect all</string>
+    <string name="connected_user">Connected user</string>
+    <string name="login_prompt_details">Sign in to access your library, playlists, and personalized recommendations.</string>
+    <string name="error_loading_playlist">Error loading playlist</string>
+    <string name="error_loading_album">Error loading album</string>
+    <string name="error_loading_artist">Error loading artist</string>
+    <string name="song">Song</string>
+    <string name="album">Album</string>
+    <string name="playlist">Playlist</string>
+    <string name="all">All</string>
+    <string name="use_suggestion">Use suggestion</string>
+    <string name="repeat">Repeat</string>
+    <string name="top_songs">Top songs</string>
+    <string name="explicit_badge">E</string>
+    <string name="playing_indicator">▶</string>
+    <string name="list_separator">, </string>
+    <string name="history_empty">No recent plays.</string>
+    <string name="nothing_playing">Nothing is playing</string>
+    <string name="stats_songs_in_library">Songs in library</string>
+    <string name="stats_recent_plays">Recent plays</string>
+    <string name="stats_more_soon">More stats coming soon on Desktop.</string>
+    <string name="refresh">Refresh</string>
+    <string name="minimize">Minimize</string>
+    <string name="maximize">Maximize</string>
+    <string name="previous">Previous</string>
+    <string name="next">Next</string>
+    <string name="shuffle_play">Shuffle play</string>
+    <string name="repeat_all">All</string>
+    <string name="repeat_one">One</string>
+    <string name="up_next">Up next</string>
+    <string name="previously_played">Previously played</string>
+    <string name="lyrics_synced">Synced</string>
+    <string name="lyrics_plain">Text</string>
+    <string name="lyrics_start_playing">Play a song to see the lyrics</string>
+    <string name="retry">Retry</string>
+    <string name="search_suggestions_available">Suggestions available</string>
+    <string name="time_remaining">Remaining: %1$s</string>
+    <string name="start">Start</string>
+    <string name="update">Update</string>
+    <string name="volume_percent">Volume: %1$d%%</string>
+    <string name="tempo_value">Tempo: %1$sx</string>
+    <string name="pitch_value">Pitch: %1$s</string>
+    <string name="select_artist">Select artist</string>
+    <string name="duration">Duration</string>
+    <string name="id">ID</string>
+    <string name="url">URL</string>
+
+    <plurals name="queue_items_removed">
+        <item quantity="one">%d song removed</item>
+        <item quantity="other">%d songs removed</item>
+    </plurals>
+    <!-- Recognition screen strings -->
+    <string name="recognize_music">Recognize music</string>
+    <string name="recognition_history">Recognition history</string>
+    <string name="tap_to_recognize">Tap to recognize</string>
+    <string name="listening">Listening…</string>
+    <string name="processing">Processing…</string>
+    <string name="play_on_app">Play on app</string>
+    <string name="re_listen">Re-listen</string>
+    <string name="no_match_found">No match found</string>
+    <string name="recognition_no_match_tip">Tip: move closer to the speaker and avoid background noise.</string>
+    <string name="try_again">Try again</string>
+    <string name="recognition_error">Recognition error</string>
+    <string name="recognition_error_tip">Tip: check your internet connection and try again.</string>
+    <string name="recognition_share_template">I recognized "%1$s" by %2$s on AniTail Music.%3$s</string>
+    <string name="recognition_share_link_template">\nOpen in AniTail: %1$s</string>
+    <string name="clear_recognition_history">Clear recognition history</string>
+    <string name="clear_recognition_history_confirm">Are you sure you want to clear recognition history?</string>
+    <string name="delete_from_history">Delete from history</string>
+    <string name="sound_capsule_title">Your Sound Capsule</string>
+    <string name="time_listened">Time listened</string>
+    <string name="sound_capsule_top_artist">Top artist</string>
+    <string name="sound_capsule_top_song">Top song</string>
+    <string name="sound_capsule_new">New</string>
+    <string name="sound_capsule_no_data">No data yet</string>
+    <string name="sound_capsule_musicless_title">This was a music-less month.</string>
+    <string name="sound_capsule_musicless_subtitle">Don\'t worry, it happens.</string>
+    <string name="sound_capsule_minutes_value">%1$d minutes</string>
+    <string name="sound_capsule_minutes_short">%1$d min</string>
+    <string name="sound_capsule_lifetime_headline">You listened to %1$d songs since joining AniTail</string>
+    <string name="sound_capsule_lifetime_description">Keep listening to unlock richer monthly insights about your music habits.</string>
+    <string name="sound_capsule_daily_average">Daily average: %1$d min</string>
+    <string name="sound_capsule_time_prefix">You listened to music for </string>
+    <string name="sound_capsule_time_suffix"> this month.</string>
+    <string name="sound_capsule_period_suffix"> are when you listened most.</string>
+    <string name="sound_capsule_music_for_right_now">Music for right now</string>
+    <string name="sound_capsule_on_repeat">On Repeat</string>
+    <string name="sound_capsule_quick_pick">Quick pick</string>
+    <string name="sound_capsule_quick_mix">Top 5 mix</string>
+    <string name="sound_capsule_play_top_song">Play top song</string>
+    <string name="sound_capsule_open_top_artist">Open top artist</string>
+    <string name="sound_capsule_active_days">Active days this month: %1$d</string>
+    <string name="sound_capsule_top_artists_title">Top artists</string>
+    <string name="sound_capsule_top_artists_prefix">You listened to </string>
+    <string name="sound_capsule_top_artists_suffix"> this month.</string>
+    <string name="sound_capsule_new_to_top_five">New to top 5</string>
+    <string name="sound_capsule_top_artist_of_month">Top artist this month</string>
+    <string name="sound_capsule_period_morning">Morning</string>
+    <string name="sound_capsule_period_afternoon">Afternoon</string>
+    <string name="sound_capsule_period_evening">Evening</string>
+    <string name="sound_capsule_period_night">Night</string>
 </resources>

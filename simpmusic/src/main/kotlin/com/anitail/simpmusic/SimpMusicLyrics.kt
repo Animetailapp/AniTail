@@ -14,6 +14,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
 
 object SimpMusicLyrics {
@@ -72,6 +73,9 @@ object SimpMusicLyrics {
             emptyList()
         }
     }.getOrElse { e ->
+        if (e is CancellationException) {
+            throw e
+        }
         println("[SimpMusic] Exception in getLyricsByVideoId: ${e.message}")
         e.printStackTrace()
         emptyList()

@@ -36,6 +36,7 @@ import com.anitail.music.db.entities.Playlist
 import com.anitail.music.db.entities.PlaylistEntity
 import com.anitail.music.db.entities.PlaylistSong
 import com.anitail.music.db.entities.PlaylistSongMap
+import com.anitail.music.db.entities.RecognitionHistory
 import com.anitail.music.db.entities.RelatedSongMap
 import com.anitail.music.db.entities.SearchHistory
 import com.anitail.music.db.entities.SetVideoIdEntity
@@ -168,12 +169,42 @@ interface DatabaseDao {
     suspend fun songsWithMediaStoreUri(): List<Song>
 
     @Transaction
+    @Query("SELECT * FROM song WHERE mediaStoreUri IS NOT NULL ORDER BY dateDownload DESC")
+    fun songsWithMediaStoreUriFlow(): Flow<List<Song>>
+
+    @Transaction
     @Query("SELECT * FROM song WHERE mediaStoreUri = :mediaStoreUri LIMIT 1")
     suspend fun songByMediaStoreUri(mediaStoreUri: String): Song?
 
     @Transaction
+    @Query("SELECT * FROM song WHERE id IN (:songIds)")
+    suspend fun songsByIds(songIds: List<String>): List<Song>
+
+    @Transaction
     @Query("SELECT song.* FROM song JOIN song_album_map ON song.id = song_album_map.songId WHERE song_album_map.albumId = :albumId")
     fun albumSongs(albumId: String): Flow<List<Song>>
+
+    @Query("SELECT song.id FROM song JOIN song_album_map ON song.id = song_album_map.songId WHERE song_album_map.albumId = :albumId")
+    fun albumSongIds(albumId: String): Flow<List<String>>
+
+    @Query(
+        """
+        SELECT CASE
+            WHEN COUNT(1) = 0 THEN 0
+            WHEN SUM(
+                CASE
+                    WHEN song.mediaStoreUri IS NOT NULL OR song.downloadUri IS NOT NULL THEN 1
+                    ELSE 0
+                END
+            ) = COUNT(1) THEN 1
+            ELSE 0
+        END
+        FROM song
+        JOIN song_album_map ON song.id = song_album_map.songId
+        WHERE song_album_map.albumId = :albumId
+        """
+    )
+    fun isAlbumFullyDownloaded(albumId: String): Flow<Boolean>
 
     @Transaction
     @Query("SELECT playlist_song_map.* FROM playlist_song_map INNER JOIN song ON playlist_song_map.songId = song.id WHERE playlistId = :playlistId ORDER BY position")
@@ -971,6 +1002,12 @@ interface DatabaseDao {
     @Query("UPDATE song SET liked = 1 WHERE id = :songId")
     suspend fun toggleLikedToTrue(songId: String)
 
+    @Query("UPDATE song SET downloadUri = :uri WHERE id = :songId")
+    fun updateDownloadUri(songId: String, uri: String?)
+
+    @Query("SELECT downloadUri FROM song WHERE id = :songId")
+    fun getDownloadUri(songId: String): String?
+
 
     @Transaction
     @Query("SELECT COUNT(1) FROM related_song_map WHERE songId = :songId LIMIT 1")
@@ -1058,6 +1095,19 @@ interface DatabaseDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     fun insert(map: RelatedSongMap)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insert(recognitionHistory: RecognitionHistory): Long
+
+    @Transaction
+    @Query("SELECT * FROM recognition_history ORDER BY recognizedAt DESC")
+    fun recognitionHistory(): Flow<List<RecognitionHistory>>
+
+    @Query("DELETE FROM recognition_history")
+    fun clearRecognitionHistory()
+
+    @Query("DELETE FROM recognition_history WHERE id = :id")
+    fun deleteRecognitionHistoryById(id: Long)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     fun insert(playCountEntity: PlayCountEntity): Long

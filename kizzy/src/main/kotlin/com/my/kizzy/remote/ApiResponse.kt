@@ -8,3 +8,9 @@ data class ApiResponse(
     @SerialName("id")
     val id: String,
 )
+
+@Serializable
+data class ImageProxyResponse(
+    @SerialName("assets")
+    val assets: Map<String, String>? = null,
+)

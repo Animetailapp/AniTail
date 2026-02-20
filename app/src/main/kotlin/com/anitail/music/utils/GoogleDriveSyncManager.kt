@@ -32,6 +32,11 @@ import javax.inject.Singleton
 class GoogleDriveSyncManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    companion object {
+        private const val LEGACY_INITIAL_BACKUP_NAME = "initial_backup.zip"
+        private const val LEGACY_MERGED_BACKUP_NAME = "merged_backup.zip"
+    }
+
     private val _signedInAccount = MutableStateFlow<GoogleSignInAccount?>(null)
     val signedInAccount: StateFlow<GoogleSignInAccount?> = _signedInAccount.asStateFlow()
 
@@ -143,6 +148,39 @@ class GoogleDriveSyncManager @Inject constructor(
         }
     }
 
+    suspend fun uploadBackupReplacingByName(
+        backupFile: File,
+        remoteName: String = backupFile.name,
+    ): Result<String> = withContext(Dispatchers.IO) {
+        val service = driveService ?: return@withContext Result.failure(Exception("Not signed in"))
+
+        try {
+            val folderId = getOrCreateBackupFolder()
+            val mediaContent = FileContent("application/octet-stream", backupFile)
+            val existingFileId = findFileIdInFolder(folderId, remoteName)
+
+            val file = if (existingFileId != null) {
+                service.files().update(existingFileId, null, mediaContent)
+                    .setFields("id, name")
+                    .execute()
+            } else {
+                val fileMetadata = com.google.api.services.drive.model.File().apply {
+                    name = remoteName
+                    parents = listOf(folderId)
+                }
+                service.files().create(fileMetadata, mediaContent)
+                    .setFields("id, name")
+                    .execute()
+            }
+
+            Timber.d("Backup uploaded (replace-by-name): ${file.name} (${file.id})")
+            Result.success(file.id)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to upload backup with replace-by-name")
+            Result.failure(e)
+        }
+    }
+
     suspend fun uploadBackup(uri: android.net.Uri, name: String): Result<String> =
         withContext(Dispatchers.IO) {
             val service =
@@ -176,6 +214,45 @@ class GoogleDriveSyncManager @Inject constructor(
             }
         }
 
+    suspend fun uploadBackupReplacingByName(uri: android.net.Uri, name: String): Result<String> =
+        withContext(Dispatchers.IO) {
+            val service =
+                driveService ?: return@withContext Result.failure(Exception("Not signed in"))
+
+            try {
+                val folderId = getOrCreateBackupFolder()
+                val existingFileId = findFileIdInFolder(folderId, name)
+
+                val inputStream = context.contentResolver.openInputStream(uri)
+                    ?: return@withContext Result.failure(Exception("Could not open stream for uri: $uri"))
+
+                val mediaContent = com.google.api.client.http.InputStreamContent(
+                    "application/octet-stream",
+                    inputStream
+                )
+
+                val file = if (existingFileId != null) {
+                    service.files().update(existingFileId, null, mediaContent)
+                        .setFields("id, name")
+                        .execute()
+                } else {
+                    val fileMetadata = com.google.api.services.drive.model.File().apply {
+                        this.name = name
+                        parents = listOf(folderId)
+                    }
+                    service.files().create(fileMetadata, mediaContent)
+                        .setFields("id, name")
+                        .execute()
+                }
+
+                Timber.d("Backup uploaded from URI (replace-by-name): ${file.name} (${file.id})")
+                Result.success(file.id)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to upload backup from URI with replace-by-name")
+                Result.failure(e)
+            }
+        }
+
     suspend fun downloadLatestBackup(destinationFile: File): Result<File> =
         withContext(Dispatchers.IO) {
             val service =
@@ -186,10 +263,16 @@ class GoogleDriveSyncManager @Inject constructor(
 
                 // Find latest backup file
                 val result = service.files().list()
-                    .setQ("'$folderId' in parents and name contains 'AniTail' and trashed = false")
-                    .setOrderBy("createdTime desc")
+                    .setQ(
+                        "'$folderId' in parents and (" +
+                            "name contains 'AniTail' or " +
+                            "name = '$LEGACY_INITIAL_BACKUP_NAME' or " +
+                            "name = '$LEGACY_MERGED_BACKUP_NAME'" +
+                            ") and trashed = false"
+                    )
+                    .setOrderBy("modifiedTime desc")
                     .setPageSize(1)
-                    .setFields("files(id, name, createdTime)")
+                    .setFields("files(id, name, modifiedTime, createdTime)")
                     .execute()
 
                 val files = result.files
@@ -219,17 +302,23 @@ class GoogleDriveSyncManager @Inject constructor(
             val folderId = getOrCreateBackupFolder()
 
             val result = service.files().list()
-                .setQ("'$folderId' in parents and name contains 'AniTail' and trashed = false")
-                .setOrderBy("createdTime desc")
+                .setQ(
+                    "'$folderId' in parents and (" +
+                        "name contains 'AniTail' or " +
+                        "name = '$LEGACY_INITIAL_BACKUP_NAME' or " +
+                        "name = '$LEGACY_MERGED_BACKUP_NAME'" +
+                        ") and trashed = false"
+                )
+                .setOrderBy("modifiedTime desc")
                 .setPageSize(20)
-                .setFields("files(id, name, createdTime, size)")
+                .setFields("files(id, name, modifiedTime, createdTime, size)")
                 .execute()
 
             val backups = result.files?.map { file ->
                 DriveBackupInfo(
                     id = file.id,
                     name = file.name,
-                    createdTime = file.createdTime?.value ?: 0L,
+                    createdTime = file.modifiedTime?.value ?: file.createdTime?.value ?: 0L,
                     size = file.size?.toLong() ?: 0L
                 )
             } ?: emptyList()
@@ -268,6 +357,21 @@ class GoogleDriveSyncManager @Inject constructor(
 
         Timber.d("Created backup folder: ${folder.id}")
         folder.id
+    }
+
+    private suspend fun findFileIdInFolder(
+        folderId: String,
+        fileName: String,
+    ): String? = withContext(Dispatchers.IO) {
+        val service = driveService ?: return@withContext null
+        val escapedFileName = fileName.replace("'", "\\'")
+        val result = service.files().list()
+            .setQ("'$folderId' in parents and name = '$escapedFileName' and trashed = false")
+            .setPageSize(1)
+            .setFields("files(id)")
+            .execute()
+
+        result.files?.firstOrNull()?.id
     }
 
     fun isSignedIn(): Boolean = _signedInAccount.value != null

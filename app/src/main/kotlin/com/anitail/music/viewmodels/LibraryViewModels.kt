@@ -86,7 +86,8 @@ constructor(
                                 .flowOn(Dispatchers.IO)
                                 .map { songs ->
                                     songs.filter {
-                                        downloads[it.id]?.state == Download.STATE_COMPLETED
+                                        downloads[it.id]?.state == Download.STATE_COMPLETED ||
+                                            !it.song.mediaStoreUri.isNullOrEmpty()
                                     }
                                 }.map { songs ->
                                     when (sortType) {

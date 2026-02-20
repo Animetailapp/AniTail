@@ -1,0 +1,476 @@
+name: Publish Desktop Release
+
+on:
+  push:
+    branches:
+      - "master"
+    paths:
+      - "desktop/build.gradle.kts"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (example: 1.14.0 or v1.14.0). Leave empty to use desktop/build.gradle.kts"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.resolve.outputs.should_publish }}
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      release_version: ${{ steps.resolve.outputs.release_version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Resolve desktop version
+        id: resolve
+        shell: bash
+        run: |
+          set -e
+
+          extract_version() {
+            # Regex updated to support single (') and double (") quotes
+            grep -oP "packageVersion\s*=\s*['\"]\K[^'\"]+" desktop/build.gradle.kts | head -n1 || true
+          }
+
+          normalize_tag() {
+            local value="$1"
+            if [[ "$value" == v* ]]; then
+              echo "$value"
+            else
+              echo "v$value"
+            fi
+          }
+
+          INPUT_VERSION="${{ inputs.version }}"
+          CURRENT_VERSION="$(extract_version)"
+          IS_MANUAL="${{ github.event_name == 'workflow_dispatch' }}"
+
+          # 1. Check for Manual Input Override
+          if [ "$IS_MANUAL" = "true" ] && [ -n "$INPUT_VERSION" ]; then
+            RELEASE_VERSION="${INPUT_VERSION#v}"
+            RELEASE_TAG="$(normalize_tag "$RELEASE_VERSION")"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "release_version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+            echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            echo "Manual input detected: Force publishing $RELEASE_TAG"
+            exit 0
+          fi
+
+          # 2. Check if file reading failed
+          if [ -z "$CURRENT_VERSION" ]; then
+            echo "Could not read packageVersion from desktop/build.gradle.kts"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # 3. Check for Manual Trigger without Input (Force publish current file version)
+          if [ "$IS_MANUAL" = "true" ]; then
+            RELEASE_TAG="$(normalize_tag "$CURRENT_VERSION")"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "release_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+            echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            echo "Manual trigger (empty input): Force publishing from file version $CURRENT_VERSION"
+            exit 0
+          fi
+
+          # 4. Check for Git Changes (Push event)
+          PREVIOUS_VERSION="$(git diff HEAD^ HEAD -- desktop/build.gradle.kts | grep -oP "packageVersion\s*=\s*['\"]\K[^'\"]+" | head -n1 || true)"
+
+          if [ -z "$PREVIOUS_VERSION" ] || [ "$PREVIOUS_VERSION" != "$CURRENT_VERSION" ]; then
+            RELEASE_TAG="$(normalize_tag "$CURRENT_VERSION")"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "release_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+            echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            echo "Desktop version changed: ${PREVIOUS_VERSION:-<none>} -> $CURRENT_VERSION"
+          else
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            echo "release_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+            echo "release_tag=$(normalize_tag "$CURRENT_VERSION")" >> "$GITHUB_OUTPUT"
+            echo "Desktop version did not change."
+          fi
+
+  build_desktop:
+    needs: check-version
+    if: needs.check-version.outputs.should_publish == 'true'
+    name: Build (${{ matrix.label }})
+    runs-on: ${{ matrix.runs_on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runs_on: ubuntu-latest
+            label: Linux DEB
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageReleaseDeb
+            java_arch: x64
+            ext: deb
+            asset_suffix: linux-x64
+          - runs_on: ubuntu-latest
+            label: Linux RPM
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageReleaseRpm
+            java_arch: x64
+            ext: rpm
+            asset_suffix: linux-x64
+          - runs_on: ubuntu-latest
+            label: Linux AppImage
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageReleaseAppImage
+            java_arch: x64
+            ext: AppImage
+            asset_suffix: linux-x64
+          - runs_on: macos-latest
+            label: macOS DMG
+            gradle_cmd: ./gradlew
+            gradle_task: :desktop:packageReleaseDmg
+            java_arch: aarch64
+            ext: dmg
+            asset_suffix: macos-arm64
+          - runs_on: windows-latest
+            label: Windows MSI
+            gradle_cmd: ./gradlew.bat
+            gradle_task: :desktop:packageReleaseMsi
+            java_arch: x64
+            ext: msi
+            asset_suffix: windows-x64
+          - runs_on: windows-11-arm
+            label: Windows ARM64 MSI
+            gradle_cmd: ./gradlew.bat
+            gradle_task: :desktop:packageReleaseMsi
+            java_arch: aarch64
+            ext: msi
+            asset_suffix: windows-arm64
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          architecture: ${{ matrix.java_arch }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-cleanup: on-success
+
+      - name: Grant execute permission for gradlew
+        if: runner.os != 'Windows'
+        run: chmod +x gradlew
+
+      - name: Install RPM tools
+        if: matrix.ext == 'rpm'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Install AppImage tools
+        if: matrix.ext == 'AppImage'
+        shell: bash
+        run: |
+          set -e
+          sudo apt-get update
+          if apt-cache show libfuse2 >/dev/null 2>&1; then
+            sudo apt-get install -y libfuse2
+          else
+            sudo apt-get install -y libfuse2t64
+          fi
+          curl -L "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage" -o /tmp/appimagetool.AppImage
+          chmod +x /tmp/appimagetool.AppImage
+
+      - name: Validate Google OAuth secret
+        shell: pwsh
+        env:
+          GOOGLE_CLIENT_SECRET_JSON: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:GOOGLE_CLIENT_SECRET_JSON)) {
+            throw "Missing required secret: GOOGLE_CLIENT_SECRET_JSON"
+          }
+
+      - name: Inject Google OAuth client_secret.json
+        shell: pwsh
+        env:
+          GOOGLE_CLIENT_SECRET_JSON: ${{ secrets.GOOGLE_CLIENT_SECRET_JSON }}
+        run: |
+          New-Item -ItemType Directory -Force "desktop/src/main/resources/oauth" | Out-Null
+          [System.IO.File]::WriteAllText(
+            "desktop/src/main/resources/oauth/client_secret.json",
+            $env:GOOGLE_CLIENT_SECRET_JSON,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
+      - name: Build desktop package
+        run: ${{ matrix.gradle_cmd }} ${{ matrix.gradle_task }}
+        env:
+          ANITAIL_DESKTOP_ONLY: 'true'
+
+      - name: Generate AppImage (fallback)
+        if: matrix.ext == 'AppImage'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APPIMAGE_FILE="$(find desktop/build/compose/binaries -type f \( -name "*.AppImage" -o -name "*.appimage" \) -print -quit)"
+          if [ -n "$APPIMAGE_FILE" ]; then
+            echo "AppImage already generated by Gradle."
+            exit 0
+          fi
+
+          SRC_DIR="$(find desktop/build/compose/binaries -type d -path "*/main-release/app/*" -print -quit)"
+          if [ -z "$SRC_DIR" ]; then
+            echo "Could not find desktop distributable directory."
+            find desktop/build/compose/binaries -maxdepth 6 -type d | sed -n '1,200p'
+            exit 1
+          fi
+
+          APP_NAME="$(basename "$SRC_DIR")"
+          APPDIR="desktop/build/compose/binaries/main-release/${APP_NAME}.AppDir"
+          rm -rf "$APPDIR"
+          mkdir -p "$APPDIR/usr"
+          cp -a "$SRC_DIR/bin" "$APPDIR/usr/"
+          cp -a "$SRC_DIR/lib" "$APPDIR/usr/"
+
+          APP_EXEC_PATH="$(find "$SRC_DIR/bin" -maxdepth 1 -type f -name "$APP_NAME" -print -quit || true)"
+          if [ -z "$APP_EXEC_PATH" ]; then
+            APP_EXEC_PATH="$(find "$SRC_DIR/bin" -maxdepth 1 -type f -executable -print -quit || true)"
+          fi
+          if [ -z "$APP_EXEC_PATH" ]; then
+            APP_EXEC_PATH="$(find "$SRC_DIR/bin" -maxdepth 1 -type f -print -quit || true)"
+          fi
+          if [ -z "$APP_EXEC_PATH" ]; then
+            echo "Could not find launcher inside $SRC_DIR/bin"
+            find "$SRC_DIR/bin" -maxdepth 2 -print | sed -n '1,200p'
+            exit 1
+          fi
+          APP_EXEC_NAME="$(basename "$APP_EXEC_PATH")"
+
+          cat > "$APPDIR/${APP_NAME}.desktop" << EOF
+          [Desktop Entry]
+          Type=Application
+          Name=${APP_NAME}
+          Exec=${APP_EXEC_NAME}
+          Icon=${APP_NAME}
+          Categories=AudioVideo;Player;
+          Terminal=false
+          EOF
+
+          if [ -f "$SRC_DIR/lib/${APP_NAME}.png" ]; then
+            cp "$SRC_DIR/lib/${APP_NAME}.png" "$APPDIR/${APP_NAME}.png"
+          else
+            ICON_FILE="$(find "$SRC_DIR/lib" -maxdepth 1 -type f -name '*.png' -print -quit || true)"
+            if [ -n "$ICON_FILE" ]; then
+              cp "$ICON_FILE" "$APPDIR/${APP_NAME}.png"
+            fi
+          fi
+
+          cat > "$APPDIR/AppRun" << EOF
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec "\$HERE/usr/bin/${APP_EXEC_NAME}" "\$@"
+          EOF
+          chmod +x "$APPDIR/AppRun"
+
+          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 /tmp/appimagetool.AppImage \
+            "$APPDIR" "desktop/build/compose/binaries/main-release/${APP_NAME}-x86_64.AppImage"
+
+      - name: Prepare release asset
+        shell: pwsh
+        run: |
+          $ext = ".${{ matrix.ext }}"
+          $allFiles = Get-ChildItem -Path "desktop/build/compose/binaries" -Recurse -File
+
+          if ("${{ matrix.ext }}" -ieq "AppImage") {
+            $files = $allFiles | Where-Object {
+              $_.Extension -ieq ".AppImage" -or
+              $_.Extension -ieq ".appimage" -or
+              $_.Name -match "AppImage$" -or
+              $_.Name -match "\.appimage$"
+            }
+          } else {
+            $files = $allFiles | Where-Object { $_.Extension -ieq $ext }
+          }
+
+          if (-not $files) {
+            Write-Host "No package found with extension $ext"
+            Write-Host "Files found under desktop/build/compose/binaries:"
+            $allFiles | Sort-Object FullName | ForEach-Object { Write-Host $_.FullName }
+            throw "No package found for ${{ matrix.label }}"
+          }
+
+          $latest = $files | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
+          New-Item -ItemType Directory -Force "dist" | Out-Null
+
+          $assetName = "AniTail-Desktop-${{ needs.check-version.outputs.release_tag }}-${{ matrix.asset_suffix }}.${{ matrix.ext }}"
+          Copy-Item $latest.FullName ("dist/" + $assetName)
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: desktop-${{ matrix.asset_suffix }}-${{ matrix.ext }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Cleanup injected secret
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path "desktop/src/main/resources/oauth/client_secret.json") {
+            Remove-Item -Force "desktop/src/main/resources/oauth/client_secret.json"
+          }
+
+  publish:
+    needs: [check-version, build_desktop]
+    if: needs.check-version.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    env:
+      TARGET_REPO: Animetailapp/Anitail-Desktop
+      RELEASE_TAG: ${{ needs.check-version.outputs.release_tag }}
+      GH_TOKEN: ${{ secrets.DESKTOP_RELEASE_TOKEN }}
+      DISCORD_WEBHOOK_BETA: ${{ secrets.DISCORD_WEBHOOK_BETA }}
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: desktop-*
+          merge-multiple: true
+          path: release_assets
+
+      - name: Publish/Update target release
+        shell: bash
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "Missing required secret: DESKTOP_RELEASE_TOKEN"
+            exit 1
+          fi
+
+          ls -la release_assets
+
+          if gh release view "$RELEASE_TAG" --repo "$TARGET_REPO" >/dev/null 2>&1; then
+            echo "Release already exists. Uploading assets with overwrite..."
+            gh release upload "$RELEASE_TAG" release_assets/* --repo "$TARGET_REPO" --clobber
+          else
+            echo "Creating release in target repository..."
+            gh release create "$RELEASE_TAG" release_assets/* \
+              --repo "$TARGET_REPO" \
+              --title "AniTail Desktop $RELEASE_TAG" \
+              --latest \
+              --notes "Automated desktop release for version ${{ needs.check-version.outputs.release_version }} from $GITHUB_REPOSITORY (${GITHUB_SHA})."
+          fi
+
+      - name: Ensure release is marked as latest
+        shell: bash
+        run: |
+          echo "Ensuring $RELEASE_TAG is marked as latest..."
+          gh release edit "$RELEASE_TAG" --repo "$TARGET_REPO" --latest
+
+      - name: Notify Discord (beta)
+        env:
+          RELEASE_TAG: ${{ needs.check-version.outputs.release_tag }}
+          RELEASE_VERSION: ${{ needs.check-version.outputs.release_version }}
+          REPO_URL: https://github.com/Animetailapp/Anitail-Desktop
+        shell: bash
+        run: |
+          DISCORD_WEBHOOK="${DISCORD_WEBHOOK:-$DISCORD_WEBHOOK_BETA}"
+
+          if [ -z "$DISCORD_WEBHOOK" ]; then
+            echo "Missing DISCORD webhook (secrets.DISCORD_WEBHOOK_BETA), skipping Discord notification"
+            exit 0
+          fi
+
+          # Create JSON payload file
+          ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          cat > payload.json << 'EOF'
+          {
+            "content": "**🚀 Nuevo release de AniTail Desktop disponible!**",
+            "username": "AniTail Bot",
+            "avatar_url": "https://github.com/Animetailapp/AniTail/blob/master/fastlane/metadata/android/en-US/images/icon.png?raw=true",
+            "embeds": [
+              {
+                "title": "🚀 Nuevo Release - AniTail Desktop RELEASE_TAG",
+                "url": "REPO_URL/releases/tag/RELEASE_TAG",
+                "description": "Se ha creado una nueva release para AniTail Desktop: **RELEASE_VERSION**.\n\nPuedes revisar los paquetes y descargar los archivos a continuación.",
+                "color": 51711,
+                "image": {
+                  "url": "https://github.com/Animetailapp/AniTail/blob/master/fastlane/metadata/android/en-US/images/featureGraphic.png?raw=true"
+                },
+                "fields": [
+                  {
+                    "name": "📦 Linux DEB",
+                    "value": "[⬇️ Descargar DEB](REPO_URL/releases/download/RELEASE_TAG/AniTail-Desktop-RELEASE_TAG-linux-x64.deb)",
+                    "inline": false
+                  },
+                  {
+                    "name": "📦 Linux RPM",
+                    "value": "[⬇️ Descargar RPM](REPO_URL/releases/download/RELEASE_TAG/AniTail-Desktop-RELEASE_TAG-linux-x64.rpm)",
+                    "inline": false
+                  },
+                  {
+                    "name": "📦 Linux AppImage",
+                    "value": "[⬇️ Descargar AppImage](REPO_URL/releases/download/RELEASE_TAG/AniTail-Desktop-RELEASE_TAG-linux-x64.AppImage)",
+                    "inline": false
+                  },
+                  {
+                    "name": "💿 macOS DMG",
+                    "value": "[⬇️ Descargar DMG](REPO_URL/releases/download/RELEASE_TAG/AniTail-Desktop-RELEASE_TAG-macos-arm64.dmg)",
+                    "inline": false
+                  },
+                  {
+                    "name": "🪟 Windows x64 MSI",
+                    "value": "[⬇️ Descargar MSI](REPO_URL/releases/download/RELEASE_TAG/AniTail-Desktop-RELEASE_TAG-windows-x64.msi)",
+                    "inline": false
+                  },
+                  {
+                    "name": "🪟 Windows ARM64 MSI",
+                    "value": "[⬇️ Descargar MSI ARM64](REPO_URL/releases/download/RELEASE_TAG/AniTail-Desktop-RELEASE_TAG-windows-arm64.msi)",
+                    "inline": false
+                  }
+                ],
+                "footer": {
+                  "text": "Release generado automáticamente por AniTail Bot",
+                  "icon_url": "https://github.com/Animetailapp/AniTail/blob/master/fastlane/metadata/android/en-US/images/icon.png?raw=true"
+                },
+                "timestamp": "TIMESTAMP"
+              }
+            ]
+          }
+          EOF
+
+          # Replace placeholders
+          sed -i "s/RELEASE_TAG/$RELEASE_TAG/g" payload.json
+          sed -i "s/RELEASE_VERSION/$RELEASE_VERSION/g" payload.json
+          sed -i "s|REPO_URL|$REPO_URL|g" payload.json
+          sed -i "s/TIMESTAMP/$ts/g" payload.json
+
+          # Post embed
+          curl -H "Content-Type: application/json" -X POST -d @payload.json "$DISCORD_WEBHOOK" || true
+
+          # Try to upload any build files that are <= 8 MiB (Discord attachment limit for many servers)
+          small_files=()
+          max_size=$((8 * 1024 * 1024))
+          while IFS= read -r -d '' f; do
+            if size=$(stat -c%s "$f" 2>/dev/null); then :; else size=$(stat -f%z "$f" 2>/dev/null || echo 0); fi
+            if [ "$size" -le "$max_size" ]; then
+              small_files+=("$f")
+            fi
+          done < <(find release_assets -type f -print0)
+
+          if [ ${#small_files[@]} -eq 0 ]; then
+            echo "No hay archivos pequeños (<=8MiB) para adjuntar. Se enviaron solo los enlaces."
+            exit 0
+          fi
+
+          for f in "${small_files[@]}"; do
+            base=$(basename "$f")
+            echo "Uploading $base to Discord webhook..."
+            curl -s -H "Expect:" -X POST \
+              -F "payload_json={\"content\": \"Adjuntando build: $base\", \"username\": \"AniTail Bot\"}" \
+              -F "file=@$f" \
+              "$DISCORD_WEBHOOK" || echo "Failed to upload $base"
+          done

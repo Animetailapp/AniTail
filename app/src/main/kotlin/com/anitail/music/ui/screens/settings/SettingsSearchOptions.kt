@@ -25,12 +25,33 @@ object SettingsSearchOptions {
     private fun appearance(context: Context): List<SettingOptionData> = listOf(
         option(
             context,
-            "dynamic_theme",
-            R.string.enable_dynamic_theme,
+            "dynamic_icon",
+            R.string.enable_dynamic_icon,
+            R.string.enable_dynamic_icon_desc,
+            sectionRes = R.string.theme
+        ),
+        option(
+            context,
+            "high_refresh_rate",
+            R.string.enable_high_refresh_rate,
+            R.string.enable_high_refresh_rate_desc,
+            sectionRes = R.string.theme
+        ),
+        option(
+            context,
+            "theme_and_colors",
+            R.string.theme,
+            R.string.customize_app_theme,
+            sectionRes = R.string.theme
+        ),
+        option(
+            context,
+            "palette_customization",
+            R.string.palette_customization,
+            R.string.design_your_own_palette,
             sectionRes = R.string.theme
         ),
         option(context, "dark_theme", R.string.dark_theme, sectionRes = R.string.theme),
-        option(context, "pure_black", R.string.pure_black, sectionRes = R.string.theme),
         option(
             context,
             "display_density",
@@ -216,6 +237,7 @@ object SettingsSearchOptions {
         option(context, "history_duration", R.string.history_duration),
         option(context, "skip_silence", R.string.skip_silence),
         option(context, "audio_normalization", R.string.audio_normalization),
+        option(context, "crossfade", R.string.crossfade),
         option(context, "audio_offload", R.string.audio_offload),
         option(context, "persistent_queue", R.string.persistent_queue),
         option(context, "auto_load_more", R.string.auto_load_more),
@@ -250,6 +272,7 @@ object SettingsSearchOptions {
 
     private fun storage(context: Context): List<SettingOptionData> = listOf(
         option(context, "downloaded_songs", R.string.downloaded_songs),
+        option(context, "max_download_speed", R.string.max_download_speed),
         option(context, "song_cache", R.string.song_cache),
         option(context, "image_cache", R.string.image_cache),
         option(context, "max_cache_size", R.string.max_cache_size),

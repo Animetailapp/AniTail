@@ -26,6 +26,7 @@ import com.anitail.music.db.entities.PlayCountEntity
 import com.anitail.music.db.entities.PlaylistEntity
 import com.anitail.music.db.entities.PlaylistSongMap
 import com.anitail.music.db.entities.PlaylistSongMapPreview
+import com.anitail.music.db.entities.RecognitionHistory
 import com.anitail.music.db.entities.RelatedSongMap
 import com.anitail.music.db.entities.SearchHistory
 import com.anitail.music.db.entities.SetVideoIdEntity
@@ -96,14 +97,15 @@ class MusicDatabase(
         Event::class,
         RelatedSongMap::class,
         SetVideoIdEntity::class,
-        PlayCountEntity::class
+        PlayCountEntity::class,
+        RecognitionHistory::class
     ],
     views = [
         SortedSongArtistMap::class,
         SortedSongAlbumMap::class,
         PlaylistSongMapPreview::class,
     ],
-    version = 26,
+    version = 28,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 2, to = 3),
@@ -129,7 +131,9 @@ class MusicDatabase(
         AutoMigration(from = 22, to = 23),
         AutoMigration(from = 23, to = 24),
         AutoMigration(from = 24, to = 25),
-        AutoMigration(from = 25, to = 26)
+        AutoMigration(from = 25, to = 26),
+        AutoMigration(from = 26, to = 27),
+        AutoMigration(from = 27, to = 28)
     ],
 )
 @TypeConverters(Converters::class)
@@ -144,9 +148,13 @@ abstract class InternalDatabase : RoomDatabase() {
                 delegate =
                 Room
                     .databaseBuilder(context, InternalDatabase::class.java, DB_NAME)
+                    // Register explicit migrations to preserve user data
                     .addMigrations(
                         MIGRATION_1_2,
+                        MIGRATION_25_26,
+                        MIGRATION_26_27,
                     )
+                    .fallbackToDestructiveMigrationOnDowngrade()
                     .addCallback(object : Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             super.onOpen(db)
@@ -389,6 +397,73 @@ val MIGRATION_1_2 =
         }
     }
 
+val MIGRATION_25_26 =
+    object : Migration(25, 26) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            // Schema change introduced in v26: lyrics.provider (nullable TEXT).
+            // Add it defensively for users coming from older backups/installations.
+            var providerColumnExists = false
+            database.query("PRAGMA table_info(lyrics)").use { cursor ->
+                val nameColumnIndex = cursor.getColumnIndex("name")
+                while (cursor.moveToNext()) {
+                    if (nameColumnIndex >= 0 && cursor.getString(nameColumnIndex) == "provider") {
+                        providerColumnExists = true
+                        break
+                    }
+                }
+            }
+            if (!providerColumnExists) {
+                database.execSQL("ALTER TABLE lyrics ADD COLUMN provider TEXT")
+            }
+
+            try {
+                // Ensure room_master_table exists
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS room_master_table " +
+                    "(id INTEGER PRIMARY KEY, identity_hash TEXT)"
+                )
+            } catch (e: Exception) {
+                // Table might already exist, ignore
+            }
+
+            try {
+                // Delete any existing hash before inserting to avoid conflicts
+                database.execSQL("DELETE FROM room_master_table WHERE id = 42")
+                
+                // Update identity hash to match schema v26. This is a safe, idempotent
+                // operation when the on-disk schema already matches the expected schema
+                // but the master table has the old hash (common when restoring backups).
+                database.execSQL(
+                    "INSERT INTO room_master_table (id, identity_hash) " +
+                    "VALUES(42, '51dbb730c8df8048ca1faa23b8fd59b3')"
+                )
+            } catch (e: Exception) {
+                // If this fails, let Room handle it naturally
+            }
+        }
+    }
+
+val MIGRATION_26_27 =
+    object : Migration(26, 27) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            // Rescue migration for installs restored with a broken v26 schema
+            // where lyrics.provider is missing.
+            var providerColumnExists = false
+            database.query("PRAGMA table_info(lyrics)").use { cursor ->
+                val nameColumnIndex = cursor.getColumnIndex("name")
+                while (cursor.moveToNext()) {
+                    if (nameColumnIndex >= 0 && cursor.getString(nameColumnIndex) == "provider") {
+                        providerColumnExists = true
+                        break
+                    }
+                }
+            }
+            if (!providerColumnExists) {
+                database.execSQL("ALTER TABLE lyrics ADD COLUMN provider TEXT")
+            }
+        }
+    }
+
 @DeleteColumn.Entries(
     DeleteColumn(tableName = "song", columnName = "isTrash"),
     DeleteColumn(tableName = "playlist", columnName = "author"),
@@ -552,7 +627,6 @@ class Migration19To20 : AutoMigrationSpec {
         columnName = "artistName"
     )
 )
-
 class Migration20To21 : AutoMigrationSpec
 
 class Migration21To22 : AutoMigrationSpec {
@@ -574,4 +648,3 @@ class Migration21To22 : AutoMigrationSpec {
         }
     }
 }
-

@@ -39,7 +39,13 @@ constructor(
     private val databaseMerger: com.anitail.music.db.DatabaseMerger,
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
 ) {
-  private val syncScope = CoroutineScope(Dispatchers.IO)
+    companion object {
+        private const val CLOUD_SYNC_REMOTE_BACKUP_NAME = "AniTail_CloudSync_Backup.zip"
+        private const val SYNC_THROTTLE_MS = 30 * 60 * 1000L // 30 minutes
+        private const val SYNC_TIMEOUT_MS = 60_000L // 60 seconds
+    }
+
+    private val syncScope = CoroutineScope(Dispatchers.IO)
     private val cloudSyncMutex = Mutex()
 
   fun likeSong(s: SongEntity) {
@@ -274,11 +280,6 @@ constructor(
                 }
             }
         }
-    }
-
-    companion object {
-        private const val SYNC_THROTTLE_MS = 30 * 60 * 1000L // 30 minutes
-        private const val SYNC_TIMEOUT_MS = 60_000L // 60 seconds
     }
 
     suspend fun syncCloud(force: Boolean = false): String? = coroutineScope {
@@ -520,7 +521,10 @@ constructor(
                     }
                 }
 
-                val uploadResult = googleDriveSyncManager.uploadBackup(mergedBackupZip)
+                val uploadResult = googleDriveSyncManager.uploadBackupReplacingByName(
+                    mergedBackupZip,
+                    CLOUD_SYNC_REMOTE_BACKUP_NAME
+                )
                 if (uploadResult.isSuccess) {
                     Timber.d("syncCloud: Sync completed successfully")
                     return@coroutineScope "Sincronización completada"
@@ -593,7 +597,10 @@ constructor(
                     }
                 }
 
-                val uploadResult = googleDriveSyncManager.uploadBackup(localBackupZip)
+                val uploadResult = googleDriveSyncManager.uploadBackupReplacingByName(
+                    localBackupZip,
+                    CLOUD_SYNC_REMOTE_BACKUP_NAME
+                )
                 if (uploadResult.isSuccess) {
                     Timber.d("syncCloud: Initial backup uploaded successfully")
                 } else {

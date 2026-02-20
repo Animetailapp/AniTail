@@ -170,3 +170,78 @@
 -dontwarn org.ietf.jgss.GSSManager
 -dontwarn org.ietf.jgss.GSSName
 -dontwarn org.ietf.jgss.Oid
+# ============================================
+# Kotlin Core
+# ============================================
+-keep class kotlin.** { *; }
+-keep interface kotlin.** { *; }
+-keep class kotlin.coroutines.** { *; }
+-keep interface kotlin.coroutines.** { *; }
+-dontwarn kotlin.**
+
+# ============================================
+# Kotlin Coroutines
+# ============================================
+-keep class kotlinx.coroutines.** { *; }
+-keep interface kotlinx.coroutines.** { *; }
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+-keepclassmembers class kotlinx.coroutines.** {
+    volatile <fields>;
+}
+-dontwarn kotlinx.coroutines.**
+
+# ============================================
+# Evitar que R8 convierta interfaces en clases
+# (Esta es la causa principal del IncompatibleClassChangeError)
+# ============================================
+-keep,allowshrinking interface * {
+    <methods>;
+}
+
+# ============================================
+# Kotlin Metadata (necesario para reflexión)
+# ============================================
+-keep class kotlin.Metadata { *; }
+-keepattributes RuntimeVisibleAnnotations
+-keepattributes AnnotationDefault
+
+# ============================================
+# Kotlin Serialization
+# ============================================
+-keepattributes *Annotation*, InnerClasses
+-keep,includedescriptorclasses class com.anitail.music.**$$serializer { *; }
+-keepclassmembers class com.anitail.music.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.anitail.music.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# ============================================
+# Media3 / ExoPlayer
+# ============================================
+-keep class androidx.media3.** { *; }
+-keep interface androidx.media3.** { *; }
+-dontwarn androidx.media3.**
+
+# ============================================
+# Ktor
+# ============================================
+-keep class io.ktor.** { *; }
+-keep interface io.ktor.** { *; }
+-dontwarn io.ktor.**
+
+# Vibra fingerprint library
+-keep class com.anitail.music.recognition.VibraSignature { *; }
+-keepclassmembers class com.anitail.music.recognition.VibraSignature {
+    native <methods>;
+}
+
+## CoverArt Native JNI and metadata embedding
+-keep class com.anitail.music.utils.CoverArtNative { *; }
+-keepclassmembers class com.anitail.music.utils.CoverArtNative {
+    native <methods>;
+}
+-keep class com.anitail.music.utils.CoverArtEmbedder { *; }
+-keep class com.anitail.music.utils.DownloadExportHelper { *; }

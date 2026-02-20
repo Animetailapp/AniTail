@@ -9,6 +9,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Microphone feature for music recognition (not required) -->
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
@@ -93,14 +98,11 @@
             android:theme="@style/Theme.Anitail"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.intent.action.MUSIC_PLAYER" />
 
-                <category android:name="android.intent.category.LAUNCHER" />
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
-                <category android:name="android.intent.category.APP_MUSIC" />
                 <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.APP_MUSIC" />
             </intent-filter>
 
             <!-- Youtube filter -->
@@ -159,6 +161,15 @@
                 <data android:scheme="vnd.youtube.launch" />
             </intent-filter>
 
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="search"
+                    android:scheme="anitail" />
+            </intent-filter>
+
             <!-- Share filter -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
@@ -172,6 +183,36 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
         </activity>
+
+    <activity-alias
+        android:name=".MainActivityLauncherDefault"
+        android:enabled="true"
+        android:exported="true"
+        android:icon="@mipmap/ic_launcher_no_monochrome"
+        android:roundIcon="@mipmap/ic_launcher_round_no_monochrome"
+        android:targetActivity=".MainActivity">
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+
+            <category android:name="android.intent.category.LAUNCHER" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent-filter>
+    </activity-alias>
+
+    <activity-alias
+        android:name=".MainActivityLauncherDynamic"
+        android:enabled="false"
+        android:exported="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:targetActivity=".MainActivity">
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+
+            <category android:name="android.intent.category.LAUNCHER" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent-filter>
+    </activity-alias>
 
     <!--  Cast -->
     <activity

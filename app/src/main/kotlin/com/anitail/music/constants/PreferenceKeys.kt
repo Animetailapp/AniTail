@@ -9,6 +9,10 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 
 val DynamicThemeKey = booleanPreferencesKey("dynamicTheme")
+val DynamicIconKey = booleanPreferencesKey("dynamicIcon")
+val HighRefreshRateKey = booleanPreferencesKey("highRefreshRate")
+val ThemePaletteKey = stringPreferencesKey("themePalette")
+val CustomThemeSeedColorKey = intPreferencesKey("customThemeSeedColor")
 val DarkModeKey = stringPreferencesKey("darkMode")
 val PureBlackKey = booleanPreferencesKey("pureBlack")
 val DensityScaleKey = floatPreferencesKey("density_scale_factor")
@@ -50,6 +54,22 @@ enum class SliderStyle {
     SLIM,
 }
 
+enum class ThemePalette {
+    CUSTOM,
+    LAVENDER,
+    SUNSET,
+    CHERRY,
+    VIOLET,
+    INDIGO,
+    OCEAN,
+    RUBY,
+    FOREST,
+    GOLDEN_HOUR,
+    MIDNIGHT,
+    SKY,
+    MINT,
+}
+
 enum class UpdateCheckFrequency {
     DAILY,
     WEEKLY,
@@ -81,6 +101,8 @@ val ProxyPasswordKey = stringPreferencesKey("proxyPassword")
 val YtmSyncKey = booleanPreferencesKey("ytmSync")
 
 val AudioQualityKey = stringPreferencesKey("audioQuality")
+val CustomDownloadPathEnabledKey = booleanPreferencesKey("customDownloadPathEnabled")
+val CustomDownloadPathUriKey = stringPreferencesKey("customDownloadPathUri")
 
 enum class AudioQuality {
     AUTO,
@@ -89,6 +111,7 @@ enum class AudioQuality {
 }
 
 val AudioOffload = booleanPreferencesKey("enableOffload")
+val CrossfadeDurationKey = intPreferencesKey("crossfadeDuration")
 
 val PersistentQueueKey = booleanPreferencesKey("persistentQueue")
 val SkipSilenceKey = booleanPreferencesKey("skipSilence")
@@ -111,6 +134,7 @@ enum class NotificationButtonType {
 val MaxImageCacheSizeKey = intPreferencesKey("maxImageCacheSize")
 val MaxSongCacheSizeKey = intPreferencesKey("maxSongCacheSize")
 val MaxDownloadSizeKey = intPreferencesKey("maxDownloadSize")
+val MaxDownloadSpeedKey = booleanPreferencesKey("maxDownloadSpeed")
 val JamEnabledKey = booleanPreferencesKey("jam_enabled")
 val JamHostKey = booleanPreferencesKey("jam_host")
 val JamHostIpKey = stringPreferencesKey("jam_host_ip")
