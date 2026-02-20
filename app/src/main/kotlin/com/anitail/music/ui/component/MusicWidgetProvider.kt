@@ -123,9 +123,13 @@ class MusicWidgetProvider : AppWidgetProvider() {
         val layoutRes = resolveLayoutRes(appWidgetManager, appWidgetIds.first())
         val views = RemoteViews(context.packageName, layoutRes)
         val supportsRecommendations = layoutRes == R.layout.widget_music
+        val isCompact = layoutRes == R.layout.widget_music_small
 
         // Set click listeners for controls
         setupWidgetControls(context, views)
+        if (isCompact) {
+            views.setViewVisibility(R.id.widget_quick_actions, View.GONE)
+        }
 
         // Update widget content if we have update data
         if (updateIntent != null && updateIntent.action == MusicService.ACTION_WIDGET_UPDATE) {
@@ -295,7 +299,9 @@ class MusicWidgetProvider : AppWidgetProvider() {
                                             Timber.tag(TAG).w("[WIDGET-ASYNC] Recommendation idx=$idx has blank id, no click intent set. Title='${rec.title}' (async)")
                                         }
                                         for (appWidgetId in appWidgetIds) {
-                                            appWidgetManager.updateAppWidget(appWidgetId, views)
+                                            if (resolveLayoutRes(appWidgetManager, appWidgetId) == layoutRes) {
+                                                appWidgetManager.updateAppWidget(appWidgetId, views)
+                                            }
                                         }
                                     }
                                 }
@@ -330,7 +336,9 @@ class MusicWidgetProvider : AppWidgetProvider() {
                                 views.setImageViewBitmap(R.id.widget_cover, bitmap)
                                 views.setImageViewBitmap(R.id.widget_backdrop, bitmap)
                                 for (appWidgetId in appWidgetIds) {
-                                    appWidgetManager.updateAppWidget(appWidgetId, views)
+                                    if (resolveLayoutRes(appWidgetManager, appWidgetId) == layoutRes) {
+                                        appWidgetManager.updateAppWidget(appWidgetId, views)
+                                    }
                                 }
                             }
                         } else {
@@ -624,8 +632,28 @@ class MusicWidgetProvider : AppWidgetProvider() {
         val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
         val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
         val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
-        val ratio = if (minHeight > 0) minWidth.toFloat() / minHeight.toFloat() else 1f
-        return if (minWidth >= 220 || ratio >= 1.55f) R.layout.widget_music else R.layout.widget_music_small
+        val maxHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, minHeight)
+        val effectiveHeight = maxOf(minHeight, maxHeight)
+        val ratio = if (effectiveHeight > 0) minWidth.toFloat() / effectiveHeight.toFloat() else 1f
+
+        val layoutRes = if (effectiveHeight < 120) {
+            R.layout.widget_music_small
+        } else if (minWidth >= 220 || ratio >= 1.55f) {
+            R.layout.widget_music
+        } else {
+            R.layout.widget_music_small
+        }
+
+        Timber.tag(TAG).d(
+            "Widget #%d layout=%s minWidth=%d minHeight=%d maxHeight=%d ratio=%.2f",
+            appWidgetId,
+            if (layoutRes == R.layout.widget_music) "wide" else "compact",
+            minWidth,
+            minHeight,
+            maxHeight,
+            ratio
+        )
+        return layoutRes
     }
 
     // Helper for recommendation
