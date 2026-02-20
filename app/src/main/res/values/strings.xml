@@ -354,6 +354,10 @@
     <string name="pure_black">Pure black</string>
     <string name="pure_black_desc">Use pure black in dark mode (OLED)</string>
     <string name="player">Player</string>
+    <string name="widget_quick_actions">Widget quick actions</string>
+    <string name="widget_quick_actions_desc">Choose 2 to 3 actions to show on the home widget</string>
+    <string name="widget_actions_min_required">Select at least 2 actions</string>
+    <string name="widget_actions_max_reached">You can select up to 3 actions</string>
     <string name="lyrics_text_position">Lyrics text position</string>
     <string name="left">Left</string>
     <string name="center">Center</string>

@@ -1,5 +1,6 @@
 package com.anitail.music.ui.screens.settings
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -38,6 +39,11 @@ import com.anitail.music.constants.PersistentQueueKey
 import com.anitail.music.constants.SimilarContent
 import com.anitail.music.constants.SkipSilenceKey
 import com.anitail.music.constants.StopMusicOnTaskClearKey
+import com.anitail.music.constants.WidgetActionExploreEnabledKey
+import com.anitail.music.constants.WidgetActionLibraryEnabledKey
+import com.anitail.music.constants.WidgetActionLyricsEnabledKey
+import com.anitail.music.constants.WidgetActionQueueEnabledKey
+import com.anitail.music.constants.WidgetActionSearchEnabledKey
 import com.anitail.music.ui.component.DurationSliderPreference
 import com.anitail.music.ui.component.EnumListPreference
 import com.anitail.music.ui.component.IconButton
@@ -116,11 +122,66 @@ fun PlayerSettings(
         key = AudioOffload,
         defaultValue = false
     )
+    val (widgetActionLyricsEnabled, onWidgetActionLyricsEnabledChange) = rememberPreference(
+        WidgetActionLyricsEnabledKey,
+        defaultValue = true
+    )
+    val (widgetActionQueueEnabled, onWidgetActionQueueEnabledChange) = rememberPreference(
+        WidgetActionQueueEnabledKey,
+        defaultValue = true
+    )
+    val (widgetActionSearchEnabled, onWidgetActionSearchEnabledChange) = rememberPreference(
+        WidgetActionSearchEnabledKey,
+        defaultValue = true
+    )
+    val (widgetActionLibraryEnabled, onWidgetActionLibraryEnabledChange) = rememberPreference(
+        WidgetActionLibraryEnabledKey,
+        defaultValue = false
+    )
+    val (widgetActionExploreEnabled, onWidgetActionExploreEnabledChange) = rememberPreference(
+        WidgetActionExploreEnabledKey,
+        defaultValue = false
+    )
 
 
     val context = LocalContext.current
     val googlePlayServicesAvailable = remember {
         GooglePlayServicesUtils.isGooglePlayServicesAvailable(context)
+    }
+    val selectedWidgetActionCount = listOf(
+        widgetActionLyricsEnabled,
+        widgetActionQueueEnabled,
+        widgetActionSearchEnabled,
+        widgetActionLibraryEnabled,
+        widgetActionExploreEnabled
+    ).count { it }
+
+    fun updateWidgetActionSelection(
+        newValue: Boolean,
+        currentValue: Boolean,
+        onChange: (Boolean) -> Unit
+    ) {
+        if (newValue == currentValue) return
+
+        if (newValue && selectedWidgetActionCount >= 3) {
+            Toast.makeText(
+                context,
+                context.getString(R.string.widget_actions_max_reached),
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        if (!newValue && selectedWidgetActionCount <= 2) {
+            Toast.makeText(
+                context,
+                context.getString(R.string.widget_actions_min_required),
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        onChange(newValue)
     }
 
     Column(
@@ -273,6 +334,76 @@ fun PlayerSettings(
                 }
             },
             isEnabled = googlePlayServicesAvailable
+        )
+
+        PreferenceGroupTitle(
+            title = stringResource(R.string.widget_quick_actions)
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.lyrics)) },
+            description = stringResource(R.string.widget_quick_actions_desc),
+            icon = { Icon(painterResource(R.drawable.lyrics), null) },
+            checked = widgetActionLyricsEnabled,
+            onCheckedChange = { value ->
+                updateWidgetActionSelection(
+                    newValue = value,
+                    currentValue = widgetActionLyricsEnabled,
+                    onChange = onWidgetActionLyricsEnabledChange
+                )
+            }
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.queue)) },
+            icon = { Icon(painterResource(R.drawable.queue_music), null) },
+            checked = widgetActionQueueEnabled,
+            onCheckedChange = { value ->
+                updateWidgetActionSelection(
+                    newValue = value,
+                    currentValue = widgetActionQueueEnabled,
+                    onChange = onWidgetActionQueueEnabledChange
+                )
+            }
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.search)) },
+            icon = { Icon(painterResource(R.drawable.search), null) },
+            checked = widgetActionSearchEnabled,
+            onCheckedChange = { value ->
+                updateWidgetActionSelection(
+                    newValue = value,
+                    currentValue = widgetActionSearchEnabled,
+                    onChange = onWidgetActionSearchEnabledChange
+                )
+            }
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.filter_library)) },
+            icon = { Icon(painterResource(R.drawable.library_music), null) },
+            checked = widgetActionLibraryEnabled,
+            onCheckedChange = { value ->
+                updateWidgetActionSelection(
+                    newValue = value,
+                    currentValue = widgetActionLibraryEnabled,
+                    onChange = onWidgetActionLibraryEnabledChange
+                )
+            }
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.explore)) },
+            icon = { Icon(painterResource(R.drawable.explore_outlined), null) },
+            checked = widgetActionExploreEnabled,
+            onCheckedChange = { value ->
+                updateWidgetActionSelection(
+                    newValue = value,
+                    currentValue = widgetActionExploreEnabled,
+                    onChange = onWidgetActionExploreEnabledChange
+                )
+            }
         )
 
         PreferenceGroupTitle(

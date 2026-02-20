@@ -7,14 +7,25 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.view.View
 import android.widget.RemoteViews
+import androidx.annotation.DrawableRes
 import androidx.annotation.RequiresApi
+import androidx.annotation.StringRes
 import androidx.core.graphics.drawable.toBitmap
+import com.anitail.music.MainActivity
+import com.anitail.music.constants.WidgetActionExploreEnabledKey
+import com.anitail.music.constants.WidgetActionLibraryEnabledKey
+import com.anitail.music.constants.WidgetActionLyricsEnabledKey
+import com.anitail.music.constants.WidgetActionQueueEnabledKey
+import com.anitail.music.constants.WidgetActionSearchEnabledKey
 import coil.ImageLoader
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.anitail.music.R
 import com.anitail.music.playback.MusicService
+import com.anitail.music.utils.dataStore
+import com.anitail.music.utils.get
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -312,7 +323,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
     }
 
     private fun setupWidgetControls(context: Context, views: RemoteViews) {
-        val openPlayerIntent = Intent(context, com.anitail.music.MainActivity::class.java).apply {
+        val openPlayerIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val openPlayerPendingIntent = PendingIntent.getActivity(
@@ -349,6 +360,37 @@ class MusicWidgetProvider : AppWidgetProvider() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         views.setOnClickPendingIntent(R.id.widget_prev, prevPendingIntent)
+
+        val buttonIds = listOf(
+            R.id.widget_action_lyrics,
+            R.id.widget_action_queue,
+            R.id.widget_action_search
+        )
+        val configuredActions = getConfiguredQuickActions(context)
+
+        buttonIds.forEachIndexed { index, buttonId ->
+            val quickAction = configuredActions.getOrNull(index)
+            if (quickAction == null) {
+                views.setViewVisibility(buttonId, View.GONE)
+                return@forEachIndexed
+            }
+
+            views.setViewVisibility(buttonId, View.VISIBLE)
+            views.setImageViewResource(buttonId, quickAction.iconRes)
+            views.setContentDescription(buttonId, context.getString(quickAction.labelRes))
+
+            val actionIntent = Intent(context, MainActivity::class.java).apply {
+                action = quickAction.intentAction
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                4 + index,
+                actionIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(buttonId, pendingIntent)
+        }
     }
     @RequiresApi(Build.VERSION_CODES.O)
     private fun forwardActionToService(context: Context, intent: Intent) {
@@ -426,16 +468,84 @@ class MusicWidgetProvider : AppWidgetProvider() {
             Timber.tag(TAG).e(e, "Error sending service intent for update")
         }
     }
+
+    private fun getConfiguredQuickActions(context: Context): List<WidgetQuickActionConfig> {
+        val selectedActions = listOf(
+            WidgetQuickActionConfig(
+                enabled = context.dataStore[WidgetActionLyricsEnabledKey, true],
+                iconRes = R.drawable.lyrics,
+                labelRes = R.string.lyrics,
+                intentAction = MainActivity.ACTION_WIDGET_OPEN_LYRICS
+            ),
+            WidgetQuickActionConfig(
+                enabled = context.dataStore[WidgetActionQueueEnabledKey, true],
+                iconRes = R.drawable.queue_music,
+                labelRes = R.string.queue,
+                intentAction = MainActivity.ACTION_WIDGET_OPEN_QUEUE
+            ),
+            WidgetQuickActionConfig(
+                enabled = context.dataStore[WidgetActionSearchEnabledKey, true],
+                iconRes = R.drawable.search,
+                labelRes = R.string.search,
+                intentAction = MainActivity.ACTION_SEARCH
+            ),
+            WidgetQuickActionConfig(
+                enabled = context.dataStore[WidgetActionLibraryEnabledKey, false],
+                iconRes = R.drawable.library_music,
+                labelRes = R.string.filter_library,
+                intentAction = MainActivity.ACTION_LIBRARY
+            ),
+            WidgetQuickActionConfig(
+                enabled = context.dataStore[WidgetActionExploreEnabledKey, false],
+                iconRes = R.drawable.explore_outlined,
+                labelRes = R.string.explore,
+                intentAction = MainActivity.ACTION_EXPLORE
+            )
+        ).filter { it.enabled }
+
+        return when {
+            selectedActions.size < 2 -> defaultQuickActions
+            selectedActions.size > 3 -> selectedActions.take(3)
+            else -> selectedActions
+        }
+    }
+
     // Helper for recommendation
     data class Recommendation(val title: String, val coverUrl: String, val id: String)
+    data class WidgetQuickActionConfig(
+        val enabled: Boolean,
+        @DrawableRes val iconRes: Int,
+        @StringRes val labelRes: Int,
+        val intentAction: String
+    )
 
     companion object {
         private const val TAG = "MusicWidgetProvider"
         const val ACTION_PLAY_PAUSE = "com.anitail.music.widget.PLAY_PAUSE"
         const val ACTION_NEXT = "com.anitail.music.widget.NEXT"
         const val ACTION_PREV = "com.anitail.music.widget.PREV"
+        private val defaultQuickActions = listOf(
+            WidgetQuickActionConfig(
+                enabled = true,
+                iconRes = R.drawable.lyrics,
+                labelRes = R.string.lyrics,
+                intentAction = MainActivity.ACTION_WIDGET_OPEN_LYRICS
+            ),
+            WidgetQuickActionConfig(
+                enabled = true,
+                iconRes = R.drawable.queue_music,
+                labelRes = R.string.queue,
+                intentAction = MainActivity.ACTION_WIDGET_OPEN_QUEUE
+            ),
+            WidgetQuickActionConfig(
+                enabled = true,
+                iconRes = R.drawable.search,
+                labelRes = R.string.search,
+                intentAction = MainActivity.ACTION_SEARCH
+            )
+        )
 
         // Flag global para desactivar completamente el widget (evita consumo de batería y CPU)
-        const val WIDGET_DISABLED = true
+        const val WIDGET_DISABLED = false
     }
 }
