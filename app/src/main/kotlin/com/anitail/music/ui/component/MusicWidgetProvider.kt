@@ -632,11 +632,10 @@ class MusicWidgetProvider : AppWidgetProvider() {
         val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
         val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
         val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
-        val maxHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, minHeight)
-        val effectiveHeight = maxOf(minHeight, maxHeight)
-        val ratio = if (effectiveHeight > 0) minWidth.toFloat() / effectiveHeight.toFloat() else 1f
+        val maxHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0)
+        val ratio = if (minHeight > 0) minWidth.toFloat() / minHeight.toFloat() else 1f
 
-        val layoutRes = if (effectiveHeight < 120) {
+        val layoutRes = if (minHeight < 110) {
             R.layout.widget_music_small
         } else if (minWidth >= 220 || ratio >= 1.55f) {
             R.layout.widget_music
