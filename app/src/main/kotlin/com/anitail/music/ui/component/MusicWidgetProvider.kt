@@ -420,10 +420,6 @@ class MusicWidgetProvider : AppWidgetProvider() {
             WidgetQuickActionSlot(
                 slotId = R.id.widget_action_slot_queue,
                 iconId = R.id.widget_action_queue
-            ),
-            WidgetQuickActionSlot(
-                slotId = R.id.widget_action_slot_search,
-                iconId = R.id.widget_action_search
             )
         )
         val configuredActions = getConfiguredQuickActions(context)
@@ -534,16 +530,16 @@ class MusicWidgetProvider : AppWidgetProvider() {
     }
 
     private fun applyWidgetVisualStyle(views: RemoteViews, dominantColor: Int) {
-        val overlayColor = withAlpha(blendColors(dominantColor, Color.BLACK, 0.44f), 174)
-        val titleColor = blendColors(dominantColor, Color.WHITE, 0.72f)
-        val artistColor = withAlpha(Color.WHITE, 218)
-        val controlBgColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.42f), 212)
-        val playBgColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.64f), 248)
-        val quickActionBgColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.34f), 188)
-        val controlIconColor = blendColors(dominantColor, Color.BLACK, 0.74f)
-        val playIconColor = blendColors(dominantColor, Color.BLACK, 0.84f)
-        val progressColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.58f), 255)
-        val coverRingColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.62f), 226)
+        val overlayColor = withAlpha(blendColors(dominantColor, Color.BLACK, 0.34f), 166)
+        val titleColor = blendColors(dominantColor, Color.WHITE, 0.28f)
+        val artistColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.48f), 224)
+        val controlBgColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.42f), 232)
+        val playBgColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.56f), 250)
+        val quickActionBgColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.36f), 214)
+        val controlIconColor = blendColors(dominantColor, Color.BLACK, 0.78f)
+        val playIconColor = blendColors(dominantColor, Color.BLACK, 0.86f)
+        val progressColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.12f), 255)
+        val coverRingColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.56f), 236)
 
         views.setInt(R.id.widget_backdrop_tint, "setBackgroundColor", overlayColor)
         views.setTextColor(R.id.widget_title, titleColor)
@@ -621,11 +617,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
             )
         ).filter { it.enabled }
 
-        return when {
-            selectedActions.size < 2 -> defaultQuickActions
-            selectedActions.size > 3 -> selectedActions.take(3)
-            else -> selectedActions
-        }
+        return if (selectedActions.size < 2) defaultQuickActions.take(2) else selectedActions.take(2)
     }
 
     private fun resolveLayoutRes(appWidgetManager: AppWidgetManager, appWidgetId: Int): Int {
@@ -635,9 +627,9 @@ class MusicWidgetProvider : AppWidgetProvider() {
         val maxHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0)
         val ratio = if (minHeight > 0) minWidth.toFloat() / minHeight.toFloat() else 1f
 
-        val layoutRes = if (minHeight < 115 || (ratio >= 1.9f && minHeight < 180)) {
+        val layoutRes = if (minHeight < 115 || (ratio >= 1.9f && minHeight < 170)) {
             R.layout.widget_music_small
-        } else if (minHeight >= 200 && ratio >= 1.45f) {
+        } else if (minHeight >= 160 && ratio >= 1.45f) {
             R.layout.widget_music
         } else {
             R.layout.widget_music_square

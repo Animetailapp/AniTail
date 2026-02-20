@@ -88,7 +88,7 @@
                     android:shadowRadius="2"
                     android:text=""
                     android:textColor="#FFFFFF"
-                    android:textSize="18sp"
+                    android:textSize="16sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -104,7 +104,7 @@
                     android:shadowRadius="1"
                     android:text=""
                     android:textColor="#DDFFFFFF"
-                    android:textSize="14sp" />
+                    android:textSize="11sp" />
             </LinearLayout>
         </RelativeLayout>
 
@@ -147,10 +147,10 @@
 
                 <FrameLayout
                     android:id="@+id/widget_action_slot_lyrics"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:layout_marginStart="5dp"
-                    android:layout_marginEnd="5dp">
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp">
 
                     <ImageView
                         android:id="@+id/widget_action_lyrics_bg"
@@ -172,10 +172,10 @@
 
                 <FrameLayout
                     android:id="@+id/widget_action_slot_queue"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:layout_marginStart="5dp"
-                    android:layout_marginEnd="5dp">
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginEnd="4dp">
 
                     <ImageView
                         android:id="@+id/widget_action_queue_bg"
@@ -197,10 +197,9 @@
 
                 <FrameLayout
                     android:id="@+id/widget_action_slot_search"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:layout_marginStart="5dp"
-                    android:layout_marginEnd="5dp">
+                    android:layout_width="1dp"
+                    android:layout_height="1dp"
+                    android:visibility="gone">
 
                     <ImageView
                         android:id="@+id/widget_action_search_bg"
@@ -283,7 +282,8 @@
             android:id="@+id/widget_progress"
             android:layout_width="match_parent"
             android:layout_height="4dp"
-            android:layout_marginTop="10dp">
+            android:layout_marginTop="10dp"
+            android:visibility="gone">
 
             <ImageView
                 android:id="@+id/widget_song_progress_track"

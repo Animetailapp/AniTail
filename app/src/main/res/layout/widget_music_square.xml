@@ -47,7 +47,7 @@
             android:shadowRadius="1"
             android:text=""
             android:textColor="#FFFFFF"
-            android:textSize="17sp"
+            android:textSize="15sp"
             android:textStyle="bold" />
 
         <TextView
@@ -59,7 +59,7 @@
             android:maxLines="1"
             android:text=""
             android:textColor="#DAFFFFFF"
-            android:textSize="11sp" />
+            android:textSize="10sp" />
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -138,7 +138,7 @@
             android:id="@+id/widget_quick_actions"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="6dp"
             android:gravity="center"
             android:orientation="horizontal">
 
@@ -190,10 +190,9 @@
 
             <FrameLayout
                 android:id="@+id/widget_action_slot_search"
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp">
+                android:layout_width="1dp"
+                android:layout_height="1dp"
+                android:visibility="gone">
 
                 <ImageView
                     android:id="@+id/widget_action_search_bg"
@@ -216,7 +215,8 @@
             android:id="@+id/widget_progress"
             android:layout_width="match_parent"
             android:layout_height="3dp"
-            android:layout_marginTop="8dp">
+            android:layout_marginTop="8dp"
+            android:visibility="gone">
 
             <ImageView
                 android:id="@+id/widget_song_progress_track"
