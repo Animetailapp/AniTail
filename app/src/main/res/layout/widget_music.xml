@@ -16,11 +16,12 @@
         android:src="@drawable/ic_music_placeholder"
         tools:ignore="ContentDescription" />
 
-    <View
+    <ImageView
         android:id="@+id/widget_backdrop_tint"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#8E102030" />
+        android:background="#8E102030"
+        tools:ignore="ContentDescription" />
 
     <LinearLayout
         android:id="@+id/widget_content"
@@ -148,7 +149,8 @@
                     android:id="@+id/widget_action_slot_lyrics"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:layout_marginHorizontal="5dp">
+                    android:layout_marginStart="5dp"
+                    android:layout_marginEnd="5dp">
 
                     <ImageView
                         android:id="@+id/widget_action_lyrics_bg"
@@ -172,7 +174,8 @@
                     android:id="@+id/widget_action_slot_queue"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:layout_marginHorizontal="5dp">
+                    android:layout_marginStart="5dp"
+                    android:layout_marginEnd="5dp">
 
                     <ImageView
                         android:id="@+id/widget_action_queue_bg"
@@ -196,7 +199,8 @@
                     android:id="@+id/widget_action_slot_search"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:layout_marginHorizontal="5dp">
+                    android:layout_marginStart="5dp"
+                    android:layout_marginEnd="5dp">
 
                     <ImageView
                         android:id="@+id/widget_action_search_bg"
@@ -281,11 +285,12 @@
             android:layout_height="4dp"
             android:layout_marginTop="10dp">
 
-            <View
+            <ImageView
                 android:id="@+id/widget_song_progress_track"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@drawable/widget_progress_track" />
+                android:background="@drawable/widget_progress_track"
+                tools:ignore="ContentDescription" />
 
             <ImageView
                 android:id="@+id/widget_song_progress"
