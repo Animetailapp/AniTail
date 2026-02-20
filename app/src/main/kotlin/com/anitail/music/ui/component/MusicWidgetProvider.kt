@@ -632,11 +632,11 @@ class MusicWidgetProvider : AppWidgetProvider() {
 
         // Some launchers (notably MIUI) can report stale min sizes while resizing.
         // Use effective dimensions (max of min/max) to avoid selecting square on large widgets.
-        val layoutRes = if (effectiveHeight < 110 || (ratio >= 2.05f && effectiveHeight < 170)) {
+        val layoutRes = if (effectiveHeight < 110 || (ratio >= 2.25f && effectiveHeight < 170)) {
             R.layout.widget_music_small
         } else if (
-            effectiveWidth >= 250 ||
-            (effectiveHeight >= 145 && ratio >= 1.35f)
+            effectiveHeight >= 165 &&
+            (ratio >= 1.2f || effectiveWidth >= 300)
         ) {
             R.layout.widget_music
         } else {
