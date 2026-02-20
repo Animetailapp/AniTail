@@ -627,9 +627,14 @@ class MusicWidgetProvider : AppWidgetProvider() {
         val maxHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0)
         val ratio = if (minHeight > 0) minWidth.toFloat() / minHeight.toFloat() else 1f
 
-        val layoutRes = if (minHeight < 115 || (ratio >= 1.9f && minHeight < 170)) {
+        // MIUI and other launchers report different minHeight values while resizing.
+        // Prefer width + ratio guards so large widgets do not fallback to square visuals.
+        val layoutRes = if (minHeight < 110 || (ratio >= 2.05f && minHeight < 170)) {
             R.layout.widget_music_small
-        } else if (minHeight >= 160 && ratio >= 1.45f) {
+        } else if (
+            minWidth >= 250 ||
+            (minHeight >= 145 && ratio >= 1.35f)
+        ) {
             R.layout.widget_music
         } else {
             R.layout.widget_music_square
