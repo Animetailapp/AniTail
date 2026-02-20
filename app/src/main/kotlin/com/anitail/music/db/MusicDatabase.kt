@@ -153,6 +153,7 @@ abstract class InternalDatabase : RoomDatabase() {
                         MIGRATION_1_2,
                         MIGRATION_25_26,
                         MIGRATION_26_27,
+                        MIGRATION_27_28,
                     )
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .addCallback(object : Callback() {
@@ -461,6 +462,97 @@ val MIGRATION_26_27 =
             if (!providerColumnExists) {
                 database.execSQL("ALTER TABLE lyrics ADD COLUMN provider TEXT")
             }
+
+            // v27 introduces recognition_history. This explicit migration overrides
+            // Room's auto-migration 26->27, so we must create/repair the table here.
+            var recognitionTableHasColumns = false
+            database.query("PRAGMA table_info(recognition_history)").use { cursor ->
+                recognitionTableHasColumns = cursor.moveToFirst()
+            }
+            if (!recognitionTableHasColumns) {
+                database.execSQL("DROP TABLE IF EXISTS recognition_history")
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `recognition_history` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `trackId` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `artist` TEXT NOT NULL,
+                        `album` TEXT,
+                        `coverArtUrl` TEXT,
+                        `coverArtHqUrl` TEXT,
+                        `genre` TEXT,
+                        `releaseDate` TEXT,
+                        `label` TEXT,
+                        `shazamUrl` TEXT,
+                        `appleMusicUrl` TEXT,
+                        `spotifyUrl` TEXT,
+                        `isrc` TEXT,
+                        `youtubeVideoId` TEXT,
+                        `recognizedAt` INTEGER NOT NULL,
+                        `liked` INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+            }
+            database.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_recognition_history_trackId` ON `recognition_history` (`trackId`)",
+            )
+        }
+    }
+
+val MIGRATION_27_28 =
+    object : Migration(27, 28) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            // v28 introduces song.downloadUri.
+            var downloadUriExists = false
+            database.query("PRAGMA table_info(song)").use { cursor ->
+                val nameColumnIndex = cursor.getColumnIndex("name")
+                while (cursor.moveToNext()) {
+                    if (nameColumnIndex >= 0 && cursor.getString(nameColumnIndex) == "downloadUri") {
+                        downloadUriExists = true
+                        break
+                    }
+                }
+            }
+            if (!downloadUriExists) {
+                database.execSQL("ALTER TABLE song ADD COLUMN downloadUri TEXT DEFAULT NULL")
+            }
+
+            // Repair recognition_history if an older faulty migration left it missing/corrupt.
+            var recognitionTableHasColumns = false
+            database.query("PRAGMA table_info(recognition_history)").use { cursor ->
+                recognitionTableHasColumns = cursor.moveToFirst()
+            }
+            if (!recognitionTableHasColumns) {
+                database.execSQL("DROP TABLE IF EXISTS recognition_history")
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `recognition_history` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `trackId` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `artist` TEXT NOT NULL,
+                        `album` TEXT,
+                        `coverArtUrl` TEXT,
+                        `coverArtHqUrl` TEXT,
+                        `genre` TEXT,
+                        `releaseDate` TEXT,
+                        `label` TEXT,
+                        `shazamUrl` TEXT,
+                        `appleMusicUrl` TEXT,
+                        `spotifyUrl` TEXT,
+                        `isrc` TEXT,
+                        `youtubeVideoId` TEXT,
+                        `recognizedAt` INTEGER NOT NULL,
+                        `liked` INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+            }
+            database.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_recognition_history_trackId` ON `recognition_history` (`trackId`)",
+            )
         }
     }
 
