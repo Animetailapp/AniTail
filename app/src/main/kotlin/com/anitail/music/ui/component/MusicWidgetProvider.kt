@@ -222,7 +222,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
             val playPauseIcon = if (isPlaying) R.drawable.pause else R.drawable.play
             views.setImageViewResource(R.id.widget_play_pause, playPauseIcon)
 
-            views.setProgressBar(R.id.widget_song_progress, 100, progress, false)
+            setWidgetProgress(views, progress)
 
             for (appWidgetId in appWidgetIds) {
                 appWidgetManager.updateAppWidget(appWidgetId, views)
@@ -355,7 +355,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
             views.setImageViewResource(R.id.widget_play_pause, R.drawable.play)
             views.setImageViewResource(R.id.widget_cover, R.drawable.ic_music_placeholder)
             views.setImageViewResource(R.id.widget_backdrop, R.drawable.ic_music_placeholder)
-            views.setProgressBar(R.id.widget_song_progress, 100, 0, false)
+            setWidgetProgress(views, 0)
 
             for (appWidgetId in appWidgetIds) {
                 appWidgetManager.updateAppWidget(appWidgetId, views)
@@ -404,23 +404,32 @@ class MusicWidgetProvider : AppWidgetProvider() {
         )
         views.setOnClickPendingIntent(R.id.widget_prev, prevPendingIntent)
 
-        val buttonIds = listOf(
-            R.id.widget_action_lyrics,
-            R.id.widget_action_queue,
-            R.id.widget_action_search
+        val actionSlots = listOf(
+            WidgetQuickActionSlot(
+                slotId = R.id.widget_action_slot_lyrics,
+                iconId = R.id.widget_action_lyrics
+            ),
+            WidgetQuickActionSlot(
+                slotId = R.id.widget_action_slot_queue,
+                iconId = R.id.widget_action_queue
+            ),
+            WidgetQuickActionSlot(
+                slotId = R.id.widget_action_slot_search,
+                iconId = R.id.widget_action_search
+            )
         )
         val configuredActions = getConfiguredQuickActions(context)
 
-        buttonIds.forEachIndexed { index, buttonId ->
+        actionSlots.forEachIndexed { index, slot ->
             val quickAction = configuredActions.getOrNull(index)
             if (quickAction == null) {
-                views.setViewVisibility(buttonId, View.GONE)
+                views.setViewVisibility(slot.slotId, View.GONE)
                 return@forEachIndexed
             }
 
-            views.setViewVisibility(buttonId, View.VISIBLE)
-            views.setImageViewResource(buttonId, quickAction.iconRes)
-            views.setContentDescription(buttonId, context.getString(quickAction.labelRes))
+            views.setViewVisibility(slot.slotId, View.VISIBLE)
+            views.setImageViewResource(slot.iconId, quickAction.iconRes)
+            views.setContentDescription(slot.iconId, context.getString(quickAction.labelRes))
 
             val actionIntent = Intent(context, MainActivity::class.java).apply {
                 action = quickAction.intentAction
@@ -432,7 +441,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 actionIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            views.setOnClickPendingIntent(buttonId, pendingIntent)
+            views.setOnClickPendingIntent(slot.slotId, pendingIntent)
         }
     }
     @RequiresApi(Build.VERSION_CODES.O)
@@ -517,20 +526,41 @@ class MusicWidgetProvider : AppWidgetProvider() {
     }
 
     private fun applyWidgetVisualStyle(views: RemoteViews, dominantColor: Int) {
-        val overlayColor = withAlpha(dominantColor, 148)
-        val accentColor = blendColors(dominantColor, Color.WHITE, 0.55f)
-        val iconColor = blendColors(dominantColor, Color.WHITE, 0.72f)
+        val overlayColor = withAlpha(blendColors(dominantColor, Color.BLACK, 0.44f), 174)
+        val titleColor = blendColors(dominantColor, Color.WHITE, 0.72f)
+        val artistColor = withAlpha(Color.WHITE, 218)
+        val controlBgColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.42f), 212)
+        val playBgColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.64f), 248)
+        val quickActionBgColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.34f), 188)
+        val controlIconColor = blendColors(dominantColor, Color.BLACK, 0.74f)
+        val playIconColor = blendColors(dominantColor, Color.BLACK, 0.84f)
+        val progressColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.58f), 255)
+        val coverRingColor = withAlpha(blendColors(dominantColor, Color.WHITE, 0.62f), 226)
 
         views.setInt(R.id.widget_backdrop_tint, "setBackgroundColor", overlayColor)
-        views.setTextColor(R.id.widget_title, accentColor)
-        views.setTextColor(R.id.widget_artist, withAlpha(Color.WHITE, 220))
+        views.setTextColor(R.id.widget_title, titleColor)
+        views.setTextColor(R.id.widget_artist, artistColor)
 
-        views.setInt(R.id.widget_prev, "setColorFilter", iconColor)
-        views.setInt(R.id.widget_next, "setColorFilter", iconColor)
-        views.setInt(R.id.widget_action_lyrics, "setColorFilter", iconColor)
-        views.setInt(R.id.widget_action_queue, "setColorFilter", iconColor)
-        views.setInt(R.id.widget_action_search, "setColorFilter", iconColor)
-        views.setInt(R.id.widget_play_pause, "setColorFilter", DEFAULT_PLAY_ICON_COLOR)
+        views.setInt(R.id.widget_cover_ring, "setColorFilter", coverRingColor)
+        views.setInt(R.id.widget_prev_bg, "setColorFilter", controlBgColor)
+        views.setInt(R.id.widget_next_bg, "setColorFilter", controlBgColor)
+        views.setInt(R.id.widget_play_pause_bg, "setColorFilter", playBgColor)
+        views.setInt(R.id.widget_action_lyrics_bg, "setColorFilter", quickActionBgColor)
+        views.setInt(R.id.widget_action_queue_bg, "setColorFilter", quickActionBgColor)
+        views.setInt(R.id.widget_action_search_bg, "setColorFilter", quickActionBgColor)
+
+        views.setInt(R.id.widget_prev, "setColorFilter", controlIconColor)
+        views.setInt(R.id.widget_next, "setColorFilter", controlIconColor)
+        views.setInt(R.id.widget_action_lyrics, "setColorFilter", controlIconColor)
+        views.setInt(R.id.widget_action_queue, "setColorFilter", controlIconColor)
+        views.setInt(R.id.widget_action_search, "setColorFilter", controlIconColor)
+        views.setInt(R.id.widget_play_pause, "setColorFilter", playIconColor)
+        views.setInt(R.id.widget_song_progress, "setColorFilter", progressColor)
+    }
+
+    private fun setWidgetProgress(views: RemoteViews, progressPercent: Int) {
+        val level = progressPercent.coerceIn(0, 100) * 100
+        views.setInt(R.id.widget_song_progress, "setImageLevel", level)
     }
 
     private fun blendColors(from: Int, to: Int, ratio: Float): Int {
@@ -606,6 +636,10 @@ class MusicWidgetProvider : AppWidgetProvider() {
         @StringRes val labelRes: Int,
         val intentAction: String
     )
+    data class WidgetQuickActionSlot(
+        val slotId: Int,
+        val iconId: Int
+    )
 
     companion object {
         private const val TAG = "MusicWidgetProvider"
@@ -613,7 +647,6 @@ class MusicWidgetProvider : AppWidgetProvider() {
         const val ACTION_NEXT = "com.anitail.music.widget.NEXT"
         const val ACTION_PREV = "com.anitail.music.widget.PREV"
         private const val DEFAULT_WIDGET_COLOR = 0xFF1D3342.toInt()
-        private const val DEFAULT_PLAY_ICON_COLOR = 0xFF102030.toInt()
         private val defaultQuickActions = listOf(
             WidgetQuickActionConfig(
                 enabled = true,
