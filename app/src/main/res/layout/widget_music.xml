@@ -1,330 +1,322 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/widget_background"
-    android:padding="10dp">
+    android:padding="0dp">
 
-    <!-- Cover art with better elevation and margins -->
     <ImageView
-        android:id="@+id/widget_cover"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentTop="true"
-        android:layout_marginEnd="12dp"
-        android:background="@drawable/rounded_corners"
-        android:clipToOutline="true"
-        android:elevation="6dp"
+        android:id="@+id/widget_backdrop"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0.52"
         android:scaleType="centerCrop"
         android:src="@drawable/ic_music_placeholder"
-        tools:ignore="ContentDescription,UnusedAttribute" />
+        tools:ignore="ContentDescription" />
 
-    <!-- Info section with better spacing -->
+    <View
+        android:id="@+id/widget_backdrop_tint"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#7F102030" />
+
     <LinearLayout
-        android:id="@+id/widget_info_section"
+        android:id="@+id/widget_content"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignTop="@id/widget_cover"
-        android:layout_toEndOf="@id/widget_cover"
         android:orientation="vertical"
-        android:layout_marginTop="2dp"
-        android:layout_marginBottom="4dp">
+        android:padding="14dp">
 
-        <TextView
-            android:id="@+id/widget_title"
+        <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text=""
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:textSize="18sp"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:singleLine="true"
-            android:shadowColor="#80000000"
-            android:shadowDx="1"
-            android:shadowDy="1"
-            android:shadowRadius="2" />
+            android:layout_marginBottom="10dp">
 
-        <TextView
-            android:id="@+id/widget_artist"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text=""
-            android:textColor="#A6A6A6"
-            android:textSize="14sp"
-            android:maxLines="1"
-            android:ellipsize="end"
-            android:singleLine="true"
-            android:shadowColor="#80000000"
-            android:shadowDx="1"
-            android:shadowDy="1"
-            android:shadowRadius="1" />
-    </LinearLayout>
-
-    <!-- Controls section with better spacing and visual feedback -->
-    <LinearLayout
-        android:id="@+id/widget_controls"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/widget_info_section"
-        android:layout_marginStart="2dp"
-        android:layout_marginTop="3dp"
-        android:gravity="center"
-        android:orientation="horizontal"
-        android:paddingVertical="3dp">
-
-        <ImageButton
-            android:id="@+id/widget_prev"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@android:color/transparent"
-            android:padding="8dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/skip_previous"
-            android:tint="#FFFFFF"
-            tools:ignore="ContentDescription" />
-
-        <ImageButton
-            android:id="@+id/widget_play_pause"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginHorizontal="8dp"
-            android:background="@android:color/transparent"
-            android:padding="10dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/play"
-            android:tint="#FFFFFF"
-            tools:ignore="ContentDescription" />
-
-        <ImageButton
-            android:id="@+id/widget_next"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@android:color/transparent"
-            android:padding="8dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/skip_next"
-            android:tint="#FFFFFF"
-            tools:ignore="ContentDescription" />
-
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/widget_quick_actions"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/widget_controls"
-        android:layout_marginTop="2dp"
-        android:gravity="center"
-        android:orientation="horizontal"
-        android:paddingVertical="2dp">
-
-        <ImageButton
-            android:id="@+id/widget_action_lyrics"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginHorizontal="6dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/lyrics"
-            android:padding="8dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/lyrics"
-            android:tint="#FFFFFF" />
-
-        <ImageButton
-            android:id="@+id/widget_action_queue"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginHorizontal="6dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/queue"
-            android:padding="8dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/queue_music"
-            android:tint="#FFFFFF" />
-
-        <ImageButton
-            android:id="@+id/widget_action_search"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginHorizontal="6dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/search"
-            android:padding="8dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/search"
-            android:tint="#FFFFFF" />
-    </LinearLayout>
-
-    <LinearLayout
-    android:id="@+id/widget_progress"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_below="@id/widget_quick_actions"
-    android:layout_marginTop="4dp"
-    android:orientation="vertical"
-    android:gravity="center_vertical">
-    <ProgressBar
-        android:id="@+id/widget_song_progress"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="3dp"
-        android:layout_marginTop="8dp"
-        android:indeterminate="false"
-        android:progressDrawable="@drawable/miniplayer_progress"
-        android:max="100"
-        android:progress="0"
-        android:secondaryProgress="0" />
-</LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/widget_recommendations"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/widget_progress"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal"
-        android:gravity="center">
-
-        <LinearLayout
-            android:id="@+id/widget_recommendation_1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginEnd="2dp"
-            android:orientation="vertical"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?android:attr/selectableItemBackground"
-            android:gravity="center">
-        <ImageView
-                android:id="@+id/widget_recommendation_cover_1"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_music_placeholder"
-                android:background="@drawable/widget_recommendation_background"
-                android:clipToOutline="true"
-                android:scaleType="centerCrop"
-                android:layout_gravity="center"/>
-            <TextView
-                android:id="@+id/widget_recommendation_title_1"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=""
-                android:textColor="#FFFFFF"
-                android:textSize="10sp"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:gravity="center"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/widget_recommendation_2"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="1dp"
-            android:layout_marginEnd="1dp"
-            android:orientation="vertical"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?android:attr/selectableItemBackground"
-            android:gravity="center">
-
-        <ImageView
-                android:id="@+id/widget_recommendation_cover_2"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_music_placeholder"
-                android:background="@drawable/widget_recommendation_background"
-                android:clipToOutline="true"
-                android:scaleType="centerCrop"
-                android:clickable="true"
-                android:focusable="true"
-                android:layout_gravity="center"/>
-            <TextView
-                android:id="@+id/widget_recommendation_title_2"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=""
-                android:textColor="#FFFFFF"
-                android:textSize="10sp"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:gravity="center"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/widget_recommendation_3"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="1dp"
-            android:layout_marginEnd="1dp"
-            android:orientation="vertical"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?android:attr/selectableItemBackground"
-            android:gravity="center">
-        <ImageView
-                android:id="@+id/widget_recommendation_cover_3"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_music_placeholder"
-                android:background="@drawable/widget_recommendation_background"
-                android:clipToOutline="true"
-                android:scaleType="centerCrop"
-                android:clickable="true"
-                android:focusable="true"
-                android:layout_gravity="center"/>
-            <TextView
-                android:id="@+id/widget_recommendation_title_3"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=""
-                android:textColor="#FFFFFF"
-                android:textSize="10sp"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:gravity="center"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/widget_recommendation_4"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="2dp"
-            android:orientation="vertical"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?android:attr/selectableItemBackground"
-            android:gravity="center">
             <ImageView
-                android:id="@+id/widget_recommendation_cover_4"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:src="@drawable/ic_music_placeholder"
-                android:background="@drawable/widget_recommendation_background"
+                android:id="@+id/widget_cover"
+                android:layout_width="82dp"
+                android:layout_height="82dp"
+                android:layout_alignParentEnd="true"
+                android:background="@drawable/widget_cover_bg"
                 android:clipToOutline="true"
+                android:padding="4dp"
                 android:scaleType="centerCrop"
-                android:clickable="true"
-                android:focusable="true"
-                android:layout_gravity="center"/>
-            <TextView
-                android:id="@+id/widget_recommendation_title_4"
-                android:layout_width="wrap_content"
+                android:src="@drawable/ic_music_placeholder"
+                tools:ignore="ContentDescription" />
+
+            <LinearLayout
+                android:id="@+id/widget_info_section"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text=""
-                android:textColor="#FFFFFF"
-                android:textSize="10sp"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:gravity="center"/>
+                android:layout_alignTop="@id/widget_cover"
+                android:layout_alignBottom="@id/widget_cover"
+                android:layout_toStartOf="@id/widget_cover"
+                android:layout_marginEnd="12dp"
+                android:gravity="center_vertical"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:shadowColor="#99000000"
+                    android:shadowDx="1"
+                    android:shadowDy="1"
+                    android:shadowRadius="2"
+                    android:singleLine="true"
+                    android:text=""
+                    android:textColor="#FFFFFF"
+                    android:textSize="27sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/widget_artist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:shadowColor="#99000000"
+                    android:shadowDx="1"
+                    android:shadowDy="1"
+                    android:shadowRadius="1"
+                    android:singleLine="true"
+                    android:text=""
+                    android:textColor="#D9FFFFFF"
+                    android:textSize="16sp" />
+            </LinearLayout>
+        </RelativeLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_controls"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/widget_prev"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/widget_control_button_bg"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/skip_previous"
+                android:tint="#FFFFFF"
+                tools:ignore="ContentDescription" />
+
+            <ImageButton
+                android:id="@+id/widget_play_pause"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_marginHorizontal="12dp"
+                android:background="@drawable/widget_play_button_bg"
+                android:padding="12dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/play"
+                android:tint="#0E1624"
+                tools:ignore="ContentDescription" />
+
+            <ImageButton
+                android:id="@+id/widget_next"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/widget_control_button_bg"
+                android:padding="10dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/skip_next"
+                android:tint="#FFFFFF"
+                tools:ignore="ContentDescription" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_quick_actions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/widget_action_lyrics"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_marginHorizontal="6dp"
+                android:background="@drawable/widget_quick_action_bg"
+                android:contentDescription="@string/lyrics"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/lyrics"
+                android:tint="#E6FFFFFF" />
+
+            <ImageButton
+                android:id="@+id/widget_action_queue"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_marginHorizontal="6dp"
+                android:background="@drawable/widget_quick_action_bg"
+                android:contentDescription="@string/queue"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/queue_music"
+                android:tint="#E6FFFFFF" />
+
+            <ImageButton
+                android:id="@+id/widget_action_search"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_marginHorizontal="6dp"
+                android:background="@drawable/widget_quick_action_bg"
+                android:contentDescription="@string/search"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/search"
+                android:tint="#E6FFFFFF" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_progress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical">
+
+            <ProgressBar
+                android:id="@+id/widget_song_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:indeterminate="false"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/miniplayer_progress"
+                android:secondaryProgress="0" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_recommendations"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/widget_recommendation_1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/widget_recommendation_cover_1"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/widget_recommendation_background"
+                    android:clipToOutline="true"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_music_placeholder" />
+
+                <TextView
+                    android:id="@+id/widget_recommendation_title_1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text=""
+                    android:textColor="#F0FFFFFF"
+                    android:textSize="9sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/widget_recommendation_2"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/widget_recommendation_cover_2"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/widget_recommendation_background"
+                    android:clipToOutline="true"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_music_placeholder" />
+
+                <TextView
+                    android:id="@+id/widget_recommendation_title_2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text=""
+                    android:textColor="#F0FFFFFF"
+                    android:textSize="9sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/widget_recommendation_3"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/widget_recommendation_cover_3"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/widget_recommendation_background"
+                    android:clipToOutline="true"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_music_placeholder" />
+
+                <TextView
+                    android:id="@+id/widget_recommendation_title_3"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text=""
+                    android:textColor="#F0FFFFFF"
+                    android:textSize="9sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/widget_recommendation_4"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/widget_recommendation_cover_4"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/widget_recommendation_background"
+                    android:clipToOutline="true"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_music_placeholder" />
+
+                <TextView
+                    android:id="@+id/widget_recommendation_title_4"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text=""
+                    android:textColor="#F0FFFFFF"
+                    android:textSize="9sp" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
-</RelativeLayout>
+</FrameLayout>

@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Build
 import android.view.View
 import android.widget.RemoteViews
@@ -177,8 +178,8 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 themeColor
             }
 
+            applyWidgetVisualStyle(views, dominantColor)
             views.setTextViewText(R.id.widget_title, song)
-            views.setInt(R.id.widget_root, "setBackgroundColor", dominantColor)
 
             val artistText = artist.ifBlank { context.getString(R.string.unknown_artist) }
             views.setTextViewText(R.id.widget_artist, artistText)
@@ -290,7 +291,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                         if (bitmap != null) {
                             withContext(Dispatchers.IO) {
                                 views.setImageViewBitmap(R.id.widget_cover, bitmap)
-                                views.setInt(R.id.widget_root, "setBackgroundColor", dominantColor)
+                                views.setImageViewBitmap(R.id.widget_backdrop, bitmap)
                                 for (appWidgetId in appWidgetIds) {
                                     appWidgetManager.updateAppWidget(appWidgetId, views)
                                 }
@@ -304,16 +305,19 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 }
             } else {
                 views.setImageViewResource(R.id.widget_cover, R.drawable.ic_music_placeholder)
+                views.setImageViewResource(R.id.widget_backdrop, R.drawable.ic_music_placeholder)
 
                 for (appWidgetId in appWidgetIds) {
                     appWidgetManager.updateAppWidget(appWidgetId, views)
                 }
             }
         } else {
+            applyWidgetVisualStyle(views, DEFAULT_WIDGET_COLOR)
             views.setTextViewText(R.id.widget_title, context.getString(R.string.app_name))
             views.setTextViewText(R.id.widget_artist, context.getString(R.string.song_notplaying))
             views.setImageViewResource(R.id.widget_play_pause, R.drawable.play)
             views.setImageViewResource(R.id.widget_cover, R.drawable.ic_music_placeholder)
+            views.setImageViewResource(R.id.widget_backdrop, R.drawable.ic_music_placeholder)
             views.setProgressBar(R.id.widget_song_progress, 100, 0, false)
 
             for (appWidgetId in appWidgetIds) {
@@ -404,6 +408,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                     
                     val views = RemoteViews(context.packageName, R.layout.widget_music)
                     setupWidgetControls(context, views)
+                    applyWidgetVisualStyle(views, DEFAULT_WIDGET_COLOR)
 
                     val isPlaying = intent.getBooleanExtra("current_is_playing", false)
 
@@ -469,6 +474,39 @@ class MusicWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    private fun applyWidgetVisualStyle(views: RemoteViews, dominantColor: Int) {
+        val overlayColor = withAlpha(dominantColor, 148)
+        val accentColor = blendColors(dominantColor, Color.WHITE, 0.55f)
+        val iconColor = blendColors(dominantColor, Color.WHITE, 0.72f)
+
+        views.setInt(R.id.widget_backdrop_tint, "setBackgroundColor", overlayColor)
+        views.setTextColor(R.id.widget_title, accentColor)
+        views.setTextColor(R.id.widget_artist, withAlpha(Color.WHITE, 220))
+
+        views.setInt(R.id.widget_prev, "setColorFilter", iconColor)
+        views.setInt(R.id.widget_next, "setColorFilter", iconColor)
+        views.setInt(R.id.widget_action_lyrics, "setColorFilter", iconColor)
+        views.setInt(R.id.widget_action_queue, "setColorFilter", iconColor)
+        views.setInt(R.id.widget_action_search, "setColorFilter", iconColor)
+        views.setInt(R.id.widget_play_pause, "setColorFilter", DEFAULT_PLAY_ICON_COLOR)
+    }
+
+    private fun blendColors(from: Int, to: Int, ratio: Float): Int {
+        val amount = ratio.coerceIn(0f, 1f)
+        val inverse = 1f - amount
+
+        return Color.argb(
+            (Color.alpha(from) * inverse + Color.alpha(to) * amount).toInt(),
+            (Color.red(from) * inverse + Color.red(to) * amount).toInt(),
+            (Color.green(from) * inverse + Color.green(to) * amount).toInt(),
+            (Color.blue(from) * inverse + Color.blue(to) * amount).toInt()
+        )
+    }
+
+    private fun withAlpha(color: Int, alpha: Int): Int {
+        return (color and 0x00FFFFFF) or ((alpha.coerceIn(0, 255)) shl 24)
+    }
+
     private fun getConfiguredQuickActions(context: Context): List<WidgetQuickActionConfig> {
         val selectedActions = listOf(
             WidgetQuickActionConfig(
@@ -524,6 +562,8 @@ class MusicWidgetProvider : AppWidgetProvider() {
         const val ACTION_PLAY_PAUSE = "com.anitail.music.widget.PLAY_PAUSE"
         const val ACTION_NEXT = "com.anitail.music.widget.NEXT"
         const val ACTION_PREV = "com.anitail.music.widget.PREV"
+        private const val DEFAULT_WIDGET_COLOR = 0xFF1D3342.toInt()
+        private const val DEFAULT_PLAY_ICON_COLOR = 0xFF102030.toInt()
         private val defaultQuickActions = listOf(
             WidgetQuickActionConfig(
                 enabled = true,
