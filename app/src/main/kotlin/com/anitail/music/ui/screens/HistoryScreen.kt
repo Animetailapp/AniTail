@@ -3,7 +3,6 @@ package com.anitail.music.ui.screens
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
@@ -72,6 +71,7 @@ import com.anitail.music.ui.menu.SelectionMediaMetadataMenu
 import com.anitail.music.ui.menu.SongMenu
 import com.anitail.music.ui.menu.YouTubeSongMenu
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.utils.rememberPreference
 import com.anitail.music.viewmodels.DateAgo
 import com.anitail.music.viewmodels.HistoryViewModel
@@ -256,7 +256,7 @@ fun HistoryScreen(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .combinedClickable(
+                                .tvCombinedClickable(
                                     onClick = {
                                         if (song.id == mediaMetadata?.id) {
                                             playerConnection.player.togglePlayPause()
@@ -329,7 +329,7 @@ fun HistoryScreen(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .combinedClickable(
+                                .tvCombinedClickable(
                                     onClick = {
                                         if (!selection) {
                                             if (event.song.id == mediaMetadata?.id) {

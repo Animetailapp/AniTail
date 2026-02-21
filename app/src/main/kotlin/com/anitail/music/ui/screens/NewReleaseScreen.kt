@@ -1,7 +1,6 @@
 package com.anitail.music.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -34,6 +33,7 @@ import com.anitail.music.ui.component.shimmer.GridItemPlaceHolder
 import com.anitail.music.ui.component.shimmer.ShimmerHost
 import com.anitail.music.ui.menu.YouTubeAlbumMenu
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.viewmodels.NewReleaseViewModel
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -69,7 +69,7 @@ fun NewReleaseScreen(
                 coroutineScope = coroutineScope,
                 modifier =
                 Modifier
-                    .combinedClickable(
+                    .tvCombinedClickable(
                         onClick = {
                             navController.navigate("album/${album.id}")
                         },

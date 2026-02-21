@@ -11,7 +11,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,6 +58,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -101,8 +101,10 @@ import com.anitail.music.ui.screens.settings.DarkMode
 import com.anitail.music.ui.theme.AnitailTheme
 import com.anitail.music.ui.theme.DefaultThemeColor
 import com.anitail.music.ui.theme.extractThemeColor
+import com.anitail.music.ui.utils.LocalIsTelevision
+import com.anitail.music.ui.utils.rememberIsTelevision
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.dataStore
-import com.google.android.gms.cast.framework.CastContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -146,7 +148,7 @@ class CastComposeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if (!com.anitail.music.utils.GooglePlayServicesUtils.isCastAvailable(this)) {
+        if (com.anitail.music.utils.GooglePlayServicesUtils.getCastContextOrNull(this) == null) {
             finish()
             return
         }
@@ -236,12 +238,15 @@ class CastComposeActivity : ComponentActivity() {
                 }
             }
 
-            AnitailTheme(
-                darkMode = prefs.first,
-                pureBlack = prefs.second,
-                themeColor = themeColor
-            ) {
-                CastExpandedContent(controllerProvider = { controller }) { finish() }
+            val isTelevision = rememberIsTelevision()
+            CompositionLocalProvider(LocalIsTelevision provides isTelevision) {
+                AnitailTheme(
+                    darkMode = prefs.first,
+                    pureBlack = prefs.second,
+                    themeColor = themeColor
+                ) {
+                    CastExpandedContent(controllerProvider = { controller }) { finish() }
+                }
             }
         }
     }
@@ -329,11 +334,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
 
     val context = LocalContext.current
     val rememberedCastContext = remember {
-        try {
-            CastContext.getSharedInstance(context)
-        } catch (_: Exception) {
-            null
-        }
+        com.anitail.music.utils.GooglePlayServicesUtils.getCastContextOrNull(context)
     }
     LaunchedEffect(controller, rememberedCastContext) {
         if (controller == null) return@LaunchedEffect
@@ -498,7 +499,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                         .size(headerBtnSize)
                         .clip(headerShape)
                         .background(headerBg)
-                        .clickable { onClose() },
+                        .tvClickable { onClose() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -532,7 +533,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                         .size(headerBtnSize)
                         .clip(headerShape)
                         .background(headerBg)
-                        .clickable { showDisconnectDialog = true },
+                        .tvClickable { showDisconnectDialog = true },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -553,9 +554,10 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                             val act = activity
                             runCatching {
                                 act?.let {
-                                    CastContext.getSharedInstance(it).sessionManager.endCurrentSession(
-                                        true
-                                    )
+                                    com.anitail.music.utils.GooglePlayServicesUtils
+                                        .getCastContextOrNull(it)
+                                        ?.sessionManager
+                                        ?.endCurrentSession(true)
                                 }
                             }
                             runCatching {
@@ -716,7 +718,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                 .size(48.dp)
                                 .clip(queueShape)
                                 .border(1.dp, clusterBorder, queueShape)
-                                .clickable(enabled = controller != null && queueItemCount > 0) {
+                                .tvClickable(enabled = controller != null && queueItemCount > 0) {
                                     if (controller != null) {
                                         showQueueSheet = true
                                     }
@@ -786,7 +788,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                     .size(48.dp)
                                     .clip(sideShape)
                                     .border(1.dp, borderCol, sideShape)
-                                    .clickable {
+                                    .tvClickable {
                                         controller?.sendCustomCommand(
                                             androidx.media3.session.SessionCommand(
                                                 MediaSessionConstants.ACTION_TOGGLE_REPEAT_MODE,
@@ -814,7 +816,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                     .size(48.dp)
                                     .clip(sideShape)
                                     .border(1.dp, borderCol, sideShape)
-                                    .clickable {
+                                    .tvClickable {
                                         controller?.sendCustomCommand(
                                             androidx.media3.session.SessionCommand(
                                                 MediaSessionConstants.ACTION_TOGGLE_LIKE,
@@ -1024,7 +1026,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                     .size(46.dp)
                                     .clip(headerShape)
                                     .border(1.dp, borderCol, headerShape)
-                                    .clickable {
+                                    .tvClickable {
                                         controller?.sendCustomCommand(
                                             androidx.media3.session.SessionCommand(
                                                 MediaSessionConstants.ACTION_TOGGLE_SHUFFLE,
@@ -1159,7 +1161,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                         Row(
                                             Modifier
                                                 .fillMaxWidth()
-                                                .clickable {
+                                                .tvClickable {
                                                     mediaId
                                                     if (controller != null) {
                                                         runCatching {
@@ -1338,4 +1340,3 @@ private fun ProgressSection(
         Text(formattedDuration, style = MaterialTheme.typography.labelSmall)
     }
 }
-

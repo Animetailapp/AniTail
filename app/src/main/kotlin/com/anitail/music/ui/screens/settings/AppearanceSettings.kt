@@ -7,7 +7,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -97,6 +96,7 @@ import com.anitail.music.ui.component.PreferenceEntry
 import com.anitail.music.ui.component.PreferenceGroupTitle
 import com.anitail.music.ui.component.SwitchPreference
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.FontUtils
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.utils.rememberPreference
@@ -328,7 +328,7 @@ fun AppearanceSettings(
                             if (sliderStyle == SliderStyle.DEFAULT) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                             RoundedCornerShape(16.dp)
                         )
-                        .clickable {
+                        .tvClickable {
                             onSliderStyleChange(SliderStyle.DEFAULT)
                             showSliderOptionDialog = false
                         }
@@ -362,7 +362,7 @@ fun AppearanceSettings(
                             if (sliderStyle == SliderStyle.SQUIGGLY) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                             RoundedCornerShape(16.dp)
                         )
-                        .clickable {
+                        .tvClickable {
                             onSliderStyleChange(SliderStyle.SQUIGGLY)
                             showSliderOptionDialog = false
                         }
@@ -396,7 +396,7 @@ fun AppearanceSettings(
                             if (sliderStyle == SliderStyle.SLIM) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                             RoundedCornerShape(16.dp)
                         )
-                        .clickable {
+                        .tvClickable {
                             onSliderStyleChange(SliderStyle.SLIM)
                             showSliderOptionDialog = false
                         }

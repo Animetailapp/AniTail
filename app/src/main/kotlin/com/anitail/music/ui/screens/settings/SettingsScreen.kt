@@ -8,7 +8,6 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -68,17 +67,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import androidx.navigation.NavController
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.anitail.music.viewmodels.HomeViewModel
-import com.anitail.music.constants.PreferredAvatarSourceKey
-import com.anitail.music.constants.AvatarSource
-import com.anitail.music.utils.rememberEnumPreference
+import androidx.navigation.NavController
 import com.anitail.music.BuildConfig
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.R
+import com.anitail.music.constants.AvatarSource
+import com.anitail.music.constants.PreferredAvatarSourceKey
 import com.anitail.music.ui.component.IconButton
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.utils.rememberEnumPreference
+import com.anitail.music.viewmodels.HomeViewModel
 import java.util.Calendar
 import androidx.compose.material3.IconButton as M3IconButton
 
@@ -598,7 +598,7 @@ fun SettingsItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .tvClickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

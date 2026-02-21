@@ -3,7 +3,6 @@ package com.anitail.music.ui.menu
 import android.annotation.SuppressLint
 import android.content.Intent
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -61,6 +60,7 @@ import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.DefaultDialog
 import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.component.YouTubeListItem
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.joinByBullet
 import com.anitail.music.utils.makeTimeString
 import kotlinx.coroutines.CoroutineScope
@@ -244,7 +244,7 @@ fun YouTubePlaylistMenu(
                             modifier = Modifier.size(ListThumbnailSize),
                         )
                     },
-                    modifier = Modifier.clickable { showErrorPlaylistAddDialog = false },
+                    modifier = Modifier.tvClickable { showErrorPlaylistAddDialog = false },
                 )
             }
 
@@ -296,7 +296,7 @@ fun YouTubePlaylistMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         println("Play: ${playEndpoint.playlistId}, ${playEndpoint.params}")
                         playerConnection.playQueue(YouTubeQueue(playEndpoint))
                         onDismiss()
@@ -314,7 +314,7 @@ fun YouTubePlaylistMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         println("Shuffle: id: ${shuffleEndpoint.playlistId}, params: ${shuffleEndpoint.params}")
                         playerConnection.playQueue(YouTubeQueue(shuffleEndpoint))
                         onDismiss()
@@ -332,7 +332,7 @@ fun YouTubePlaylistMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         println("Radio: ${radioEndpoint.playlistId}, ${radioEndpoint.params}")
                         playerConnection.playQueue(YouTubeQueue(radioEndpoint))
                         onDismiss()
@@ -349,7 +349,7 @@ fun YouTubePlaylistMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     coroutineScope.launch {
                         songs
                             .ifEmpty {
@@ -378,7 +378,7 @@ fun YouTubePlaylistMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     coroutineScope.launch {
                         songs
                             .ifEmpty {
@@ -407,7 +407,7 @@ fun YouTubePlaylistMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     showChoosePlaylistDialog = true
                 }
             )
@@ -429,7 +429,7 @@ fun YouTubePlaylistMenu(
                                     contentDescription = null,
                                 )
                             },
-                            modifier = Modifier.clickable {
+                            modifier = Modifier.tvClickable {
                                 showRemoveDownloadDialog = true
                             }
                         )
@@ -443,7 +443,7 @@ fun YouTubePlaylistMenu(
                                     strokeWidth = 2.dp
                                 )
                             },
-                            modifier = Modifier.clickable {
+                            modifier = Modifier.tvClickable {
                                 showRemoveDownloadDialog = true
                             }
                         )
@@ -457,7 +457,7 @@ fun YouTubePlaylistMenu(
                                     contentDescription = null,
                                 )
                             },
-                            modifier = Modifier.clickable {
+                            modifier = Modifier.tvClickable {
                                 coroutineScope.launch(Dispatchers.IO) {
                                     val mediaMetadataSongs = songs.map { it.toMediaMetadata() }
                                     database.transaction {
@@ -483,7 +483,7 @@ fun YouTubePlaylistMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     val intent = Intent().apply {
                         action = Intent.ACTION_SEND
                         type = "text/plain"
@@ -504,7 +504,7 @@ fun YouTubePlaylistMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         onDismiss()
                         selectAction()
                     }

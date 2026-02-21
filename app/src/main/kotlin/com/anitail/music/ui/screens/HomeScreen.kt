@@ -132,6 +132,7 @@ import com.anitail.music.ui.menu.YouTubeArtistMenu
 import com.anitail.music.ui.menu.YouTubePlaylistMenu
 import com.anitail.music.ui.menu.YouTubeSongMenu
 import com.anitail.music.ui.utils.SnapLayoutInfoProvider
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.ui.utils.isScrollingUp
 import com.anitail.music.ui.utils.resize
 import com.anitail.music.utils.rememberPreference
@@ -786,7 +787,7 @@ fun HomeScreen(
                 song = it,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .combinedClickable(
+                    .tvCombinedClickable(
                         onClick = {
                             if (it.id == mediaMetadata?.id) {
                                 playerConnection.player.togglePlayPause()
@@ -820,7 +821,7 @@ fun HomeScreen(
                 coroutineScope = scope,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .combinedClickable(
+                    .tvCombinedClickable(
                         onClick = {
                             navController.navigate("album/${it.id}")
                         },
@@ -841,7 +842,7 @@ fun HomeScreen(
                 artist = it,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .combinedClickable(
+                    .tvCombinedClickable(
                         onClick = {
                             navController.navigate("artist/${it.id}")
                         },
@@ -872,7 +873,7 @@ fun HomeScreen(
             coroutineScope = scope,
             thumbnailRatio = 1f,
             modifier = Modifier
-                .combinedClickable(
+                .tvCombinedClickable(
                     onClick = {
                         when (item) {
                             is SongItem -> playerConnection.playQueue(
@@ -1047,7 +1048,7 @@ fun HomeScreen(
                                 },
                                 modifier = Modifier
                                     .width(horizontalLazyGridItemWidth)
-                                    .combinedClickable(
+                                    .tvCombinedClickable(
                                         onClick = {
                                             if (song!!.id == mediaMetadata?.id) {
                                                 playerConnection.player.togglePlayPause()
@@ -1213,7 +1214,7 @@ fun HomeScreen(
                                 },
                                 modifier = Modifier
                                     .width(horizontalLazyGridItemWidth)
-                                    .combinedClickable(
+                                    .tvCombinedClickable(
                                         onClick = {
                                             if (song!!.id == mediaMetadata?.id) {
                                                 playerConnection.player.togglePlayPause()

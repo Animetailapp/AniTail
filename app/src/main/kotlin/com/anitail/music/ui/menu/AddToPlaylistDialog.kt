@@ -1,7 +1,7 @@
 package com.anitail.music.ui.menu
 
+import com.anitail.music.ui.utils.tvClickable
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
@@ -51,7 +51,7 @@ fun AddToPlaylistDialog(
         mutableStateOf(emptyList<Playlist>())
     }
     val (innerTubeCookie) = rememberPreference(InnerTubeCookieKey, "")
-    val isLoggedIn = remember(innerTubeCookie) {
+    remember(innerTubeCookie) {
         "SAPISID" in parseCookieString(innerTubeCookie)
     }
     var showCreatePlaylistDialog by rememberSaveable {
@@ -92,7 +92,7 @@ fun AddToPlaylistDialog(
                             modifier = Modifier.size(ListThumbnailSize)
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         showCreatePlaylistDialog = true
                     }
                 )
@@ -101,7 +101,7 @@ fun AddToPlaylistDialog(
             items(playlists) { playlist ->
                 PlaylistListItem(
                     playlist = playlist,
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         selectedPlaylist = playlist
                         coroutineScope.launch(Dispatchers.IO) {
                             if (songIds == null) {

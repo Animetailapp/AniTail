@@ -5,8 +5,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Indication
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.sizeIn
@@ -29,6 +27,8 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.ui.utils.tvCombinedClickable
 
 @Composable
 fun ResizableIconButton(
@@ -44,10 +44,10 @@ fun ResizableIconButton(
         contentDescription = null,
         colorFilter = ColorFilter.tint(color),
         modifier = modifier
-            .clickable(
-                indication = indication ?: ripple(bounded = false),
-                interactionSource = remember { MutableInteractionSource() },
+            .tvClickable(
                 enabled = enabled,
+                shape = CircleShape,
+                indication = indication ?: ripple(bounded = false),
                 onClick = onClick,
             )
             .alpha(if (enabled) 1f else 0.5f),
@@ -71,7 +71,7 @@ fun IconButton(
             .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .clip(CircleShape)
             .background(color = colors.containerColor)
-            .combinedClickable(
+            .tvCombinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
                 enabled = enabled,

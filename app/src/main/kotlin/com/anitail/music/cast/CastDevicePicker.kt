@@ -1,7 +1,6 @@
 package com.anitail.music.cast
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,9 +29,9 @@ import androidx.compose.ui.unit.dp
 import androidx.mediarouter.media.MediaRouteSelector
 import androidx.mediarouter.media.MediaRouter
 import com.anitail.music.R
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.GooglePlayServicesUtils
 import com.google.android.gms.cast.CastMediaControlIntent
-import com.google.android.gms.cast.framework.CastContext
 import kotlinx.coroutines.delay
 
 private data class CastRouteUi(
@@ -46,14 +45,11 @@ private data class CastRouteUi(
 fun CastDevicePickerDialog(onDismiss: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    // Verificar si Cast está disponible antes de mostrar el diálogo
-    if (!GooglePlayServicesUtils.isCastAvailable(context)) {
+    val castContext = remember { GooglePlayServicesUtils.getCastContextOrNull(context) }
+    if (castContext == null) {
         onDismiss()
         return
     }
-    
-    val castContext =
-        remember { runCatching { CastContext.getSharedInstance(context) }.getOrNull() }
     val mediaRouter = remember { MediaRouter.getInstance(context) }
     val selector = remember {
         MediaRouteSelector.Builder()
@@ -149,10 +145,10 @@ fun CastDevicePickerDialog(onDismiss: () -> Unit) {
                                             alpha = 0.15f
                                         ) else Color.Transparent
                                     )
-                                    .clickable(enabled = !route.isConnecting) {
+                                    .tvClickable(enabled = !route.isConnecting) {
                                         val found =
                                             mediaRouter.routes.firstOrNull { r -> r.id == route.id }
-                                                ?: return@clickable
+                                                ?: return@tvClickable
                                         if (route.isSelected) {
                                             castContext?.sessionManager?.endCurrentSession(true)
                                         } else {

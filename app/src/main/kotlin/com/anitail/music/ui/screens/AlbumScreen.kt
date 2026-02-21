@@ -3,7 +3,6 @@ package com.anitail.music.ui.screens
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -89,6 +88,7 @@ import com.anitail.music.ui.menu.SongMenu
 import com.anitail.music.ui.menu.YouTubeAlbumMenu
 import com.anitail.music.ui.utils.ItemWrapper
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.viewmodels.AlbumViewModel
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -372,7 +372,7 @@ fun AlbumScreen(
                         modifier =
                         Modifier
                             .fillMaxWidth()
-                            .combinedClickable(
+                            .tvCombinedClickable(
                                 onClick = {
                                     if (!selection) {
                                         if (songWrapper.item.id == mediaMetadata?.id) {
@@ -421,7 +421,7 @@ fun AlbumScreen(
                                 coroutineScope = scope,
                                 modifier =
                                 Modifier
-                                    .combinedClickable(
+                                    .tvCombinedClickable(
                                         onClick = { navController.navigate("album/${item.id}") },
                                         onLongClick = {
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)

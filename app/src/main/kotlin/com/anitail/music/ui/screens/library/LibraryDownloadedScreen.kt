@@ -1,7 +1,6 @@
 package com.anitail.music.ui.screens.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -51,6 +50,8 @@ import com.anitail.music.ui.component.SongListItem
 import com.anitail.music.ui.menu.SelectionSongMenu
 import com.anitail.music.ui.menu.SongMenu
 import com.anitail.music.ui.utils.ItemWrapper
+
+import com.anitail.music.ui.utils.tvCombinedClickable
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -225,7 +226,7 @@ fun LibraryDownloadedScreen(
                         isSelected = songWrapper.isSelected && selection,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .combinedClickable(
+                            .tvCombinedClickable(
                                 onClick = {
                                     if (!selection) {
                                         if (songWrapper.item.id == mediaMetadata?.id) {

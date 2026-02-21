@@ -2,7 +2,6 @@ package com.anitail.music.cast
 
 import android.content.Context
 import com.anitail.music.utils.GooglePlayServicesUtils
-import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.Session
 import com.google.android.gms.cast.framework.SessionManagerListener
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,11 +14,7 @@ class CastManager(
 
     // Memoizar CastContext para evitar múltiples llamadas
     private val castContext by lazy {
-        if (GooglePlayServicesUtils.isCastAvailable(context)) {
-            CastContext.getSharedInstance(context)
-        } else {
-            null
-        }
+        GooglePlayServicesUtils.getCastContextOrNull(context)
     }
 
     private val sessionListener = object : SessionManagerListener<Session> {

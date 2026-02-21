@@ -1,7 +1,6 @@
 package com.anitail.music.ui.screens.artist
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -49,6 +48,7 @@ import com.anitail.music.ui.component.SongListItem
 import com.anitail.music.ui.component.SortHeader
 import com.anitail.music.ui.menu.SongMenu
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.utils.rememberPreference
 import com.anitail.music.viewmodels.ArtistSongsViewModel
@@ -148,7 +148,7 @@ fun ArtistSongsScreen(
                     modifier =
                     Modifier
                         .fillMaxWidth()
-                        .combinedClickable(
+                        .tvCombinedClickable(
                             onClick = {
                                 if (song.id == mediaMetadata?.id) {
                                     playerConnection.player.togglePlayPause()

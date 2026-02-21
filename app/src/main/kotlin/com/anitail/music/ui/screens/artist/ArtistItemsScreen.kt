@@ -1,8 +1,6 @@
 package com.anitail.music.ui.screens.artist
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -55,6 +53,8 @@ import com.anitail.music.ui.menu.YouTubeArtistMenu
 import com.anitail.music.ui.menu.YouTubePlaylistMenu
 import com.anitail.music.ui.menu.YouTubeSongMenu
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.viewmodels.ArtistItemsViewModel
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -166,7 +166,7 @@ fun ArtistItemsScreen(
                     },
                     modifier =
                     Modifier
-                        .clickable {
+                        .tvClickable {
                             when (item) {
                                 is SongItem -> {
                                     if (item.id == mediaMetadata?.id) {
@@ -220,7 +220,7 @@ fun ArtistItemsScreen(
                     fillMaxWidth = true,
                     coroutineScope = coroutineScope,
                     modifier = Modifier
-                        .combinedClickable(
+                        .tvCombinedClickable(
                             onClick = {
                                 when (item) {
                                     is SongItem -> playerConnection.playQueue(

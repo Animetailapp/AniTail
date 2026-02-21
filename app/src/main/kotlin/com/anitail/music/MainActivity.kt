@@ -182,10 +182,13 @@ import com.anitail.music.ui.theme.ColorSaver
 import com.anitail.music.ui.theme.DefaultThemeColor
 import com.anitail.music.ui.theme.ThemePreviewState
 import com.anitail.music.ui.theme.extractThemeColor
+import com.anitail.music.ui.utils.LocalIsTelevision
 import com.anitail.music.ui.theme.seedColor
 import com.anitail.music.ui.utils.appBarScrollBehavior
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.rememberIsTelevision
 import com.anitail.music.ui.utils.resetHeightOffset
+import com.anitail.music.ui.utils.tvFocusable
 import com.anitail.music.utils.LocaleManager
 import com.anitail.music.utils.PermissionHelper
 import com.anitail.music.utils.SyncUtils
@@ -496,21 +499,23 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            AnitailTheme(
-                darkMode = darkTheme,
-                pureBlack = pureBlack,
-                themeColor = themeColor,
-                preferFidelityStyle = isPaletteCustomizationPreviewActive ||
+            val isTelevision = rememberIsTelevision()
+            CompositionLocalProvider(LocalIsTelevision provides isTelevision) {
+                AnitailTheme(
+                    darkMode = darkTheme,
+                    pureBlack = pureBlack,
+                    themeColor = themeColor,
+                    preferFidelityStyle = isPaletteCustomizationPreviewActive ||
                     (!enableDynamicTheme && selectedThemePalette == ThemePalette.CUSTOM),
             ) {
-                BoxWithConstraints(
-                    modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface
-                        )
-                ) {
+                    BoxWithConstraints(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .background(
+                                    if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface
+                                )
+                    ) {
                     val focusManager = LocalFocusManager.current
                     val density = LocalDensity.current
                     val windowsInsets = WindowInsets.systemBars
@@ -1101,6 +1106,9 @@ class MainActivity : AppCompatActivity() {
                                                 navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true
 
                                             NavigationBarItem(
+                                                modifier = Modifier.tvFocusable(
+                                                    shape = RoundedCornerShape(12.dp),
+                                                ),
                                                 selected = isSelected,
                                                 icon = {
                                                     Icon(
@@ -1308,6 +1316,7 @@ class MainActivity : AppCompatActivity() {
                             }
                             openSearchImmediately = false
                         }
+                    }
                     }
                 }
             }
@@ -1577,4 +1586,3 @@ val LocalDownloadUtil = staticCompositionLocalOf<DownloadUtil> { error("No Downl
 val LocalSyncUtils = staticCompositionLocalOf<SyncUtils> { error("No SyncUtils provided") }
 val LocalDownloadLibraryRepository =
     staticCompositionLocalOf<DownloadLibraryRepository> { error("No DownloadLibraryRepository provided") }
-

@@ -69,6 +69,7 @@ import com.anitail.music.ui.component.DownloadFormatDialog
 import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.component.LocalBottomSheetPageState
 import com.anitail.music.ui.utils.ShowMediaInfo
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.utils.joinByBullet
 import com.anitail.music.utils.makeTimeString
@@ -168,7 +169,7 @@ fun YouTubeSongMenu(
                     modifier =
                     Modifier
                         .height(ListItemHeight)
-                        .clickable {
+                        .tvClickable {
                             navController.navigate("artist/${artist.id}")
                             showSelectArtistDialog = false
                             onDismiss()
@@ -181,7 +182,7 @@ fun YouTubeSongMenu(
                         Modifier
                             .fillParentMaxWidth()
                             .height(ListItemHeight)
-                            .clickable {
+                            .tvClickable {
                                 navController.navigate("artist/${artist.id}")
                                 showSelectArtistDialog = false
                                 onDismiss()
@@ -283,7 +284,7 @@ fun YouTubeSongMenu(
                     shape = RoundedCornerShape(8.dp)
                 )
                 .clip(RoundedCornerShape(8.dp))
-                .clickable {
+                .tvClickable {
                     playerConnection.playNext(song.toMediaItem())
                     onDismiss()
                 }
@@ -314,7 +315,7 @@ fun YouTubeSongMenu(
                     shape = RoundedCornerShape(8.dp)
                 )
                 .clip(RoundedCornerShape(8.dp))
-                .clickable {
+                .tvClickable {
                     showChoosePlaylistDialog = true
                 }
                 .padding(12.dp),
@@ -344,7 +345,7 @@ fun YouTubeSongMenu(
                     shape = RoundedCornerShape(8.dp)
                 )
                 .clip(RoundedCornerShape(8.dp))
-                .clickable {
+                .tvClickable {
                     val intent = Intent().apply {
                         action = Intent.ACTION_SEND
                         type = "text/plain"
@@ -389,7 +390,7 @@ fun YouTubeSongMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     playerConnection.playQueue(YouTubeQueue.radio(song.toMediaMetadata()))
                     onDismiss()
                 }
@@ -404,7 +405,7 @@ fun YouTubeSongMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     playerConnection.addToQueue(song.toMediaItem())
                     onDismiss()
                 }
@@ -421,7 +422,7 @@ fun YouTubeSongMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     if (librarySong?.song?.inLibrary != null) {
                         database.query {
                             inLibrary(song.id, null)
@@ -451,7 +452,7 @@ fun YouTubeSongMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             downloadUtil.removeDownload(song.id)
                         }
                     )
@@ -489,7 +490,7 @@ fun YouTubeSongMenu(
                                 strokeWidth = 2.dp
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             downloadUtil.removeDownload(song.id)
                         }
                     )
@@ -503,7 +504,7 @@ fun YouTubeSongMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             showDownloadFormatDialog = true
                             isLoadingFormats = true
                             availableFormats = emptyList()
@@ -532,7 +533,7 @@ fun YouTubeSongMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         if (artists.size == 1) {
                             navController.navigate("artist/${artists[0].id}")
                             onDismiss()
@@ -553,7 +554,7 @@ fun YouTubeSongMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         navController.navigate("album/${album.id}")
                         onDismiss()
                     }
@@ -569,7 +570,7 @@ fun YouTubeSongMenu(
                          contentDescription = null,
                      )
                  },
-                 modifier = Modifier.clickable {
+                 modifier = Modifier.tvClickable {
                       onDismiss()
                       bottomSheetPageState.show {
                           ShowMediaInfo(song.id)

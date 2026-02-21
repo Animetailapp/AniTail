@@ -74,6 +74,7 @@ import com.anitail.music.ui.component.BigSeekBar
 import com.anitail.music.ui.component.BottomSheetState
 import com.anitail.music.ui.component.DownloadFormatDialog
 import com.anitail.music.ui.component.ListDialog
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.utils.makeTimeString
 import kotlinx.coroutines.Dispatchers
@@ -183,7 +184,7 @@ fun PlayerMenu(
                     Modifier
                         .fillParentMaxWidth()
                         .height(ListItemHeight)
-                        .clickable {
+                        .tvClickable {
                             navController.navigate("artist/${artist.id}")
                             showSelectArtistDialog = false
                             playerBottomSheetState.collapseSoft()
@@ -261,7 +262,7 @@ fun PlayerMenu(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = buttonShape
                 )
-                .clickable {
+                .tvClickable {
                     playerConnection.playQueue(
                         YouTubeQueue(
                             WatchEndpoint(videoId = mediaMetadata.id),
@@ -297,7 +298,7 @@ fun PlayerMenu(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = buttonShape
                 )
-                .clickable {
+                .tvClickable {
                     showChoosePlaylistDialog = true
                 }
                 .padding(12.dp),
@@ -326,7 +327,7 @@ fun PlayerMenu(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = buttonShape
                 )
-                .clickable {
+                .tvClickable {
                     val clipboard =
                         context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                     val clip = android.content.ClipData.newPlainText(
@@ -378,7 +379,7 @@ fun PlayerMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         if (mediaMetadata.artists.size == 1) {
                             navController.navigate("artist/${mediaMetadata.artists[0].id}")
                             playerBottomSheetState.collapseSoft()
@@ -400,7 +401,7 @@ fun PlayerMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         navController.navigate("album/${mediaMetadata.album.id}")
                         playerBottomSheetState.collapseSoft()
                         onDismiss()
@@ -424,7 +425,7 @@ fun PlayerMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             downloadUtil.removeDownload(mediaMetadata.id)
                         }
                     )
@@ -462,7 +463,7 @@ fun PlayerMenu(
                                 strokeWidth = 2.dp
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             downloadUtil.removeDownload(mediaMetadata.id)
                         }
                     )
@@ -476,7 +477,7 @@ fun PlayerMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             showDownloadFormatDialog = true
                             isLoadingFormats = true
                             availableFormats = emptyList()
@@ -504,7 +505,7 @@ fun PlayerMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     val intent = Intent().apply {
                         action = Intent.ACTION_SEND
                         type = "text/plain"
@@ -527,7 +528,7 @@ fun PlayerMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     onShowDetailsDialog()
                     onDismiss()
                 }
@@ -554,7 +555,7 @@ fun PlayerMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     if (sleepTimer.isActive) {
                         sleepTimer.clear()
                     } else {
@@ -574,7 +575,7 @@ fun PlayerMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         val intent =
                             Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
                                 putExtra(
@@ -600,7 +601,7 @@ fun PlayerMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         showPitchTempoDialog = true
                     }
                 )

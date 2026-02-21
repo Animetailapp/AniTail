@@ -2,8 +2,7 @@ package com.anitail.music.ui.screens.search
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -62,8 +63,11 @@ import com.anitail.music.ui.menu.YouTubeAlbumMenu
 import com.anitail.music.ui.menu.YouTubeArtistMenu
 import com.anitail.music.ui.menu.YouTubePlaylistMenu
 import com.anitail.music.ui.menu.YouTubeSongMenu
+import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.viewmodels.OnlineSearchSuggestionViewModel
 import kotlinx.coroutines.flow.drop
+
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -155,6 +159,7 @@ fun OnlineSearchScreen(
         }
 
         items(viewState.items, key = { it.id }) { item ->
+            val interactionSource = remember { MutableInteractionSource() }
             YouTubeListItem(
                 item = item,
                 isActive = when (item) {
@@ -210,7 +215,9 @@ fun OnlineSearchScreen(
                     }
                 },
                 modifier = Modifier
-                    .combinedClickable(
+                    .tvCombinedClickable(
+                        interactionSource = interactionSource,
+                        shape = RoundedCornerShape(12.dp),
                         onClick = {
                             when (item) {
                                 is SongItem -> {
@@ -223,14 +230,17 @@ fun OnlineSearchScreen(
                                         onDismiss()
                                     }
                                 }
+
                                 is AlbumItem -> {
                                     navController.navigate("album/${item.id}")
                                     onDismiss()
                                 }
+
                                 is ArtistItem -> {
                                     navController.navigate("artist/${item.id}")
                                     onDismiss()
                                 }
+
                                 is PlaylistItem -> {
                                     navController.navigate("online_playlist/${item.id}")
                                     onDismiss()
@@ -249,6 +259,7 @@ fun OnlineSearchScreen(
                                             onDismiss()
                                         }
                                     )
+
                                     is AlbumItem -> YouTubeAlbumMenu(
                                         albumItem = item,
                                         navController = navController,
@@ -257,6 +268,7 @@ fun OnlineSearchScreen(
                                             onDismiss()
                                         }
                                     )
+
                                     is ArtistItem -> YouTubeArtistMenu(
                                         artist = item,
                                         onDismiss = {
@@ -264,6 +276,7 @@ fun OnlineSearchScreen(
                                             onDismiss()
                                         }
                                     )
+
                                     is PlaylistItem -> YouTubePlaylistMenu(
                                         playlist = item,
                                         coroutineScope = coroutineScope,
@@ -299,13 +312,15 @@ fun SuggestionItem(
             .fillMaxWidth()
             .height(SuggestionItemHeight)
             .background(if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface)
-            .clickable(onClick = onClick)
+            .tvClickable(onClick = onClick)
             .padding(end = SearchBarIconOffsetX),
     ) {
         Icon(
             painterResource(if (online) R.drawable.search else R.drawable.history),
             contentDescription = null,
-            modifier = Modifier.padding(horizontal = 16.dp).alpha(0.5f)
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .alpha(0.5f)
         )
 
         Text(

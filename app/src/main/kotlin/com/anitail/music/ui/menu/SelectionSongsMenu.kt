@@ -1,7 +1,6 @@
 package com.anitail.music.ui.menu
 
 import android.annotation.SuppressLint
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -43,6 +42,7 @@ import com.anitail.music.models.MediaMetadata
 import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.DefaultDialog
+import com.anitail.music.ui.utils.tvClickable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -156,7 +156,7 @@ fun SelectionSongMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     onDismiss()
                     playerConnection.playQueue(
                         ListQueue(
@@ -177,7 +177,7 @@ fun SelectionSongMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     onDismiss()
                     playerConnection.playQueue(
                         ListQueue(
@@ -198,7 +198,7 @@ fun SelectionSongMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     onDismiss()
                     playerConnection.addToQueue(songSelection.map { it.toMediaItem() })
                     clearAction()
@@ -214,7 +214,7 @@ fun SelectionSongMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     showChoosePlaylistDialog = true
                 }
             )
@@ -236,7 +236,7 @@ fun SelectionSongMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     if (allInLibrary) {
                         database.query {
                             songSelection.forEach { song ->
@@ -270,7 +270,7 @@ fun SelectionSongMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             showRemoveDownloadDialog = true
                         }
                     )
@@ -284,7 +284,7 @@ fun SelectionSongMenu(
                                 strokeWidth = 2.dp
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             showRemoveDownloadDialog = true
                         }
                     )
@@ -298,7 +298,7 @@ fun SelectionSongMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             downloadUtil.downloadSongsToMediaStore(songSelection)
                         }
                     )
@@ -322,7 +322,7 @@ fun SelectionSongMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     val allLiked = songSelection.all { it.song.liked }
                     onDismiss()
                     database.query {
@@ -347,7 +347,7 @@ fun SelectionSongMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         onDismiss()
                         var i = 0
                         database.query {
@@ -453,7 +453,7 @@ fun SelectionMediaMetadataMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         onDismiss()
                         val indicesToRemove = currentItems
                             .filter { playerConnection.player.availableCommands.contains(Player.COMMAND_CHANGE_MEDIA_ITEMS) }
@@ -476,7 +476,7 @@ fun SelectionMediaMetadataMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     onDismiss()
                     playerConnection.playQueue(
                         ListQueue(
@@ -497,7 +497,7 @@ fun SelectionMediaMetadataMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     onDismiss()
                     playerConnection.playQueue(
                         ListQueue(
@@ -518,7 +518,7 @@ fun SelectionMediaMetadataMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     onDismiss()
                     playerConnection.addToQueue(songSelection.map { it.toMediaItem() })
                     clearAction()
@@ -534,7 +534,7 @@ fun SelectionMediaMetadataMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     showChoosePlaylistDialog = true
                 }
             )
@@ -554,7 +554,7 @@ fun SelectionMediaMetadataMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     database.query {
                         if (allLiked) {
                             songSelection.forEach { song ->
@@ -585,7 +585,7 @@ fun SelectionMediaMetadataMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             showRemoveDownloadDialog = true
                         }
                     )
@@ -599,7 +599,7 @@ fun SelectionMediaMetadataMenu(
                                 strokeWidth = 2.dp
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             showRemoveDownloadDialog = true
                         }
                     )
@@ -613,7 +613,7 @@ fun SelectionMediaMetadataMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             coroutineScope.launch(Dispatchers.IO) {
                                 songSelection.forEach { mediaMetadata ->
                                     val song = database.song(mediaMetadata.id).first()

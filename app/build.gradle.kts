@@ -282,6 +282,8 @@ dependencies {
     implementation(libs.work.runtime.ktx)
     implementation(libs.hilt.work)    // OneSignal Push Notifications
     implementation(libs.onesignal)
+
+    testImplementation(libs.junit)
     
     // Last.fm integration
     implementation(libs.lastfm.java)

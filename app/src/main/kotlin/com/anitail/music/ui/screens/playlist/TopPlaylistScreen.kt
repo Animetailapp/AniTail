@@ -2,7 +2,6 @@ package com.anitail.music.ui.screens.playlist
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -91,6 +90,7 @@ import com.anitail.music.ui.menu.SelectionSongMenu
 import com.anitail.music.ui.menu.SongMenu
 import com.anitail.music.ui.utils.ItemWrapper
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.utils.makeTimeString
 import com.anitail.music.viewmodels.TopPlaylistViewModel
 
@@ -434,7 +434,7 @@ fun TopPlaylistScreen(
                             isSelected = songWrapper.isSelected && selection,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .combinedClickable(
+                                .tvCombinedClickable(
                                     onClick = {
                                         if (!selection) {
                                             if (songWrapper.item.song.id == mediaMetadata?.id) {

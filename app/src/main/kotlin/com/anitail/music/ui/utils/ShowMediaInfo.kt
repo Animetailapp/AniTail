@@ -3,8 +3,6 @@ package com.anitail.music.ui.utils
 import android.text.format.Formatter
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -155,8 +153,7 @@ fun ShowMediaInfo(videoId: String) {
                             color = MaterialTheme.colorScheme.onBackground,
                             modifier =
                             Modifier
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
+                                .tvClickable(
                                     indication = null,
                                     onClick = {
                                         clipboardManager.setText(AnnotatedString(displayText))

@@ -1,8 +1,6 @@
 package com.anitail.music.ui.screens.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -71,6 +69,8 @@ import com.anitail.music.ui.component.SortHeader
 import com.anitail.music.ui.menu.AlbumMenu
 import com.anitail.music.ui.menu.ArtistMenu
 import com.anitail.music.ui.menu.PlaylistMenu
+import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.utils.rememberPreference
 import com.anitail.music.viewmodels.LibraryMixViewModel
@@ -298,7 +298,7 @@ fun LibraryMixScreen(
                                 modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .clickable {
+                                    .tvClickable {
                                         navController.navigate("auto_playlist/liked")
                                     }
                                     .animateItem(),
@@ -317,7 +317,7 @@ fun LibraryMixScreen(
                                 modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .clickable {
+                                    .tvClickable {
                                         navController.navigate("auto_playlist/downloaded")
                                     }
                                     .animateItem(),
@@ -336,7 +336,7 @@ fun LibraryMixScreen(
                                 modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .clickable {
+                                    .tvClickable {
                                         navController.navigate("top_playlist/$topSize")
                                     }
                                     .animateItem(),
@@ -355,7 +355,7 @@ fun LibraryMixScreen(
                                 modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .clickable {
+                                    .tvClickable {
                                         navController.navigate("cache_playlist/cached")
                                     }
                                     .animateItem(),
@@ -393,7 +393,7 @@ fun LibraryMixScreen(
                                     modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .combinedClickable(
+                                        .tvCombinedClickable(
                                             onClick = {
                                                 navController.navigate("local_playlist/${item.id}")
                                             },
@@ -436,7 +436,7 @@ fun LibraryMixScreen(
                                     modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .combinedClickable(
+                                        .tvCombinedClickable(
                                             onClick = {
                                                 navController.navigate("artist/${item.id}")
                                             },
@@ -481,7 +481,7 @@ fun LibraryMixScreen(
                                     modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .combinedClickable(
+                                        .tvCombinedClickable(
                                             onClick = {
                                                 navController.navigate("album/${item.id}")
                                             },
@@ -542,7 +542,7 @@ fun LibraryMixScreen(
                                 modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .combinedClickable(
+                                    .tvCombinedClickable(
                                         onClick = {
                                             navController.navigate("auto_playlist/liked")
                                         },
@@ -564,7 +564,7 @@ fun LibraryMixScreen(
                                 modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .combinedClickable(
+                                    .tvCombinedClickable(
                                         onClick = {
                                             navController.navigate("auto_playlist/downloaded")
                                         },
@@ -586,7 +586,7 @@ fun LibraryMixScreen(
                                 modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .combinedClickable(
+                                    .tvCombinedClickable(
                                         onClick = {
                                             navController.navigate("top_playlist/$topSize")
                                         },
@@ -608,7 +608,7 @@ fun LibraryMixScreen(
                                 modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .combinedClickable(
+                                    .tvCombinedClickable(
                                         onClick = {
                                             navController.navigate("cache_playlist/cached")
                                         },
@@ -631,7 +631,7 @@ fun LibraryMixScreen(
                                     modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .combinedClickable(
+                                        .tvCombinedClickable(
                                             onClick = {
                                                 navController.navigate("local_playlist/${item.id}")
                                             },
@@ -657,7 +657,7 @@ fun LibraryMixScreen(
                                     modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .combinedClickable(
+                                        .tvCombinedClickable(
                                             onClick = {
                                                 navController.navigate("artist/${item.id}")
                                             },
@@ -686,7 +686,7 @@ fun LibraryMixScreen(
                                     modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .combinedClickable(
+                                        .tvCombinedClickable(
                                             onClick = {
                                                 navController.navigate("album/${item.id}")
                                             },

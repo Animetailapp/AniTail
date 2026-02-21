@@ -2,8 +2,6 @@
 package com.anitail.music.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -67,6 +65,8 @@ import com.anitail.music.ui.menu.YouTubePlaylistMenu
 import com.anitail.music.ui.menu.YouTubeSongMenu
 import com.anitail.music.ui.utils.SnapLayoutInfoProvider
 import com.anitail.music.ui.utils.backToMain
+import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.viewmodels.YouTubeBrowseViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -171,7 +171,7 @@ fun YouTubeBrowseScreen(
                                             },
                                             modifier =
                                             Modifier
-                                                .clickable {
+                                                .tvClickable {
                                                     if (song.id == mediaMetadata?.id) {
                                                         playerConnection.player.togglePlayPause()
                                                     } else {
@@ -205,7 +205,7 @@ fun YouTubeBrowseScreen(
                                         coroutineScope = coroutineScope,
                                         modifier =
                                         Modifier
-                                            .combinedClickable(
+                                            .tvCombinedClickable(
                                                 onClick = {
                                                     when (item) {
                                                         is AlbumItem -> navController.navigate("album/${item.id}")

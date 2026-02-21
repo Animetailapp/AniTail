@@ -11,7 +11,6 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -71,6 +70,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.anitail.music.R
+import com.anitail.music.ui.utils.tvClickable
 
 @Composable
 fun JamControls(
@@ -215,7 +215,7 @@ fun ConnectionModeCard(
     Card(
         modifier = modifier
             .shadow(elevation = elevation)
-            .clickable(onClick = onClick)
+            .tvClickable(onClick = onClick)
             .padding(4.dp),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
@@ -241,9 +241,9 @@ fun ConnectionModeCard(
                     .size(56.dp)
                     .clip(CircleShape)
                     .background(
-                        if (isSelected) 
+                        if (isSelected)
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                        else 
+                        else
                             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
                     ),
                 contentAlignment = Alignment.Center
@@ -660,7 +660,7 @@ fun HostItem(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clickable { onSelect() },
+            .tvClickable { onSelect() },
         shape = MaterialTheme.shapes.small,
         border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
         colors = CardDefaults.cardColors(
@@ -682,9 +682,9 @@ fun HostItem(
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(
-                        if (isSelected) 
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) 
-                        else 
+                        if (isSelected)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                        else
                             MaterialTheme.colorScheme.surfaceVariant
                     ),
                 contentAlignment = Alignment.Center
@@ -834,7 +834,7 @@ fun ClientModeContent(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { 
+                                    .tvClickable {
                                         viewModel.connectToHost(JamViewModel.HostInfo(ip = connection.ip))
                                     }
                                     .padding(vertical = 8.dp, horizontal = 4.dp),
@@ -1061,4 +1061,3 @@ fun ClientModeContent(
         }
     }
 }
-

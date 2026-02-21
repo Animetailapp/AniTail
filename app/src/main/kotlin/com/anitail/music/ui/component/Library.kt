@@ -1,8 +1,6 @@
 package com.anitail.music.ui.component
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -19,6 +17,8 @@ import com.anitail.music.ui.menu.AlbumMenu
 import com.anitail.music.ui.menu.ArtistMenu
 import com.anitail.music.ui.menu.PlaylistMenu
 import com.anitail.music.ui.menu.YouTubePlaylistMenu
+import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.ui.utils.tvCombinedClickable
 import kotlinx.coroutines.CoroutineScope
 
 @Composable
@@ -50,7 +50,7 @@ fun LibraryArtistListItem(
     },
     modifier = modifier
         .fillMaxWidth()
-        .clickable {
+        .tvClickable {
             navController.navigate("artist/${artist.id}")
         }
 )
@@ -68,7 +68,7 @@ fun LibraryArtistGridItem(
     fillMaxWidth = true,
     modifier = modifier
         .fillMaxWidth()
-        .combinedClickable(
+        .tvCombinedClickable(
             onClick = {
                 navController.navigate("artist/${artist.id}")
             },
@@ -116,7 +116,7 @@ fun LibraryAlbumListItem(
     },
     modifier = modifier
         .fillMaxWidth()
-        .clickable {
+        .tvClickable {
             navController.navigate("album/${album.id}")
         }
 )
@@ -139,7 +139,7 @@ fun LibraryAlbumGridItem(
     fillMaxWidth = true,
     modifier = modifier
         .fillMaxWidth()
-        .combinedClickable(
+        .tvCombinedClickable(
             onClick = {
                 navController.navigate("album/${album.id}")
             },
@@ -213,7 +213,7 @@ fun LibraryPlaylistListItem(
     },
     modifier = modifier
         .fillMaxWidth()
-        .clickable {
+        .tvClickable {
             if (!playlist.playlist.isEditable && playlist.songCount == 0 && playlist.playlist.remoteSongCount != 0)
                 navController.navigate("online_playlist/${playlist.playlist.browseId}")
             else
@@ -234,7 +234,7 @@ fun LibraryPlaylistGridItem(
     fillMaxWidth = true,
     modifier = modifier
         .fillMaxWidth()
-        .combinedClickable(
+        .tvCombinedClickable(
             onClick = {
                 if (!playlist.playlist.isEditable && playlist.songCount == 0 && playlist.playlist.remoteSongCount != 0)
                     navController.navigate("online_playlist/${playlist.playlist.browseId}")

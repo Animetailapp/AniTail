@@ -2,7 +2,6 @@ package com.anitail.music.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -72,6 +71,7 @@ import com.anitail.music.ui.component.shimmer.TextPlaceholder
 import com.anitail.music.ui.menu.YouTubeAlbumMenu
 import com.anitail.music.ui.menu.YouTubeSongMenu
 import com.anitail.music.ui.utils.SnapLayoutInfoProvider
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.viewmodels.ChartsViewModel
 import com.anitail.music.viewmodels.ExploreViewModel
 
@@ -287,7 +287,7 @@ fun ExploreScreen(
                                     },
                                     modifier = Modifier
                                         .width(horizontalLazyGridItemWidth)
-                                        .combinedClickable(
+                                        .tvCombinedClickable(
                                             onClick = {
                                                 if (song.id == mediaMetadata?.id) {
                                                     playerConnection.player.togglePlayPause()
@@ -339,7 +339,7 @@ fun ExploreScreen(
                                 isPlaying = isPlaying,
                                 coroutineScope = coroutineScope,
                                 modifier = Modifier
-                                    .combinedClickable(
+                                    .tvCombinedClickable(
                                         onClick = {
                                             navController.navigate("album/${album.id}")
                                         },
@@ -379,7 +379,7 @@ fun ExploreScreen(
                                 isPlaying = isPlaying,
                                 coroutineScope = coroutineScope,
                                 modifier = Modifier
-                                    .combinedClickable(
+                                    .tvCombinedClickable(
                                         onClick = {
                                             if (video.id == mediaMetadata?.id) {
                                                 playerConnection.player.togglePlayPause()

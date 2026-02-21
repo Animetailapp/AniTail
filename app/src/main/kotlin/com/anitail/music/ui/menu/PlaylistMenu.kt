@@ -1,7 +1,6 @@
 package com.anitail.music.ui.menu
 
 import android.content.Intent
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -47,6 +46,7 @@ import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.DefaultDialog
 import com.anitail.music.ui.component.PlaylistListItem
 import com.anitail.music.ui.component.TextFieldDialog
+import com.anitail.music.ui.utils.tvClickable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
@@ -260,7 +260,7 @@ fun PlaylistMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         coroutineScope.launch(Dispatchers.IO) {
                             YouTube.playlist(browseId).getOrNull()?.playlist?.let { playlistItem ->
                                 playlistItem.radioEndpoint?.let { radioEndpoint ->
@@ -284,7 +284,7 @@ fun PlaylistMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     onDismiss()
                     playerConnection.playQueue(
                         ListQueue(
@@ -304,7 +304,7 @@ fun PlaylistMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     coroutineScope.launch {
                         playerConnection.playNext(songs.map { it.toMediaItem() })
                     }
@@ -321,7 +321,7 @@ fun PlaylistMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     onDismiss()
                     playerConnection.addToQueue(songs.map { it.toMediaItem() })
                 }
@@ -336,7 +336,7 @@ fun PlaylistMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     onDismiss()
                     playerConnection.playQueue(
                         ListQueue(
@@ -357,7 +357,7 @@ fun PlaylistMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         showEditDialog = true
                     }
                 )
@@ -380,7 +380,7 @@ fun PlaylistMenu(
                                     contentDescription = null,
                                 )
                             },
-                            modifier = Modifier.clickable {
+                            modifier = Modifier.tvClickable {
                                 downloadUtil.removeDownloads(songs.map { it.id })
                                 onDismiss()
                             }
@@ -404,7 +404,7 @@ fun PlaylistMenu(
                                     strokeWidth = 2.dp
                                 )
                             },
-                            modifier = Modifier.clickable {
+                            modifier = Modifier.tvClickable {
                                 downloadUtil.cancelMediaStoreDownloads(songs.map { it.id })
                                 onDismiss()
                             }
@@ -428,7 +428,7 @@ fun PlaylistMenu(
                                     contentDescription = null,
                                 )
                             },
-                            modifier = Modifier.clickable {
+                            modifier = Modifier.tvClickable {
                                 downloadUtil.retryMediaStoreDownloads(songs.map { it.id })
                                 onDismiss()
                             }
@@ -444,7 +444,7 @@ fun PlaylistMenu(
                                     contentDescription = null,
                                 )
                             },
-                            modifier = Modifier.clickable {
+                            modifier = Modifier.tvClickable {
                                 downloadUtil.downloadSongsToMediaStore(songs)
                                 onDismiss()
                             }
@@ -463,7 +463,7 @@ fun PlaylistMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         showDeletePlaylistDialog = true
                     }
                 )
@@ -479,7 +479,7 @@ fun PlaylistMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         val intent = Intent().apply {
                             action = Intent.ACTION_SEND
                             type = "text/plain"
@@ -493,3 +493,4 @@ fun PlaylistMenu(
         }
     }
 }
+

@@ -24,8 +24,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -160,6 +158,8 @@ import com.anitail.music.ui.menu.LyricsMenu
 import com.anitail.music.ui.screens.settings.DarkMode
 import com.anitail.music.ui.screens.settings.LyricsPosition
 import com.anitail.music.ui.utils.fadingEdge
+import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.utils.ComposeToImage
 import com.anitail.music.utils.FontUtils
 import com.anitail.music.utils.rememberEnumPreference
@@ -721,7 +721,7 @@ fun Lyrics(
                     val itemModifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp)) // Clip for background
-                        .combinedClickable(
+                        .tvCombinedClickable(
                             enabled = true,
                             onClick = {
                                 if (isSelectionModeActive) {
@@ -1300,7 +1300,7 @@ fun Lyrics(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
+                            .tvClickable {
                                 val shareIntent = Intent().apply {
                                     action = Intent.ACTION_SEND
                                     type = "text/plain"
@@ -1340,7 +1340,7 @@ fun Lyrics(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
+                            .tvClickable {
                                 // Pass the potentially multi-line lyrics to the color picker
                                 shareDialogData = Triple(lyricsText, songTitle, artists)
                                 showColorPickerDialog = true
@@ -1372,7 +1372,7 @@ fun Lyrics(
                     ) {
                         Row(
                             modifier = Modifier
-                                .clickable { showShareDialog = false }
+                                .tvClickable { showShareDialog = false }
                                 .padding(vertical = 8.dp, horizontal = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -1497,7 +1497,7 @@ fun Lyrics(
                                 modifier = Modifier
                                     .size(32.dp)
                                     .background(color, shape = RoundedCornerShape(8.dp))
-                                    .clickable { previewBackgroundColor = color }
+                                    .tvClickable { previewBackgroundColor = color }
                                     .border(
                                         2.dp,
                                         if (previewBackgroundColor == color) MaterialTheme.colorScheme.primary else Color.Transparent,
@@ -1514,7 +1514,7 @@ fun Lyrics(
                                 modifier = Modifier
                                     .size(32.dp)
                                     .background(color, shape = RoundedCornerShape(8.dp))
-                                    .clickable { previewTextColor = color }
+                                    .tvClickable { previewTextColor = color }
                                     .border(
                                         2.dp,
                                         if (previewTextColor == color) MaterialTheme.colorScheme.primary else Color.Transparent,
@@ -1531,7 +1531,7 @@ fun Lyrics(
                                 modifier = Modifier
                                     .size(32.dp)
                                     .background(color, shape = RoundedCornerShape(8.dp))
-                                    .clickable { previewSecondaryTextColor = color }
+                                    .tvClickable { previewSecondaryTextColor = color }
                                     .border(
                                         2.dp,
                                         if (previewSecondaryTextColor == color) MaterialTheme.colorScheme.primary else Color.Transparent,

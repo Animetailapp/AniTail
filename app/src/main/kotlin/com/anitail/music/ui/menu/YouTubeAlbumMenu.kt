@@ -3,7 +3,6 @@ package com.anitail.music.ui.menu
 import android.annotation.SuppressLint
 import android.content.Intent
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -59,6 +58,7 @@ import com.anitail.music.playback.queues.YouTubeAlbumRadio
 import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.component.SongListItem
 import com.anitail.music.ui.component.YouTubeListItem
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.reportException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -143,7 +143,7 @@ fun YouTubeAlbumMenu(
                             modifier = Modifier.size(ListThumbnailSize),
                         )
                     },
-                    modifier = Modifier.clickable { showErrorPlaylistAddDialog = false },
+                    modifier = Modifier.tvClickable { showErrorPlaylistAddDialog = false },
                 )
             }
 
@@ -169,7 +169,7 @@ fun YouTubeAlbumMenu(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .height(ListItemHeight)
-                        .clickable {
+                        .tvClickable {
                             navController.navigate("artist/${artist.id}")
                             showSelectArtistDialog = false
                             onDismiss()
@@ -181,7 +181,7 @@ fun YouTubeAlbumMenu(
                         modifier = Modifier
                             .fillParentMaxWidth()
                             .height(ListItemHeight)
-                            .clickable {
+                            .tvClickable {
                                 showSelectArtistDialog = false
                                 onDismiss()
                                 navController.navigate("artist/${artist.id}")
@@ -240,7 +240,7 @@ fun YouTubeAlbumMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     playerConnection.playQueue(YouTubeAlbumRadio(albumItem.playlistId))
                     onDismiss()
                 }
@@ -255,7 +255,7 @@ fun YouTubeAlbumMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     album
                         ?.songs
                         ?.map { it.toMediaItem() }
@@ -273,7 +273,7 @@ fun YouTubeAlbumMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     album
                         ?.songs
                         ?.map { it.toMediaItem() }
@@ -291,7 +291,7 @@ fun YouTubeAlbumMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     showChoosePlaylistDialog = true
                 }
             )
@@ -312,7 +312,7 @@ fun YouTubeAlbumMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             downloadUtil.removeDownloads(album?.songs?.map { it.id }.orEmpty())
                         }
                     )
@@ -326,7 +326,7 @@ fun YouTubeAlbumMenu(
                                 strokeWidth = 2.dp
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             downloadUtil.removeDownloads(album?.songs?.map { it.id }.orEmpty())
                         }
                     )
@@ -340,7 +340,7 @@ fun YouTubeAlbumMenu(
                                 contentDescription = null,
                             )
                         },
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.tvClickable {
                             downloadUtil.downloadSongsToMediaStore(album?.songs.orEmpty())
                         }
                     )
@@ -357,7 +357,7 @@ fun YouTubeAlbumMenu(
                             contentDescription = null,
                         )
                     },
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.tvClickable {
                         if (artists.size == 1) {
                             navController.navigate("artist/${artists[0].id}")
                             onDismiss()
@@ -377,7 +377,7 @@ fun YouTubeAlbumMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     val intent = Intent().apply {
                         action = Intent.ACTION_SEND
                         type = "text/plain"

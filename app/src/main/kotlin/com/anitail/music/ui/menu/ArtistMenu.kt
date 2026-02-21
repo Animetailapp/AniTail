@@ -3,7 +3,6 @@ package com.anitail.music.ui.menu
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -41,6 +40,7 @@ import com.anitail.music.db.entities.Artist
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.ArtistListItem
+import com.anitail.music.ui.utils.tvClickable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -86,7 +86,7 @@ fun ArtistMenu(
                         shape = RoundedCornerShape(8.dp)
                     )
                     .clip(RoundedCornerShape(8.dp))
-                    .clickable {
+                    .tvClickable {
                         coroutineScope.launch {
                             val songs = withContext(Dispatchers.IO) {
                                 database
@@ -132,7 +132,7 @@ fun ArtistMenu(
                         shape = RoundedCornerShape(8.dp)
                     )
                     .clip(RoundedCornerShape(8.dp))
-                    .clickable {
+                    .tvClickable {
                         coroutineScope.launch {
                             val songs = withContext(Dispatchers.IO) {
                                 database
@@ -179,7 +179,7 @@ fun ArtistMenu(
                         shape = RoundedCornerShape(8.dp)
                     )
                     .clip(RoundedCornerShape(8.dp))
-                    .clickable {
+                    .tvClickable {
                         onDismiss()
                         val intent = Intent().apply {
                             action = Intent.ACTION_SEND
@@ -235,7 +235,7 @@ fun ArtistMenu(
                         contentDescription = null,
                     )
                 },
-                modifier = Modifier.clickable {
+                modifier = Modifier.tvClickable {
                     database.transaction {
                         update(artist.artist.toggleLike())
                     }

@@ -10,7 +10,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,6 +74,7 @@ import com.anitail.music.constants.UseNewMiniPlayerDesignKey
 import com.anitail.music.db.entities.ArtistEntity
 import com.anitail.music.extensions.togglePlayPause
 import com.anitail.music.models.MediaMetadata
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.rememberPreference
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
@@ -86,6 +86,7 @@ fun MiniPlayer(
     duration: Long,
     modifier: Modifier = Modifier,
     pureBlack: Boolean,
+    onOpenPlayer: () -> Unit = {},
 ) {
     val useNewMiniPlayerDesign by rememberPreference(UseNewMiniPlayerDesignKey, true)
 
@@ -94,14 +95,16 @@ fun MiniPlayer(
             position = position,
             duration = duration,
             modifier = modifier,
-            pureBlack = pureBlack
+            pureBlack = pureBlack,
+            onOpenPlayer = onOpenPlayer,
         )
     } else {
         LegacyMiniPlayer(
             position = position,
             duration = duration,
             modifier = modifier,
-            pureBlack = pureBlack
+            pureBlack = pureBlack,
+            onOpenPlayer = onOpenPlayer,
         )
     }
 }
@@ -112,6 +115,7 @@ private fun NewMiniPlayer(
     duration: Long,
     modifier: Modifier = Modifier,
     pureBlack: Boolean,
+    onOpenPlayer: () -> Unit,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val database = LocalDatabase.current
@@ -231,6 +235,7 @@ private fun NewMiniPlayer(
                     else
                         MaterialTheme.colorScheme.surfaceContainer // Same as navigation bar color
                 )
+                .tvClickable(onClick = onOpenPlayer)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -269,7 +274,7 @@ private fun NewMiniPlayer(
                                 color = MaterialTheme.colorScheme.primary,
                                 shape = CircleShape
                             )
-                            .clickable {
+                            .tvClickable {
                                 if (playbackState == Player.STATE_ENDED) {
                                     playerConnection.player.seekTo(0, 0)
                                     playerConnection.player.playWhenReady = true
@@ -392,7 +397,7 @@ private fun NewMiniPlayer(
                                         Color.Transparent,
                                     shape = CircleShape
                                 )
-                                .clickable {
+                                .tvClickable {
                                     database.transaction {
                                         val artist = libraryArtist?.artist
                                         if (artist != null) {
@@ -456,7 +461,7 @@ private fun NewMiniPlayer(
                                     Color.Transparent,
                                 shape = CircleShape
                             )
-                            .clickable {
+                            .tvClickable {
                                 playerConnection.service.toggleLike()
                             }
                     ) {
@@ -486,6 +491,7 @@ private fun LegacyMiniPlayer(
     duration: Long,
     modifier: Modifier = Modifier,
     pureBlack: Boolean,
+    onOpenPlayer: () -> Unit,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val isPlaying by playerConnection.isPlaying.collectAsState()
@@ -590,6 +596,7 @@ private fun LegacyMiniPlayer(
                     baseModifier
                 }
             }
+            .tvClickable(onClick = onOpenPlayer)
     ) {
         LinearProgressIndicator(
             progress = { (position.toFloat() / duration).coerceIn(0f, 1f) },

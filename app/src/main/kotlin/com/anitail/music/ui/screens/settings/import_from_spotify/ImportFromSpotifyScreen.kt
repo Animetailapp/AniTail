@@ -4,7 +4,6 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -78,6 +77,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.anitail.music.R
 import com.anitail.music.ui.screens.settings.import_from_spotify.model.Playlist
+import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.viewmodels.ImportFromSpotifyViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -114,6 +114,9 @@ fun ImportFromSpotifyScreen(
     val selectAll = rememberSaveable {
         mutableStateOf(false)
     }
+    // Capturar mensajes de recursos para usarlos dentro de efectos/callbacks sin llamar a context.getString
+    val importSucceededMessage = stringResource(id = R.string.import_succeeded)
+    val importInProgressWarningMessage = stringResource(id = R.string.import_in_progress_warning)
     LaunchedEffect(
         lazyListState.canScrollForward, importFromSpotifyScreenState.value.isRequesting
     ) {
@@ -146,13 +149,13 @@ fun ImportFromSpotifyScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
+                            .tvClickable {
                                 if (importFromSpotifyViewModel.selectedAllPlaylists.value) {
                                     importFromSpotifyViewModel.selectedAllPlaylists.value = false
                                     importFromSpotifyViewModel.selectedPlaylists.clear()
                                     importFromSpotifyViewModel.isLikedSongsSelectedForImport.value =
                                         false
-                                    return@clickable
+                                    return@tvClickable
                                 }
                                 selectAll.value = selectAll.value.not()
                                 importFromSpotifyViewModel.selectAllPlaylists(
@@ -183,9 +186,9 @@ fun ImportFromSpotifyScreen(
                     item {
                         Row(modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
+                            .tvClickable {
                                 if (selectAll.value) {
-                                    return@clickable
+                                    return@tvClickable
                                 }
                                 importFromSpotifyViewModel.isLikedSongsSelectedForImport.value =
                                     importFromSpotifyViewModel.isLikedSongsSelectedForImport.value.not()
@@ -227,9 +230,9 @@ fun ImportFromSpotifyScreen(
                     items(userPlaylists) { playlist ->
                         Row(modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
+                            .tvClickable {
                                 if (selectAll.value) {
-                                    return@clickable
+                                    return@tvClickable
                                 }
                                 if (importFromSpotifyViewModel.selectedPlaylists.map { it.id }
                                         .contains(
@@ -358,7 +361,7 @@ fun ImportFromSpotifyScreen(
             }
             Row(modifier = Modifier
                 .fillMaxWidth()
-                .clickable {
+                .tvClickable {
                     isInstructionExpanded.value = isInstructionExpanded.value.not()
                 }
                 .padding(top = 7.5.dp),
@@ -453,7 +456,7 @@ fun ImportFromSpotifyScreen(
                 )
                 Row(modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
+                    .tvClickable {
                         isStackTraceVisible.value = isStackTraceVisible.value.not()
                     }
                     .padding(start = 15.dp, end = 15.dp),
@@ -582,7 +585,7 @@ fun ImportFromSpotifyScreen(
     if (importFromSpotifyViewModel.isImportingInProgress.value) {
         Scaffold(topBar = {
             Column(modifier = Modifier
-                .clickable { }
+                .tvClickable { }
                 .fillMaxWidth()
                 .padding(15.dp)
                 .windowInsetsPadding(WindowInsets.statusBars)) {
@@ -598,7 +601,7 @@ fun ImportFromSpotifyScreen(
         }) {
             Box(modifier = Modifier
                 .padding(it)
-                .clickable { }
+                .tvClickable { }
                 .fillMaxSize()
                 .padding(start = 15.dp, end = 15.dp, bottom = 15.dp),
                 contentAlignment = Alignment.BottomCenter) {
@@ -658,7 +661,7 @@ fun ImportFromSpotifyScreen(
     }
     LaunchedEffect(importFromSpotifyViewModel.isImportingCompleted.value) {
         if (importFromSpotifyViewModel.isImportingCompleted.value) {
-            Toast.makeText(context, context.getString(R.string.import_succeeded), Toast.LENGTH_LONG).show()
+            Toast.makeText(context, importSucceededMessage, Toast.LENGTH_LONG).show()
             navController.navigateUp()
         }
     }
@@ -666,7 +669,7 @@ fun ImportFromSpotifyScreen(
         if (importFromSpotifyViewModel.isImportingInProgress.value) {
             Toast.makeText(
                 context,
-                context.getString(R.string.import_in_progress_warning),
+                importInProgressWarningMessage,
                 Toast.LENGTH_SHORT
             ).show()
         } else {
@@ -679,4 +682,3 @@ fun ImportFromSpotifyScreen(
         }
     }
 }
-
