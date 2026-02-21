@@ -45,7 +45,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -65,8 +67,8 @@ data class CommunityPlaylistItem(
 )
 
 data class HomeContentUiState(
-    val quickPicks: List<Song>? = null,
-    val forgottenFavorites: List<Song>? = null,
+    val quickPicks: List<Song> = emptyList(),
+    val forgottenFavorites: List<Song> = emptyList(),
     val keepListening: List<LocalItem>? = null,
     val similarRecommendations: List<SimilarRecommendation>? = null,
     val accountPlaylists: List<PlaylistItem>? = null,
@@ -129,8 +131,8 @@ class HomeViewModel @Inject constructor(
     val discordUsername = MutableStateFlow<String?>(null)
 
     private data class ContentListSnapshot(
-        val quickPicks: List<Song>?,
-        val forgottenFavorites: List<Song>?,
+        val quickPicks: List<Song>,
+        val forgottenFavorites: List<Song>,
         val keepListening: List<LocalItem>?,
         val similarRecommendations: List<SimilarRecommendation>?,
         val accountPlaylists: List<PlaylistItem>?,
@@ -157,10 +159,39 @@ class HomeViewModel @Inject constructor(
         val accountImageUrl: String?,
     )
 
+    private fun observeResolvedSongs(
+        source: StateFlow<List<Song>?>,
+    ): StateFlow<List<Song>> {
+        return source
+            .flatMapLatest { baseSongs ->
+                if (baseSongs.isNullOrEmpty()) {
+                    flowOf(emptyList())
+                } else {
+                    combine(
+                        baseSongs.map { fallbackSong ->
+                            database.song(fallbackSong.id).map { latestSong ->
+                                latestSong ?: fallbackSong
+                            }
+                        }
+                    ) { songsArray ->
+                        songsArray.toList()
+                    }
+                }
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyList(),
+            )
+    }
+
+    private val resolvedQuickPicks = observeResolvedSongs(quickPicks)
+    private val resolvedForgottenFavorites = observeResolvedSongs(forgottenFavorites)
+
     private val contentListSnapshot =
         combine(
-            quickPicks,
-            forgottenFavorites,
+            resolvedQuickPicks,
+            resolvedForgottenFavorites,
             keepListening,
             similarRecommendations,
             accountPlaylists,
