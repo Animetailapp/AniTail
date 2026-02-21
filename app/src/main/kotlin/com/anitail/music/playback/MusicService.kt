@@ -197,6 +197,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   private var currentSongStartTime: Long = 0L
   private var hasScrobbled = false
   private var lastScrobbleCheckSongId: String? = null
+  private var widgetStaticCache: WidgetStaticCache? = null
+  private val widgetImageLoader by lazy { coil.ImageLoader(this) }
 
   @Inject lateinit var mediaLibrarySessionCallback: MediaLibrarySessionCallback
 
@@ -283,8 +285,15 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     val discordPresence = discordPresenceState.asStateFlow()
 
   val automixItems = MutableStateFlow<List<MediaItem>>(emptyList())
-    private var consecutivePlaybackErr = 0
+  private var consecutivePlaybackErr = 0
     private var lastWidgetUpdateAt: Long = 0L
+
+    private data class WidgetStaticCache(
+        val mediaId: String,
+        val coverUrl: String,
+        val themeColor: Int,
+        val dominantColor: Int
+    )
 
     override fun onCreate() {
     super.onCreate()
@@ -1256,35 +1265,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     }
 
     when (intent.action) {
-      ACTION_PLAY_RECOMMENDATION -> {
-        ensureForegroundBootstrap()
-        val songId = intent.getStringExtra(EXTRA_WIDGET_RECOMMENDATION_ID)
-        if (!songId.isNullOrBlank()) {
-          scope.launch(Dispatchers.IO + SupervisorJob()) {
-            try {
-              val song = database.song(songId).firstOrNull()
-              if (song != null) {
-                val mediaItem = song.toMediaMetadata().toMediaItem()
-                withContext(Dispatchers.Main) {
-                  try {
-                    player.setMediaItem(mediaItem)
-                    player.prepare()
-                    player.playWhenReady = true
-                  } catch (e: Exception) {
-                    Timber.tag("MusicService").e(e, "Error to set media item")
-                  }
-                }
-              } else {
-                Timber.tag("MusicService").e("non existent songId: $songId")
-              }
-            } catch (e: Exception) {
-              Timber.tag("MusicService").e(e, "Error to play recommendation")
-            }
-          }
-        } else {
-          Timber.tag("MusicService").e("songId is null or blank")
-        }
-      }
       ACTION_DOWNLOAD_LYRICS -> {
         val songId = intent.getStringExtra(EXTRA_SONG_ID)
         if (songId != null) {
@@ -1459,26 +1439,12 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       }
       lastWidgetUpdateAt = now
 
-    val meta = currentMediaMetadata.value
-
-    if (meta?.id != null) {
-      scope.launch(Dispatchers.IO) {
-        try {
-          val recommendationTitle =
-              database.getRelatedSongs(meta.id).firstOrNull()?.firstOrNull()?.song?.title ?: ""
-          withContext(Dispatchers.Main) { sendWidgetUpdateInternal(recommendationTitle) }
-        } catch (_: Exception) {
-          withContext(Dispatchers.Main) { sendWidgetUpdateInternal("") }
-        }
-      }
-    } else {
-      sendWidgetUpdateInternal("")
-    }
+    sendWidgetUpdateInternal()
   }
 
-  private fun sendWidgetUpdateInternal(recommendationTitle: String) {
+  private fun sendWidgetUpdateInternal() {
     if (Looper.myLooper() != Looper.getMainLooper()) {
-      scope.launch(Dispatchers.Main) { sendWidgetUpdateInternal(recommendationTitle) }
+      scope.launch(Dispatchers.Main) { sendWidgetUpdateInternal() }
       return
     }
 
@@ -1493,93 +1459,88 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       artistName = meta.artists.joinToString(", ") { it.name }
     }
 
+    val mediaId = meta?.id ?: song?.song?.id ?: ""
     val coverUrl = meta?.thumbnailUrl ?: song?.song?.thumbnailUrl ?: ""
-
     val defaultColor = com.anitail.music.ui.theme.DefaultThemeColor.toArgb()
+    val staticCache = widgetStaticCache
+    val canReuseStaticCache =
+        staticCache != null &&
+            staticCache.mediaId == mediaId &&
+            staticCache.coverUrl == coverUrl
 
-    if (coverUrl.isNotBlank()) {
-      scope.launch(Dispatchers.IO) {
-        try {
-          val loader = coil.ImageLoader(this@MusicService)
-          val req =
-              coil.request.ImageRequest.Builder(this@MusicService)
-                  .data(coverUrl)
-                  .allowHardware(false)
-                  .build()
-          val result = loader.execute(req)
-          val bmp = (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
-
-          val finalColor =
-              if (bmp != null) {
-                try {
-                  val palette =
-                      androidx.palette.graphics.Palette.Builder(bmp)
-                          .maximumColorCount(32)
-                          .generate()
-
-                  palette.vibrantSwatch?.rgb
-                      ?: palette.mutedSwatch?.rgb
-                      ?: palette.darkVibrantSwatch?.rgb
-                      ?: palette.darkMutedSwatch?.rgb
-                      ?: defaultColor
-                } catch (_: Exception) {
-                  defaultColor
-                }
-              } else {
-                defaultColor
-              }
-
-          sendWidgetBroadcast(
-              songTitle,
-              artistName,
-              recommendationTitle,
-              isPlaying,
-              finalColor,
-              coverUrl,
-              finalColor)
-        } catch (_: Exception) {
-
-          withContext(Dispatchers.Main) {
-            sendWidgetBroadcast(
-                songTitle,
-                artistName,
-                recommendationTitle,
-                isPlaying,
-                defaultColor,
-                coverUrl,
-                defaultColor)
-          }
-        }
-      }
-    } else {
+    if (canReuseStaticCache) {
+      val cachedStatic = staticCache ?: return
       scope.launch(Dispatchers.IO) {
         sendWidgetBroadcast(
             songTitle,
             artistName,
-            recommendationTitle,
             isPlaying,
-            defaultColor,
+            cachedStatic.themeColor,
             coverUrl,
-            defaultColor)
+            cachedStatic.dominantColor)
       }
+      return
+    }
+
+    scope.launch(Dispatchers.IO) {
+      val dominantColor = resolveWidgetDominantColor(coverUrl, defaultColor)
+      val refreshedStaticCache =
+          WidgetStaticCache(
+              mediaId = mediaId,
+              coverUrl = coverUrl,
+              themeColor = dominantColor,
+              dominantColor = dominantColor)
+
+      widgetStaticCache = refreshedStaticCache
+      sendWidgetBroadcast(
+          songTitle,
+          artistName,
+          isPlaying,
+          refreshedStaticCache.themeColor,
+          coverUrl,
+          refreshedStaticCache.dominantColor)
+    }
+  }
+
+  private suspend fun resolveWidgetDominantColor(coverUrl: String, defaultColor: Int): Int {
+    if (coverUrl.isBlank()) {
+      return defaultColor
+    }
+
+    return try {
+      val request =
+          coil.request.ImageRequest.Builder(this@MusicService)
+              .data(coverUrl)
+              .allowHardware(false)
+              .build()
+      val result = widgetImageLoader.execute(request)
+      val bitmap =
+          (result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: return defaultColor
+
+      try {
+        val palette =
+            androidx.palette.graphics.Palette.Builder(bitmap).maximumColorCount(32).generate()
+        palette.vibrantSwatch?.rgb
+            ?: palette.mutedSwatch?.rgb
+            ?: palette.darkVibrantSwatch?.rgb
+            ?: palette.darkMutedSwatch?.rgb
+            ?: defaultColor
+      } catch (_: Exception) {
+        defaultColor
+      }
+    } catch (_: Exception) {
+      defaultColor
     }
   }
 
   private suspend fun sendWidgetBroadcast(
       songTitle: String,
       artistName: String,
-      recommendationTitle: String,
       isPlaying: Boolean,
       themeColor: Int,
       coverUrl: String,
       dominantColor: Int
   ) {
-    val meta = currentMediaMetadata.value
-    val song = currentSong.value
-
-    val related =
-        database.getRelatedSongs(song?.song?.id ?: meta?.id ?: "").firstOrNull()?.take(4)
-            ?: emptyList()
     val finalArtistName = artistName.ifBlank { getString(R.string.unknown_artist) }
     val (duration, position) =
         withContext(Dispatchers.Main) {
@@ -1594,7 +1555,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                   this@MusicService, com.anitail.music.ui.component.MusicWidgetProvider::class.java)
           putExtra(EXTRA_WIDGET_SONG_TITLE, songTitle)
           putExtra(EXTRA_WIDGET_ARTIST, finalArtistName)
-          putExtra(EXTRA_WIDGET_RECOMMENDATION, recommendationTitle)
           putExtra(EXTRA_WIDGET_IS_PLAYING, isPlaying)
           putExtra(EXTRA_WIDGET_THEME_COLOR, themeColor)
           putExtra(EXTRA_WIDGET_COVER_URL, coverUrl)
@@ -1602,27 +1562,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
           putExtra(EXTRA_WIDGET_PROGRESS, progress)
           putExtra(EXTRA_WIDGET_CURRENT_POSITION, position)
           putExtra(EXTRA_WIDGET_DURATION, duration)
-          // Add up to 4 recommendations (title, cover, id)
-          related.getOrNull(0)?.let {
-            putExtra(EXTRA_WIDGET_RECOMMENDATION_1_TITLE, it.song.title)
-            putExtra(EXTRA_WIDGET_RECOMMENDATION_1_COVER_URL, it.song.thumbnailUrl ?: "")
-            putExtra(EXTRA_WIDGET_RECOMMENDATION_1_ID, it.song.id)
-          }
-          related.getOrNull(1)?.let {
-            putExtra(EXTRA_WIDGET_RECOMMENDATION_2_TITLE, it.song.title)
-            putExtra(EXTRA_WIDGET_RECOMMENDATION_2_COVER_URL, it.song.thumbnailUrl ?: "")
-            putExtra(EXTRA_WIDGET_RECOMMENDATION_2_ID, it.song.id)
-          }
-          related.getOrNull(2)?.let {
-            putExtra(EXTRA_WIDGET_RECOMMENDATION_3_TITLE, it.song.title)
-            putExtra(EXTRA_WIDGET_RECOMMENDATION_3_COVER_URL, it.song.thumbnailUrl ?: "")
-            putExtra(EXTRA_WIDGET_RECOMMENDATION_3_ID, it.song.id)
-          }
-          related.getOrNull(3)?.let {
-            putExtra(EXTRA_WIDGET_RECOMMENDATION_4_TITLE, it.song.title)
-            putExtra(EXTRA_WIDGET_RECOMMENDATION_4_COVER_URL, it.song.thumbnailUrl ?: "")
-            putExtra(EXTRA_WIDGET_RECOMMENDATION_4_ID, it.song.id)
-          }
           addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
           addCategory(Intent.CATEGORY_DEFAULT)
         }
@@ -2214,6 +2153,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       } catch (_: Exception) {
       }
       resetCrossfadeState()
+    widgetStaticCache = null
     stopPeriodicWidgetUpdates()
     widgetUpdateJob?.cancel()
     stopPeriodicScrobbleCheck()
@@ -2246,35 +2186,11 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   }
 
   companion object {
-    const val EXTRA_WIDGET_RECOMMENDATION_ID = "com.anitail.music.widget.RECOMMENDATION_ID"
-    // Widget recommendation actions and extras
-    const val ACTION_PLAY_RECOMMENDATION = "com.anitail.music.widget.ACTION_PLAY_RECOMMENDATION"
-    const val EXTRA_WIDGET_RECOMMENDATION_1_TITLE =
-        "com.anitail.music.widget.RECOMMENDATION_1_TITLE"
-    const val EXTRA_WIDGET_RECOMMENDATION_1_COVER_URL =
-        "com.anitail.music.widget.RECOMMENDATION_1_COVER_URL"
-    const val EXTRA_WIDGET_RECOMMENDATION_1_ID = "com.anitail.music.widget.RECOMMENDATION_1_ID"
-    const val EXTRA_WIDGET_RECOMMENDATION_2_TITLE =
-        "com.anitail.music.widget.RECOMMENDATION_2_TITLE"
-    const val EXTRA_WIDGET_RECOMMENDATION_2_COVER_URL =
-        "com.anitail.music.widget.RECOMMENDATION_2_COVER_URL"
-    const val EXTRA_WIDGET_RECOMMENDATION_2_ID = "com.anitail.music.widget.RECOMMENDATION_2_ID"
-    const val EXTRA_WIDGET_RECOMMENDATION_3_TITLE =
-        "com.anitail.music.widget.RECOMMENDATION_3_TITLE"
-    const val EXTRA_WIDGET_RECOMMENDATION_3_COVER_URL =
-        "com.anitail.music.widget.RECOMMENDATION_3_COVER_URL"
-    const val EXTRA_WIDGET_RECOMMENDATION_3_ID = "com.anitail.music.widget.RECOMMENDATION_3_ID"
-    const val EXTRA_WIDGET_RECOMMENDATION_4_TITLE =
-        "com.anitail.music.widget.RECOMMENDATION_4_TITLE"
-    const val EXTRA_WIDGET_RECOMMENDATION_4_COVER_URL =
-        "com.anitail.music.widget.RECOMMENDATION_4_COVER_URL"
-    const val EXTRA_WIDGET_RECOMMENDATION_4_ID = "com.anitail.music.widget.RECOMMENDATION_4_ID"
     const val ROOT = "root"
     // --- Widget Broadcast constants ---
     const val ACTION_WIDGET_UPDATE = "com.anitail.music.widget.ACTION_WIDGET_UPDATE"
     const val EXTRA_WIDGET_SONG_TITLE = "com.anitail.music.widget.EXTRA_WIDGET_SONG_TITLE"
     const val EXTRA_WIDGET_ARTIST = "com.anitail.music.widget.EXTRA_WIDGET_ARTIST"
-    const val EXTRA_WIDGET_RECOMMENDATION = "com.anitail.music.widget.EXTRA_WIDGET_RECOMMENDATION"
     const val EXTRA_WIDGET_IS_PLAYING = "com.anitail.music.widget.IS_PLAYING"
     const val EXTRA_WIDGET_THEME_COLOR = "com.anitail.music.widget.THEME_COLOR"
     const val EXTRA_WIDGET_COVER_URL = "com.anitail.music.widget.COVER_URL"
@@ -2295,6 +2211,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     const val PERSISTENT_AUTOMIX_FILE = "persistent_automix.data"
       const val MAX_CONSECUTIVE_ERR = 5
       const val WIDGET_UPDATE_THROTTLE_MS = 300L
+      const val WIDGET_PERIODIC_UPDATE_MS = 1000L
       const val CROSSFADE_MIN_DURATION_MS = 350L
       const val CROSSFADE_STEP_INTERVAL_MS = 50L
       const val CROSSFADE_PAUSED_POLL_INTERVAL_MS = 100L
@@ -2316,6 +2233,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   fun closePlayer() {
     player.pause()
       resetCrossfadeState()
+    widgetStaticCache = null
 
     if (dataStore.get(PersistentQueueKey, true)) {
       saveQueueToDisk()
@@ -2562,10 +2480,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
   /** Starts periodic widget updates to show song progress */
   private fun startPeriodicWidgetUpdates() {
-      // Widget deshabilitado: no iniciar job periódico
-      widgetUpdateJob?.cancel()
-      widgetUpdateJob = null
-      return
       if (Looper.myLooper() != Looper.getMainLooper()) {
       scope.launch(Dispatchers.Main) { startPeriodicWidgetUpdates() }
       return
@@ -2580,7 +2494,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
               if (player.isPlaying && player.playbackState == STATE_READY) {
                 sendWidgetUpdateBroadcast()
               }
-                delay(5000) // Menor frecuencia incluso si se reactivara el widget
+                delay(WIDGET_PERIODIC_UPDATE_MS)
             }
           } catch (_: Exception) {}
         }
