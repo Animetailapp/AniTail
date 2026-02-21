@@ -11,7 +11,7 @@
         android:id="@+id/widget_backdrop"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:alpha="0.76"
+        android:alpha="0.85"
         android:scaleType="centerCrop"
         android:src="@drawable/ic_music_placeholder"
         tools:ignore="ContentDescription" />
@@ -42,10 +42,10 @@
             android:ellipsize="end"
             android:gravity="center"
             android:maxLines="1"
-            android:shadowColor="#90000000"
-            android:shadowDx="1"
+            android:shadowColor="#CC000000"
+            android:shadowDx="0"
             android:shadowDy="1"
-            android:shadowRadius="1"
+            android:shadowRadius="4"
             android:text=""
             android:textColor="#FFFFFF"
             android:textSize="15sp"
@@ -58,6 +58,10 @@
             android:ellipsize="end"
             android:gravity="center"
             android:maxLines="1"
+            android:shadowColor="#AA000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="3"
             android:text=""
             android:textColor="#DAFFFFFF"
             android:textSize="10sp" />
@@ -92,24 +96,37 @@
             </FrameLayout>
 
             <FrameLayout
-                android:id="@+id/widget_play_slot"
-                android:layout_width="50dp"
-                android:layout_height="50dp">
+                android:layout_width="56dp"
+                android:layout_height="56dp">
 
                 <ImageView
-                    android:id="@+id/widget_play_pause_bg"
+                    android:id="@+id/widget_play_progress_ring"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:src="@drawable/widget_play_button_bg"
+                    android:scaleType="fitXY"
                     tools:ignore="ContentDescription" />
 
-                <ImageView
-                    android:id="@+id/widget_play_pause"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:padding="11dp"
-                    android:src="@drawable/play"
-                    tools:ignore="ContentDescription" />
+                <FrameLayout
+                    android:id="@+id/widget_play_slot"
+                    android:layout_width="46dp"
+                    android:layout_height="46dp"
+                    android:layout_gravity="center">
+
+                    <ImageView
+                        android:id="@+id/widget_play_pause_bg"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/widget_play_button_bg"
+                        tools:ignore="ContentDescription" />
+
+                    <ImageView
+                        android:id="@+id/widget_play_pause"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:padding="11dp"
+                        android:src="@drawable/play"
+                        tools:ignore="ContentDescription" />
+                </FrameLayout>
             </FrameLayout>
 
             <FrameLayout

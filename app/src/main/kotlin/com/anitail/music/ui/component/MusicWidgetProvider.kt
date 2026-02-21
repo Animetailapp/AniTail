@@ -234,7 +234,11 @@ class MusicWidgetProvider : AppWidgetProvider() {
 
             // Progress ring on cover art (only wide layout has it)
             if (layoutRes == R.layout.widget_music) {
-                updateProgressRing(context, views, progress, dominantColor)
+                updateProgressRing(context, views, R.id.widget_cover_progress_ring, progress, dominantColor, 84)
+            }
+            // Progress ring around play button (square layout)
+            if (layoutRes == R.layout.widget_music_square) {
+                updateProgressRing(context, views, R.id.widget_play_progress_ring, progress, dominantColor, 56)
             }
 
             for (appWidgetId in appWidgetIds) {
@@ -376,7 +380,10 @@ class MusicWidgetProvider : AppWidgetProvider() {
 
             // Clear progress ring for wide layout
             if (layoutRes == R.layout.widget_music) {
-                updateProgressRing(context, views, 0, DEFAULT_WIDGET_COLOR)
+                updateProgressRing(context, views, R.id.widget_cover_progress_ring, 0, DEFAULT_WIDGET_COLOR, 84)
+            }
+            if (layoutRes == R.layout.widget_music_square) {
+                updateProgressRing(context, views, R.id.widget_play_progress_ring, 0, DEFAULT_WIDGET_COLOR, 56)
             }
 
             for (appWidgetId in appWidgetIds) {
@@ -548,11 +555,11 @@ class MusicWidgetProvider : AppWidgetProvider() {
         val saturatedColor = saturateColor(dominantColor, 1.4f)
 
         // Overlay más sutil para dejar ver más el cover
-        val overlayColor = withAlpha(blendColors(saturatedColor, Color.BLACK, 0.20f), 130)
+        val overlayColor = withAlpha(blendColors(saturatedColor, Color.BLACK, 0.15f), 110)
 
-        // Texto blanco con ligero tinte del dominante
-        val titleColor = blendColors(saturatedColor, Color.WHITE, 0.12f)
-        val artistColor = withAlpha(blendColors(saturatedColor, Color.WHITE, 0.30f), 230)
+        // Texto BLANCO puro para legibilidad
+        val titleColor = Color.WHITE
+        val artistColor = withAlpha(Color.WHITE, 210)
 
         // Controles con color de acento vibrante
         val controlBgColor = withAlpha(blendColors(saturatedColor, Color.WHITE, 0.25f), 200)
@@ -566,7 +573,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         // Progreso y ring con color de acento
         val progressColor = withAlpha(saturatedColor, 255)
         // Ring track (dim) — progress arc will overlay this brightly
-        val coverRingTrackColor = withAlpha(blendColors(saturatedColor, Color.WHITE, 0.15f), 100)
+        val coverRingTrackColor = withAlpha(blendColors(saturatedColor, Color.WHITE, 0.10f), 70)
 
         views.setInt(R.id.widget_backdrop_tint, "setBackgroundColor", overlayColor)
         views.setTextColor(R.id.widget_title, titleColor)
@@ -594,13 +601,13 @@ class MusicWidgetProvider : AppWidgetProvider() {
         views.setInt(R.id.widget_song_progress, "setImageLevel", level)
     }
 
-    private fun updateProgressRing(context: Context, views: RemoteViews, progress: Int, dominantColor: Int) {
+    private fun updateProgressRing(context: Context, views: RemoteViews, viewId: Int, progress: Int, dominantColor: Int, sizeDp: Int) {
         val density = context.resources.displayMetrics.density
-        val sizePx = (84 * density).toInt()
-        val strokePx = 3.5f * density
+        val sizePx = (sizeDp * density).toInt()
+        val strokePx = 5f * density
 
         val saturated = saturateColor(dominantColor, 1.4f)
-        val ringColor = withAlpha(blendColors(saturated, Color.WHITE, 0.40f), 245)
+        val ringColor = withAlpha(blendColors(saturated, Color.WHITE, 0.50f), 255)
 
         val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -616,7 +623,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         if (sweepAngle > 0f) {
             canvas.drawArc(rect, -90f, sweepAngle, false, paint)
         }
-        views.setImageViewBitmap(R.id.widget_cover_progress_ring, bitmap)
+        views.setImageViewBitmap(viewId, bitmap)
     }
 
     private fun blendColors(from: Int, to: Int, ratio: Float): Int {
