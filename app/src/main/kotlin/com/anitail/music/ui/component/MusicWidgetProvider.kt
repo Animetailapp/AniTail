@@ -190,6 +190,10 @@ class MusicWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_artist, artist.ifBlank { context.getString(R.string.unknown_artist) })
             views.setImageViewResource(R.id.widget_play_pause, if (isPlaying) R.drawable.pause else R.drawable.play)
             setWidgetProgress(views, progress)
+            views.setViewVisibility(
+                R.id.widget_progress,
+                if (layoutRes == R.layout.widget_music_square) View.GONE else View.VISIBLE
+            )
 
             if (layoutRes == R.layout.widget_music) {
                 updateProgressRing(context, views, R.id.widget_cover_progress_ring, progress, dominantColor, 80)
@@ -240,6 +244,10 @@ class MusicWidgetProvider : AppWidgetProvider() {
             views.setImageViewResource(R.id.widget_cover, R.drawable.ic_music_placeholder)
             views.setImageViewResource(R.id.widget_backdrop, R.drawable.ic_music_placeholder)
             setWidgetProgress(views, 0)
+            views.setViewVisibility(
+                R.id.widget_progress,
+                if (layoutRes == R.layout.widget_music_square) View.GONE else View.VISIBLE
+            )
 
             // Clear progress ring for wide layout
             if (layoutRes == R.layout.widget_music) {
@@ -416,7 +424,9 @@ class MusicWidgetProvider : AppWidgetProvider() {
         val controlIconColor = pickReadableForeground(controlBgColor)
         val playIconColor = pickReadableForeground(playBgColor)
 
-        val progressColor = withAlpha(blendColors(accentColor, Color.WHITE, 0.08f), 255)
+        val readableProgressColor = pickReadableForeground(overlayColor)
+        val progressColor = withAlpha(readableProgressColor, 246)
+        val progressTrackColor = withAlpha(readableProgressColor, 96)
         val coverRingTrackColor = withAlpha(blendColors(accentColor, Color.WHITE, 0.35f), 85)
 
         views.setInt(R.id.widget_backdrop_tint, "setBackgroundColor", overlayColor)
@@ -437,6 +447,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         views.setInt(R.id.widget_action_queue, "setColorFilter", controlIconColor)
         views.setInt(R.id.widget_action_search, "setColorFilter", controlIconColor)
         views.setInt(R.id.widget_play_pause, "setColorFilter", playIconColor)
+        views.setInt(R.id.widget_song_progress_track, "setColorFilter", progressTrackColor)
         views.setInt(R.id.widget_song_progress, "setColorFilter", progressColor)
     }
 

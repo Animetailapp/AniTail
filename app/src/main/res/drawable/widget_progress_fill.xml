@@ -3,7 +3,7 @@
     android:clipOrientation="horizontal"
     android:gravity="start">
     <shape android:shape="rectangle">
-        <corners android:radius="2dp" />
+        <corners android:radius="3dp" />
         <solid android:color="#FFFFFFFF" />
     </shape>
 </clip>

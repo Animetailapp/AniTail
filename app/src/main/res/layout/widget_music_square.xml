@@ -243,13 +243,15 @@
                 android:id="@+id/widget_song_progress_track"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@drawable/widget_progress_track"
+                android:scaleType="fitXY"
+                android:src="@drawable/widget_progress_track"
                 tools:ignore="ContentDescription" />
 
             <ImageView
                 android:id="@+id/widget_song_progress"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                android:scaleType="fitXY"
                 android:src="@drawable/widget_progress_fill"
                 tools:ignore="ContentDescription" />
         </FrameLayout>

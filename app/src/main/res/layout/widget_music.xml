@@ -294,7 +294,7 @@
         <FrameLayout
             android:id="@+id/widget_progress"
             android:layout_width="match_parent"
-            android:layout_height="3dp"
+            android:layout_height="4dp"
             android:layout_marginTop="8dp"
             android:visibility="gone">
 
@@ -302,7 +302,8 @@
                 android:id="@+id/widget_song_progress_track"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@drawable/widget_progress_track"
+                android:scaleType="fitXY"
+                android:src="@drawable/widget_progress_track"
                 tools:ignore="ContentDescription" />
 
             <ImageView
