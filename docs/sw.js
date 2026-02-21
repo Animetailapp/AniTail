@@ -1,10 +1,12 @@
 // Service Worker básico para caché (Stale-while-revalidate)
-const CACHE_NAME = 'anitail-v4';
+const CACHE_NAME = 'anitail-v7';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './styles.css',
+  './styles.css?v=20260221c',
   './app.js',
+  './app.js?v=20260221c',
   './manifest.json',
   './locales/es.json',
   './locales/en.json',
@@ -33,6 +35,7 @@ self.addEventListener('install', (event) => {
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('fetch', (event) => {
@@ -69,4 +72,5 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  self.clients.claim();
 });
