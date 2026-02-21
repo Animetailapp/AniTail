@@ -442,6 +442,10 @@ class MusicWidgetProvider : AppWidgetProvider() {
             WidgetQuickActionSlot(
                 slotId = R.id.widget_action_slot_queue,
                 iconId = R.id.widget_action_queue
+            ),
+            WidgetQuickActionSlot(
+                slotId = R.id.widget_action_slot_search,
+                iconId = R.id.widget_action_search
             )
         )
         val configuredActions = getConfiguredQuickActions(context)
@@ -706,7 +710,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
             )
         ).filter { it.enabled }
 
-        return if (selectedActions.size < 2) defaultQuickActions.take(2) else selectedActions.take(2)
+        return if (selectedActions.isEmpty()) defaultQuickActions.take(3) else selectedActions.take(3)
     }
 
     private fun resolveLayoutRes(appWidgetManager: AppWidgetManager, appWidgetId: Int): Int {

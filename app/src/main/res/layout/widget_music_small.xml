@@ -35,7 +35,7 @@
 
         <RelativeLayout
             android:layout_width="match_parent"
-            android:layout_height="52dp">
+            android:layout_height="58dp">
 
             <LinearLayout
                 android:id="@+id/widget_info_section"
@@ -158,29 +158,33 @@
                         tools:ignore="ContentDescription" />
                 </FrameLayout>
             </LinearLayout>
+
+            <FrameLayout
+                android:id="@+id/widget_progress"
+                android:layout_width="match_parent"
+                android:layout_height="4dp"
+                android:layout_alignParentBottom="true"
+                android:layout_alignParentStart="true"
+                android:layout_marginBottom="2dp"
+                android:layout_marginEnd="10dp"
+                android:layout_toStartOf="@id/widget_controls_row">
+
+                <ImageView
+                    android:id="@+id/widget_song_progress_track"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/widget_progress_track"
+                    tools:ignore="ContentDescription" />
+
+                <ImageView
+                    android:id="@+id/widget_song_progress"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
+                    android:src="@drawable/widget_progress_fill"
+                    tools:ignore="ContentDescription" />
+            </FrameLayout>
         </RelativeLayout>
-
-        <FrameLayout
-            android:id="@+id/widget_progress"
-            android:layout_width="match_parent"
-            android:layout_height="4dp"
-            android:layout_marginTop="6dp">
-
-            <ImageView
-                android:id="@+id/widget_song_progress_track"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@drawable/widget_progress_track"
-                tools:ignore="ContentDescription" />
-
-            <ImageView
-                android:id="@+id/widget_song_progress"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="fitXY"
-                android:src="@drawable/widget_progress_fill"
-                tools:ignore="ContentDescription" />
-        </FrameLayout>
 
         <LinearLayout
             android:id="@+id/widget_quick_actions"
