@@ -1,6 +1,7 @@
 package com.anitail.music.ui.screens
 
 import android.annotation.SuppressLint
+import androidx.annotation.StringRes
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -779,7 +780,7 @@ private fun SongsHorizontalGridSection(
 @OptIn(ExperimentalFoundationApi::class)
 private fun LazyListScope.SongsGridBlock(
     sectionKey: String,
-    title: String,
+    @StringRes titleRes: Int,
     songs: List<Song>,
     rows: Int,
     lazyGridState: LazyGridState,
@@ -795,7 +796,7 @@ private fun LazyListScope.SongsGridBlock(
 
     item(key = "${sectionKey}_title") {
         NavigationTitle(
-            title = title,
+            title = stringResource(titleRes),
             modifier = Modifier.animateItem(),
         )
     }
@@ -1200,7 +1201,7 @@ fun HomeScreen(
             }
             SongsGridBlock(
                 sectionKey = "quick_picks",
-                title = stringResource(R.string.quick_picks),
+                titleRes = R.string.quick_picks,
                 songs = quickPicks,
                 rows = 4,
                 lazyGridState = quickPicksLazyGridState,
@@ -1292,7 +1293,7 @@ fun HomeScreen(
 
             SongsGridBlock(
                 sectionKey = "forgotten_favorites",
-                title = stringResource(R.string.forgotten_favorites),
+                titleRes = R.string.forgotten_favorites,
                 songs = forgottenFavorites,
                 rows = min(4, forgottenFavorites.size).coerceAtLeast(1),
                 lazyGridState = forgottenFavoritesLazyGridState,
