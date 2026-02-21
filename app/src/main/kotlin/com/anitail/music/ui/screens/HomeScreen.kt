@@ -110,6 +110,7 @@ import com.anitail.music.db.entities.Playlist
 import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.extensions.togglePlayPause
+import com.anitail.music.models.SimilarRecommendation
 import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.queues.LocalAlbumRadio
 import com.anitail.music.playback.queues.ListQueue
@@ -843,6 +844,224 @@ private fun LazyListScope.SongsGridBlock(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.KeepListeningBlock(
+    keepListening: List<LocalItem>?,
+    keepListeningLazyGridState: LazyGridState,
+    localGridItem: @Composable (LocalItem) -> Unit,
+) {
+    if (keepListening.isNullOrEmpty()) return
+
+    item(key = "keep_listening_title") {
+        NavigationTitle(
+            title = stringResource(R.string.keep_listening),
+            modifier = Modifier.animateItem(),
+        )
+    }
+
+    item(key = "keep_listening_content") {
+        val rows = if (keepListening.size > 6) 2 else 1
+        LazyHorizontalGrid(
+            state = keepListeningLazyGridState,
+            rows = GridCells.Fixed(rows),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height((GridThumbnailHeight + with(LocalDensity.current) {
+                    MaterialTheme.typography.bodyLarge.lineHeight.toDp() * 2 +
+                            MaterialTheme.typography.bodyMedium.lineHeight.toDp() * 2
+                }) * rows)
+                .animateItem(),
+        ) {
+            items(
+                items = keepListening,
+                key = { localItemStableKey(it) },
+                contentType = { localItemContentType(it) },
+            ) {
+                localGridItem(it)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.AccountPlaylistsBlock(
+    accountPlaylists: List<PlaylistItem>?,
+    accountName: String,
+    accountImageUrl: String?,
+    onAccountClick: () -> Unit,
+    ytGridItem: @Composable (YTItem) -> Unit,
+) {
+    if (accountPlaylists.isNullOrEmpty()) return
+
+    item(key = "account_playlists_title") {
+        NavigationTitle(
+            label = stringResource(R.string.your_ytb_playlists),
+            title = accountName,
+            thumbnail = {
+                if (accountImageUrl != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(accountImageUrl)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .diskCacheKey(accountImageUrl)
+                            .crossfade(false),
+                        placeholder = painterResource(id = R.drawable.person),
+                        error = painterResource(id = R.drawable.person),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(ListThumbnailSize)
+                            .clip(CircleShape),
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(id = R.drawable.person),
+                        contentDescription = null,
+                        modifier = Modifier.size(ListThumbnailSize),
+                    )
+                }
+            },
+            onClick = onAccountClick,
+            modifier = Modifier.animateItem(),
+        )
+    }
+
+    item(key = "account_playlists_content") {
+        YtItemsRowSection(
+            ytItems = accountPlaylists,
+            itemContent = ytGridItem,
+            modifier = Modifier.animateItem(),
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.SimilarRecommendationsBlock(
+    similarRecommendations: List<SimilarRecommendation>?,
+    onTitleClick: (LocalItem) -> Unit,
+    ytGridItem: @Composable (YTItem) -> Unit,
+) {
+    similarRecommendations?.forEachIndexed { index, recommendation ->
+        val recommendationKey = "${recommendation.title.id}_$index"
+
+        item(key = "similar_title_$recommendationKey") {
+            NavigationTitle(
+                label = stringResource(R.string.similar_to),
+                title = recommendation.title.title,
+                thumbnail = recommendation.title.thumbnailUrl?.let { thumbnailUrl ->
+                    {
+                        val shape =
+                            if (recommendation.title is Artist) CircleShape else RoundedCornerShape(
+                                ThumbnailCornerRadius,
+                            )
+                        AsyncImage(
+                            model = thumbnailUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(ListThumbnailSize)
+                                .clip(shape),
+                        )
+                    }
+                },
+                onClick = { onTitleClick(recommendation.title) },
+                modifier = Modifier.animateItem(),
+            )
+        }
+
+        item(key = "similar_items_$recommendationKey") {
+            YtItemsRowSection(
+                ytItems = recommendation.items,
+                itemContent = ytGridItem,
+                modifier = Modifier.animateItem(),
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.SpeedDialBlock(
+    speedDialItems: List<YTItem>,
+    maxWidth: Dp,
+    onItemClick: (YTItem) -> Unit,
+    onSurpriseClick: () -> Unit,
+) {
+    if (speedDialItems.isEmpty()) return
+
+    item(key = "speed_dial_title") {
+        HomeSectionHeader(
+            title = stringResource(R.string.speed_dial),
+            modifier = Modifier.animateItem(),
+        )
+    }
+
+    item(key = "speed_dial_content") {
+        SpeedDialSection(
+            items = speedDialItems,
+            maxWidth = maxWidth,
+            onItemClick = onItemClick,
+            onSurpriseClick = onSurpriseClick,
+            modifier = Modifier.animateItem(),
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.CommunityPlaylistsBlock(
+    playlists: List<CommunityPlaylistItem>?,
+    maxWidth: Dp,
+    onOpenPlaylist: (CommunityPlaylistItem) -> Unit,
+    onSongClick: (SongItem) -> Unit,
+    onPlayAllClick: (CommunityPlaylistItem) -> Unit,
+    onRadioClick: (CommunityPlaylistItem) -> Unit,
+    onAddClick: (CommunityPlaylistItem) -> Unit,
+) {
+    if (playlists.isNullOrEmpty()) return
+
+    item(key = "community_playlists_title") {
+        HomeSectionHeader(
+            title = stringResource(R.string.from_the_community),
+            modifier = Modifier.animateItem(),
+        )
+    }
+
+    item(key = "community_playlists_content") {
+        CommunityPlaylistsSection(
+            playlists = playlists,
+            maxWidth = maxWidth,
+            onOpenPlaylist = onOpenPlaylist,
+            onSongClick = onSongClick,
+            onPlayAllClick = onPlayAllClick,
+            onRadioClick = onRadioClick,
+            onAddClick = onAddClick,
+            modifier = Modifier.animateItem(),
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.DailyDiscoverBlock(
+    discoverItems: List<DailyDiscoverItem>?,
+    maxWidth: Dp,
+    onItemClick: (DailyDiscoverItem) -> Unit,
+) {
+    if (discoverItems.isNullOrEmpty()) return
+
+    item(key = "daily_discover_title") {
+        HomeSectionHeader(
+            title = stringResource(R.string.daily_discover),
+            modifier = Modifier.animateItem(),
+        )
+    }
+    item(key = "daily_discover_content") {
+        DailyDiscoverSection(
+            discoverItems = discoverItems,
+            maxWidth = maxWidth,
+            onItemClick = onItemClick,
+            modifier = Modifier.animateItem(),
+        )
+    }
+}
+
 @Composable
 private fun YtItemsRowSection(
     ytItems: List<YTItem>,
@@ -1243,83 +1462,19 @@ fun HomeScreen(
                 onSongMenuClick = { song -> showSongMenu(song, false) },
             )
 
-            keepListening?.takeIf { it.isNotEmpty() }?.let { keepListening ->
-                item {
-                    NavigationTitle(
-                        title = stringResource(R.string.keep_listening),
-                        modifier = Modifier.animateItem()
-                    )
-                }
+            KeepListeningBlock(
+                keepListening = keepListening,
+                keepListeningLazyGridState = keepListeningLazyGridState,
+                localGridItem = localGridItem,
+            )
 
-                item {
-                    val rows = if (keepListening.size > 6) 2 else 1
-                    LazyHorizontalGrid(
-                        state = keepListeningLazyGridState,
-                        rows = GridCells.Fixed(rows),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height((GridThumbnailHeight + with(LocalDensity.current) {
-                                MaterialTheme.typography.bodyLarge.lineHeight.toDp() * 2 +
-                                        MaterialTheme.typography.bodyMedium.lineHeight.toDp() * 2
-                            }) * rows)
-                            .animateItem()
-                    ) {
-                        items(
-                            items = keepListening,
-                            key = { localItemStableKey(it) },
-                            contentType = { localItemContentType(it) },
-                        ) {
-                            localGridItem(it)
-                        }
-                    }
-                }
-            }
-
-            accountPlaylists?.takeIf { it.isNotEmpty() }?.let { accountPlaylists ->
-                item {
-                    NavigationTitle(
-                        label = stringResource(R.string.your_ytb_playlists),
-                        title = accountName,
-                        thumbnail = {
-                            if (url != null) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(url)
-                                        .diskCachePolicy(CachePolicy.ENABLED)
-                                        .diskCacheKey(url)
-                                        .crossfade(false) // Remover crossfade para mejor rendimiento
-                                        .build(),
-                                    placeholder = painterResource(id = R.drawable.person),
-                                    error = painterResource(id = R.drawable.person),
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(ListThumbnailSize)
-                                        .clip(CircleShape)
-                                )
-                            } else {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.person),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(ListThumbnailSize)
-                                )
-                            }
-                        },
-                        onClick = {
-                            navController.navigate("account")
-                        },
-                        modifier = Modifier.animateItem()
-                    )
-                }
-
-                item {
-                    YtItemsRowSection(
-                        ytItems = accountPlaylists,
-                        itemContent = ytGridItem,
-                        modifier = Modifier.animateItem(),
-                    )
-                }
-            }
+            AccountPlaylistsBlock(
+                accountPlaylists = accountPlaylists,
+                accountName = accountName,
+                accountImageUrl = url,
+                onAccountClick = { navController.navigate("account") },
+                ytGridItem = ytGridItem,
+            )
 
             SongsGridBlock(
                 sectionKey = "forgotten_favorites",
@@ -1336,167 +1491,103 @@ fun HomeScreen(
                 onSongMenuClick = { song -> showSongMenu(song, true) },
             )
 
-            similarRecommendations?.forEachIndexed { index, recommendation ->
-                val recommendationKey = "${recommendation.title.id}_$index"
-                item(key = "similar_title_$recommendationKey") {
-                    NavigationTitle(
-                        label = stringResource(R.string.similar_to),
-                        title = recommendation.title.title,
-                        thumbnail = recommendation.title.thumbnailUrl?.let { thumbnailUrl ->
-                            {
-                                val shape =
-                                    if (recommendation.title is Artist) CircleShape else RoundedCornerShape(
-                                        ThumbnailCornerRadius
-                                    )
-                                AsyncImage(
-                                    model = thumbnailUrl,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .size(ListThumbnailSize)
-                                        .clip(shape)
-                                )
-                            }
-                        },
-                        onClick = {
-                            when (recommendation.title) {
-                                is Song -> navController.navigate("album/${recommendation.title.album!!.id}")
-                                is Album -> navController.navigate("album/${recommendation.title.id}")
-                                is Artist -> navController.navigate("artist/${recommendation.title.id}")
-                                is Playlist -> {}
-                            }
-                        },
-                        modifier = Modifier.animateItem()
-                    )
-                }
+            SimilarRecommendationsBlock(
+                similarRecommendations = similarRecommendations,
+                onTitleClick = { localItem ->
+                    when (localItem) {
+                        is Song -> navController.navigate("album/${localItem.album!!.id}")
+                        is Album -> navController.navigate("album/${localItem.id}")
+                        is Artist -> navController.navigate("artist/${localItem.id}")
+                        is Playlist -> {}
+                    }
+                },
+                ytGridItem = ytGridItem,
+            )
 
-                item(key = "similar_items_$recommendationKey") {
-                    YtItemsRowSection(
-                        ytItems = recommendation.items,
-                        itemContent = ytGridItem,
-                        modifier = Modifier.animateItem(),
-                    )
-                }
-            }
+            SpeedDialBlock(
+                speedDialItems = speedDialItems,
+                maxWidth = maxWidth,
+                onItemClick = { item ->
+                    when (item) {
+                        is SongItem -> playerConnection.playQueue(
+                            YouTubeQueue(
+                                item.endpoint ?: WatchEndpoint(videoId = item.id),
+                                item.toMediaMetadata(),
+                            ),
+                        )
 
-            speedDialItems.takeIf { it.isNotEmpty() }?.let { speedDialList ->
-                item(key = "speed_dial_title") {
-                    HomeSectionHeader(
-                        title = stringResource(R.string.speed_dial),
-                        modifier = Modifier.animateItem(),
-                    )
-                }
-
-                item(key = "speed_dial_content") {
-                    SpeedDialSection(
-                        items = speedDialList,
-                        maxWidth = maxWidth,
-                        onItemClick = { item ->
-                            when (item) {
-                                is SongItem -> playerConnection.playQueue(
-                                    YouTubeQueue(
-                                        item.endpoint ?: WatchEndpoint(videoId = item.id),
-                                        item.toMediaMetadata(),
-                                    ),
-                                )
-
-                                is AlbumItem -> navController.navigate("album/${item.id}")
-                                is ArtistItem -> navController.navigate("artist/${item.id}")
-                                is PlaylistItem -> navController.navigate("online_playlist/${item.id.removePrefix("VL")}")
-                            }
-                        },
-                        onSurpriseClick = {
-                            val luckyItem = speedDialList.randomOrNull()
-                            if (luckyItem != null) {
-                                when (luckyItem) {
-                                    is SongItem -> playerConnection.playQueue(
-                                        YouTubeQueue(
-                                            luckyItem.endpoint ?: WatchEndpoint(videoId = luckyItem.id),
-                                            luckyItem.toMediaMetadata(),
-                                        ),
-                                    )
-
-                                    is AlbumItem -> navController.navigate("album/${luckyItem.id}")
-                                    is ArtistItem -> navController.navigate("artist/${luckyItem.id}")
-                                    is PlaylistItem -> navController.navigate("online_playlist/${luckyItem.id.removePrefix("VL")}")
-                                }
-                            }
-                        },
-                        modifier = Modifier.animateItem(),
-                    )
-                }
-            }
-
-            communityPlaylists?.takeIf { it.isNotEmpty() }?.let { playlists ->
-                item(key = "community_playlists_title") {
-                    HomeSectionHeader(
-                        title = stringResource(R.string.from_the_community),
-                        modifier = Modifier.animateItem(),
-                    )
-                }
-
-                item(key = "community_playlists_content") {
-                    CommunityPlaylistsSection(
-                        playlists = playlists,
-                        maxWidth = maxWidth,
-                        onOpenPlaylist = { playlistItem ->
-                            navController.navigate("online_playlist/${playlistItem.playlist.id.removePrefix("VL")}")
-                        },
-                        onSongClick = { song ->
-                            playerConnection.playQueue(
+                        is AlbumItem -> navController.navigate("album/${item.id}")
+                        is ArtistItem -> navController.navigate("artist/${item.id}")
+                        is PlaylistItem -> navController.navigate("online_playlist/${item.id.removePrefix("VL")}")
+                    }
+                },
+                onSurpriseClick = {
+                    val luckyItem = speedDialItems.randomOrNull()
+                    if (luckyItem != null) {
+                        when (luckyItem) {
+                            is SongItem -> playerConnection.playQueue(
                                 YouTubeQueue(
-                                    song.endpoint ?: WatchEndpoint(videoId = song.id),
-                                    song.toMediaMetadata(),
+                                    luckyItem.endpoint ?: WatchEndpoint(videoId = luckyItem.id),
+                                    luckyItem.toMediaMetadata(),
                                 ),
                             )
-                        },
-                        onPlayAllClick = { playlistItem ->
-                            playerConnection.playQueue(
-                                ListQueue(
-                                    title = playlistItem.playlist.title,
-                                    items = playlistItem.songs.map { it.toMediaItem() },
-                                ),
-                            )
-                        },
-                        onRadioClick = { playlistItem ->
-                            val radioEndpoint = playlistItem.playlist.radioEndpoint
-                            if (radioEndpoint != null) {
-                                playerConnection.playQueue(YouTubeQueue(radioEndpoint))
-                            } else {
-                                navController.navigate("online_playlist/${playlistItem.playlist.id.removePrefix("VL")}")
-                            }
-                        },
-                        onAddClick = { playlistItem ->
-                            navController.navigate("online_playlist/${playlistItem.playlist.id.removePrefix("VL")}")
-                        },
-                        modifier = Modifier.animateItem(),
-                    )
-                }
-            }
 
-            dailyDiscover?.takeIf { it.isNotEmpty() }?.let { discoverList ->
-                item(key = "daily_discover_title") {
-                    HomeSectionHeader(
-                        title = stringResource(R.string.daily_discover),
-                        modifier = Modifier.animateItem(),
+                            is AlbumItem -> navController.navigate("album/${luckyItem.id}")
+                            is ArtistItem -> navController.navigate("artist/${luckyItem.id}")
+                            is PlaylistItem -> navController.navigate("online_playlist/${luckyItem.id.removePrefix("VL")}")
+                        }
+                    }
+                },
+            )
+
+            CommunityPlaylistsBlock(
+                playlists = communityPlaylists,
+                maxWidth = maxWidth,
+                onOpenPlaylist = { playlistItem ->
+                    navController.navigate("online_playlist/${playlistItem.playlist.id.removePrefix("VL")}")
+                },
+                onSongClick = { song ->
+                    playerConnection.playQueue(
+                        YouTubeQueue(
+                            song.endpoint ?: WatchEndpoint(videoId = song.id),
+                            song.toMediaMetadata(),
+                        ),
                     )
-                }
-                item(key = "daily_discover_content") {
-                    DailyDiscoverSection(
-                        discoverItems = discoverList,
-                        maxWidth = maxWidth,
-                        onItemClick = { discoverItem ->
-                            playerConnection.playQueue(
-                                YouTubeQueue(
-                                    discoverItem.recommendation.endpoint
-                                        ?: WatchEndpoint(videoId = discoverItem.recommendation.id),
-                                    discoverItem.recommendation.toMediaMetadata(),
-                                ),
-                            )
-                        },
-                        modifier = Modifier.animateItem(),
+                },
+                onPlayAllClick = { playlistItem ->
+                    playerConnection.playQueue(
+                        ListQueue(
+                            title = playlistItem.playlist.title,
+                            items = playlistItem.songs.map { it.toMediaItem() },
+                        ),
                     )
-                }
-            }
+                },
+                onRadioClick = { playlistItem ->
+                    val radioEndpoint = playlistItem.playlist.radioEndpoint
+                    if (radioEndpoint != null) {
+                        playerConnection.playQueue(YouTubeQueue(radioEndpoint))
+                    } else {
+                        navController.navigate("online_playlist/${playlistItem.playlist.id.removePrefix("VL")}")
+                    }
+                },
+                onAddClick = { playlistItem ->
+                    navController.navigate("online_playlist/${playlistItem.playlist.id.removePrefix("VL")}")
+                },
+            )
+
+            DailyDiscoverBlock(
+                discoverItems = dailyDiscover,
+                maxWidth = maxWidth,
+                onItemClick = { discoverItem ->
+                    playerConnection.playQueue(
+                        YouTubeQueue(
+                            discoverItem.recommendation.endpoint
+                                ?: WatchEndpoint(videoId = discoverItem.recommendation.id),
+                            discoverItem.recommendation.toMediaMetadata(),
+                        ),
+                    )
+                },
+            )
 
             explorePage?.moodAndGenres?.let { moodAndGenres ->
                 item(key = "mood_and_genres_title") {
