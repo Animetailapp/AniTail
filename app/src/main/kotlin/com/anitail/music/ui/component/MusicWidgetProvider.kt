@@ -192,7 +192,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
             setWidgetProgress(views, progress)
             views.setViewVisibility(
                 R.id.widget_progress,
-                if (layoutRes == R.layout.widget_music_square) View.GONE else View.VISIBLE
+                if (layoutRes == R.layout.widget_music_small) View.VISIBLE else View.GONE
             )
 
             if (layoutRes == R.layout.widget_music) {
@@ -246,7 +246,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
             setWidgetProgress(views, 0)
             views.setViewVisibility(
                 R.id.widget_progress,
-                if (layoutRes == R.layout.widget_music_square) View.GONE else View.VISIBLE
+                if (layoutRes == R.layout.widget_music_small) View.VISIBLE else View.GONE
             )
 
             // Clear progress ring for wide layout
