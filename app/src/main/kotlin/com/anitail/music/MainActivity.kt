@@ -146,6 +146,7 @@ import com.anitail.music.constants.SearchSource
 import com.anitail.music.constants.SearchSourceKey
 import com.anitail.music.constants.SlimNavBarHeight
 import com.anitail.music.constants.SlimNavBarKey
+import com.anitail.music.constants.ShowLyricsKey
 import com.anitail.music.constants.StopMusicOnTaskClearKey
 import com.anitail.music.constants.ThemePalette
 import com.anitail.music.constants.ThemePaletteKey
@@ -232,6 +233,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var navController: NavHostController
     private var pendingIntent: Intent? = null
     private var latestVersionName by mutableStateOf(BuildConfig.VERSION_NAME)
+    private var pendingExternalAction by mutableStateOf<String?>(null)
 
     private var playerConnection by mutableStateOf<PlayerConnection?>(null)
     private val serviceConnection =
@@ -318,6 +320,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
+        pendingExternalAction = intent.action
         if (::navController.isInitialized) {
             handleDeepLinkIntent(intent, navController)
         } else {
@@ -334,6 +338,7 @@ class MainActivity : AppCompatActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingExternalAction = intent.action
         window.decorView.layoutDirection = View.LAYOUT_DIRECTION_LTR
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
@@ -591,6 +596,7 @@ class MainActivity : AppCompatActivity() {
                     var openSearchImmediately: Boolean by remember {
                         mutableStateOf(intent?.action == ACTION_SEARCH)
                     }
+                    var showLyrics by rememberPreference(ShowLyricsKey, defaultValue = false)
 
                     val shouldShowSearchBar =
                         remember(active, navBackStackEntry) {
@@ -723,6 +729,39 @@ class MainActivity : AppCompatActivity() {
                                 playerBottomSheetState.collapseSoft()
                             }
                         }
+                    }
+                    LaunchedEffect(pendingExternalAction, activePlayer) {
+                        when (pendingExternalAction) {
+                            ACTION_SEARCH -> {
+                                openSearchImmediately = true
+                                onActiveChange(true)
+                            }
+
+                            ACTION_LIBRARY -> {
+                                onActiveChange(false)
+                                navigateToScreen(navController, Screens.Library)
+                            }
+
+                            ACTION_EXPLORE -> {
+                                onActiveChange(false)
+                                navigateToScreen(navController, Screens.Explore)
+                            }
+
+                            ACTION_WIDGET_OPEN_QUEUE -> {
+                                showLyrics = false
+                                if (activePlayer?.currentMediaItem != null) {
+                                    playerBottomSheetState.expandSoft()
+                                }
+                            }
+
+                            ACTION_WIDGET_OPEN_LYRICS -> {
+                                showLyrics = true
+                                if (activePlayer?.currentMediaItem != null) {
+                                    playerBottomSheetState.expandSoft()
+                                }
+                            }
+                        }
+                        pendingExternalAction = null
                     }
                     DisposableEffect(activePlayer, playerBottomSheetState) {
                         val player = activePlayer ?: return@DisposableEffect onDispose { }
@@ -1480,6 +1519,8 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_SEARCH = "com.anitail.music.action.SEARCH"
         const val ACTION_EXPLORE = "com.anitail.music.action.EXPLORE"
         const val ACTION_LIBRARY = "com.anitail.music.action.LIBRARY"
+        const val ACTION_WIDGET_OPEN_QUEUE = "com.anitail.music.action.WIDGET_OPEN_QUEUE"
+        const val ACTION_WIDGET_OPEN_LYRICS = "com.anitail.music.action.WIDGET_OPEN_LYRICS"
         private const val DEFAULT_LAUNCHER_ALIAS_SUFFIX = ".MainActivityLauncherDefault"
         private const val DYNAMIC_LAUNCHER_ALIAS_SUFFIX = ".MainActivityLauncherDynamic"
     }

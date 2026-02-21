@@ -247,6 +247,12 @@ object SettingsSearchOptions {
         option(context, "auto_download_lyrics", R.string.auto_download_lyrics),
         option(context, "stop_music_on_task_clear", R.string.stop_music_on_task_clear),
         option(context, "enable_cast", R.string.enable_cast),
+        option(context, "widget_quick_actions", R.string.widget_quick_actions, R.string.widget_quick_actions_desc),
+        option(context, "widget_action_lyrics", R.string.lyrics, sectionRes = R.string.widget_quick_actions),
+        option(context, "widget_action_queue", R.string.queue, sectionRes = R.string.widget_quick_actions),
+        option(context, "widget_action_search", R.string.search, sectionRes = R.string.widget_quick_actions),
+        option(context, "widget_action_library", R.string.filter_library, sectionRes = R.string.widget_quick_actions),
+        option(context, "widget_action_explore", R.string.explore, sectionRes = R.string.widget_quick_actions),
         option(context, "notification_button_type", R.string.notification_button_type)
     )
 

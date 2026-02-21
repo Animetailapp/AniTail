@@ -74,7 +74,6 @@
                 <action android:name="com.anitail.music.widget.PLAY_PAUSE" />
                 <action android:name="com.anitail.music.widget.NEXT" />
                 <action android:name="com.anitail.music.widget.PREV" />
-                <action android:name="com.anitail.music.widget.ACTION_PLAY_RECOMMENDATION" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
