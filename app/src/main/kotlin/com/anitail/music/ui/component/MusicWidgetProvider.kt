@@ -424,9 +424,8 @@ class MusicWidgetProvider : AppWidgetProvider() {
         val controlIconColor = pickReadableForeground(controlBgColor)
         val playIconColor = pickReadableForeground(playBgColor)
 
-        val readableProgressColor = pickReadableForeground(overlayColor)
-        val progressColor = withAlpha(readableProgressColor, 246)
-        val progressTrackColor = withAlpha(readableProgressColor, 96)
+        val progressColor = withAlpha(blendColors(accentColor, Color.WHITE, 0.46f), 255)
+        val progressTrackColor = withAlpha(blendColors(progressColor, Color.BLACK, 0.58f), 170)
         val coverRingTrackColor = withAlpha(blendColors(accentColor, Color.WHITE, 0.35f), 85)
 
         views.setInt(R.id.widget_backdrop_tint, "setBackgroundColor", overlayColor)

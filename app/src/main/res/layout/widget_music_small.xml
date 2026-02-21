@@ -36,7 +36,7 @@
 
         <RelativeLayout
             android:layout_width="match_parent"
-            android:layout_height="62dp">
+            android:layout_height="64dp">
 
             <LinearLayout
                 android:id="@+id/widget_info_section"
@@ -168,7 +168,8 @@
                 android:layout_alignParentStart="true"
                 android:layout_alignParentEnd="true"
                 android:layout_marginStart="2dp"
-                android:layout_marginEnd="2dp">
+                android:layout_marginEnd="2dp"
+                android:layout_marginBottom="6dp">
 
                 <ImageView
                     android:id="@+id/widget_song_progress_track"
