@@ -163,12 +163,12 @@
             <FrameLayout
                 android:id="@+id/widget_progress"
                 android:layout_width="match_parent"
-                android:layout_height="4dp"
+                android:layout_height="5dp"
                 android:layout_alignParentBottom="true"
                 android:layout_alignParentStart="true"
-                android:layout_marginBottom="1dp"
-                android:layout_marginEnd="10dp"
-                android:layout_toStartOf="@id/widget_controls_row">
+                android:layout_alignParentEnd="true"
+                android:layout_marginStart="2dp"
+                android:layout_marginEnd="2dp">
 
                 <ImageView
                     android:id="@+id/widget_song_progress_track"
