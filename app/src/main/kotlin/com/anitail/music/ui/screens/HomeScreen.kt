@@ -170,12 +170,30 @@ private fun ytItemStableKey(item: YTItem): String {
     }
 }
 
+private fun ytItemContentType(item: YTItem): String {
+    return when (item) {
+        is SongItem -> "yt_song"
+        is AlbumItem -> "yt_album"
+        is ArtistItem -> "yt_artist"
+        is PlaylistItem -> "yt_playlist"
+    }
+}
+
 private fun localItemStableKey(item: LocalItem): String {
     return when (item) {
         is Song -> "song:${item.id}"
         is Album -> "album:${item.id}"
         is Artist -> "artist:${item.id}"
         is Playlist -> "playlist:${item.id}"
+    }
+}
+
+private fun localItemContentType(item: LocalItem): String {
+    return when (item) {
+        is Song -> "local_song"
+        is Album -> "local_album"
+        is Artist -> "local_artist"
+        is Playlist -> "local_playlist"
     }
 }
 
@@ -593,7 +611,11 @@ private fun SpeedDialSection(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(pages.size, key = { "speed_dial_page_$it" }) { pageIndex ->
+            items(
+                count = pages.size,
+                key = { "speed_dial_page_$it" },
+                contentType = { "speed_dial_page" },
+            ) { pageIndex ->
                 val pageItems = pages[pageIndex]
                 Column(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -661,6 +683,7 @@ private fun CommunityPlaylistsSection(
         items(
             items = playlists,
             key = { it.playlist.id },
+            contentType = { "community_playlist_card" },
         ) { playlistItem ->
             CommunityPlaylistCard(
                 item = playlistItem,
@@ -709,6 +732,7 @@ private fun DailyDiscoverSection(
             items(
                 items = visibleDiscoverItems,
                 key = { it.recommendation.id },
+                contentType = { "daily_discover_card" },
             ) { discoverItem ->
                 DailyDiscoverCard(
                     item = discoverItem,
@@ -751,6 +775,7 @@ private fun SongsHorizontalGridSection(
         items(
             items = songs,
             key = { it.id },
+            contentType = { "song_list_item" },
         ) { currentSong ->
             SongListItem(
                 song = currentSong,
@@ -833,6 +858,7 @@ private fun YtItemsRowSection(
         items(
             items = ytItems,
             key = { ytItemStableKey(it) },
+            contentType = { ytItemContentType(it) },
         ) { item ->
             itemContent(item)
         }
@@ -1188,7 +1214,10 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         ) {
-                            items(5) {
+                            items(
+                                count = 5,
+                                contentType = { "chips_shimmer_placeholder" },
+                            ) {
                                 TextPlaceholder(
                                     height = 30.dp,
                                     shape = RoundedCornerShape(16.dp),
@@ -1238,6 +1267,7 @@ fun HomeScreen(
                         items(
                             items = keepListening,
                             key = { localItemStableKey(it) },
+                            contentType = { localItemContentType(it) },
                         ) {
                             localGridItem(it)
                         }
@@ -1489,6 +1519,7 @@ fun HomeScreen(
                         items(
                             items = moodAndGenres,
                             key = { "${it.endpoint.browseId}:${it.endpoint.params.orEmpty()}" },
+                            contentType = { "mood_and_genres_button" },
                         ) {
                             MoodAndGenresButton(
                                 title = it.title,
@@ -1612,7 +1643,10 @@ fun HomeScreen(
                                     .only(WindowInsetsSides.Horizontal)
                                     .asPaddingValues(),
                             ) {
-                                items(4) {
+                                items(
+                                    count = 4,
+                                    contentType = { "section_grid_placeholder" },
+                                ) {
                                     GridItemPlaceHolder()
                                 }
                             }
