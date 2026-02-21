@@ -61,7 +61,6 @@ internal fun SpeedDialSection(
             items(
                 count = pages.size,
                 key = { "speed_dial_page_$it" },
-                contentType = { "speed_dial_page" },
             ) { pageIndex ->
                 val pageItems = pages[pageIndex]
                 androidx.compose.foundation.layout.Column(
@@ -130,7 +129,6 @@ internal fun CommunityPlaylistsSection(
         items(
             items = playlists,
             key = { it.playlist.id },
-            contentType = { "community_playlist_card" },
         ) { playlistItem ->
             CommunityPlaylistCard(
                 item = playlistItem,
@@ -179,7 +177,6 @@ internal fun DailyDiscoverSection(
             items(
                 items = visibleDiscoverItems,
                 key = { it.recommendation.id },
-                contentType = { "daily_discover_card" },
             ) { discoverItem ->
                 DailyDiscoverCard(
                     item = discoverItem,

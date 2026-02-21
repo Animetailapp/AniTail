@@ -472,7 +472,6 @@ fun HomeScreen(
                         ) {
                             items(
                                 count = 5,
-                                contentType = { "chips_shimmer_placeholder" },
                             ) {
                                 TextPlaceholder(
                                     height = 30.dp,
@@ -647,7 +646,6 @@ fun HomeScreen(
                         items(
                             items = moodAndGenres,
                             key = { "${it.endpoint.browseId}:${it.endpoint.params.orEmpty()}" },
-                            contentType = { "mood_and_genres_button" },
                         ) {
                             MoodAndGenresButton(
                                 title = it.title,
@@ -773,7 +771,6 @@ fun HomeScreen(
                             ) {
                                 items(
                                     count = 4,
-                                    contentType = { "section_grid_placeholder" },
                                 ) {
                                     GridItemPlaceHolder()
                                 }

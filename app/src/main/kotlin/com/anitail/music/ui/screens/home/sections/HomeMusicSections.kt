@@ -79,7 +79,6 @@ private fun SongsHorizontalGridSection(
         items(
             items = songs,
             key = { it.id },
-            contentType = { "song_list_item" },
         ) { currentSong ->
             SongListItem(
                 song = currentSong,
@@ -178,7 +177,6 @@ internal fun LazyListScope.KeepListeningBlock(
             items(
                 items = keepListening,
                 key = { localItemStableKey(it) },
-                contentType = { localItemContentType(it) },
             ) {
                 localGridItem(it)
             }
@@ -296,7 +294,6 @@ internal fun YtItemsRowSection(
         items(
             items = ytItems,
             key = { ytItemStableKey(it) },
-            contentType = { ytItemContentType(it) },
         ) { item ->
             itemContent(item)
         }

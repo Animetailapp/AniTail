@@ -47,30 +47,12 @@ internal fun ytItemStableKey(item: YTItem): String {
     }
 }
 
-internal fun ytItemContentType(item: YTItem): String {
-    return when (item) {
-        is SongItem -> "yt_song"
-        is AlbumItem -> "yt_album"
-        is ArtistItem -> "yt_artist"
-        is PlaylistItem -> "yt_playlist"
-    }
-}
-
 internal fun localItemStableKey(item: LocalItem): String {
     return when (item) {
         is Song -> "song:${item.id}"
         is Album -> "album:${item.id}"
         is Artist -> "artist:${item.id}"
         is Playlist -> "playlist:${item.id}"
-    }
-}
-
-internal fun localItemContentType(item: LocalItem): String {
-    return when (item) {
-        is Song -> "local_song"
-        is Album -> "local_album"
-        is Artist -> "local_artist"
-        is Playlist -> "local_playlist"
     }
 }
 
