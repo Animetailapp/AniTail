@@ -117,7 +117,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         val isCompact = layoutRes == R.layout.widget_music_small
 
         // Set click listeners for controls
-        setupWidgetControls(context, views)
+        setupWidgetControls(context, views, layoutRes)
         if (isCompact) {
             views.setViewVisibility(R.id.widget_quick_actions, View.GONE)
         }
@@ -264,7 +264,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         }
     }
 
-    private fun setupWidgetControls(context: Context, views: RemoteViews) {
+    private fun setupWidgetControls(context: Context, views: RemoteViews, layoutRes: Int) {
         val openPlayerIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -319,7 +319,12 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 iconId = R.id.widget_action_search
             )
         )
-        val configuredActions = getConfiguredQuickActions(context)
+        val maxQuickActions = when (layoutRes) {
+            R.layout.widget_music -> 2
+            R.layout.widget_music_small -> 0
+            else -> 3
+        }
+        val configuredActions = getConfiguredQuickActions(context).take(maxQuickActions)
 
         actionSlots.forEachIndexed { index, slot ->
             val quickAction = configuredActions.getOrNull(index)
