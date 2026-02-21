@@ -47,7 +47,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
 import androidx.compose.material3.pulltorefresh.pullToRefresh
@@ -719,6 +718,48 @@ private fun DailyDiscoverSection(
     }
 }
 
+@Composable
+private fun SyncStatusSnackbar(
+    viewModel: HomeViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
+
+    if (syncStatus.isNullOrBlank()) return
+
+    Snackbar(
+        modifier = modifier
+            .padding(16.dp)
+            .padding(LocalPlayerAwareWindowInsets.current.asPaddingValues()),
+        containerColor = MaterialTheme.colorScheme.inverseSurface,
+        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (isSyncing) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .weight(0.15f)
+                        .padding(end = 12.dp),
+                    color = MaterialTheme.colorScheme.inverseOnSurface,
+                )
+            } else {
+                Icon(
+                    painter = painterResource(R.drawable.check_circle),
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 12.dp),
+                )
+            }
+            Text(
+                text = syncStatus.orEmpty(),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+    }
+}
+
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -735,35 +776,34 @@ fun HomeScreen(
     val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
-    val quickPicks by viewModel.quickPicks.collectAsStateWithLifecycle()
-    val forgottenFavorites by viewModel.forgottenFavorites.collectAsStateWithLifecycle()
-    val keepListening by viewModel.keepListening.collectAsStateWithLifecycle()
-    val similarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
-    val accountPlaylists by viewModel.accountPlaylists.collectAsStateWithLifecycle()
-    val dailyDiscover by viewModel.dailyDiscover.collectAsStateWithLifecycle()
-    val communityPlaylists by viewModel.communityPlaylists.collectAsStateWithLifecycle()
-    val speedDialItems by viewModel.speedDialItems.collectAsStateWithLifecycle()
-    val homePage by viewModel.homePage.collectAsStateWithLifecycle()
-    val explorePage by viewModel.explorePage.collectAsStateWithLifecycle()
+    val contentUiState by viewModel.contentUiState.collectAsStateWithLifecycle()
 
-    val allLocalItems by viewModel.allLocalItems.collectAsStateWithLifecycle()
-    val allYtItems by viewModel.allYtItems.collectAsStateWithLifecycle()
-    val selectedChip by viewModel.selectedChip.collectAsStateWithLifecycle()
+    val quickPicks = contentUiState.quickPicks
+    val forgottenFavorites = contentUiState.forgottenFavorites
+    val keepListening = contentUiState.keepListening
+    val similarRecommendations = contentUiState.similarRecommendations
+    val accountPlaylists = contentUiState.accountPlaylists
+    val dailyDiscover = contentUiState.dailyDiscover
+    val communityPlaylists = contentUiState.communityPlaylists
+    val speedDialItems = contentUiState.speedDialItems
+    val homePage = contentUiState.homePage
+    val explorePage = contentUiState.explorePage
 
-    val isLoading: Boolean by viewModel.isLoading.collectAsStateWithLifecycle()
+    val allLocalItems = contentUiState.allLocalItems
+    val allYtItems = contentUiState.allYtItems
+    val selectedChip = contentUiState.selectedChip
+
+    val isLoading = contentUiState.isLoading
     val isMoodAndGenresLoading = isLoading && explorePage?.moodAndGenres == null
-    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
-    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
-    val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
-    remember { SnackbarHostState() }
+    val isRefreshing = contentUiState.isRefreshing
     val pullRefreshState = rememberPullToRefreshState()
 
     val quickPicksLazyGridState = rememberLazyGridState()
     val forgottenFavoritesLazyGridState = rememberLazyGridState()
     val keepListeningLazyGridState = rememberLazyGridState()
 
-    val accountName by viewModel.accountName.collectAsStateWithLifecycle()
-    val accountImageUrl by viewModel.accountImageUrl.collectAsStateWithLifecycle()
+    val accountName = contentUiState.accountName
+    val accountImageUrl = contentUiState.accountImageUrl
     val innerTubeCookie by rememberPreference(InnerTubeCookieKey, "")
     val isLoggedIn = remember(innerTubeCookie) {
         "SAPISID" in parseCookieString(innerTubeCookie)
@@ -1672,39 +1712,9 @@ fun HomeScreen(
                 .padding(LocalPlayerAwareWindowInsets.current.asPaddingValues()),
         )
 
-        // Cloud sync status indicator
-        if (syncStatus != null) {
-            Snackbar(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp)
-                    .padding(LocalPlayerAwareWindowInsets.current.asPaddingValues()),
-                containerColor = MaterialTheme.colorScheme.inverseSurface,
-                contentColor = MaterialTheme.colorScheme.inverseOnSurface
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (isSyncing) {
-                        LinearProgressIndicator(
-                            modifier = Modifier
-                                .weight(0.15f)
-                                .padding(end = 12.dp),
-                            color = MaterialTheme.colorScheme.inverseOnSurface
-                        )
-                    } else {
-                        Icon(
-                            painter = painterResource(R.drawable.check_circle),
-                            contentDescription = null,
-                            modifier = Modifier.padding(end = 12.dp)
-                        )
-                    }
-                    Text(
-                        text = syncStatus ?: "",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-        }
+        SyncStatusSnackbar(
+            viewModel = viewModel,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }

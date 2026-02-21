@@ -41,9 +41,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import timber.log.Timber
@@ -58,6 +62,26 @@ data class DailyDiscoverItem(
 data class CommunityPlaylistItem(
     val playlist: PlaylistItem,
     val songs: List<SongItem>,
+)
+
+data class HomeContentUiState(
+    val quickPicks: List<Song>? = null,
+    val forgottenFavorites: List<Song>? = null,
+    val keepListening: List<LocalItem>? = null,
+    val similarRecommendations: List<SimilarRecommendation>? = null,
+    val accountPlaylists: List<PlaylistItem>? = null,
+    val dailyDiscover: List<DailyDiscoverItem>? = null,
+    val communityPlaylists: List<CommunityPlaylistItem>? = null,
+    val speedDialItems: List<YTItem> = emptyList(),
+    val homePage: HomePage? = null,
+    val explorePage: ExplorePage? = null,
+    val allLocalItems: List<LocalItem> = emptyList(),
+    val allYtItems: List<YTItem> = emptyList(),
+    val selectedChip: HomePage.Chip? = null,
+    val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val accountName: String = "Guest",
+    val accountImageUrl: String? = null,
 )
 
 @HiltViewModel
@@ -103,6 +127,126 @@ class HomeViewModel @Inject constructor(
     val discordAvatarUrl = MutableStateFlow<String?>(null)
     // Discord username state
     val discordUsername = MutableStateFlow<String?>(null)
+
+    private data class ContentListSnapshot(
+        val quickPicks: List<Song>?,
+        val forgottenFavorites: List<Song>?,
+        val keepListening: List<LocalItem>?,
+        val similarRecommendations: List<SimilarRecommendation>?,
+        val accountPlaylists: List<PlaylistItem>?,
+    )
+
+    private data class ContentPageSnapshot(
+        val dailyDiscover: List<DailyDiscoverItem>?,
+        val communityPlaylists: List<CommunityPlaylistItem>?,
+        val speedDialItems: List<YTItem>,
+        val homePage: HomePage?,
+        val explorePage: ExplorePage?,
+    )
+
+    private data class ContentMetaSnapshot(
+        val allLocalItems: List<LocalItem>,
+        val allYtItems: List<YTItem>,
+        val selectedChip: HomePage.Chip?,
+        val isLoading: Boolean,
+        val isRefreshing: Boolean,
+    )
+
+    private data class ContentAccountSnapshot(
+        val accountName: String,
+        val accountImageUrl: String?,
+    )
+
+    private val contentListSnapshot =
+        combine(
+            quickPicks,
+            forgottenFavorites,
+            keepListening,
+            similarRecommendations,
+            accountPlaylists,
+        ) { quickPicks, forgottenFavorites, keepListening, similarRecommendations, accountPlaylists ->
+            ContentListSnapshot(
+                quickPicks = quickPicks,
+                forgottenFavorites = forgottenFavorites,
+                keepListening = keepListening,
+                similarRecommendations = similarRecommendations,
+                accountPlaylists = accountPlaylists,
+            )
+        }
+
+    private val contentPageSnapshot =
+        combine(
+            dailyDiscover,
+            communityPlaylists,
+            speedDialItems,
+            homePage,
+            explorePage,
+        ) { dailyDiscover, communityPlaylists, speedDialItems, homePage, explorePage ->
+            ContentPageSnapshot(
+                dailyDiscover = dailyDiscover,
+                communityPlaylists = communityPlaylists,
+                speedDialItems = speedDialItems,
+                homePage = homePage,
+                explorePage = explorePage,
+            )
+        }
+
+    private val contentMetaSnapshot =
+        combine(
+            allLocalItems,
+            allYtItems,
+            selectedChip,
+            isLoading,
+            isRefreshing,
+        ) { allLocalItems, allYtItems, selectedChip, isLoading, isRefreshing ->
+            ContentMetaSnapshot(
+                allLocalItems = allLocalItems,
+                allYtItems = allYtItems,
+                selectedChip = selectedChip,
+                isLoading = isLoading,
+                isRefreshing = isRefreshing,
+            )
+        }
+
+    private val contentAccountSnapshot =
+        combine(accountName, accountImageUrl) { accountName, accountImageUrl ->
+            ContentAccountSnapshot(
+                accountName = accountName,
+                accountImageUrl = accountImageUrl,
+            )
+        }
+
+    val contentUiState: StateFlow<HomeContentUiState> =
+        combine(
+            contentListSnapshot,
+            contentPageSnapshot,
+            contentMetaSnapshot,
+            contentAccountSnapshot,
+        ) { lists, pages, meta, account ->
+            HomeContentUiState(
+                quickPicks = lists.quickPicks,
+                forgottenFavorites = lists.forgottenFavorites,
+                keepListening = lists.keepListening,
+                similarRecommendations = lists.similarRecommendations,
+                accountPlaylists = lists.accountPlaylists,
+                dailyDiscover = pages.dailyDiscover,
+                communityPlaylists = pages.communityPlaylists,
+                speedDialItems = pages.speedDialItems,
+                homePage = pages.homePage,
+                explorePage = pages.explorePage,
+                allLocalItems = meta.allLocalItems,
+                allYtItems = meta.allYtItems,
+                selectedChip = meta.selectedChip,
+                isLoading = meta.isLoading,
+                isRefreshing = meta.isRefreshing,
+                accountName = account.accountName,
+                accountImageUrl = account.accountImageUrl,
+            )
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = HomeContentUiState(),
+        )
 
     init {
         try {
