@@ -11,7 +11,7 @@
         android:id="@+id/widget_backdrop"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:alpha="0.68"
+        android:alpha="0.76"
         android:scaleType="centerCrop"
         android:src="@drawable/ic_music_placeholder"
         tools:ignore="ContentDescription" />
@@ -20,7 +20,7 @@
         android:id="@+id/widget_backdrop_tint"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#96112433"
+        android:background="#68112433"
         tools:ignore="ContentDescription" />
 
     <LinearLayout
@@ -71,9 +71,9 @@
 
             <FrameLayout
                 android:id="@+id/widget_prev_slot"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_marginEnd="9dp">
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="12dp">
 
                 <ImageView
                     android:id="@+id/widget_prev_bg"
@@ -114,9 +114,9 @@
 
             <FrameLayout
                 android:id="@+id/widget_next_slot"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_marginStart="9dp">
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="12dp">
 
                 <ImageView
                     android:id="@+id/widget_next_bg"
@@ -145,10 +145,10 @@
 
             <FrameLayout
                 android:id="@+id/widget_action_slot_lyrics"
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp">
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="6dp">
 
                 <ImageView
                     android:id="@+id/widget_action_lyrics_bg"
@@ -168,10 +168,10 @@
 
             <FrameLayout
                 android:id="@+id/widget_action_slot_queue"
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp">
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginStart="6dp"
+                android:layout_marginEnd="6dp">
 
                 <ImageView
                     android:id="@+id/widget_action_queue_bg"

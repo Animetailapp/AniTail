@@ -11,7 +11,7 @@
         android:id="@+id/widget_backdrop"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:alpha="0.62"
+        android:alpha="0.72"
         android:scaleType="centerCrop"
         android:src="@drawable/ic_music_placeholder"
         tools:ignore="ContentDescription" />
@@ -20,7 +20,7 @@
         android:id="@+id/widget_backdrop_tint"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#8E102030"
+        android:background="#66102030"
         tools:ignore="ContentDescription" />
 
     <LinearLayout
@@ -52,6 +52,13 @@
                     android:layout_height="match_parent"
                     android:scaleType="fitXY"
                     android:src="@drawable/widget_cover_bg"
+                    tools:ignore="ContentDescription" />
+
+                <ImageView
+                    android:id="@+id/widget_cover_progress_ring"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitXY"
                     tools:ignore="ContentDescription" />
 
                 <ImageView
@@ -148,10 +155,10 @@
 
                 <FrameLayout
                     android:id="@+id/widget_action_slot_lyrics"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_marginStart="5dp"
-                    android:layout_marginEnd="5dp">
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp">
 
                     <ImageView
                         android:id="@+id/widget_action_lyrics_bg"
@@ -173,10 +180,10 @@
 
                 <FrameLayout
                     android:id="@+id/widget_action_slot_queue"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_marginStart="5dp"
-                    android:layout_marginEnd="5dp">
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp">
 
                     <ImageView
                         android:id="@+id/widget_action_queue_bg"
@@ -232,9 +239,9 @@
 
                 <FrameLayout
                     android:id="@+id/widget_prev_slot"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginEnd="8dp">
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="12dp">
 
                     <ImageView
                         android:id="@+id/widget_prev_bg"
@@ -256,8 +263,8 @@
 
                 <FrameLayout
                     android:id="@+id/widget_next_slot"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp">
+                    android:layout_width="40dp"
+                    android:layout_height="40dp">
 
                     <ImageView
                         android:id="@+id/widget_next_bg"

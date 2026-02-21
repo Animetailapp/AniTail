@@ -11,7 +11,7 @@
         android:id="@+id/widget_backdrop"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:alpha="0.62"
+        android:alpha="0.72"
         android:scaleType="centerCrop"
         android:src="@drawable/ic_music_placeholder"
         tools:ignore="ContentDescription" />
@@ -20,7 +20,7 @@
         android:id="@+id/widget_backdrop_tint"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#8A102030"
+        android:background="#62102030"
         tools:ignore="ContentDescription" />
 
     <LinearLayout
@@ -85,9 +85,9 @@
 
                 <FrameLayout
                     android:id="@+id/widget_prev_slot"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
-                    android:layout_marginEnd="7dp">
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="10dp">
 
                     <ImageView
                         android:id="@+id/widget_prev_bg"
@@ -109,9 +109,9 @@
 
                 <FrameLayout
                     android:id="@+id/widget_play_slot"
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
-                    android:layout_marginEnd="7dp">
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="10dp">
 
                     <ImageView
                         android:id="@+id/widget_play_pause_bg"
@@ -133,8 +133,8 @@
 
                 <FrameLayout
                     android:id="@+id/widget_next_slot"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp">
+                    android:layout_width="36dp"
+                    android:layout_height="36dp">
 
                     <ImageView
                         android:id="@+id/widget_next_bg"
