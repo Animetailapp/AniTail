@@ -11,7 +11,7 @@
         android:id="@+id/widget_backdrop"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:alpha="0.82"
+        android:alpha="0.88"
         android:scaleType="centerCrop"
         android:src="@drawable/ic_music_placeholder"
         tools:ignore="ContentDescription" />
@@ -28,14 +28,14 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingStart="12dp"
-        android:paddingTop="10dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="8dp">
+        android:paddingStart="14dp"
+        android:paddingTop="11dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="9dp">
 
         <RelativeLayout
             android:layout_width="match_parent"
-            android:layout_height="54dp">
+            android:layout_height="52dp">
 
             <LinearLayout
                 android:id="@+id/widget_info_section"
@@ -59,7 +59,7 @@
                     android:shadowRadius="4"
                     android:text=""
                     android:textColor="#FFFFFF"
-                    android:textSize="19sp"
+                    android:textSize="16sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -75,7 +75,7 @@
                     android:shadowRadius="3"
                     android:text=""
                     android:textColor="#DAFFFFFF"
-                    android:textSize="12sp" />
+                    android:textSize="11sp" />
             </LinearLayout>
 
             <LinearLayout
@@ -89,9 +89,9 @@
 
                 <FrameLayout
                     android:id="@+id/widget_prev_slot"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_marginEnd="10dp">
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_marginEnd="8dp">
 
                     <ImageView
                         android:id="@+id/widget_prev_bg"
@@ -113,9 +113,9 @@
 
                 <FrameLayout
                     android:id="@+id/widget_play_slot"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_marginEnd="10dp">
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:layout_marginEnd="8dp">
 
                     <ImageView
                         android:id="@+id/widget_play_pause_bg"
@@ -129,7 +129,7 @@
                         android:id="@+id/widget_play_pause"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:padding="10dp"
+                        android:padding="9dp"
                         android:scaleType="fitCenter"
                         android:src="@drawable/play"
                         tools:ignore="ContentDescription" />
@@ -137,8 +137,8 @@
 
                 <FrameLayout
                     android:id="@+id/widget_next_slot"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp">
+                    android:layout_width="34dp"
+                    android:layout_height="34dp">
 
                     <ImageView
                         android:id="@+id/widget_next_bg"
@@ -164,7 +164,7 @@
             android:id="@+id/widget_progress"
             android:layout_width="match_parent"
             android:layout_height="4dp"
-            android:layout_marginTop="8dp">
+            android:layout_marginTop="6dp">
 
             <ImageView
                 android:id="@+id/widget_song_progress_track"

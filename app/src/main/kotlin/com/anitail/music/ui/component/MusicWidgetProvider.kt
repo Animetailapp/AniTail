@@ -36,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import kotlin.math.pow
 
 class MusicWidgetProvider : AppWidgetProvider() {
     @RequiresApi(Build.VERSION_CODES.O)
@@ -234,11 +235,11 @@ class MusicWidgetProvider : AppWidgetProvider() {
 
             // Progress ring on cover art (only wide layout has it)
             if (layoutRes == R.layout.widget_music) {
-                updateProgressRing(context, views, R.id.widget_cover_progress_ring, progress, dominantColor, 84)
+                updateProgressRing(context, views, R.id.widget_cover_progress_ring, progress, dominantColor, 80)
             }
             // Progress ring around play button (square layout)
             if (layoutRes == R.layout.widget_music_square) {
-                updateProgressRing(context, views, R.id.widget_play_progress_ring, progress, dominantColor, 56)
+                updateProgressRing(context, views, R.id.widget_play_progress_ring, progress, dominantColor, 52)
             }
 
             for (appWidgetId in appWidgetIds) {
@@ -380,10 +381,10 @@ class MusicWidgetProvider : AppWidgetProvider() {
 
             // Clear progress ring for wide layout
             if (layoutRes == R.layout.widget_music) {
-                updateProgressRing(context, views, R.id.widget_cover_progress_ring, 0, DEFAULT_WIDGET_COLOR, 84)
+                updateProgressRing(context, views, R.id.widget_cover_progress_ring, 0, DEFAULT_WIDGET_COLOR, 80)
             }
             if (layoutRes == R.layout.widget_music_square) {
-                updateProgressRing(context, views, R.id.widget_play_progress_ring, 0, DEFAULT_WIDGET_COLOR, 56)
+                updateProgressRing(context, views, R.id.widget_play_progress_ring, 0, DEFAULT_WIDGET_COLOR, 52)
             }
 
             for (appWidgetId in appWidgetIds) {
@@ -551,29 +552,20 @@ class MusicWidgetProvider : AppWidgetProvider() {
     }
 
     private fun applyWidgetVisualStyle(views: RemoteViews, dominantColor: Int) {
-        // Saturar el color dominante para mantener vibancia como en "New Styles"
-        val saturatedColor = saturateColor(dominantColor, 1.4f)
+        val accentColor = normalizeWidgetAccent(dominantColor)
+        val overlayColor = withAlpha(blendColors(accentColor, Color.BLACK, 0.62f), 150)
+        val titleColor = pickReadableForeground(overlayColor)
+        val artistColor = withAlpha(titleColor, 215)
 
-        // Overlay más sutil para dejar ver más el cover
-        val overlayColor = withAlpha(blendColors(saturatedColor, Color.BLACK, 0.15f), 110)
+        val controlBgColor = withAlpha(blendColors(accentColor, Color.WHITE, 0.30f), 180)
+        val playBgColor = withAlpha(blendColors(accentColor, Color.WHITE, 0.16f), 236)
+        val quickActionBgColor = withAlpha(blendColors(accentColor, Color.WHITE, 0.24f), 172)
 
-        // Texto BLANCO puro para legibilidad
-        val titleColor = Color.WHITE
-        val artistColor = withAlpha(Color.WHITE, 210)
+        val controlIconColor = pickReadableForeground(controlBgColor)
+        val playIconColor = pickReadableForeground(playBgColor)
 
-        // Controles con color de acento vibrante
-        val controlBgColor = withAlpha(blendColors(saturatedColor, Color.WHITE, 0.25f), 200)
-        val playBgColor = withAlpha(saturatedColor, 230)
-        val quickActionBgColor = withAlpha(blendColors(saturatedColor, Color.WHITE, 0.20f), 190)
-
-        // Íconos oscuros sobre fondo de acento (alto contraste)
-        val controlIconColor = blendColors(saturatedColor, Color.BLACK, 0.60f)
-        val playIconColor = blendColors(saturatedColor, Color.BLACK, 0.80f)
-
-        // Progreso y ring con color de acento
-        val progressColor = withAlpha(saturatedColor, 255)
-        // Ring track (dim) — progress arc will overlay this brightly
-        val coverRingTrackColor = withAlpha(blendColors(saturatedColor, Color.WHITE, 0.10f), 70)
+        val progressColor = withAlpha(blendColors(accentColor, Color.WHITE, 0.08f), 255)
+        val coverRingTrackColor = withAlpha(blendColors(accentColor, Color.WHITE, 0.35f), 85)
 
         views.setInt(R.id.widget_backdrop_tint, "setBackgroundColor", overlayColor)
         views.setTextColor(R.id.widget_title, titleColor)
@@ -606,8 +598,8 @@ class MusicWidgetProvider : AppWidgetProvider() {
         val sizePx = (sizeDp * density).toInt()
         val strokePx = 5f * density
 
-        val saturated = saturateColor(dominantColor, 1.4f)
-        val ringColor = withAlpha(blendColors(saturated, Color.WHITE, 0.50f), 255)
+        val accentColor = normalizeWidgetAccent(dominantColor)
+        val ringColor = withAlpha(blendColors(accentColor, Color.WHITE, 0.42f), 255)
 
         val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -642,12 +634,42 @@ class MusicWidgetProvider : AppWidgetProvider() {
         return (color and 0x00FFFFFF) or ((alpha.coerceIn(0, 255)) shl 24)
     }
 
-    private fun saturateColor(color: Int, factor: Float): Int {
+    private fun normalizeWidgetAccent(color: Int): Int {
         val hsv = FloatArray(3)
         Color.colorToHSV(color, hsv)
-        hsv[1] = (hsv[1] * factor).coerceIn(0f, 1f)  // Aumentar saturación
-        hsv[2] = (hsv[2] * 1.1f).coerceIn(0f, 1f)    // Ligero aumento de brillo
-        return Color.HSVToColor(Color.alpha(color), hsv)
+        hsv[1] = (hsv[1] * 1.05f).coerceIn(0.25f, 0.78f)
+        hsv[2] = hsv[2].coerceIn(0.35f, 0.82f)
+        return Color.HSVToColor(255, hsv)
+    }
+
+    private fun pickReadableForeground(backgroundColor: Int): Int {
+        val contrastWithWhite = contrastRatio(backgroundColor, Color.WHITE)
+        val contrastWithBlack = contrastRatio(backgroundColor, Color.BLACK)
+        return if (contrastWithBlack >= contrastWithWhite) Color.BLACK else Color.WHITE
+    }
+
+    private fun contrastRatio(firstColor: Int, secondColor: Int): Double {
+        val firstLuminance = colorLuminance(firstColor)
+        val secondLuminance = colorLuminance(secondColor)
+        val lighter = maxOf(firstLuminance, secondLuminance)
+        val darker = minOf(firstLuminance, secondLuminance)
+        return (lighter + 0.05) / (darker + 0.05)
+    }
+
+    private fun colorLuminance(color: Int): Double {
+        val red = toLinearColorChannel(Color.red(color))
+        val green = toLinearColorChannel(Color.green(color))
+        val blue = toLinearColorChannel(Color.blue(color))
+        return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+    }
+
+    private fun toLinearColorChannel(channel: Int): Double {
+        val srgb = channel / 255.0
+        return if (srgb <= 0.03928) {
+            srgb / 12.92
+        } else {
+            ((srgb + 0.055) / 1.055).pow(2.4)
+        }
     }
 
     private fun getConfiguredQuickActions(context: Context): List<WidgetQuickActionConfig> {
