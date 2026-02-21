@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
@@ -775,6 +776,47 @@ private fun SongsHorizontalGridSection(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+private fun LazyListScope.SongsGridBlock(
+    sectionKey: String,
+    title: String,
+    songs: List<Song>,
+    rows: Int,
+    lazyGridState: LazyGridState,
+    flingBehavior: FlingBehavior,
+    itemWidth: Dp,
+    mediaMetadataId: String?,
+    isPlaying: Boolean,
+    onSongClick: (Song) -> Unit,
+    onSongLongClick: (Song) -> Unit,
+    onSongMenuClick: (Song) -> Unit,
+) {
+    if (songs.isEmpty()) return
+
+    item(key = "${sectionKey}_title") {
+        NavigationTitle(
+            title = title,
+            modifier = Modifier.animateItem(),
+        )
+    }
+
+    item(key = "${sectionKey}_content") {
+        SongsHorizontalGridSection(
+            songs = songs,
+            rows = rows,
+            lazyGridState = lazyGridState,
+            flingBehavior = flingBehavior,
+            itemWidth = itemWidth,
+            mediaMetadataId = mediaMetadataId,
+            isPlaying = isPlaying,
+            onSongClick = onSongClick,
+            onSongLongClick = onSongLongClick,
+            onSongMenuClick = onSongMenuClick,
+            modifier = Modifier.animateItem(),
+        )
+    }
+}
+
 @Composable
 private fun YtItemsRowSection(
     ytItems: List<YTItem>,
@@ -895,6 +937,8 @@ fun HomeScreen(
         backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsStateWithLifecycle()
     val scrollToTop = scrollToTopState?.value == true
     val latestContinuation by rememberUpdatedState(homePage?.continuation)
+    val quickPicksFirstId = quickPicks.firstOrNull()?.id
+    val forgottenFavoritesFirstId = forgottenFavorites.firstOrNull()?.id
 
     LaunchedEffect(scrollToTop) {
         if (scrollToTop) {
@@ -908,7 +952,7 @@ fun HomeScreen(
             .distinctUntilChanged() // Evitar emitir el mismo valor repetidamente
             .collect { lastVisibleIndex ->
                 val len = lazylistState.layoutInfo.totalItemsCount
-                if (lastVisibleIndex != null && lastVisibleIndex >= len - 3) {
+                if (lastVisibleIndex != null && len > 0 && lastVisibleIndex >= len - 3) {
                     viewModel.loadMoreYouTubeItems(latestContinuation)
                 }
             }
@@ -1064,12 +1108,19 @@ fun HomeScreen(
         )
     }
 
-    LaunchedEffect(quickPicks) {
-        quickPicksLazyGridState.scrollToItem(0)
+    LaunchedEffect(quickPicksFirstId) {
+        if (quickPicksFirstId != null && quickPicksLazyGridState.firstVisibleItemIndex > 0) {
+            quickPicksLazyGridState.scrollToItem(0)
+        }
     }
 
-    LaunchedEffect(forgottenFavorites) {
-        forgottenFavoritesLazyGridState.scrollToItem(0)
+    LaunchedEffect(forgottenFavoritesFirstId) {
+        if (
+            forgottenFavoritesFirstId != null &&
+            forgottenFavoritesLazyGridState.firstVisibleItemIndex > 0
+        ) {
+            forgottenFavoritesLazyGridState.scrollToItem(0)
+        }
     }
 
     BoxWithConstraints(
@@ -1087,7 +1138,10 @@ fun HomeScreen(
         }
         val horizontalLazyGridItemWidthFactor = if (maxWidth * 0.475f >= 320.dp) 0.475f else 0.9f
         val horizontalLazyGridItemWidth = maxWidth * horizontalLazyGridItemWidthFactor
-        val quickPicksSnapLayoutInfoProvider = remember(quickPicksLazyGridState) {
+        val quickPicksSnapLayoutInfoProvider = remember(
+            quickPicksLazyGridState,
+            horizontalLazyGridItemWidthFactor,
+        ) {
             SnapLayoutInfoProvider(
                 lazyGridState = quickPicksLazyGridState,
                 positionInLayout = { layoutSize, itemSize ->
@@ -1095,7 +1149,10 @@ fun HomeScreen(
                 }
             )
         }
-        val forgottenFavoritesSnapLayoutInfoProvider = remember(forgottenFavoritesLazyGridState) {
+        val forgottenFavoritesSnapLayoutInfoProvider = remember(
+            forgottenFavoritesLazyGridState,
+            horizontalLazyGridItemWidthFactor,
+        ) {
             SnapLayoutInfoProvider(
                 lazyGridState = forgottenFavoritesLazyGridState,
                 positionInLayout = { layoutSize, itemSize ->
@@ -1103,6 +1160,9 @@ fun HomeScreen(
                 }
             )
         }
+        val quickPicksFlingBehavior = rememberSnapFlingBehavior(quickPicksSnapLayoutInfoProvider)
+        val forgottenFavoritesFlingBehavior =
+            rememberSnapFlingBehavior(forgottenFavoritesSnapLayoutInfoProvider)
 
         LazyColumn(
             state = lazylistState,
@@ -1138,29 +1198,20 @@ fun HomeScreen(
                     }
                 }
             }
-            quickPicks.takeIf { it.isNotEmpty() }?.let { quickPicks ->
-                item {
-                    NavigationTitle(
-                        title = stringResource(R.string.quick_picks),
-                        modifier = Modifier.animateItem()
-                    )
-                }
-
-                item {
-                    SongsHorizontalGridSection(
-                        songs = quickPicks,
-                        rows = 4,
-                        lazyGridState = quickPicksLazyGridState,
-                        flingBehavior = rememberSnapFlingBehavior(quickPicksSnapLayoutInfoProvider),
-                        itemWidth = horizontalLazyGridItemWidth,
-                        mediaMetadataId = mediaMetadata?.id,
-                        isPlaying = isPlaying,
-                        onSongClick = playOrToggleSong,
-                        onSongLongClick = { song -> showSongMenu(song, true) },
-                        onSongMenuClick = { song -> showSongMenu(song, false) },
-                    )
-                }
-            }
+            SongsGridBlock(
+                sectionKey = "quick_picks",
+                title = stringResource(R.string.quick_picks),
+                songs = quickPicks,
+                rows = 4,
+                lazyGridState = quickPicksLazyGridState,
+                flingBehavior = quickPicksFlingBehavior,
+                itemWidth = horizontalLazyGridItemWidth,
+                mediaMetadataId = mediaMetadata?.id,
+                isPlaying = isPlaying,
+                onSongClick = playOrToggleSong,
+                onSongLongClick = { song -> showSongMenu(song, true) },
+                onSongMenuClick = { song -> showSongMenu(song, false) },
+            )
 
             keepListening?.takeIf { it.isNotEmpty() }?.let { keepListening ->
                 item {
@@ -1239,33 +1290,20 @@ fun HomeScreen(
                 }
             }
 
-            forgottenFavorites.takeIf { it.isNotEmpty() }?.let { forgottenFavorites ->
-                item {
-                    NavigationTitle(
-                        title = stringResource(R.string.forgotten_favorites),
-                        modifier = Modifier.animateItem()
-                    )
-                }
-
-                item {
-                    // take min in case list size is less than 4
-                    val rows = min(4, forgottenFavorites.size)
-                    SongsHorizontalGridSection(
-                        songs = forgottenFavorites,
-                        rows = rows,
-                        lazyGridState = forgottenFavoritesLazyGridState,
-                        flingBehavior = rememberSnapFlingBehavior(
-                            forgottenFavoritesSnapLayoutInfoProvider,
-                        ),
-                        itemWidth = horizontalLazyGridItemWidth,
-                        mediaMetadataId = mediaMetadata?.id,
-                        isPlaying = isPlaying,
-                        onSongClick = playOrToggleSong,
-                        onSongLongClick = { song -> showSongMenu(song, true) },
-                        onSongMenuClick = { song -> showSongMenu(song, true) },
-                    )
-                }
-            }
+            SongsGridBlock(
+                sectionKey = "forgotten_favorites",
+                title = stringResource(R.string.forgotten_favorites),
+                songs = forgottenFavorites,
+                rows = min(4, forgottenFavorites.size).coerceAtLeast(1),
+                lazyGridState = forgottenFavoritesLazyGridState,
+                flingBehavior = forgottenFavoritesFlingBehavior,
+                itemWidth = horizontalLazyGridItemWidth,
+                mediaMetadataId = mediaMetadata?.id,
+                isPlaying = isPlaying,
+                onSongClick = playOrToggleSong,
+                onSongLongClick = { song -> showSongMenu(song, true) },
+                onSongMenuClick = { song -> showSongMenu(song, true) },
+            )
 
             similarRecommendations?.forEachIndexed { index, recommendation ->
                 val recommendationKey = "${recommendation.title.id}_$index"
