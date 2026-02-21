@@ -195,7 +195,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 updateProgressRing(context, views, R.id.widget_cover_progress_ring, progress, dominantColor, 80)
             }
             if (layoutRes == R.layout.widget_music_square) {
-                updateProgressRing(context, views, R.id.widget_play_progress_ring, progress, dominantColor, 52)
+                updateProgressRing(context, views, R.id.widget_play_progress_ring, progress, dominantColor, 56)
             }
 
             updateWidgetInstances(appWidgetManager, appWidgetIds, views)
@@ -246,7 +246,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 updateProgressRing(context, views, R.id.widget_cover_progress_ring, 0, DEFAULT_WIDGET_COLOR, 80)
             }
             if (layoutRes == R.layout.widget_music_square) {
-                updateProgressRing(context, views, R.id.widget_play_progress_ring, 0, DEFAULT_WIDGET_COLOR, 52)
+                updateProgressRing(context, views, R.id.widget_play_progress_ring, 0, DEFAULT_WIDGET_COLOR, 56)
             }
 
             lastMainCoverUrl = ""

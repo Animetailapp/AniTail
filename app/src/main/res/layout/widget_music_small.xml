@@ -35,7 +35,7 @@
 
         <RelativeLayout
             android:layout_width="match_parent"
-            android:layout_height="58dp">
+            android:layout_height="62dp">
 
             <LinearLayout
                 android:id="@+id/widget_info_section"
@@ -89,8 +89,8 @@
 
                 <FrameLayout
                     android:id="@+id/widget_prev_slot"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
                     android:layout_marginEnd="8dp">
 
                     <ImageView
@@ -105,7 +105,7 @@
                         android:id="@+id/widget_prev"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:padding="8dp"
+                        android:padding="9dp"
                         android:scaleType="fitCenter"
                         android:src="@drawable/skip_previous"
                         tools:ignore="ContentDescription" />
@@ -113,8 +113,8 @@
 
                 <FrameLayout
                     android:id="@+id/widget_play_slot"
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
+                    android:layout_width="46dp"
+                    android:layout_height="46dp"
                     android:layout_marginEnd="8dp">
 
                     <ImageView
@@ -129,7 +129,7 @@
                         android:id="@+id/widget_play_pause"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:padding="9dp"
+                        android:padding="10dp"
                         android:scaleType="fitCenter"
                         android:src="@drawable/play"
                         tools:ignore="ContentDescription" />
@@ -137,8 +137,8 @@
 
                 <FrameLayout
                     android:id="@+id/widget_next_slot"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp">
+                    android:layout_width="38dp"
+                    android:layout_height="38dp">
 
                     <ImageView
                         android:id="@+id/widget_next_bg"
@@ -152,7 +152,7 @@
                         android:id="@+id/widget_next"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:padding="8dp"
+                        android:padding="9dp"
                         android:scaleType="fitCenter"
                         android:src="@drawable/skip_next"
                         tools:ignore="ContentDescription" />
