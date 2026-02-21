@@ -125,7 +125,6 @@ internal fun LazyListScope.SongsGridBlock(
     item(key = "${sectionKey}_title") {
         NavigationTitle(
             title = stringResource(titleRes),
-            modifier = Modifier.animateItem(),
         )
     }
 
@@ -141,7 +140,6 @@ internal fun LazyListScope.SongsGridBlock(
             onSongClick = onSongClick,
             onSongLongClick = onSongLongClick,
             onSongMenuClick = onSongMenuClick,
-            modifier = Modifier.animateItem(),
         )
     }
 }
@@ -157,7 +155,6 @@ internal fun LazyListScope.KeepListeningBlock(
     item(key = "keep_listening_title") {
         NavigationTitle(
             title = stringResource(R.string.keep_listening),
-            modifier = Modifier.animateItem(),
         )
     }
 
@@ -171,8 +168,7 @@ internal fun LazyListScope.KeepListeningBlock(
                 .height((GridThumbnailHeight + with(LocalDensity.current) {
                     MaterialTheme.typography.bodyLarge.lineHeight.toDp() * 2 +
                             MaterialTheme.typography.bodyMedium.lineHeight.toDp() * 2
-                }) * rows)
-                .animateItem(),
+                }) * rows),
         ) {
             items(
                 items = keepListening,
@@ -223,7 +219,6 @@ internal fun LazyListScope.AccountPlaylistsBlock(
                 }
             },
             onClick = onAccountClick,
-            modifier = Modifier.animateItem(),
         )
     }
 
@@ -231,7 +226,6 @@ internal fun LazyListScope.AccountPlaylistsBlock(
         YtItemsRowSection(
             ytItems = accountPlaylists,
             itemContent = ytGridItem,
-            modifier = Modifier.animateItem(),
         )
     }
 }
@@ -265,7 +259,6 @@ internal fun LazyListScope.SimilarRecommendationsBlock(
                     }
                 },
                 onClick = { onTitleClick(recommendation.title) },
-                modifier = Modifier.animateItem(),
             )
         }
 
@@ -273,7 +266,6 @@ internal fun LazyListScope.SimilarRecommendationsBlock(
             YtItemsRowSection(
                 ytItems = recommendation.items,
                 itemContent = ytGridItem,
-                modifier = Modifier.animateItem(),
             )
         }
     }

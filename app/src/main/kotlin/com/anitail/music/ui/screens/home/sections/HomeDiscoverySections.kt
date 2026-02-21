@@ -202,7 +202,6 @@ internal fun LazyListScope.SpeedDialBlock(
     item(key = "speed_dial_title") {
         HomeSectionHeader(
             title = stringResource(R.string.speed_dial),
-            modifier = Modifier.animateItem(),
         )
     }
 
@@ -212,7 +211,6 @@ internal fun LazyListScope.SpeedDialBlock(
             maxWidth = maxWidth,
             onItemClick = onItemClick,
             onSurpriseClick = onSurpriseClick,
-            modifier = Modifier.animateItem(),
         )
     }
 }
@@ -232,7 +230,6 @@ internal fun LazyListScope.CommunityPlaylistsBlock(
     item(key = "community_playlists_title") {
         HomeSectionHeader(
             title = stringResource(R.string.from_the_community),
-            modifier = Modifier.animateItem(),
         )
     }
 
@@ -245,7 +242,6 @@ internal fun LazyListScope.CommunityPlaylistsBlock(
             onPlayAllClick = onPlayAllClick,
             onRadioClick = onRadioClick,
             onAddClick = onAddClick,
-            modifier = Modifier.animateItem(),
         )
     }
 }
@@ -261,7 +257,6 @@ internal fun LazyListScope.DailyDiscoverBlock(
     item(key = "daily_discover_title") {
         HomeSectionHeader(
             title = stringResource(R.string.daily_discover),
-            modifier = Modifier.animateItem(),
         )
     }
     item(key = "daily_discover_content") {
@@ -269,7 +264,6 @@ internal fun LazyListScope.DailyDiscoverBlock(
             discoverItems = discoverItems,
             maxWidth = maxWidth,
             onItemClick = onItemClick,
-            modifier = Modifier.animateItem(),
         )
     }
 }

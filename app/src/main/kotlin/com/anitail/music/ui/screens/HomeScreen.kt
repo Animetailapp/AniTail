@@ -632,7 +632,6 @@ fun HomeScreen(
                         onClick = {
                             navController.navigate("mood_and_genres")
                         },
-                        modifier = Modifier.animateItem(),
                     )
                 }
                 item(key = "mood_and_genres_list") {
@@ -640,8 +639,7 @@ fun HomeScreen(
                         rows = GridCells.Fixed(4),
                         contentPadding = PaddingValues(6.dp),
                         modifier = Modifier
-                            .height((MoodAndGenresButtonHeight + 12.dp) * 4 + 12.dp)
-                            .animateItem(),
+                            .height((MoodAndGenresButtonHeight + 12.dp) * 4 + 12.dp),
                     ) {
                         items(
                             items = moodAndGenres,
@@ -663,9 +661,7 @@ fun HomeScreen(
 
             if (isMoodAndGenresLoading) {
                 item(key = "mood_and_genres_shimmer") {
-                    ShimmerHost(
-                        modifier = Modifier.animateItem(),
-                    ) {
+                    ShimmerHost {
                         TextPlaceholder(
                             height = 36.dp,
                             modifier = Modifier
@@ -739,7 +735,6 @@ fun HomeScreen(
                         } else {
                             null
                         },
-                        modifier = Modifier.animateItem()
                     )
                 }
 
@@ -747,16 +742,13 @@ fun HomeScreen(
                     YtItemsRowSection(
                         ytItems = section.items,
                         itemContent = ytGridItem,
-                        modifier = Modifier.animateItem(),
                     )
                 }
             }
 
             if (isLoading || homePage?.continuation != null && homePage?.sections?.isNotEmpty() == true) {
                 item(key = "loading_shimmer") {
-                    ShimmerHost(
-                        modifier = Modifier.animateItem()
-                    ) {
+                    ShimmerHost {
                         repeat(3) {
                             TextPlaceholder(
                                 height = 36.dp,
