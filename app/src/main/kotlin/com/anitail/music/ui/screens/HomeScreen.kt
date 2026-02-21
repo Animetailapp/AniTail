@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.FlingBehavior
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -725,7 +726,7 @@ private fun SongsHorizontalGridSection(
     songs: List<Song>,
     rows: Int,
     lazyGridState: LazyGridState,
-    snapLayoutInfoProvider: SnapLayoutInfoProvider,
+    flingBehavior: FlingBehavior,
     itemWidth: Dp,
     mediaMetadataId: String?,
     isPlaying: Boolean,
@@ -737,14 +738,13 @@ private fun SongsHorizontalGridSection(
     LazyHorizontalGrid(
         state = lazyGridState,
         rows = GridCells.Fixed(rows),
-        flingBehavior = rememberSnapFlingBehavior(snapLayoutInfoProvider),
+        flingBehavior = flingBehavior,
         contentPadding = WindowInsets.systemBars
             .only(WindowInsetsSides.Horizontal)
             .asPaddingValues(),
         modifier = modifier
             .fillMaxWidth()
-            .height(ListItemHeight * rows)
-            .animateItem(),
+            .height(ListItemHeight * rows),
     ) {
         items(
             items = songs,
@@ -1151,7 +1151,7 @@ fun HomeScreen(
                         songs = quickPicks,
                         rows = 4,
                         lazyGridState = quickPicksLazyGridState,
-                        snapLayoutInfoProvider = quickPicksSnapLayoutInfoProvider,
+                        flingBehavior = rememberSnapFlingBehavior(quickPicksSnapLayoutInfoProvider),
                         itemWidth = horizontalLazyGridItemWidth,
                         mediaMetadataId = mediaMetadata?.id,
                         isPlaying = isPlaying,
@@ -1254,7 +1254,9 @@ fun HomeScreen(
                         songs = forgottenFavorites,
                         rows = rows,
                         lazyGridState = forgottenFavoritesLazyGridState,
-                        snapLayoutInfoProvider = forgottenFavoritesSnapLayoutInfoProvider,
+                        flingBehavior = rememberSnapFlingBehavior(
+                            forgottenFavoritesSnapLayoutInfoProvider,
+                        ),
                         itemWidth = horizontalLazyGridItemWidth,
                         mediaMetadataId = mediaMetadata?.id,
                         isPlaying = isPlaying,
