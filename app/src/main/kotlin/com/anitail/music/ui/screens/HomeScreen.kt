@@ -54,11 +54,11 @@ import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +78,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import coil.compose.AsyncImage
@@ -155,6 +156,24 @@ private fun highResThumbnail(
     if (url == null) return null
     val resized = url.replace(Regex("=w\\d+-h\\d+"), "=w$width-h$height")
     return resized.resize(width, height)
+}
+
+private fun ytItemStableKey(item: YTItem): String {
+    return when (item) {
+        is SongItem -> "song:${item.id}"
+        is AlbumItem -> "album:${item.id}"
+        is ArtistItem -> "artist:${item.id}"
+        is PlaylistItem -> "playlist:${item.id}"
+    }
+}
+
+private fun localItemStableKey(item: LocalItem): String {
+    return when (item) {
+        is Song -> "song:${item.id}"
+        is Album -> "album:${item.id}"
+        is Artist -> "artist:${item.id}"
+        is Playlist -> "playlist:${item.id}"
+    }
 }
 
 @Composable
@@ -713,37 +732,38 @@ fun HomeScreen(
     val playerConnection = LocalPlayerConnection.current ?: return
     val haptic = LocalHapticFeedback.current
 
-    val isPlaying by playerConnection.isPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
-    val quickPicks by viewModel.quickPicks.collectAsState()
-    val forgottenFavorites by viewModel.forgottenFavorites.collectAsState()
-    val keepListening by viewModel.keepListening.collectAsState()
-    val similarRecommendations by viewModel.similarRecommendations.collectAsState()
-    val accountPlaylists by viewModel.accountPlaylists.collectAsState()
-    val dailyDiscover by viewModel.dailyDiscover.collectAsState()
-    val communityPlaylists by viewModel.communityPlaylists.collectAsState()
-    val speedDialItems by viewModel.speedDialItems.collectAsState()
-    val homePage by viewModel.homePage.collectAsState()
-    val explorePage by viewModel.explorePage.collectAsState()
+    val quickPicks by viewModel.quickPicks.collectAsStateWithLifecycle()
+    val forgottenFavorites by viewModel.forgottenFavorites.collectAsStateWithLifecycle()
+    val keepListening by viewModel.keepListening.collectAsStateWithLifecycle()
+    val similarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
+    val accountPlaylists by viewModel.accountPlaylists.collectAsStateWithLifecycle()
+    val dailyDiscover by viewModel.dailyDiscover.collectAsStateWithLifecycle()
+    val communityPlaylists by viewModel.communityPlaylists.collectAsStateWithLifecycle()
+    val speedDialItems by viewModel.speedDialItems.collectAsStateWithLifecycle()
+    val homePage by viewModel.homePage.collectAsStateWithLifecycle()
+    val explorePage by viewModel.explorePage.collectAsStateWithLifecycle()
 
-    val allLocalItems by viewModel.allLocalItems.collectAsState()
-    val allYtItems by viewModel.allYtItems.collectAsState()
-    val selectedChip by viewModel.selectedChip.collectAsState()
+    val allLocalItems by viewModel.allLocalItems.collectAsStateWithLifecycle()
+    val allYtItems by viewModel.allYtItems.collectAsStateWithLifecycle()
+    val selectedChip by viewModel.selectedChip.collectAsStateWithLifecycle()
 
-    val isLoading: Boolean by viewModel.isLoading.collectAsState()
+    val isLoading: Boolean by viewModel.isLoading.collectAsStateWithLifecycle()
     val isMoodAndGenresLoading = isLoading && explorePage?.moodAndGenres == null
-    val isRefreshing by viewModel.isRefreshing.collectAsState()
-    val isSyncing by viewModel.isSyncing.collectAsState()
-    val syncStatus by viewModel.syncStatus.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
     remember { SnackbarHostState() }
     val pullRefreshState = rememberPullToRefreshState()
 
     val quickPicksLazyGridState = rememberLazyGridState()
     val forgottenFavoritesLazyGridState = rememberLazyGridState()
+    val keepListeningLazyGridState = rememberLazyGridState()
 
-    val accountName by viewModel.accountName.collectAsState()
-    val accountImageUrl by viewModel.accountImageUrl.collectAsState()
+    val accountName by viewModel.accountName.collectAsStateWithLifecycle()
+    val accountImageUrl by viewModel.accountImageUrl.collectAsStateWithLifecycle()
     val innerTubeCookie by rememberPreference(InnerTubeCookieKey, "")
     val isLoggedIn = remember(innerTubeCookie) {
         "SAPISID" in parseCookieString(innerTubeCookie)
@@ -753,11 +773,13 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
     val lazylistState = rememberLazyListState()
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val scrollToTop =
-        backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsState()
+    val scrollToTopState =
+        backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsStateWithLifecycle()
+    val scrollToTop = scrollToTopState?.value == true
+    val latestContinuation by rememberUpdatedState(homePage?.continuation)
 
-    LaunchedEffect(scrollToTop?.value) {
-        if (scrollToTop?.value == true) {
+    LaunchedEffect(scrollToTop) {
+        if (scrollToTop) {
             lazylistState.animateScrollToItem(0)
             backStackEntry?.savedStateHandle?.set("scrollToTop", false)
         }
@@ -769,7 +791,7 @@ fun HomeScreen(
             .collect { lastVisibleIndex ->
                 val len = lazylistState.layoutInfo.totalItemsCount
                 if (lastVisibleIndex != null && lastVisibleIndex >= len - 3) {
-                    viewModel.loadMoreYouTubeItems(homePage?.continuation)
+                    viewModel.loadMoreYouTubeItems(latestContinuation)
                 }
             }
     }
@@ -868,7 +890,7 @@ fun HomeScreen(
     val ytGridItem: @Composable (YTItem) -> Unit = { item ->
         YouTubeGridItem(
             item = item,
-            isActive = item.id in listOf(mediaMetadata?.album?.id, mediaMetadata?.id),
+            isActive = item.id == mediaMetadata?.id || item.id == mediaMetadata?.album?.id,
             isPlaying = isPlaying,
             coroutineScope = scope,
             thumbnailRatio = 1f,
@@ -940,6 +962,9 @@ fun HomeScreen(
             ),
         contentAlignment = Alignment.TopStart
     ) {
+        val chips = remember(homePage?.chips) {
+            homePage?.chips?.map { it to it.title }.orEmpty()
+        }
         val horizontalLazyGridItemWidthFactor = if (maxWidth * 0.475f >= 320.dp) 0.475f else 0.9f
         val horizontalLazyGridItemWidth = maxWidth * horizontalLazyGridItemWidthFactor
         val quickPicksSnapLayoutInfoProvider = remember(quickPicksLazyGridState) {
@@ -965,7 +990,7 @@ fun HomeScreen(
         ) {
             item {
                 ChipsRow(
-                    chips = homePage?.chips?.mapNotNull { it to it.title } ?: emptyList(),
+                    chips = chips,
                     currentValue = selectedChip,
                     onValueUpdate = {
                         viewModel.toggleChip(it)
@@ -1020,7 +1045,7 @@ fun HomeScreen(
                         ) { originalSong ->
                             // fetch song from database to keep updated
                             val song by database.song(originalSong.id)
-                                .collectAsState(initial = originalSong)
+                                .collectAsStateWithLifecycle(initialValue = originalSong)
 
                             SongListItem(
                                 song = song!!,
@@ -1084,7 +1109,7 @@ fun HomeScreen(
                 item {
                     val rows = if (keepListening.size > 6) 2 else 1
                     LazyHorizontalGrid(
-                        state = rememberLazyGridState(),
+                        state = keepListeningLazyGridState,
                         rows = GridCells.Fixed(rows),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1094,7 +1119,10 @@ fun HomeScreen(
                             }) * rows)
                             .animateItem()
                     ) {
-                        items(keepListening) {
+                        items(
+                            items = keepListening,
+                            key = { localItemStableKey(it) },
+                        ) {
                             localGridItem(it)
                         }
                     }
@@ -1185,7 +1213,7 @@ fun HomeScreen(
                             key = { it.id }
                         ) { originalSong ->
                             val song by database.song(originalSong.id)
-                                .collectAsState(initial = originalSong)
+                                .collectAsStateWithLifecycle(initialValue = originalSong)
 
                             SongListItem(
                                 song = song!!,
@@ -1239,15 +1267,16 @@ fun HomeScreen(
                 }
             }
 
-            similarRecommendations?.forEach {
-                item {
+            similarRecommendations?.forEachIndexed { index, recommendation ->
+                val recommendationKey = "${recommendation.title.id}_$index"
+                item(key = "similar_title_$recommendationKey") {
                     NavigationTitle(
                         label = stringResource(R.string.similar_to),
-                        title = it.title.title,
-                        thumbnail = it.title.thumbnailUrl?.let { thumbnailUrl ->
+                        title = recommendation.title.title,
+                        thumbnail = recommendation.title.thumbnailUrl?.let { thumbnailUrl ->
                             {
                                 val shape =
-                                    if (it.title is Artist) CircleShape else RoundedCornerShape(
+                                    if (recommendation.title is Artist) CircleShape else RoundedCornerShape(
                                         ThumbnailCornerRadius
                                     )
                                 AsyncImage(
@@ -1260,10 +1289,10 @@ fun HomeScreen(
                             }
                         },
                         onClick = {
-                            when (it.title) {
-                                is Song -> navController.navigate("album/${it.title.album!!.id}")
-                                is Album -> navController.navigate("album/${it.title.id}")
-                                is Artist -> navController.navigate("artist/${it.title.id}")
+                            when (recommendation.title) {
+                                is Song -> navController.navigate("album/${recommendation.title.album!!.id}")
+                                is Album -> navController.navigate("album/${recommendation.title.id}")
+                                is Artist -> navController.navigate("artist/${recommendation.title.id}")
                                 is Playlist -> {}
                             }
                         },
@@ -1271,14 +1300,17 @@ fun HomeScreen(
                     )
                 }
 
-                item {
+                item(key = "similar_items_$recommendationKey") {
                     LazyRow(
                         contentPadding = WindowInsets.systemBars
                             .only(WindowInsetsSides.Horizontal)
                             .asPaddingValues(),
                         modifier = Modifier.animateItem()
                     ) {
-                        items(it.items) { item ->
+                        items(
+                            items = recommendation.items,
+                            key = { ytItemStableKey(it) },
+                        ) { item ->
                             ytGridItem(item)
                         }
                     }
@@ -1423,7 +1455,10 @@ fun HomeScreen(
                             .height((MoodAndGenresButtonHeight + 12.dp) * 4 + 12.dp)
                             .animateItem(),
                     ) {
-                        items(moodAndGenres) {
+                        items(
+                            items = moodAndGenres,
+                            key = { "${it.endpoint.browseId}:${it.endpoint.params.orEmpty()}" },
+                        ) {
                             MoodAndGenresButton(
                                 title = it.title,
                                 onClick = {
@@ -1467,11 +1502,12 @@ fun HomeScreen(
                 }
             }
 
-            homePage?.sections?.forEach { section ->
+            homePage?.sections?.forEachIndexed { index, section ->
                 val sectionSongs = section.items.filterIsInstance<SongItem>()
                 val hasPlayableSongs = sectionSongs.isNotEmpty()
+                val sectionKey = "${section.endpoint?.browseId ?: section.title}_$index"
 
-                item {
+                item(key = "home_section_title_$sectionKey") {
                     NavigationTitle(
                         title = section.title,
                         label = section.label,
@@ -1519,14 +1555,17 @@ fun HomeScreen(
                     )
                 }
 
-                item {
+                item(key = "home_section_items_$sectionKey") {
                     LazyRow(
                         contentPadding = WindowInsets.systemBars
                             .only(WindowInsetsSides.Horizontal)
                             .asPaddingValues(),
                         modifier = Modifier.animateItem()
                     ) {
-                        items(section.items) { item ->
+                        items(
+                            items = section.items,
+                            key = { ytItemStableKey(it) },
+                        ) { item ->
                             ytGridItem(item)
                         }
                     }

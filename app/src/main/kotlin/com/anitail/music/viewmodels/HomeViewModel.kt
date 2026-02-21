@@ -348,6 +348,7 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun load() {
         deferredHomeContentJob?.cancel()
+        consumedContinuations.clear()
         isLoading.value = true
 
         try {
@@ -424,26 +425,29 @@ class HomeViewModel @Inject constructor(
     }
 
     private val _isLoadingMore = MutableStateFlow(false)
+    private val consumedContinuations = mutableSetOf<String>()
+
     fun loadMoreYouTubeItems(continuation: String?) {
-        if (continuation == null || _isLoadingMore.value) return
+        if (continuation.isNullOrBlank() || _isLoadingMore.value || continuation in consumedContinuations) return
         val hideExplicit = context.dataStore.get(HideExplicitKey, false)
 
         viewModelScope.launch(Dispatchers.IO) {
             _isLoadingMore.value = true
-            val nextSections = YouTube.home(continuation).getOrNull() ?: run {
-                _isLoadingMore.value = false
-                return@launch
-            }
+            try {
+                val nextSections = YouTube.home(continuation).getOrNull() ?: return@launch
 
-            homePage.value = nextSections.copy(
-                chips = homePage.value?.chips,
-                sections = (homePage.value?.sections.orEmpty() + nextSections.sections).map { section ->
-                    section.copy(items = section.items.filterExplicit(hideExplicit))
-                }
-            )
-            rebuildAllYtItems()
-            rebuildSpeedDialItems()
-            _isLoadingMore.value = false
+                homePage.value = nextSections.copy(
+                    chips = homePage.value?.chips,
+                    sections = (homePage.value?.sections.orEmpty() + nextSections.sections).map { section ->
+                        section.copy(items = section.items.filterExplicit(hideExplicit))
+                    }
+                )
+                consumedContinuations += continuation
+                rebuildAllYtItems()
+                rebuildSpeedDialItems()
+            } finally {
+                _isLoadingMore.value = false
+            }
         }
     }
 
@@ -452,6 +456,7 @@ class HomeViewModel @Inject constructor(
             homePage.value = previousHomePage.value
             previousHomePage.value = null
             selectedChip.value = null
+            consumedContinuations.clear()
             rebuildAllYtItems()
             rebuildSpeedDialItems()
             return
@@ -472,6 +477,7 @@ class HomeViewModel @Inject constructor(
                 }
             )
             selectedChip.value = chip
+            consumedContinuations.clear()
             rebuildAllYtItems()
             rebuildSpeedDialItems()
         }
