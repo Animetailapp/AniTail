@@ -159,6 +159,8 @@
 
 html {
   scroll-behavior: smooth;
+  width: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -172,9 +174,15 @@ body {
   color: var(--text);
   line-height: 1.6;
   min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+main {
+  width: 100%;
 }
 
 a {
@@ -297,6 +305,7 @@ img {
 }
 
 .nav {
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   padding: 16px 24px;
@@ -467,13 +476,19 @@ img {
    Hero Section
    ======================================== */
 .hero {
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   padding: 50px 24px 80px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 300px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: clamp(32px, 7vw, 140px);
   align-items: center;
+}
+
+.hero__copy,
+.hero__visual {
+  min-width: 0;
 }
 
 .eyebrow {
@@ -638,12 +653,14 @@ img {
    Sections
    ======================================== */
 .section {
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   padding: 100px 24px;
 }
 
 .section--alt {
+  width: 100%;
   background: var(--surface);
   border-radius: 48px;
   margin: 40px auto;
@@ -675,7 +692,7 @@ img {
    ======================================== */
 .screens__wrapper {
   position: relative;
-  margin: 60px -24px;
+  margin: 60px 0;
   padding: 40px 0;
 }
 
@@ -813,9 +830,13 @@ img {
 
 .desktop__layout {
   display: grid;
-  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 28px;
   align-items: start;
+}
+
+.desktop__layout > * {
+  min-width: 0;
 }
 
 .desktop__panel {
@@ -862,8 +883,11 @@ img {
 }
 
 .desktop__wrapper {
+  width: 100%;
+  max-width: 100%;
   margin: 0;
   padding: 20px 0;
+  overflow: hidden;
 }
 
 .desktop__wrapper::before {
@@ -871,8 +895,14 @@ img {
   height: 70%;
 }
 
+.desktop__gallery {
+  width: 100%;
+  max-width: 100%;
+}
+
 .desktop__gallery figure {
-  flex: 0 0 min(72vw, 520px);
+  flex: 0 0 clamp(260px, 72vw, 520px);
+  max-width: 100%;
 }
 
 .desktop__gallery img {
@@ -1019,6 +1049,7 @@ img {
    GitHub Release Section
    ======================================== */
 .release-container {
+  width: 100%;
   background: var(--surface-alt);
   border: 1px solid var(--card-border);
   border-radius: 24px;
@@ -1243,6 +1274,7 @@ img {
    CTA Section
    ======================================== */
 .cta {
+  width: 100%;
   max-width: 1100px;
   margin: 60px auto;
   padding: 80px 60px;
@@ -1286,11 +1318,12 @@ img {
    Footer
    ======================================== */
 .site-footer {
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   padding: 80px 24px 48px;
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 60px;
   border-top: 1px solid var(--card-border);
 }
@@ -1391,6 +1424,7 @@ img {
 @media (max-width: 1024px) {
   .hero {
     grid-template-columns: 1fr;
+    gap: 48px;
     text-align: center;
     padding: 80px 24px 60px;
   }
@@ -1435,8 +1469,8 @@ img {
   }
 
   .desktop__gallery figure {
-    flex: 0 0 82vw;
-    max-width: 420px;
+    flex: 0 0 min(82vw, 380px);
+    max-width: none;
   }
 
   .screens__gallery figcaption {
@@ -1532,6 +1566,10 @@ img {
   .desktop__panel {
     padding: 22px;
   }
+
+  .desktop__gallery {
+    padding: 16px 12px;
+  }
 }
 
 @media (max-width: 600px) {
@@ -1569,6 +1607,39 @@ img {
   }
 
   .downloads {
+    grid-template-columns: 1fr;
+  }
+
+  .desktop__gallery figure {
+    flex: 0 0 calc(100% - 24px);
+  }
+}
+
+@media (min-width: 1025px) {
+  .desktop__layout {
+    grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .release-selector-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .version-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .release-header,
+  .release-content,
+  .release-loading {
+    padding: 20px;
+  }
+
+  .release-assets {
     grid-template-columns: 1fr;
   }
 }
