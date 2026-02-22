@@ -3,6 +3,7 @@ package com.anitail.music.ui.screens.settings
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -63,6 +64,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.datastore.preferences.core.edit
 import androidx.documentfile.provider.DocumentFile
 import androidx.navigation.NavController
 import coil.annotation.ExperimentalCoilApi
@@ -76,6 +78,7 @@ import com.anitail.music.constants.MaxDownloadSpeedKey
 import com.anitail.music.constants.MaxDownloadSizeKey
 import com.anitail.music.constants.MaxImageCacheSizeKey
 import com.anitail.music.constants.MaxSongCacheSizeKey
+import com.anitail.music.constants.VisitorDataKey
 import com.anitail.music.extensions.tryOrNull
 import com.anitail.music.ui.component.AnimatedIconButton
 import com.anitail.music.ui.component.EnhancedListPreference
@@ -84,6 +87,7 @@ import com.anitail.music.ui.component.SwitchPreference
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.ui.utils.formatFileSize
 import com.anitail.music.utils.MediaStoreHelper
+import com.anitail.music.utils.dataStore
 import com.anitail.music.utils.rememberPreference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -146,6 +150,8 @@ fun StorageSettings(
     var showDownloadClearConfirm by remember { mutableStateOf(false) }
     var showSongCacheClearConfirm by remember { mutableStateOf(false) }
     var showImageCacheClearConfirm by remember { mutableStateOf(false) }
+    var showVisitorDataResetConfirm by remember { mutableStateOf(false) }
+    var isResettingVisitorData by remember { mutableStateOf(false) }
     var customPathValid by remember { mutableStateOf(true) }
 
     suspend fun loadStorageSnapshot(): StorageSnapshot = withContext(Dispatchers.IO) {
@@ -557,6 +563,28 @@ fun StorageSettings(
                 )
             }
 
+            StorageSection(
+                title = stringResource(R.string.security),
+                icon = R.drawable.settings
+            ) {
+                Text(
+                    text = stringResource(R.string.reset_visitor_data_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                )
+
+                EnhancedPreferenceEntry(
+                    title = stringResource(R.string.reset_visitor_data),
+                    icon = R.drawable.refresh,
+                    iconTint = MaterialTheme.colorScheme.error,
+                    onClick = {
+                        if (!isResettingVisitorData) {
+                            showVisitorDataResetConfirm = true
+                        }
+                    },
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
@@ -611,6 +639,42 @@ fun StorageSettings(
                 showImageCacheClearConfirm = false
             },
             onDismiss = { showImageCacheClearConfirm = false }
+        )
+    }
+
+    if (showVisitorDataResetConfirm) {
+        ConfirmationDialog(
+            title = stringResource(R.string.reset_visitor_data),
+            message = stringResource(R.string.reset_visitor_data_confirm),
+            onConfirm = {
+                coroutineScope.launch(Dispatchers.IO) {
+                    try {
+                        withContext(Dispatchers.Main) {
+                            isResettingVisitorData = true
+                        }
+
+                        context.dataStore.edit { settings ->
+                            settings.remove(VisitorDataKey)
+                        }
+
+                        delay(500)
+
+                        withContext(Dispatchers.Main) {
+                            showVisitorDataResetConfirm = false
+                            isResettingVisitorData = false
+                            delay(300)
+                            restartApp(context)
+                        }
+                    } catch (e: Exception) {
+                        Log.e("StorageSettings", "Error al restablecer VISITOR_DATA", e)
+                        withContext(Dispatchers.Main) {
+                            isResettingVisitorData = false
+                            showVisitorDataResetConfirm = false
+                        }
+                    }
+                }
+            },
+            onDismiss = { showVisitorDataResetConfirm = false }
         )
     }
 }
@@ -797,4 +861,17 @@ fun ConfirmationDialog(
             }
         }
     )
+}
+
+private fun restartApp(context: android.content.Context) {
+    val packageManager = context.packageManager
+    val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+
+    intent?.let {
+        val componentName = it.component
+        val mainIntent = Intent.makeRestartActivityTask(componentName)
+        mainIntent.setPackage(context.packageName)
+        context.startActivity(mainIntent)
+        Runtime.getRuntime().exit(0)
+    }
 }
