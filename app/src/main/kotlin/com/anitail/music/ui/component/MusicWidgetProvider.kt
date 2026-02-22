@@ -35,9 +35,24 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.pow
 
-class MusicWidgetProvider : AppWidgetProvider() {
+open class MusicWidgetProvider : AppWidgetProvider() {
+    protected open fun widgetComponentClass(): Class<out AppWidgetProvider> = MusicWidgetProvider::class.java
+
+    private fun providerCacheKey(): String = widgetComponentClass().name
+
+    private fun getLastCoverUrl(): String = lastCoverUrlByProvider[providerCacheKey()].orEmpty()
+
+    private fun setLastCoverUrl(url: String) {
+        if (url.isBlank()) {
+            lastCoverUrlByProvider.remove(providerCacheKey())
+        } else {
+            lastCoverUrlByProvider[providerCacheKey()] = url
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         if (WIDGET_DISABLED) {
@@ -71,7 +86,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
             return
         }
         val appWidgetManager = AppWidgetManager.getInstance(context)
-        val thisWidget = ComponentName(context, MusicWidgetProvider::class.java)
+        val thisWidget = ComponentName(context, widgetComponentClass())
         val appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
 
         when (intent.action) {
@@ -204,14 +219,15 @@ class MusicWidgetProvider : AppWidgetProvider() {
 
             updateWidgetInstances(appWidgetManager, appWidgetIds, views)
 
+            val previousCoverUrl = getLastCoverUrl()
             if (coverUrl.isBlank()) {
-                if (lastMainCoverUrl.isNotBlank()) {
+                if (previousCoverUrl.isNotBlank()) {
                     views.setImageViewResource(R.id.widget_cover, R.drawable.ic_music_placeholder)
                     views.setImageViewResource(R.id.widget_backdrop, R.drawable.ic_music_placeholder)
                     updateWidgetInstances(appWidgetManager, appWidgetIds, views)
                 }
-                lastMainCoverUrl = ""
-            } else if (coverUrl != lastMainCoverUrl) {
+                setLastCoverUrl("")
+            } else if (coverUrl != previousCoverUrl) {
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
                         val request = ImageRequest.Builder(context)
@@ -226,7 +242,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                         if (bitmap != null) {
                             views.setImageViewBitmap(R.id.widget_cover, bitmap)
                             views.setImageViewBitmap(R.id.widget_backdrop, bitmap)
-                            lastMainCoverUrl = coverUrl
+                            setLastCoverUrl(coverUrl)
                             updateWidgetInstances(appWidgetManager, appWidgetIds, views)
                         } else {
                             Timber.tag(TAG).w("Failed to load cover image, bitmap is null")
@@ -257,7 +273,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 updateProgressRing(context, views, R.id.widget_play_progress_ring, 0, DEFAULT_WIDGET_COLOR, 56)
             }
 
-            lastMainCoverUrl = ""
+            setLastCoverUrl("")
             updateWidgetInstances(appWidgetManager, appWidgetIds, views)
         }
     }
@@ -283,8 +299,10 @@ class MusicWidgetProvider : AppWidgetProvider() {
         views.setOnClickPendingIntent(R.id.widget_cover, openPlayerPendingIntent)
         views.setOnClickPendingIntent(R.id.widget_root, openPlayerPendingIntent)
         views.setOnClickPendingIntent(R.id.widget_backdrop, openPlayerPendingIntent)
+        val providerClass = widgetComponentClass()
+
         // Play/Pause intent
-        val playPauseIntent = Intent(context, MusicWidgetProvider::class.java).apply {
+        val playPauseIntent = Intent(context, providerClass).apply {
             action = ACTION_PLAY_PAUSE
         }
         val playPausePendingIntent = PendingIntent.getBroadcast(
@@ -294,7 +312,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         views.setOnClickPendingIntent(R.id.widget_play_pause, playPausePendingIntent)
 
         // Next track intent
-        val nextIntent = Intent(context, MusicWidgetProvider::class.java).apply {
+        val nextIntent = Intent(context, providerClass).apply {
             action = ACTION_NEXT
         }
         val nextPendingIntent = PendingIntent.getBroadcast(
@@ -304,7 +322,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         views.setOnClickPendingIntent(R.id.widget_next, nextPendingIntent)
 
         // Previous track intent
-        val prevIntent = Intent(context, MusicWidgetProvider::class.java).apply {
+        val prevIntent = Intent(context, providerClass).apply {
             action = ACTION_PREV
         }
         val prevPendingIntent = PendingIntent.getBroadcast(
@@ -586,7 +604,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         return if (selectedActions.isEmpty()) defaultQuickActions.take(3) else selectedActions.take(3)
     }
 
-    private fun resolveLayoutRes(appWidgetManager: AppWidgetManager, appWidgetId: Int): Int {
+    protected open fun resolveLayoutRes(appWidgetManager: AppWidgetManager, appWidgetId: Int): Int {
         val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
         val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
         val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
@@ -645,7 +663,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         const val ACTION_NEXT = "com.anitail.music.widget.NEXT"
         const val ACTION_PREV = "com.anitail.music.widget.PREV"
         private const val DEFAULT_WIDGET_COLOR = 0xFF1D3342.toInt()
-        @Volatile private var lastMainCoverUrl: String = ""
+        private val lastCoverUrlByProvider = ConcurrentHashMap<String, String>()
         private val imageLoaderLock = Any()
         @Volatile private var widgetImageLoader: ImageLoader? = null
         private val defaultQuickActions = listOf(

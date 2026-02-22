@@ -119,6 +119,7 @@ import com.anitail.music.playback.queues.EmptyQueue
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.playback.queues.Queue
 import com.anitail.music.playback.queues.filterExplicit
+import com.anitail.music.ui.component.MusicOrbWidgetProvider
 import com.anitail.music.ui.component.MusicWidgetProvider.Companion.ACTION_NEXT
 import com.anitail.music.ui.component.MusicWidgetProvider.Companion.ACTION_PLAY_PAUSE
 import com.anitail.music.ui.component.MusicWidgetProvider.Companion.ACTION_PREV
@@ -1547,28 +1548,33 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
           player.duration.coerceAtLeast(1L) to player.currentPosition.coerceAtLeast(0L)
         }
     val progress = ((position.toFloat() / duration.toFloat()) * 100).toInt().coerceIn(0, 100)
+    val widgetProviders =
+        listOf(
+            com.anitail.music.ui.component.MusicWidgetProvider::class.java,
+            MusicOrbWidgetProvider::class.java,
+        )
 
-    val intent =
-        Intent(ACTION_WIDGET_UPDATE).apply {
-          component =
-              ComponentName(
-                  this@MusicService, com.anitail.music.ui.component.MusicWidgetProvider::class.java)
-          putExtra(EXTRA_WIDGET_SONG_TITLE, songTitle)
-          putExtra(EXTRA_WIDGET_ARTIST, finalArtistName)
-          putExtra(EXTRA_WIDGET_IS_PLAYING, isPlaying)
-          putExtra(EXTRA_WIDGET_THEME_COLOR, themeColor)
-          putExtra(EXTRA_WIDGET_COVER_URL, coverUrl)
-          putExtra(EXTRA_WIDGET_DOMINANT_COLOR, dominantColor)
-          putExtra(EXTRA_WIDGET_PROGRESS, progress)
-          putExtra(EXTRA_WIDGET_CURRENT_POSITION, position)
-          putExtra(EXTRA_WIDGET_DURATION, duration)
-          addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
-          addCategory(Intent.CATEGORY_DEFAULT)
-        }
+    widgetProviders.forEach { widgetProvider ->
+      val intent =
+          Intent(ACTION_WIDGET_UPDATE).apply {
+            component = ComponentName(this@MusicService, widgetProvider)
+            putExtra(EXTRA_WIDGET_SONG_TITLE, songTitle)
+            putExtra(EXTRA_WIDGET_ARTIST, finalArtistName)
+            putExtra(EXTRA_WIDGET_IS_PLAYING, isPlaying)
+            putExtra(EXTRA_WIDGET_THEME_COLOR, themeColor)
+            putExtra(EXTRA_WIDGET_COVER_URL, coverUrl)
+            putExtra(EXTRA_WIDGET_DOMINANT_COLOR, dominantColor)
+            putExtra(EXTRA_WIDGET_PROGRESS, progress)
+            putExtra(EXTRA_WIDGET_CURRENT_POSITION, position)
+            putExtra(EXTRA_WIDGET_DURATION, duration)
+            addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES)
+            addCategory(Intent.CATEGORY_DEFAULT)
+          }
 
-    try {
-      sendBroadcast(intent)
-    } catch (_: Exception) {}
+      try {
+        sendBroadcast(intent)
+      } catch (_: Exception) {}
+    }
   }
 
   override fun onPlaybackStateChanged(
