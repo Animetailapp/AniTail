@@ -435,10 +435,10 @@ open class MusicWidgetProvider : AppWidgetProvider() {
 
     private fun applyWidgetVisualStyle(views: RemoteViews, dominantColor: Int, layoutRes: Int) {
         if (layoutRes == R.layout.widget_music_orb) {
-            val overlayColor = withAlpha(Color.BLACK, 32)
-            val controlBgColor = 0xD4D7EAF3.toInt()
-            val playBgColor = 0xD4D7EAF3.toInt()
-            val iconColor = 0xFF2B5164.toInt()
+            val overlayColor = Color.TRANSPARENT
+            val controlBgColor = 0xDDEAF3F8.toInt()
+            val playBgColor = 0xDDEAF3F8.toInt()
+            val iconColor = 0xFF365C72.toInt()
 
             views.setInt(R.id.widget_backdrop_tint, "setBackgroundColor", overlayColor)
             views.setTextColor(R.id.widget_title, Color.TRANSPARENT)

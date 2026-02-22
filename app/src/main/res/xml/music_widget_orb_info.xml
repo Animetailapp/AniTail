@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:minWidth="140dp"
-    android:minHeight="140dp"
-    android:minResizeWidth="120dp"
-    android:minResizeHeight="120dp"
+    android:minWidth="220dp"
+    android:minHeight="220dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="180dp"
     android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/widget_music_orb"
     android:previewLayout="@layout/widget_music_orb"
