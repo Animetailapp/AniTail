@@ -35,9 +35,24 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.pow
 
-class MusicWidgetProvider : AppWidgetProvider() {
+open class MusicWidgetProvider : AppWidgetProvider() {
+    protected open fun widgetComponentClass(): Class<out AppWidgetProvider> = MusicWidgetProvider::class.java
+
+    private fun providerCacheKey(): String = widgetComponentClass().name
+
+    private fun getLastCoverUrl(): String = lastCoverUrlByProvider[providerCacheKey()].orEmpty()
+
+    private fun setLastCoverUrl(url: String) {
+        if (url.isBlank()) {
+            lastCoverUrlByProvider.remove(providerCacheKey())
+        } else {
+            lastCoverUrlByProvider[providerCacheKey()] = url
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         if (WIDGET_DISABLED) {
@@ -71,7 +86,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
             return
         }
         val appWidgetManager = AppWidgetManager.getInstance(context)
-        val thisWidget = ComponentName(context, MusicWidgetProvider::class.java)
+        val thisWidget = ComponentName(context, widgetComponentClass())
         val appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget)
 
         when (intent.action) {
@@ -185,7 +200,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 themeColor
             }
 
-            applyWidgetVisualStyle(views, dominantColor)
+            applyWidgetVisualStyle(views, dominantColor, layoutRes)
             views.setTextViewText(R.id.widget_title, song)
             views.setTextViewText(R.id.widget_artist, artist.ifBlank { context.getString(R.string.unknown_artist) })
             views.setImageViewResource(R.id.widget_play_pause, if (isPlaying) R.drawable.pause else R.drawable.play)
@@ -204,19 +219,20 @@ class MusicWidgetProvider : AppWidgetProvider() {
 
             updateWidgetInstances(appWidgetManager, appWidgetIds, views)
 
+            val previousCoverUrl = getLastCoverUrl()
             if (coverUrl.isBlank()) {
-                if (lastMainCoverUrl.isNotBlank()) {
-                    views.setImageViewResource(R.id.widget_cover, R.drawable.ic_music_placeholder)
-                    views.setImageViewResource(R.id.widget_backdrop, R.drawable.ic_music_placeholder)
+                if (previousCoverUrl.isNotBlank()) {
+                    views.setImageViewResource(R.id.widget_cover, R.drawable.ic_anitail)
+                    views.setImageViewResource(R.id.widget_backdrop, R.drawable.ic_anitail)
                     updateWidgetInstances(appWidgetManager, appWidgetIds, views)
                 }
-                lastMainCoverUrl = ""
-            } else if (coverUrl != lastMainCoverUrl) {
+                setLastCoverUrl("")
+            } else if (coverUrl != previousCoverUrl) {
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
                         val request = ImageRequest.Builder(context)
                             .data(coverUrl)
-                            .size(135, 135)
+                            .size(512, 512)
                             .allowHardware(false)
                             .crossfade(true)
                             .build()
@@ -226,7 +242,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                         if (bitmap != null) {
                             views.setImageViewBitmap(R.id.widget_cover, bitmap)
                             views.setImageViewBitmap(R.id.widget_backdrop, bitmap)
-                            lastMainCoverUrl = coverUrl
+                            setLastCoverUrl(coverUrl)
                             updateWidgetInstances(appWidgetManager, appWidgetIds, views)
                         } else {
                             Timber.tag(TAG).w("Failed to load cover image, bitmap is null")
@@ -237,12 +253,12 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 }
             }
         } else {
-            applyWidgetVisualStyle(views, DEFAULT_WIDGET_COLOR)
+            applyWidgetVisualStyle(views, DEFAULT_WIDGET_COLOR, layoutRes)
             views.setTextViewText(R.id.widget_title, context.getString(R.string.app_name))
             views.setTextViewText(R.id.widget_artist, context.getString(R.string.song_notplaying))
             views.setImageViewResource(R.id.widget_play_pause, R.drawable.play)
-            views.setImageViewResource(R.id.widget_cover, R.drawable.ic_music_placeholder)
-            views.setImageViewResource(R.id.widget_backdrop, R.drawable.ic_music_placeholder)
+            views.setImageViewResource(R.id.widget_cover, R.drawable.ic_anitail)
+            views.setImageViewResource(R.id.widget_backdrop, R.drawable.ic_anitail)
             setWidgetProgress(views, 0)
             views.setViewVisibility(
                 R.id.widget_progress,
@@ -257,7 +273,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
                 updateProgressRing(context, views, R.id.widget_play_progress_ring, 0, DEFAULT_WIDGET_COLOR, 56)
             }
 
-            lastMainCoverUrl = ""
+            setLastCoverUrl("")
             updateWidgetInstances(appWidgetManager, appWidgetIds, views)
         }
     }
@@ -283,8 +299,10 @@ class MusicWidgetProvider : AppWidgetProvider() {
         views.setOnClickPendingIntent(R.id.widget_cover, openPlayerPendingIntent)
         views.setOnClickPendingIntent(R.id.widget_root, openPlayerPendingIntent)
         views.setOnClickPendingIntent(R.id.widget_backdrop, openPlayerPendingIntent)
+        val providerClass = widgetComponentClass()
+
         // Play/Pause intent
-        val playPauseIntent = Intent(context, MusicWidgetProvider::class.java).apply {
+        val playPauseIntent = Intent(context, providerClass).apply {
             action = ACTION_PLAY_PAUSE
         }
         val playPausePendingIntent = PendingIntent.getBroadcast(
@@ -294,7 +312,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         views.setOnClickPendingIntent(R.id.widget_play_pause, playPausePendingIntent)
 
         // Next track intent
-        val nextIntent = Intent(context, MusicWidgetProvider::class.java).apply {
+        val nextIntent = Intent(context, providerClass).apply {
             action = ACTION_NEXT
         }
         val nextPendingIntent = PendingIntent.getBroadcast(
@@ -304,7 +322,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         views.setOnClickPendingIntent(R.id.widget_next, nextPendingIntent)
 
         // Previous track intent
-        val prevIntent = Intent(context, MusicWidgetProvider::class.java).apply {
+        val prevIntent = Intent(context, providerClass).apply {
             action = ACTION_PREV
         }
         val prevPendingIntent = PendingIntent.getBroadcast(
@@ -330,7 +348,11 @@ class MusicWidgetProvider : AppWidgetProvider() {
         val maxQuickActions = when (layoutRes) {
             R.layout.widget_music -> 2
             R.layout.widget_music_small -> 0
+            R.layout.widget_music_orb -> 0
             else -> 3
+        }
+        if (layoutRes == R.layout.widget_music_orb) {
+            views.setViewVisibility(R.id.widget_quick_actions, View.GONE)
         }
         val configuredActions = getConfiguredQuickActions(context).take(maxQuickActions)
 
@@ -411,7 +433,41 @@ class MusicWidgetProvider : AppWidgetProvider() {
         }
     }
 
-    private fun applyWidgetVisualStyle(views: RemoteViews, dominantColor: Int) {
+    private fun applyWidgetVisualStyle(views: RemoteViews, dominantColor: Int, layoutRes: Int) {
+        if (layoutRes == R.layout.widget_music_orb) {
+            val hsv = FloatArray(3)
+            Color.colorToHSV(dominantColor, hsv)
+            hsv[1] = 0.15f
+            hsv[2] = 0.95f
+            val controlBgColor = Color.HSVToColor(235, hsv)
+            
+            hsv[1] = 0.60f
+            hsv[2] = 0.35f
+            val iconColor = Color.HSVToColor(255, hsv)
+
+            views.setInt(R.id.widget_backdrop_tint, "setBackgroundColor", Color.TRANSPARENT)
+            views.setTextColor(R.id.widget_title, Color.TRANSPARENT)
+            views.setTextColor(R.id.widget_artist, Color.TRANSPARENT)
+
+            views.setInt(R.id.widget_cover_ring, "setColorFilter", Color.TRANSPARENT)
+            views.setInt(R.id.widget_prev_bg, "setColorFilter", controlBgColor)
+            views.setInt(R.id.widget_next_bg, "setColorFilter", controlBgColor)
+            views.setInt(R.id.widget_play_pause_bg, "setColorFilter", controlBgColor)
+            views.setInt(R.id.widget_action_lyrics_bg, "setColorFilter", Color.TRANSPARENT)
+            views.setInt(R.id.widget_action_queue_bg, "setColorFilter", Color.TRANSPARENT)
+            views.setInt(R.id.widget_action_search_bg, "setColorFilter", Color.TRANSPARENT)
+
+            views.setInt(R.id.widget_prev, "setColorFilter", iconColor)
+            views.setInt(R.id.widget_next, "setColorFilter", iconColor)
+            views.setInt(R.id.widget_play_pause, "setColorFilter", iconColor)
+            views.setInt(R.id.widget_action_lyrics, "setColorFilter", Color.TRANSPARENT)
+            views.setInt(R.id.widget_action_queue, "setColorFilter", Color.TRANSPARENT)
+            views.setInt(R.id.widget_action_search, "setColorFilter", Color.TRANSPARENT)
+            views.setInt(R.id.widget_song_progress_track, "setColorFilter", Color.TRANSPARENT)
+            views.setInt(R.id.widget_song_progress, "setColorFilter", Color.TRANSPARENT)
+            return
+        }
+
         val accentColor = normalizeWidgetAccent(dominantColor)
         val overlayColor = withAlpha(blendColors(accentColor, Color.BLACK, 0.62f), 150)
         val titleColor = pickReadableForeground(overlayColor)
@@ -586,7 +642,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         return if (selectedActions.isEmpty()) defaultQuickActions.take(3) else selectedActions.take(3)
     }
 
-    private fun resolveLayoutRes(appWidgetManager: AppWidgetManager, appWidgetId: Int): Int {
+    protected open fun resolveLayoutRes(appWidgetManager: AppWidgetManager, appWidgetId: Int): Int {
         val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
         val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
         val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
@@ -645,7 +701,7 @@ class MusicWidgetProvider : AppWidgetProvider() {
         const val ACTION_NEXT = "com.anitail.music.widget.NEXT"
         const val ACTION_PREV = "com.anitail.music.widget.PREV"
         private const val DEFAULT_WIDGET_COLOR = 0xFF1D3342.toInt()
-        @Volatile private var lastMainCoverUrl: String = ""
+        private val lastCoverUrlByProvider = ConcurrentHashMap<String, String>()
         private val imageLoaderLock = Any()
         @Volatile private var widgetImageLoader: ImageLoader? = null
         private val defaultQuickActions = listOf(

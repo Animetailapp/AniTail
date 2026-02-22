@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:padding="0dp">
+
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <FrameLayout
+            android:id="@+id/widget_cover_container"
+            android:layout_width="144dp"
+            android:layout_height="144dp"
+            android:layout_margin="16dp"
+            android:layout_gravity="center"
+            android:background="@drawable/widget_cover_mask"
+            android:clipChildren="false"
+            android:clipToOutline="true"
+            android:clipToPadding="false">
+
+            <ImageView
+                android:id="@+id/widget_cover_ring"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                android:src="@drawable/widget_cover_bg"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:id="@+id/widget_backdrop"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:alpha="0.94"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_anitail"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:id="@+id/widget_backdrop_tint"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#15000000"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:id="@+id/widget_cover"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/widget_cover_mask"
+                android:clipToOutline="true"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_anitail"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:id="@+id/widget_cover_progress_ring"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                tools:ignore="ContentDescription" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/widget_prev_slot"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_gravity="start|top"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="8dp">
+
+            <ImageView
+                android:id="@+id/widget_prev_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                android:src="@drawable/widget_orb_control_button_bg"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:id="@+id/widget_prev"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="12dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/skip_previous"
+                tools:ignore="ContentDescription" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/widget_next_slot"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_gravity="end|top"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="8dp">
+
+            <ImageView
+                android:id="@+id/widget_next_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                android:src="@drawable/widget_orb_control_button_bg"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:id="@+id/widget_next"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="12dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/skip_next"
+                tools:ignore="ContentDescription" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/widget_play_slot"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="start|bottom"
+            android:layout_marginStart="6dp"
+            android:layout_marginBottom="8dp">
+
+            <ImageView
+                android:id="@+id/widget_play_pause_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                android:src="@drawable/widget_orb_play_button_bg"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:id="@+id/widget_play_pause"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="13dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/play"
+                tools:ignore="ContentDescription" />
+        </FrameLayout>
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/widget_info_section"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            tools:text="Song" />
+
+        <TextView
+            android:id="@+id/widget_artist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:textColor="#DDFFFFFF"
+            android:textSize="10sp"
+            tools:text="Artist" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/widget_quick_actions"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <FrameLayout
+            android:id="@+id/widget_action_slot_lyrics"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/widget_action_lyrics_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/widget_quick_action_bg"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:id="@+id/widget_action_lyrics"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/lyrics"
+                android:src="@drawable/lyrics" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/widget_action_slot_queue"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/widget_action_queue_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/widget_quick_action_bg"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:id="@+id/widget_action_queue"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/queue"
+                android:src="@drawable/queue_music" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/widget_action_slot_search"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/widget_action_search_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/widget_quick_action_bg"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:id="@+id/widget_action_search"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/search"
+                android:src="@drawable/search" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/widget_progress"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/widget_song_progress_track"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_progress_track"
+            tools:ignore="ContentDescription" />
+
+        <ImageView
+            android:id="@+id/widget_song_progress"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_progress_fill"
+            tools:ignore="ContentDescription" />
+    </FrameLayout>
+
+    <ImageView
+        android:id="@+id/widget_play_progress_ring"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:visibility="gone"
+        tools:ignore="ContentDescription" />
+
+</FrameLayout>
