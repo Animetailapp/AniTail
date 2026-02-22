@@ -201,7 +201,8 @@ internal fun LazyListScope.AccountPlaylistsBlock(
                             .data(accountImageUrl)
                             .diskCachePolicy(CachePolicy.ENABLED)
                             .diskCacheKey(accountImageUrl)
-                            .crossfade(false),
+                            .crossfade(false)
+                            .build(),
                         placeholder = painterResource(id = R.drawable.person),
                         error = painterResource(id = R.drawable.person),
                         contentDescription = null,
