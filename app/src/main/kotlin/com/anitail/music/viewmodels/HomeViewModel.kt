@@ -53,6 +53,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import timber.log.Timber
+import java.util.Collections
 import javax.inject.Inject
 
 data class DailyDiscoverItem(
@@ -600,16 +601,29 @@ class HomeViewModel @Inject constructor(
     }
 
     private val _isLoadingMore = MutableStateFlow(false)
-    private val consumedContinuations = mutableSetOf<String>()
+    private val consumedContinuations = Collections.synchronizedSet(mutableSetOf<String>())
 
     fun loadMoreYouTubeItems(continuation: String?) {
-        if (continuation.isNullOrBlank() || _isLoadingMore.value || continuation in consumedContinuations) return
+        if (continuation.isNullOrBlank()) return
+
+        synchronized(consumedContinuations) {
+            if (_isLoadingMore.value || continuation in consumedContinuations) return
+            // Reserve continuation immediately to avoid concurrent requests during fast scroll.
+            consumedContinuations += continuation
+        }
+        _isLoadingMore.value = true
+
         val hideExplicit = context.dataStore.get(HideExplicitKey, false)
 
         viewModelScope.launch(Dispatchers.IO) {
-            _isLoadingMore.value = true
             try {
-                val nextSections = YouTube.home(continuation).getOrNull() ?: return@launch
+                val nextSections = YouTube.home(continuation).getOrNull()
+                if (nextSections == null) {
+                    synchronized(consumedContinuations) {
+                        consumedContinuations.remove(continuation)
+                    }
+                    return@launch
+                }
 
                 homePage.value = nextSections.copy(
                     chips = homePage.value?.chips,
@@ -617,9 +631,14 @@ class HomeViewModel @Inject constructor(
                         section.copy(items = section.items.filterExplicit(hideExplicit))
                     }
                 )
-                consumedContinuations += continuation
                 rebuildAllYtItems()
                 rebuildSpeedDialItems()
+            } catch (e: Exception) {
+                // Allow retry if this continuation fails before being applied.
+                synchronized(consumedContinuations) {
+                    consumedContinuations.remove(continuation)
+                }
+                reportException(e)
             } finally {
                 _isLoadingMore.value = false
             }
