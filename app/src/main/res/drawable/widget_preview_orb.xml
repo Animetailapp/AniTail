@@ -1,99 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:gravity="top|start"
-        android:left="10dp"
-        android:top="10dp"
-        android:width="190dp"
-        android:height="190dp">
-        <shape android:shape="rectangle">
-            <corners android:radius="26dp" />
+        android:gravity="center"
+        android:width="204dp"
+        android:height="204dp">
+        <shape android:shape="oval">
             <solid android:color="#2B000000" />
         </shape>
     </item>
 
     <item
-        android:gravity="top|start"
-        android:left="10dp"
-        android:top="10dp"
-        android:width="190dp"
-        android:height="190dp">
-        <bitmap
-            android:gravity="fill"
-            android:src="@drawable/ic_music_placeholder" />
+        android:gravity="center"
+        android:width="196dp"
+        android:height="196dp">
+        <shape android:shape="oval">
+            <bitmap
+                android:gravity="fill"
+                android:src="@drawable/ic_music_placeholder" />
+        </shape>
     </item>
 
     <item
-        android:gravity="top|start"
-        android:left="10dp"
-        android:top="10dp"
-        android:width="190dp"
-        android:height="190dp">
-        <shape android:shape="rectangle">
-            <corners android:radius="26dp" />
+        android:gravity="center"
+        android:width="196dp"
+        android:height="196dp">
+        <shape android:shape="oval">
             <gradient
                 android:angle="270"
-                android:startColor="#12000000"
+                android:startColor="#15000000"
                 android:endColor="#00000000" />
         </shape>
     </item>
 
     <item
-        android:gravity="top|start"
-        android:left="24dp"
-        android:top="24dp"
-        android:width="56dp"
-        android:height="56dp">
+        android:gravity="end|top"
+        android:right="14dp"
+        android:top="16dp"
+        android:width="60dp"
+        android:height="60dp">
         <shape android:shape="oval">
             <solid android:color="#DDEAF3F8" />
         </shape>
     </item>
 
     <item
-        android:gravity="top|start"
-        android:left="40dp"
-        android:top="40dp"
-        android:width="24dp"
-        android:height="24dp"
-        android:drawable="@drawable/skip_previous"
-        android:tint="#365C72" />
-
-    <item
-        android:gravity="top|start"
-        android:left="130dp"
-        android:top="24dp"
-        android:width="56dp"
-        android:height="56dp">
-        <shape android:shape="oval">
-            <solid android:color="#DDEAF3F8" />
-        </shape>
-    </item>
-
-    <item
-        android:gravity="top|start"
-        android:left="146dp"
-        android:top="40dp"
+        android:gravity="end|top"
+        android:right="32dp"
+        android:top="34dp"
         android:width="24dp"
         android:height="24dp"
         android:drawable="@drawable/skip_next"
         android:tint="#365C72" />
 
     <item
-        android:gravity="top|start"
-        android:left="24dp"
-        android:top="130dp"
-        android:width="60dp"
-        android:height="60dp">
+        android:gravity="start|bottom"
+        android:left="12dp"
+        android:bottom="14dp"
+        android:width="64dp"
+        android:height="64dp">
         <shape android:shape="rectangle">
-            <corners android:radius="18dp" />
+            <corners android:radius="20dp" />
             <solid android:color="#DDEAF3F8" />
         </shape>
     </item>
 
     <item
-        android:gravity="top|start"
-        android:left="42dp"
-        android:top="148dp"
+        android:gravity="start|bottom"
+        android:left="32dp"
+        android:bottom="34dp"
         android:width="24dp"
         android:height="24dp"
         android:drawable="@drawable/pause"

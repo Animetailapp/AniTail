@@ -11,12 +11,10 @@
 
     <FrameLayout
         android:id="@+id/widget_cover_container"
-        android:layout_width="228dp"
-        android:layout_height="228dp"
-        android:layout_gravity="start|top"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="10dp"
-        android:background="@drawable/widget_orb_cover_mask"
+        android:layout_width="210dp"
+        android:layout_height="210dp"
+        android:layout_gravity="center"
+        android:background="@drawable/widget_cover_mask"
         android:clipChildren="false"
         android:clipToOutline="true"
         android:clipToPadding="false">
@@ -26,13 +24,14 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:scaleType="fitXY"
-            android:src="@android:color/transparent"
+            android:src="@drawable/widget_cover_bg"
             tools:ignore="ContentDescription" />
 
         <ImageView
             android:id="@+id/widget_backdrop"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:alpha="0.94"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_music_placeholder"
             tools:ignore="ContentDescription" />
@@ -41,14 +40,14 @@
             android:id="@+id/widget_backdrop_tint"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#00000000"
+            android:background="#15000000"
             tools:ignore="ContentDescription" />
 
         <ImageView
             android:id="@+id/widget_cover"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@drawable/widget_orb_cover_mask"
+            android:background="@drawable/widget_cover_mask"
             android:clipToOutline="true"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_music_placeholder"
@@ -60,84 +59,84 @@
             android:layout_height="match_parent"
             android:scaleType="fitXY"
             tools:ignore="ContentDescription" />
+    </FrameLayout>
 
-        <FrameLayout
-            android:id="@+id/widget_prev_slot"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:layout_gravity="start|top"
-            android:layout_marginStart="14dp"
-            android:layout_marginTop="14dp">
+    <FrameLayout
+        android:id="@+id/widget_next_slot"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_gravity="end|top"
+        android:layout_marginTop="14dp"
+        android:layout_marginEnd="12dp">
 
-            <ImageView
-                android:id="@+id/widget_prev_bg"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="fitXY"
-                android:src="@drawable/widget_orb_control_button_bg"
-                tools:ignore="ContentDescription" />
+        <ImageView
+            android:id="@+id/widget_next_bg"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_orb_control_button_bg"
+            tools:ignore="ContentDescription" />
 
-            <ImageView
-                android:id="@+id/widget_prev"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:padding="18dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/skip_previous"
-                tools:ignore="ContentDescription" />
-        </FrameLayout>
+        <ImageView
+            android:id="@+id/widget_next"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="18dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/skip_next"
+            tools:ignore="ContentDescription" />
+    </FrameLayout>
 
-        <FrameLayout
-            android:id="@+id/widget_next_slot"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:layout_gravity="end|top"
-            android:layout_marginTop="14dp"
-            android:layout_marginEnd="14dp">
+    <FrameLayout
+        android:id="@+id/widget_play_slot"
+        android:layout_width="68dp"
+        android:layout_height="68dp"
+        android:layout_gravity="start|bottom"
+        android:layout_marginStart="10dp"
+        android:layout_marginBottom="14dp">
 
-            <ImageView
-                android:id="@+id/widget_next_bg"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="fitXY"
-                android:src="@drawable/widget_orb_control_button_bg"
-                tools:ignore="ContentDescription" />
+        <ImageView
+            android:id="@+id/widget_play_pause_bg"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_orb_play_button_bg"
+            tools:ignore="ContentDescription" />
 
-            <ImageView
-                android:id="@+id/widget_next"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:padding="18dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/skip_next"
-                tools:ignore="ContentDescription" />
-        </FrameLayout>
+        <ImageView
+            android:id="@+id/widget_play_pause"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="19dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/play"
+            tools:ignore="ContentDescription" />
+    </FrameLayout>
 
-        <FrameLayout
-            android:id="@+id/widget_play_slot"
-            android:layout_width="68dp"
-            android:layout_height="68dp"
-            android:layout_gravity="start|bottom"
-            android:layout_marginStart="14dp"
-            android:layout_marginBottom="14dp">
+    <FrameLayout
+        android:id="@+id/widget_prev_slot"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_gravity="start|top"
+        android:layout_marginTop="14dp"
+        android:layout_marginStart="12dp">
 
-            <ImageView
-                android:id="@+id/widget_play_pause_bg"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="fitXY"
-                android:src="@drawable/widget_orb_play_button_bg"
-                tools:ignore="ContentDescription" />
+        <ImageView
+            android:id="@+id/widget_prev_bg"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_orb_control_button_bg"
+            tools:ignore="ContentDescription" />
 
-            <ImageView
-                android:id="@+id/widget_play_pause"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:padding="19dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/play"
-                tools:ignore="ContentDescription" />
-        </FrameLayout>
+        <ImageView
+            android:id="@+id/widget_prev"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="18dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/skip_previous"
+            tools:ignore="ContentDescription" />
     </FrameLayout>
 
     <LinearLayout
