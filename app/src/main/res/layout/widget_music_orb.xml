@@ -86,6 +86,32 @@
     </FrameLayout>
 
     <FrameLayout
+        android:id="@+id/widget_prev_slot"
+        android:layout_width="66dp"
+        android:layout_height="66dp"
+        android:layout_gravity="start|top"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="16dp">
+
+        <ImageView
+            android:id="@+id/widget_prev_bg"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/widget_play_button_bg"
+            tools:ignore="ContentDescription" />
+
+        <ImageView
+            android:id="@+id/widget_prev"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="17dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/skip_previous"
+            tools:ignore="ContentDescription" />
+    </FrameLayout>
+
+    <FrameLayout
         android:id="@+id/widget_play_slot"
         android:layout_width="66dp"
         android:layout_height="66dp"
@@ -108,28 +134,6 @@
             android:padding="17dp"
             android:scaleType="fitCenter"
             android:src="@drawable/play"
-            tools:ignore="ContentDescription" />
-    </FrameLayout>
-
-    <FrameLayout
-        android:id="@+id/widget_prev_slot"
-        android:layout_width="1dp"
-        android:layout_height="1dp"
-        android:visibility="gone">
-
-        <ImageView
-            android:id="@+id/widget_prev_bg"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="fitXY"
-            android:src="@drawable/widget_control_button_bg"
-            tools:ignore="ContentDescription" />
-
-        <ImageView
-            android:id="@+id/widget_prev"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:src="@drawable/skip_previous"
             tools:ignore="ContentDescription" />
     </FrameLayout>
 
