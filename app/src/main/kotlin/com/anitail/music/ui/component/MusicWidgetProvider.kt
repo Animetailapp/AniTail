@@ -232,7 +232,7 @@ open class MusicWidgetProvider : AppWidgetProvider() {
                     try {
                         val request = ImageRequest.Builder(context)
                             .data(coverUrl)
-                            .size(135, 135)
+                            .size(512, 512)
                             .allowHardware(false)
                             .crossfade(true)
                             .build()
@@ -435,29 +435,34 @@ open class MusicWidgetProvider : AppWidgetProvider() {
 
     private fun applyWidgetVisualStyle(views: RemoteViews, dominantColor: Int, layoutRes: Int) {
         if (layoutRes == R.layout.widget_music_orb) {
-            val overlayColor = Color.TRANSPARENT
-            val controlBgColor = 0xDDEAF3F8.toInt()
-            val playBgColor = 0xDDEAF3F8.toInt()
-            val iconColor = 0xFF365C72.toInt()
+            val hsv = FloatArray(3)
+            Color.colorToHSV(dominantColor, hsv)
+            hsv[1] = 0.15f
+            hsv[2] = 0.95f
+            val controlBgColor = Color.HSVToColor(235, hsv)
+            
+            hsv[1] = 0.60f
+            hsv[2] = 0.35f
+            val iconColor = Color.HSVToColor(255, hsv)
 
-            views.setInt(R.id.widget_backdrop_tint, "setBackgroundColor", overlayColor)
+            views.setInt(R.id.widget_backdrop_tint, "setBackgroundColor", Color.TRANSPARENT)
             views.setTextColor(R.id.widget_title, Color.TRANSPARENT)
             views.setTextColor(R.id.widget_artist, Color.TRANSPARENT)
 
             views.setInt(R.id.widget_cover_ring, "setColorFilter", Color.TRANSPARENT)
             views.setInt(R.id.widget_prev_bg, "setColorFilter", controlBgColor)
             views.setInt(R.id.widget_next_bg, "setColorFilter", controlBgColor)
-            views.setInt(R.id.widget_play_pause_bg, "setColorFilter", playBgColor)
+            views.setInt(R.id.widget_play_pause_bg, "setColorFilter", controlBgColor)
             views.setInt(R.id.widget_action_lyrics_bg, "setColorFilter", Color.TRANSPARENT)
             views.setInt(R.id.widget_action_queue_bg, "setColorFilter", Color.TRANSPARENT)
             views.setInt(R.id.widget_action_search_bg, "setColorFilter", Color.TRANSPARENT)
 
             views.setInt(R.id.widget_prev, "setColorFilter", iconColor)
             views.setInt(R.id.widget_next, "setColorFilter", iconColor)
-            views.setInt(R.id.widget_action_lyrics, "setColorFilter", iconColor)
-            views.setInt(R.id.widget_action_queue, "setColorFilter", iconColor)
-            views.setInt(R.id.widget_action_search, "setColorFilter", iconColor)
             views.setInt(R.id.widget_play_pause, "setColorFilter", iconColor)
+            views.setInt(R.id.widget_action_lyrics, "setColorFilter", Color.TRANSPARENT)
+            views.setInt(R.id.widget_action_queue, "setColorFilter", Color.TRANSPARENT)
+            views.setInt(R.id.widget_action_search, "setColorFilter", Color.TRANSPARENT)
             views.setInt(R.id.widget_song_progress_track, "setColorFilter", Color.TRANSPARENT)
             views.setInt(R.id.widget_song_progress, "setColorFilter", Color.TRANSPARENT)
             return

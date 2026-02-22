@@ -10,133 +10,142 @@
     android:padding="0dp">
 
     <FrameLayout
-        android:id="@+id/widget_cover_container"
-        android:layout_width="144dp"
-        android:layout_height="144dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:background="@drawable/widget_cover_mask"
         android:clipChildren="false"
-        android:clipToOutline="true"
         android:clipToPadding="false">
 
-        <ImageView
-            android:id="@+id/widget_cover_ring"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="fitXY"
-            android:src="@drawable/widget_cover_bg"
-            tools:ignore="ContentDescription" />
-
-        <ImageView
-            android:id="@+id/widget_backdrop"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:alpha="0.94"
-            android:scaleType="centerCrop"
-            android:src="@drawable/ic_music_placeholder"
-            tools:ignore="ContentDescription" />
-
-        <ImageView
-            android:id="@+id/widget_backdrop_tint"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#15000000"
-            tools:ignore="ContentDescription" />
-
-        <ImageView
-            android:id="@+id/widget_cover"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+        <FrameLayout
+            android:id="@+id/widget_cover_container"
+            android:layout_width="144dp"
+            android:layout_height="144dp"
+            android:layout_margin="16dp"
+            android:layout_gravity="center"
             android:background="@drawable/widget_cover_mask"
+            android:clipChildren="false"
             android:clipToOutline="true"
-            android:scaleType="centerCrop"
-            android:src="@drawable/ic_music_placeholder"
-            tools:ignore="ContentDescription" />
+            android:clipToPadding="false">
 
-        <ImageView
-            android:id="@+id/widget_cover_progress_ring"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="fitXY"
-            tools:ignore="ContentDescription" />
-    </FrameLayout>
+            <ImageView
+                android:id="@+id/widget_cover_ring"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                android:src="@drawable/widget_cover_bg"
+                tools:ignore="ContentDescription" />
 
-    <FrameLayout
-        android:id="@+id/widget_next_slot"
-        android:layout_width="46dp"
-        android:layout_height="46dp"
-        android:layout_gravity="end|top"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="8dp">
+            <ImageView
+                android:id="@+id/widget_backdrop"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:alpha="0.94"
+                android:scaleType="centerCrop"
+                android:src="@mipmap/ic_launcher"
+                tools:ignore="ContentDescription" />
 
-        <ImageView
-            android:id="@+id/widget_next_bg"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="fitXY"
-            android:src="@drawable/widget_orb_control_button_bg"
-            tools:ignore="ContentDescription" />
+            <ImageView
+                android:id="@+id/widget_backdrop_tint"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#15000000"
+                tools:ignore="ContentDescription" />
 
-        <ImageView
-            android:id="@+id/widget_next"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:padding="12dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/skip_next"
-            tools:ignore="ContentDescription" />
-    </FrameLayout>
+            <ImageView
+                android:id="@+id/widget_cover"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/widget_cover_mask"
+                android:clipToOutline="true"
+                android:scaleType="centerCrop"
+                android:src="@mipmap/ic_launcher"
+                tools:ignore="ContentDescription" />
 
-    <FrameLayout
-        android:id="@+id/widget_play_slot"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_gravity="start|bottom"
-        android:layout_marginStart="6dp"
-        android:layout_marginBottom="8dp">
+            <ImageView
+                android:id="@+id/widget_cover_progress_ring"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                tools:ignore="ContentDescription" />
+        </FrameLayout>
 
-        <ImageView
-            android:id="@+id/widget_play_pause_bg"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="fitXY"
-            android:src="@drawable/widget_orb_play_button_bg"
-            tools:ignore="ContentDescription" />
+        <FrameLayout
+            android:id="@+id/widget_prev_slot"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_gravity="start|top"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="8dp">
 
-        <ImageView
-            android:id="@+id/widget_play_pause"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:padding="13dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/play"
-            tools:ignore="ContentDescription" />
-    </FrameLayout>
+            <ImageView
+                android:id="@+id/widget_prev_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                android:src="@drawable/widget_orb_control_button_bg"
+                tools:ignore="ContentDescription" />
 
-    <FrameLayout
-        android:id="@+id/widget_prev_slot"
-        android:layout_width="46dp"
-        android:layout_height="46dp"
-        android:layout_gravity="start|top"
-        android:layout_marginTop="8dp"
-        android:layout_marginStart="8dp">
+            <ImageView
+                android:id="@+id/widget_prev"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="12dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/skip_previous"
+                tools:ignore="ContentDescription" />
+        </FrameLayout>
 
-        <ImageView
-            android:id="@+id/widget_prev_bg"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="fitXY"
-            android:src="@drawable/widget_orb_control_button_bg"
-            tools:ignore="ContentDescription" />
+        <FrameLayout
+            android:id="@+id/widget_next_slot"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_gravity="end|top"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="8dp">
 
-        <ImageView
-            android:id="@+id/widget_prev"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:padding="12dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/skip_previous"
-            tools:ignore="ContentDescription" />
+            <ImageView
+                android:id="@+id/widget_next_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                android:src="@drawable/widget_orb_control_button_bg"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:id="@+id/widget_next"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="12dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/skip_next"
+                tools:ignore="ContentDescription" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/widget_play_slot"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="start|bottom"
+            android:layout_marginStart="6dp"
+            android:layout_marginBottom="8dp">
+
+            <ImageView
+                android:id="@+id/widget_play_pause_bg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitXY"
+                android:src="@drawable/widget_orb_play_button_bg"
+                tools:ignore="ContentDescription" />
+
+            <ImageView
+                android:id="@+id/widget_play_pause"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="13dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/play"
+                tools:ignore="ContentDescription" />
+        </FrameLayout>
     </FrameLayout>
 
     <LinearLayout
