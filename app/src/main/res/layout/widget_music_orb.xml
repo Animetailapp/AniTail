@@ -11,8 +11,8 @@
 
     <FrameLayout
         android:id="@+id/widget_cover_container"
-        android:layout_width="210dp"
-        android:layout_height="210dp"
+        android:layout_width="144dp"
+        android:layout_height="144dp"
         android:layout_gravity="center"
         android:background="@drawable/widget_cover_mask"
         android:clipChildren="false"
@@ -63,11 +63,11 @@
 
     <FrameLayout
         android:id="@+id/widget_next_slot"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
+        android:layout_width="46dp"
+        android:layout_height="46dp"
         android:layout_gravity="end|top"
-        android:layout_marginTop="14dp"
-        android:layout_marginEnd="12dp">
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp">
 
         <ImageView
             android:id="@+id/widget_next_bg"
@@ -81,7 +81,7 @@
             android:id="@+id/widget_next"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="18dp"
+            android:padding="12dp"
             android:scaleType="fitCenter"
             android:src="@drawable/skip_next"
             tools:ignore="ContentDescription" />
@@ -89,11 +89,11 @@
 
     <FrameLayout
         android:id="@+id/widget_play_slot"
-        android:layout_width="68dp"
-        android:layout_height="68dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
         android:layout_gravity="start|bottom"
-        android:layout_marginStart="10dp"
-        android:layout_marginBottom="14dp">
+        android:layout_marginStart="6dp"
+        android:layout_marginBottom="8dp">
 
         <ImageView
             android:id="@+id/widget_play_pause_bg"
@@ -107,7 +107,7 @@
             android:id="@+id/widget_play_pause"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="19dp"
+            android:padding="13dp"
             android:scaleType="fitCenter"
             android:src="@drawable/play"
             tools:ignore="ContentDescription" />
@@ -115,11 +115,11 @@
 
     <FrameLayout
         android:id="@+id/widget_prev_slot"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
+        android:layout_width="46dp"
+        android:layout_height="46dp"
         android:layout_gravity="start|top"
-        android:layout_marginTop="14dp"
-        android:layout_marginStart="12dp">
+        android:layout_marginTop="8dp"
+        android:layout_marginStart="8dp">
 
         <ImageView
             android:id="@+id/widget_prev_bg"
@@ -133,7 +133,7 @@
             android:id="@+id/widget_prev"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:padding="18dp"
+            android:padding="12dp"
             android:scaleType="fitCenter"
             android:src="@drawable/skip_previous"
             tools:ignore="ContentDescription" />
