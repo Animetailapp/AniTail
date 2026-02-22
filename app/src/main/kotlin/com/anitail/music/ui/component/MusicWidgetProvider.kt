@@ -200,7 +200,7 @@ open class MusicWidgetProvider : AppWidgetProvider() {
                 themeColor
             }
 
-            applyWidgetVisualStyle(views, dominantColor)
+            applyWidgetVisualStyle(views, dominantColor, layoutRes)
             views.setTextViewText(R.id.widget_title, song)
             views.setTextViewText(R.id.widget_artist, artist.ifBlank { context.getString(R.string.unknown_artist) })
             views.setImageViewResource(R.id.widget_play_pause, if (isPlaying) R.drawable.pause else R.drawable.play)
@@ -253,7 +253,7 @@ open class MusicWidgetProvider : AppWidgetProvider() {
                 }
             }
         } else {
-            applyWidgetVisualStyle(views, DEFAULT_WIDGET_COLOR)
+            applyWidgetVisualStyle(views, DEFAULT_WIDGET_COLOR, layoutRes)
             views.setTextViewText(R.id.widget_title, context.getString(R.string.app_name))
             views.setTextViewText(R.id.widget_artist, context.getString(R.string.song_notplaying))
             views.setImageViewResource(R.id.widget_play_pause, R.drawable.play)
@@ -348,7 +348,11 @@ open class MusicWidgetProvider : AppWidgetProvider() {
         val maxQuickActions = when (layoutRes) {
             R.layout.widget_music -> 2
             R.layout.widget_music_small -> 0
+            R.layout.widget_music_orb -> 0
             else -> 3
+        }
+        if (layoutRes == R.layout.widget_music_orb) {
+            views.setViewVisibility(R.id.widget_quick_actions, View.GONE)
         }
         val configuredActions = getConfiguredQuickActions(context).take(maxQuickActions)
 
@@ -429,7 +433,36 @@ open class MusicWidgetProvider : AppWidgetProvider() {
         }
     }
 
-    private fun applyWidgetVisualStyle(views: RemoteViews, dominantColor: Int) {
+    private fun applyWidgetVisualStyle(views: RemoteViews, dominantColor: Int, layoutRes: Int) {
+        if (layoutRes == R.layout.widget_music_orb) {
+            val overlayColor = withAlpha(Color.BLACK, 32)
+            val controlBgColor = 0xD4D7EAF3.toInt()
+            val playBgColor = 0xD4D7EAF3.toInt()
+            val iconColor = 0xFF2B5164.toInt()
+
+            views.setInt(R.id.widget_backdrop_tint, "setBackgroundColor", overlayColor)
+            views.setTextColor(R.id.widget_title, Color.TRANSPARENT)
+            views.setTextColor(R.id.widget_artist, Color.TRANSPARENT)
+
+            views.setInt(R.id.widget_cover_ring, "setColorFilter", Color.TRANSPARENT)
+            views.setInt(R.id.widget_prev_bg, "setColorFilter", controlBgColor)
+            views.setInt(R.id.widget_next_bg, "setColorFilter", controlBgColor)
+            views.setInt(R.id.widget_play_pause_bg, "setColorFilter", playBgColor)
+            views.setInt(R.id.widget_action_lyrics_bg, "setColorFilter", Color.TRANSPARENT)
+            views.setInt(R.id.widget_action_queue_bg, "setColorFilter", Color.TRANSPARENT)
+            views.setInt(R.id.widget_action_search_bg, "setColorFilter", Color.TRANSPARENT)
+
+            views.setInt(R.id.widget_prev, "setColorFilter", iconColor)
+            views.setInt(R.id.widget_next, "setColorFilter", iconColor)
+            views.setInt(R.id.widget_action_lyrics, "setColorFilter", iconColor)
+            views.setInt(R.id.widget_action_queue, "setColorFilter", iconColor)
+            views.setInt(R.id.widget_action_search, "setColorFilter", iconColor)
+            views.setInt(R.id.widget_play_pause, "setColorFilter", iconColor)
+            views.setInt(R.id.widget_song_progress_track, "setColorFilter", Color.TRANSPARENT)
+            views.setInt(R.id.widget_song_progress, "setColorFilter", Color.TRANSPARENT)
+            return
+        }
+
         val accentColor = normalizeWidgetAccent(dominantColor)
         val overlayColor = withAlpha(blendColors(accentColor, Color.BLACK, 0.62f), 150)
         val titleColor = pickReadableForeground(overlayColor)
