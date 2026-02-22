@@ -9,4 +9,4 @@
     android:previewLayout="@layout/widget_music"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen|keyguard"
-    android:previewImage="@drawable/widget_preview" />
+    android:previewImage="@drawable/ic_anitail" />
