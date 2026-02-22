@@ -31,6 +31,7 @@ import java.time.Duration
 import java.time.LocalDateTime
 import java.time.YearMonth
 import java.time.ZoneOffset
+import java.util.Locale
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -188,16 +189,22 @@ constructor(
             toTimeStamp = toTimestamp,
         ).first()
         if (queriedArtists.isNotEmpty()) {
-            return queriedArtists.map { artist ->
-                ArtistStat(
-                    id = artist.id,
-                    name = artist.artist.name,
-                    thumbnailUrl = artist.artist.thumbnailUrl ?: fallbackThumbnails[artist.id],
-                    playTimeMs = artist.timeListened?.toLong() ?: 0L,
-                )
-            }
+            return mergeArtistStatsByName(
+                stats = queriedArtists.map { artist ->
+                    ArtistStat(
+                        id = artist.id,
+                        name = artist.artist.name,
+                        thumbnailUrl = artist.artist.thumbnailUrl ?: fallbackThumbnails[artist.id],
+                        playTimeMs = artist.timeListened?.toLong() ?: 0L,
+                    )
+                },
+                limit = limit,
+            )
         }
-        return buildTopArtistsFallback(monthEvents, limit, fallbackThumbnails)
+        return mergeArtistStatsByName(
+            stats = buildTopArtistsFallback(monthEvents, fallbackThumbnails),
+            limit = limit,
+        )
     }
 
     private fun buildTopSongsFallback(monthEvents: List<EventWithSong>, limit: Int): List<TopSongUi> {
@@ -221,7 +228,6 @@ constructor(
 
     private fun buildTopArtistsFallback(
         monthEvents: List<EventWithSong>,
-        limit: Int,
         fallbackThumbnails: Map<String, String?>,
     ): List<ArtistStat> {
         if (monthEvents.isEmpty()) return emptyList()
@@ -266,7 +272,6 @@ constructor(
         return artistStats
             .values
             .sortedByDescending { it.playTimeMs }
-            .take(limit)
     }
 
     private fun artistThumbnailFallback(monthEvents: List<EventWithSong>): Map<String, String?> {
@@ -283,6 +288,42 @@ constructor(
         }
         return bestByArtist.mapValues { (_, value) -> value.second }
     }
+
+    private fun mergeArtistStatsByName(stats: List<ArtistStat>, limit: Int): List<ArtistStat> {
+        if (stats.isEmpty()) return emptyList()
+
+        val mergedByName = linkedMapOf<String, ArtistStat>()
+        stats.forEach { stat ->
+            val normalizedName = stat.name.trim().lowercase(Locale.ROOT)
+            if (normalizedName.isBlank()) return@forEach
+
+            val current = mergedByName[normalizedName]
+            if (current == null) {
+                mergedByName[normalizedName] = stat
+                return@forEach
+            }
+
+            val preferred =
+                when {
+                    current.id.isGeneratedArtistId() && !stat.id.isGeneratedArtistId() -> stat
+                    !current.id.isGeneratedArtistId() && stat.id.isGeneratedArtistId() -> current
+                    stat.playTimeMs > current.playTimeMs -> stat
+                    else -> current
+                }
+            mergedByName[normalizedName] =
+                preferred.copy(
+                    thumbnailUrl = preferred.thumbnailUrl ?: current.thumbnailUrl ?: stat.thumbnailUrl,
+                    playTimeMs = current.playTimeMs + stat.playTimeMs,
+                )
+        }
+
+        return mergedByName
+            .values
+            .sortedByDescending { it.playTimeMs }
+            .take(limit)
+    }
+
+    private fun String.isGeneratedArtistId(): Boolean = startsWith("LA") || startsWith("local:")
 
     private suspend fun refreshArtistThumbnailIfNeeded(artistId: String) {
         if (!artistRefreshInProgress.add(artistId)) return
