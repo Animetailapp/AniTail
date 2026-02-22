@@ -222,8 +222,8 @@ open class MusicWidgetProvider : AppWidgetProvider() {
             val previousCoverUrl = getLastCoverUrl()
             if (coverUrl.isBlank()) {
                 if (previousCoverUrl.isNotBlank()) {
-                    views.setImageViewResource(R.id.widget_cover, R.drawable.ic_music_placeholder)
-                    views.setImageViewResource(R.id.widget_backdrop, R.drawable.ic_music_placeholder)
+                    views.setImageViewResource(R.id.widget_cover, R.drawable.ic_anitail)
+                    views.setImageViewResource(R.id.widget_backdrop, R.drawable.ic_anitail)
                     updateWidgetInstances(appWidgetManager, appWidgetIds, views)
                 }
                 setLastCoverUrl("")
@@ -257,8 +257,8 @@ open class MusicWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_title, context.getString(R.string.app_name))
             views.setTextViewText(R.id.widget_artist, context.getString(R.string.song_notplaying))
             views.setImageViewResource(R.id.widget_play_pause, R.drawable.play)
-            views.setImageViewResource(R.id.widget_cover, R.drawable.ic_music_placeholder)
-            views.setImageViewResource(R.id.widget_backdrop, R.drawable.ic_music_placeholder)
+            views.setImageViewResource(R.id.widget_cover, R.drawable.ic_anitail)
+            views.setImageViewResource(R.id.widget_backdrop, R.drawable.ic_anitail)
             setWidgetProgress(views, 0)
             views.setViewVisibility(
                 R.id.widget_progress,
