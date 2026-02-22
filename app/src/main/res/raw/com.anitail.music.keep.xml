@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@mipmap/ic_launcher,@mipmap/ic_launcher_round,@mipmap/ic_launcher_no_monochrome,@mipmap/ic_launcher_round_no_monochrome,@mipmap/ic_launcher_background,@mipmap/ic_launcher_foreground,@mipmap/ic_launcher_monochrome,@drawable/launcher_background_v31" />
