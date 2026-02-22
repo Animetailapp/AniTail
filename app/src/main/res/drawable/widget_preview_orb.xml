@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:gravity="center"
+        android:width="150dp"
+        android:height="150dp">
+        <shape android:shape="oval">
+            <solid android:color="#2B000000" />
+        </shape>
+    </item>
+
+    <item
+        android:gravity="center"
+        android:width="144dp"
+        android:height="144dp">
+        <shape android:shape="oval">
+            <solid android:color="#2B000000" />
+        </shape>
+    </item>
+
+    <item
+        android:gravity="center"
+        android:width="144dp"
+        android:height="144dp"
+        android:drawable="@drawable/ic_anitail" />
+
+    <item
+        android:gravity="start|top"
+        android:left="11dp"
+        android:top="11dp"
+        android:width="40dp"
+        android:height="40dp">
+        <shape android:shape="oval">
+            <solid android:color="#2B384E" />
+        </shape>
+    </item>
+
+    <item
+        android:gravity="start|top"
+        android:left="20dp"
+        android:top="20dp"
+        android:width="22dp"
+        android:height="22dp"
+        android:drawable="@drawable/skip_previous" />
+
+    <item
+        android:gravity="end|top"
+        android:right="11dp"
+        android:top="11dp"
+        android:width="40dp"
+        android:height="40dp">
+        <shape android:shape="oval">
+            <solid android:color="#2B384E" />
+        </shape>
+    </item>
+
+    <item
+        android:gravity="end|top"
+        android:right="20dp"
+        android:top="20dp"
+        android:width="22dp"
+        android:height="22dp"
+        android:drawable="@drawable/skip_next" />
+
+    <item
+        android:gravity="start|bottom"
+        android:left="9dp"
+        android:bottom="11dp"
+        android:width="42dp"
+        android:height="42dp">
+        <shape android:shape="oval">
+            <solid android:color="#2B384E" />
+        </shape>
+    </item>
+
+    <item
+        android:gravity="start|bottom"
+        android:left="19dp"
+        android:bottom="20dp"
+        android:width="22dp"
+        android:height="22dp"
+        android:drawable="@drawable/play" />
+</layer-list>
