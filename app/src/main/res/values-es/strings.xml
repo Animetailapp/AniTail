@@ -448,6 +448,9 @@
     <string name="reset_app_keep_downloads">Restablecer app (mantener descargas)</string>
     <string name="reset_app_keep_downloads_description">Restablece datos locales y ajustes sin borrar canciones descargadas.</string>
     <string name="reset_app_keep_downloads_confirm">Se restablecerán todos los datos locales de la app. Las canciones descargadas se conservarán.</string>
+    <string name="reset_visitor_data">Restablecer visitor data</string>
+    <string name="reset_visitor_data_description">Genera una nueva identidad de visitante. La app se reiniciará para aplicar el cambio.</string>
+    <string name="reset_visitor_data_confirm">Se restablecerá el visitor data y la app se reiniciará. ¿Deseas continuar?</string>
     <string name="disable_screenshot">Desactivar capturas de pantalla</string>
     <string name="disable_screenshot_desc">Cuando esta opción está activada, las capturas de pantalla y la vista de la aplicación en Recientes están desactivadas.</string>
     <string name="disable_screenshot_not_supported_desktop">No compatible en desktop.</string>

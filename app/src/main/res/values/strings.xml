@@ -503,6 +503,9 @@
     <string name="reset_app_keep_downloads">Reset app (keep downloads)</string>
     <string name="reset_app_keep_downloads_description">Reset local app data and settings without deleting downloaded songs.</string>
     <string name="reset_app_keep_downloads_confirm">All local app data will be reset. Downloaded songs will be preserved.</string>
+    <string name="reset_visitor_data">Reset visitor data</string>
+    <string name="reset_visitor_data_description">Generate a new visitor identity. The app will restart to apply the change.</string>
+    <string name="reset_visitor_data_confirm">Visitor data will be reset and the app will restart. Continue?</string>
     <string name="disable_screenshot">Disable screenshot</string>
     <string name="disable_screenshot_desc">When this option is on, screenshots and the app\'s view in Recents are disabled.</string>
     <string name="disable_screenshot_not_supported_desktop">Not supported on desktop.</string>
