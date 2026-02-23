@@ -147,6 +147,7 @@ import com.anitail.music.lyrics.LyricsUtils.isKyrgyz
 import com.anitail.music.lyrics.LyricsUtils.isRussian
 import com.anitail.music.lyrics.LyricsUtils.isSerbian
 import com.anitail.music.lyrics.LyricsUtils.isUkrainian
+import com.anitail.music.lyrics.LyricsUtils.decodeHtmlEntities
 import com.anitail.music.lyrics.LyricsUtils.parseLyrics
 import com.anitail.music.lyrics.LyricsUtils.romanizeCyrillic
 import com.anitail.music.lyrics.LyricsUtils.romanizeJapanese
@@ -213,7 +214,7 @@ fun Lyrics(
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
     val lyricsEntity by playerConnection.currentLyrics.collectAsState(initial = null)
     val currentSong by playerConnection.currentSong.collectAsState(initial = null)
-    val lyrics = remember(lyricsEntity) { lyricsEntity?.lyrics?.trim() }
+    val lyrics = remember(lyricsEntity) { lyricsEntity?.lyrics?.trim()?.let(::decodeHtmlEntities) }
     val parsedLines = remember(lyrics) {
         if (lyrics.isNullOrEmpty() || !lyrics.startsWith("[")) {
             null
