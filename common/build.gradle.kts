@@ -1,13 +1,13 @@
 plugins {
     kotlin("multiplatform")
-    id("com.android.library")
+    id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
 kotlin {
     applyDefaultHierarchyTemplate()
-    androidTarget()
+    androidLibrary()
     jvm("desktop")
 
     sourceSets {
@@ -27,7 +27,6 @@ kotlin {
                 implementation(projects.innertube)
             }
         }
-        val androidUnitTest by getting
         val desktopMain by getting {
             dependencies {
                 implementation(projects.innertube)
@@ -40,10 +39,5 @@ kotlin {
 android {
     namespace = "com.anitail.shared"
     compileSdk = 36
-    defaultConfig {
-        minSdk = 23
-    }
-    buildFeatures {
-        compose = true
-    }
+    minSdk = 23
 }
