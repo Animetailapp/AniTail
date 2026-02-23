@@ -150,7 +150,7 @@ fun CastDevicePickerDialog(onDismiss: () -> Unit) {
                                             mediaRouter.routes.firstOrNull { r -> r.id == route.id }
                                                 ?: return@tvClickable
                                         if (route.isSelected) {
-                                            castContext?.sessionManager?.endCurrentSession(true)
+                                            castContext.sessionManager.endCurrentSession(true)
                                         } else {
                                             connectingRouteId = route.id
                                             found.select()

@@ -622,6 +622,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                             volumeJob?.cancel()
                             volumeJob = activity?.lifecycleScope?.launch {
                                 delay(300)
+                                @Suppress("DEPRECATION")
                                 controller?.setDeviceVolume(v.toInt())
                             }
                         },
@@ -1100,6 +1101,7 @@ private fun CastExpandedContent(controllerProvider: () -> MediaController?, onCl
                                     val currentMediaId = c?.currentMediaItem?.mediaId
                                     val isCurrent =
                                         currentMediaId != null && mediaId == currentMediaId
+                                    @Suppress("DEPRECATION")
                                     val dismissState = rememberSwipeToDismissBoxState(
                                         confirmValueChange = { value ->
                                             if (value == SwipeToDismissBoxValue.EndToStart || value == SwipeToDismissBoxValue.StartToEnd) {

@@ -113,7 +113,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.util.Consumer
 import androidx.core.view.WindowCompat
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -387,7 +387,7 @@ class MainActivity : AppCompatActivity() {
                     while (isActive) {
                         playerConnection?.service?.lanJamServer?.clientList?.let { clients ->
                             jamViewModel.updateActiveConnections(
-                                clients.map { client -> client.ip to client.connectedAt.toLong() }
+                                clients.map { client -> client.ip to client.connectedAt }
                             )
                         }
                         // Incrementar delay para reducir carga del CPU

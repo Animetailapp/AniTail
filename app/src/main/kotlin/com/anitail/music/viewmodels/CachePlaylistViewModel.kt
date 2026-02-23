@@ -32,8 +32,8 @@ class CachePlaylistViewModel @Inject constructor(
     init {
         viewModelScope.launch(Dispatchers.IO) {
             while (isActive) {
-                val cachedIds = playerCache.keys.mapNotNull { it?.toString() }.toSet()
-                val downloadedIds = downloadCache.keys.mapNotNull { it?.toString() }.toSet()
+                val cachedIds = playerCache.keys.toSet()
+                val downloadedIds = downloadCache.keys.toSet()
                 val managedDownloadIds = downloadUtil.downloads.value
                     .filterValues { download ->
                         download.state == Download.STATE_COMPLETED

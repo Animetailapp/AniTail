@@ -383,7 +383,6 @@ fun BottomSheetPlayer(
             PlayerBackgroundStyle.DEFAULT -> MaterialTheme.colorScheme.onBackground
             PlayerBackgroundStyle.BLUR -> Color.White
             PlayerBackgroundStyle.GRADIENT -> Color.White
-            else -> MaterialTheme.colorScheme.onBackground
         }
 
     val icBackgroundColor =
@@ -391,7 +390,6 @@ fun BottomSheetPlayer(
             PlayerBackgroundStyle.DEFAULT -> MaterialTheme.colorScheme.surface
             PlayerBackgroundStyle.BLUR -> Color.Black
             PlayerBackgroundStyle.GRADIENT -> Color.Black
-            else -> MaterialTheme.colorScheme.surface
         }
 
     val (textButtonColor, iconButtonColor) = when (playerButtonsStyle) {

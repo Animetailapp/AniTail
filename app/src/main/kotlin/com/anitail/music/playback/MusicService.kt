@@ -1470,7 +1470,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             staticCache.coverUrl == coverUrl
 
     if (canReuseStaticCache) {
-      val cachedStatic = staticCache ?: return
+      val cachedStatic = staticCache
       scope.launch(Dispatchers.IO) {
         sendWidgetBroadcast(
             songTitle,

@@ -1,7 +1,7 @@
 package com.anitail.music.ui.screens
 
 import androidx.compose.runtime.Composable
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.anitail.music.viewmodels.SoundCapsuleViewModel
 

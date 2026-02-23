@@ -92,7 +92,7 @@ import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEachIndexed
 import androidx.compose.ui.util.fastSumBy
 import androidx.compose.ui.zIndex
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.offline.Download
 import androidx.navigation.NavController
@@ -559,9 +559,10 @@ fun LocalPlaylistScreen(
                                 coroutineScope.launch {
                                     playlist?.playlist?.browseId?.let { it1 ->
                                         var setVideoId = getSetVideoId(currentItem.map.songId)
-                                        if (setVideoId?.setVideoId != null) {
+                                        val remoteSetVideoId = setVideoId?.setVideoId
+                                        if (remoteSetVideoId != null) {
                                             YouTube.removeFromPlaylist(
-                                                it1, currentItem.map.songId, setVideoId.setVideoId!!
+                                                it1, currentItem.map.songId, remoteSetVideoId
                                             )
                                         }
                                     }
@@ -596,6 +597,7 @@ fun LocalPlaylistScreen(
                             }
                         }
 
+                        @Suppress("DEPRECATION")
                         val dismissBoxState =
                             rememberSwipeToDismissBoxState(
                                 positionalThreshold = { totalDistance ->
@@ -734,6 +736,7 @@ fun LocalPlaylistScreen(
                             }
                         }
 
+                        @Suppress("DEPRECATION")
                         val dismissBoxState =
                             rememberSwipeToDismissBoxState(
                                 positionalThreshold = { totalDistance ->
