@@ -330,7 +330,7 @@ class ImportFromSpotifyViewModel @Inject constructor(
         val playlists = mutableListOf<Playlist>()
 
         while (url != null) {
-            val currentUrl = url ?: break
+            val currentUrl: String = url
             httpClient.get(currentUrl) {
                 bearerAuth(authToken)
             }.body<SpotifyPlaylistPaginatedResponse>().let { response ->
