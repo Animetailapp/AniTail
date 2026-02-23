@@ -1,8 +1,3 @@
-/**
- * Metrolist Project (C) 2026
- * Licensed under GPL-3.0 | See git history for contributors
- */
-
 package com.anitail.music.ui.screens.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -40,7 +35,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,9 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import coil3.compose.AsyncImage
-import android.widget.Toast
-import com.anitail.music.LocalListenTogetherManager
+import coil.compose.AsyncImage
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
@@ -93,8 +85,6 @@ fun LocalArtistScreen(
 ) {
     val menuState = LocalMenuState.current
     val playerConnection = LocalPlayerConnection.current ?: return
-    val listenTogetherManager = LocalListenTogetherManager.current
-    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     val artist by viewModel.artist.collectAsState()
@@ -170,10 +160,6 @@ fun LocalArtistScreen(
                             ) {
                                 IconButton(
                                     onClick = {
-                                        if (listenTogetherManager?.isInRoom == true) {
-                                            Toast.makeText(context, R.string.local_playback_blocked_listen_together, Toast.LENGTH_SHORT).show()
-                                            return@IconButton
-                                        }
                                         Timber.d("LocalArtistScreen: [LIST] Play all clicked - ${songs.size} songs")
                                         if (songs.isNotEmpty()) {
                                             val mediaItems = songs.map { it.toMediaItem() }
@@ -197,10 +183,6 @@ fun LocalArtistScreen(
                                 }
                                 IconButton(
                                     onClick = {
-                                        if (listenTogetherManager?.isInRoom == true) {
-                                            Toast.makeText(context, R.string.local_playback_blocked_listen_together, Toast.LENGTH_SHORT).show()
-                                            return@IconButton
-                                        }
                                         Timber.d("LocalArtistScreen: [LIST] Shuffle clicked - ${songs.size} songs")
                                         if (songs.isNotEmpty()) {
                                             playerConnection.playQueue(
@@ -333,10 +315,6 @@ fun LocalArtistScreen(
                                     .fillMaxWidth()
                                     .combinedClickable(
                                         onClick = {
-                                            if (listenTogetherManager?.isInRoom == true) {
-                                                Toast.makeText(context, R.string.local_playback_blocked_listen_together, Toast.LENGTH_SHORT).show()
-                                                return@combinedClickable
-                                            }
                                             Timber.d("LocalArtistScreen: [LIST] Song clicked - id=${song.id}, title=${song.song.title}")
                                             val mediaItem = song.toMediaItem()
                                             Timber.d("LocalArtistScreen: [LIST] Song MediaItem uri=${mediaItem.localConfiguration?.uri}")
@@ -427,10 +405,6 @@ fun LocalArtistScreen(
                             ) {
                                 IconButton(
                                     onClick = {
-                                        if (listenTogetherManager?.isInRoom == true) {
-                                            Toast.makeText(context, R.string.local_playback_blocked_listen_together, Toast.LENGTH_SHORT).show()
-                                            return@IconButton
-                                        }
                                         Timber.d("LocalArtistScreen: [GRID] Play all clicked - ${songs.size} songs")
                                         if (songs.isNotEmpty()) {
                                             val mediaItems = songs.map { it.toMediaItem() }
@@ -451,10 +425,6 @@ fun LocalArtistScreen(
                                 }
                                 IconButton(
                                     onClick = {
-                                        if (listenTogetherManager?.isInRoom == true) {
-                                            Toast.makeText(context, R.string.local_playback_blocked_listen_together, Toast.LENGTH_SHORT).show()
-                                            return@IconButton
-                                        }
                                         Timber.d("LocalArtistScreen: [GRID] Shuffle clicked - ${songs.size} songs")
                                         if (songs.isNotEmpty()) {
                                             playerConnection.playQueue(
@@ -576,3 +546,4 @@ fun LocalArtistScreen(
         scrollBehavior = scrollBehavior
     )
 }
+

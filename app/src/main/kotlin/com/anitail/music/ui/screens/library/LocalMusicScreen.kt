@@ -1,8 +1,3 @@
-/**
- * Metrolist Project (C) 2026
- * Licensed under GPL-3.0 | See git history for contributors
- */
-
 package com.anitail.music.ui.screens.library
 
 import android.Manifest
@@ -56,7 +51,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -66,9 +60,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
-import android.widget.Toast
-import com.anitail.music.LocalDatabase
-import com.anitail.music.LocalListenTogetherManager
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
@@ -101,7 +92,6 @@ import com.anitail.music.ui.component.AlbumGridItem
 import com.anitail.music.ui.component.ChipsRow
 import com.anitail.music.ui.menu.AlbumMenu
 import com.anitail.music.ui.menu.SongMenu
-import com.anitail.music.utils.LocalMusicRepository
 import com.anitail.music.utils.LocalSyncStatus
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.utils.rememberPreference
@@ -118,11 +108,8 @@ fun LocalMusicScreen(
 ) {
     val menuState = LocalMenuState.current
     val playerConnection = LocalPlayerConnection.current
-    val listenTogetherManager = LocalListenTogetherManager.current
-    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
-    val database = LocalDatabase.current
 
     var viewType by rememberEnumPreference(ArtistViewTypeKey, LibraryViewType.GRID)
     val (sortType, onSortTypeChange) = rememberEnumPreference(
@@ -536,10 +523,6 @@ fun LocalMusicScreen(
                                                 .fillMaxWidth()
                                                 .combinedClickable(
                                                     onClick = {
-                                                        if (listenTogetherManager?.isInRoom == true) {
-                                                            Toast.makeText(context, R.string.local_playback_blocked_listen_together, Toast.LENGTH_SHORT).show()
-                                                            return@combinedClickable
-                                                        }
                                                         playerConnection?.playQueue(
                                                             ListQueue(
                                                                 title = song.song.title,
@@ -750,4 +733,5 @@ fun FolderListItem(
         modifier = modifier.clickable(onClick = onClick)
     )
 }
+
 

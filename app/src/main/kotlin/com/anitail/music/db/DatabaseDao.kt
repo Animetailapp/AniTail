@@ -1330,6 +1330,18 @@ interface DatabaseDao {
     fun upsert(map: SongAlbumMap)
 
     @Upsert
+    fun upsert(artist: ArtistEntity)
+
+    @Upsert
+    fun upsert(album: AlbumEntity)
+
+    @Upsert
+    fun upsert(map: SongArtistMap)
+
+    @Upsert
+    fun upsert(map: AlbumArtistMap)
+
+    @Upsert
     fun upsert(lyrics: LyricsEntity)
 
     @Upsert
