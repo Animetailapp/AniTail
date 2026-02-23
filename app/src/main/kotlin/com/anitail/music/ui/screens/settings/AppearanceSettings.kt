@@ -949,7 +949,7 @@ fun AppearanceSettings(
 
                         val value = percentValue / 100f
 
-                        if (value != null && value in 0.5f..1.2f) {
+                        if (value in 0.5f..1.2f) {
                             setCustomDensityValue(value)
                             setDensityScale(value)
 

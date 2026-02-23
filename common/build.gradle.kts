@@ -6,6 +6,10 @@ plugins {
 }
 
 kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
     applyDefaultHierarchyTemplate()
     android {
         namespace = "com.anitail.shared"

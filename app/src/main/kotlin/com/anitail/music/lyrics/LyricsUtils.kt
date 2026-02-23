@@ -12,6 +12,8 @@ object LyricsUtils {
     val TIME_REGEX = "\\[(\\d\\d):(\\d\\d)\\.(\\d{2,3})\\]".toRegex()
     private val RICH_SYNC_LINE_REGEX = "\\[(\\d{1,2}):(\\d{2})\\.(\\d{2,3})\\](.+)".toRegex()
     private val RICH_SYNC_WORD_REGEX = "<(\\d{1,2}):(\\d{2})\\.(\\d{2,3})>\\s*([^<]+)".toRegex()
+    private val HTML_HEX_ENTITY_REGEX = "&#x([0-9A-Fa-f]{1,6});".toRegex()
+    private val HTML_DEC_ENTITY_REGEX = "&#(\\d{1,7});".toRegex()
 
     private val WORD_SPLIT_REGEX = "((?<=\\s|[.,!?;])|(?=\\s|[.,!?;]))".toRegex()
     private val PUNCTUATION_REGEX = "[.,!?;]".toRegex()
@@ -276,6 +278,45 @@ object LyricsUtils {
         }
     }
 
+    fun decodeHtmlEntities(text: String): String {
+        if (!text.contains('&')) return text
+
+        var decoded = text
+        repeat(2) {
+            decoded = decodeHtmlEntitiesPass(decoded)
+        }
+        return decoded
+    }
+
+    private fun decodeHtmlEntitiesPass(text: String): String {
+        var decoded = text
+            .replace("&apos;", "'")
+            .replace("&#39;", "'")
+            .replace("&quot;", "\"")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&amp;", "&")
+
+        decoded = HTML_HEX_ENTITY_REGEX.replace(decoded) { match ->
+            match.groupValues[1].toIntOrNull(16)?.toUnicodeCharString() ?: match.value
+        }
+
+        decoded = HTML_DEC_ENTITY_REGEX.replace(decoded) { match ->
+            match.groupValues[1].toIntOrNull()?.toUnicodeCharString() ?: match.value
+        }
+
+        return decoded
+    }
+
+    private fun Int.toUnicodeCharString(): String? {
+        if (this !in 0..0x10FFFF) return null
+        return try {
+            String(Character.toChars(this))
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    }
+
     /**
      * Parse rich sync lyrics format: [MM:SS.mm]<MM:SS.mm> word <MM:SS.mm> word ...
      * This format provides word-by-word timing for karaoke-style highlighting
@@ -300,7 +341,9 @@ object LyricsUtils {
                 val wordTimings = parseRichSyncWords(content, index, lines)
 
                 // Extract plain text (remove all <MM:SS.mm> tags)
-                val plainText = content.replace(Regex("<\\d{1,2}:\\d{2}\\.\\d{2,3}>\\s*"), "").trim()
+                val plainText = decodeHtmlEntities(
+                    content.replace(Regex("<\\d{1,2}:\\d{2}\\.\\d{2,3}>\\s*"), "").trim()
+                )
 
                 if (plainText.isNotBlank()) {
                     result.add(LyricsEntry(lineTimeMs, plainText, wordTimings))
@@ -331,7 +374,7 @@ object LyricsUtils {
             val fractionPart = if (match.groupValues[3].length == 3) fraction / 1000.0 else fraction / 100.0
             val startTimeSeconds = minutes * 60.0 + seconds + fractionPart
 
-            val wordText = match.groupValues[4].trim()
+            val wordText = decodeHtmlEntities(match.groupValues[4].trim())
 
             // Calculate end time: use next word's start time, or estimate from next line
             val endTimeSeconds = if (index < wordMatches.size - 1) {
@@ -412,7 +455,7 @@ object LyricsUtils {
                 val parts = wordData.split(":")
                 if (parts.size == 3) {
                     WordTimestamp(
-                        text = parts[0],
+                        text = decodeHtmlEntities(parts[0]),
                         startTime = parts[1].toDouble(),
                         endTime = parts[2].toDouble()
                     )
@@ -429,7 +472,7 @@ object LyricsUtils {
         }
         val matchResult = LINE_REGEX.matchEntire(line.trim()) ?: return null
         val times = matchResult.groupValues[1]
-        val text = matchResult.groupValues[3]
+        val text = decodeHtmlEntities(matchResult.groupValues[3])
         val timeMatchResults = TIME_REGEX.findAll(times)
 
         return timeMatchResults

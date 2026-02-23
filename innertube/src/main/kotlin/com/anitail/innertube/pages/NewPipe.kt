@@ -61,7 +61,7 @@ private class NewPipeDownloaderImpl(proxy: Proxy?, proxyAuth: String?) : Downloa
             throw ReCaptchaException("reCaptcha Challenge requested", url)
         }
 
-        val responseBodyToReturn = response.body?.string()
+        val responseBodyToReturn = response.body.string()
 
         val latestUrl = response.request.url.toString()
         return Response(response.code, response.message, response.headers.toMultimap(), responseBodyToReturn, latestUrl)

@@ -23,8 +23,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -248,7 +248,7 @@ fun UpdateSettings(
                     supportingContent = { Text(frequencyLabel) },
                     leadingContent = { Icon(painterResource(R.drawable.clock), null) },
                     trailingContent = {
-                        Icon(Icons.Default.KeyboardArrowRight, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
                     },
                     modifier = Modifier
                         .tvClickable(enabled = autoUpdateEnabled) { showFrequencyDialog = true },

@@ -124,12 +124,11 @@ open class DiscordWebSocket(
     }
 
     fun isWebSocketConnected(): Boolean {
-        return websocket?.incoming != null && websocket?.outgoing?.isClosedForSend == false
+        return websocket?.isActive == true
     }
 
     suspend fun sendActivity(presence: Presence) {
-        if (presenceChannel.isClosedForSend) return
-        presenceChannel.send(presence)
+        presenceChannel.trySend(presence)
     }
 
     private suspend fun processPresenceQueue() {

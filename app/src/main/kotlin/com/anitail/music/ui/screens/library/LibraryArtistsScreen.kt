@@ -36,7 +36,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.anitail.music.LocalPlayerAwareWindowInsets
@@ -164,17 +164,15 @@ fun LibraryArtistsScreen(
 
             Spacer(Modifier.weight(1f))
 
-            artists?.let { artists ->
-                Text(
-                    text = pluralStringResource(
-                        R.plurals.n_artist,
-                        artists.size,
-                        artists.size
-                    ),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-            }
+            Text(
+                text = pluralStringResource(
+                    R.plurals.n_artist,
+                    artists.size,
+                    artists.size
+                ),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.secondary,
+            )
 
             IconButton(
                 onClick = {

@@ -243,7 +243,12 @@ dependencies {
     implementation(libs.media3.session)
     implementation(libs.media3.okhttp)
     implementation(libs.media3.cast)
-    implementation(libs.play.services.cast)
+    implementation(libs.play.services.cast) {
+        version {
+            strictly(libs.versions.playServicesCast.get())
+        }
+        because("22.3.0 triggers R8 invalid stack map table warnings during release minify")
+    }
     implementation(libs.play.services.base)
     implementation(libs.squigglyslider)
 

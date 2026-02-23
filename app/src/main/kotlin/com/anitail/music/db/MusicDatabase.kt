@@ -155,7 +155,7 @@ abstract class InternalDatabase : RoomDatabase() {
                         MIGRATION_26_27,
                         MIGRATION_27_28,
                     )
-                    .fallbackToDestructiveMigrationOnDowngrade()
+                    .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
                     .addCallback(object : Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             super.onOpen(db)
@@ -193,7 +193,8 @@ abstract class InternalDatabase : RoomDatabase() {
 
 val MIGRATION_1_2 =
     object : Migration(1, 2) {
-        override fun migrate(database: SupportSQLiteDatabase) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            val database = db
             data class OldSongEntity(
                 val id: String,
                 val title: String,
@@ -400,7 +401,8 @@ val MIGRATION_1_2 =
 
 val MIGRATION_25_26 =
     object : Migration(25, 26) {
-        override fun migrate(database: SupportSQLiteDatabase) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            val database = db
             // Schema change introduced in v26: lyrics.provider (nullable TEXT).
             // Add it defensively for users coming from older backups/installations.
             var providerColumnExists = false
@@ -446,7 +448,8 @@ val MIGRATION_25_26 =
 
 val MIGRATION_26_27 =
     object : Migration(26, 27) {
-        override fun migrate(database: SupportSQLiteDatabase) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            val database = db
             // Rescue migration for installs restored with a broken v26 schema
             // where lyrics.provider is missing.
             var providerColumnExists = false
@@ -503,7 +506,8 @@ val MIGRATION_26_27 =
 
 val MIGRATION_27_28 =
     object : Migration(27, 28) {
-        override fun migrate(database: SupportSQLiteDatabase) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            val database = db
             // v28 introduces song.downloadUri.
             var downloadUriExists = false
             database.query("PRAGMA table_info(song)").use { cursor ->

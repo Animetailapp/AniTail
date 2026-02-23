@@ -103,14 +103,13 @@ class LanJamClient(val host: String, private val port: Int = 5000, private val o
                     var line: String? = null
                     try {
                         // Bucle de lectura
-                        while (running && socket?.isConnected == true && !socket?.isClosed!! && 
+                        while (running && socket?.isConnected == true && socket?.isClosed == false &&
                                reader.readLine().also { line = it } != null) {
-                            if (line != null) {
-                                val displayLine = if (line!!.length > 50) "${line!!.take(50)}..." else line
-                                Timber.tag("LanJamClient").d("Mensaje recibido: $displayLine")
-                                withContext(Dispatchers.Main) {
-                                    onMessage(line!!)
-                                }
+                            val receivedLine = line ?: continue
+                            val displayLine = if (receivedLine.length > 50) "${receivedLine.take(50)}..." else receivedLine
+                            Timber.tag("LanJamClient").d("Mensaje recibido: $displayLine")
+                            withContext(Dispatchers.Main) {
+                                onMessage(receivedLine)
                             }
                         }
                     } catch (e: SocketTimeoutException) {

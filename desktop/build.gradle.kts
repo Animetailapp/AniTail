@@ -50,7 +50,7 @@ dependencies {
     implementation(projects.kizzy)
 
     implementation(compose.desktop.currentOs)
-    implementation(compose.material3)
+    implementation(libs.material3)
     implementation(libs.materialKolor)
     implementation(libs.compose.reorderable)
 

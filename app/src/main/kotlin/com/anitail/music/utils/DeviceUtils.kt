@@ -23,6 +23,7 @@ object DeviceUtils {
 
     fun isTelevisionDevice(context: Context): Boolean {
         val pm = context.packageManager
+        @Suppress("DEPRECATION")
         val hasTelevisionFeature = pm.hasSystemFeature(PackageManager.FEATURE_TELEVISION)
         val hasLeanbackFeature = pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
         val hasFireTvFeature = pm.hasSystemFeature("amazon.hardware.fire_tv")

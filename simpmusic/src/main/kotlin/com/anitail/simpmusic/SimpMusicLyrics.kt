@@ -19,6 +19,8 @@ import kotlin.math.abs
 
 object SimpMusicLyrics {
     private const val BASE_URL = "https://api-lyrics.simpmusic.org/v1/"
+    private val htmlHexEntityRegex = "&#x([0-9A-Fa-f]{1,6});".toRegex()
+    private val htmlDecEntityRegex = "&#(\\d{1,7});".toRegex()
 
     private val client by lazy {
         HttpClient(OkHttp) {
@@ -108,8 +110,8 @@ object SimpMusicLyrics {
             ?: bestMatch?.syncedLyrics?.takeIf { it.isNotBlank() }
             ?: bestMatch?.plainLyrics?.takeIf { it.isNotBlank() }
             ?: throw IllegalStateException("Track found but all lyrics empty for videoId: $videoId")
-        
-        lyrics
+
+        decodeHtmlEntities(lyrics)
     }
 
     suspend fun getAllLyrics(
@@ -135,17 +137,56 @@ object SimpMusicLyrics {
                 // Prioritize richSyncLyrics for word-by-word sync
                 if (track.richSyncLyrics != null && track.richSyncLyrics.isNotBlank() && durationMatch) {
                     count++
-                    callback(track.richSyncLyrics)
+                    callback(decodeHtmlEntities(track.richSyncLyrics))
                 } else if (track.syncedLyrics != null && track.syncedLyrics.isNotBlank() && durationMatch) {
                     count++
-                    callback(track.syncedLyrics)
+                    callback(decodeHtmlEntities(track.syncedLyrics))
                 }
                 if (track.plainLyrics != null && track.plainLyrics.isNotBlank() && durationMatch && plain == 0) {
                     count++
                     plain++
-                    callback(track.plainLyrics)
+                    callback(decodeHtmlEntities(track.plainLyrics))
                 }
             }
+        }
+    }
+
+    private fun decodeHtmlEntities(text: String): String {
+        if (!text.contains('&')) return text
+
+        var decoded = text
+        repeat(2) {
+            decoded = decodeHtmlEntitiesPass(decoded)
+        }
+        return decoded
+    }
+
+    private fun decodeHtmlEntitiesPass(text: String): String {
+        var decoded = text
+            .replace("&apos;", "'")
+            .replace("&#39;", "'")
+            .replace("&quot;", "\"")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&amp;", "&")
+
+        decoded = htmlHexEntityRegex.replace(decoded) { match ->
+            match.groupValues[1].toIntOrNull(16)?.toUnicodeCharString() ?: match.value
+        }
+
+        decoded = htmlDecEntityRegex.replace(decoded) { match ->
+            match.groupValues[1].toIntOrNull()?.toUnicodeCharString() ?: match.value
+        }
+
+        return decoded
+    }
+
+    private fun Int.toUnicodeCharString(): String? {
+        if (this !in 0..0x10FFFF) return null
+        return try {
+            String(Character.toChars(this))
+        } catch (_: IllegalArgumentException) {
+            null
         }
     }
 }

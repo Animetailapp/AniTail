@@ -552,6 +552,7 @@ fun Queue(
                         key = window.uid.hashCode(),
                     ) {
                         val currentItem by rememberUpdatedState(window)
+                        @Suppress("DEPRECATION")
                         val dismissBoxState =
                             rememberSwipeToDismissBoxState(
                                 positionalThreshold = { totalDistance ->

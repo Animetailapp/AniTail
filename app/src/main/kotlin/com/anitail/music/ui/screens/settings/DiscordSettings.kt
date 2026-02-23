@@ -465,7 +465,7 @@ fun RichPresence(song: Song?) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 LinearProgressIndicator(
-                    progress = progress, // Pass progress directly as a value
+                    progress = { progress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(4.dp),

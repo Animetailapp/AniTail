@@ -58,7 +58,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -711,16 +711,12 @@ fun HomeScreen(
                             }
                         },
                         onClick = section.endpoint?.browseId?.let { browseId ->
-                            if (homePage != null) {
-                                {
-                                    when (browseId) {
-                                        "FEmusic_moods_and_genres" -> navController.navigate("mood_and_genres")
-                                        "FEmusic_charts" -> navController.navigate("charts_screen")
-                                        else -> navController.navigate("browse/$browseId")
-                                    }
+                            {
+                                when (browseId) {
+                                    "FEmusic_moods_and_genres" -> navController.navigate("mood_and_genres")
+                                    "FEmusic_charts" -> navController.navigate("charts_screen")
+                                    else -> navController.navigate("browse/$browseId")
                                 }
-                            } else {
-                                null
                             }
                         },
                         onPlayAllClick = if (hasPlayableSongs) {
@@ -746,7 +742,8 @@ fun HomeScreen(
                 }
             }
 
-            if (isLoading || homePage?.continuation != null && homePage?.sections?.isNotEmpty() == true) {
+            val hasHomeContinuation = homePage?.continuation != null && homePage.sections.isNotEmpty()
+            if (isLoading || hasHomeContinuation) {
                 item(key = "loading_shimmer") {
                     ShimmerHost {
                         repeat(3) {
