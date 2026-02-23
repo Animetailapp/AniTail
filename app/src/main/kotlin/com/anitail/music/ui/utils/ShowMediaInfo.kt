@@ -62,6 +62,7 @@ fun ShowMediaInfo(videoId: String) {
 
     val playerConnection = LocalPlayerConnection.current
     val context = LocalContext.current
+    @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
 
     LaunchedEffect(Unit, videoId) {

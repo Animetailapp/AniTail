@@ -330,7 +330,8 @@ class ImportFromSpotifyViewModel @Inject constructor(
         val playlists = mutableListOf<Playlist>()
 
         while (url != null) {
-            httpClient.get(url) {
+            val currentUrl = url ?: break
+            httpClient.get(currentUrl) {
                 bearerAuth(authToken)
             }.body<SpotifyPlaylistPaginatedResponse>().let { response ->
                 if (response.items.isNotEmpty()) {
@@ -340,7 +341,7 @@ class ImportFromSpotifyViewModel @Inject constructor(
                         )
                     })
                 }
-                logTheString(url.toString())
+                logTheString(currentUrl)
                 url = response.nextUrl
             }
         }

@@ -791,7 +791,7 @@ private fun MusicForNowCard(
                         )
                     } else {
                         AsyncImage(
-                            model = topSong?.thumbnailUrl,
+                            model = topSong.thumbnailUrl,
                             contentDescription = null,
                             modifier = Modifier.fillMaxSize(),
                         )

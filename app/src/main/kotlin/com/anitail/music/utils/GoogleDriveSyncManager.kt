@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.anitail.music.utils
 
 import android.content.Context
@@ -319,7 +321,7 @@ class GoogleDriveSyncManager @Inject constructor(
                     id = file.id,
                     name = file.name,
                     createdTime = file.modifiedTime?.value ?: file.createdTime?.value ?: 0L,
-                    size = file.size?.toLong() ?: 0L
+                    size = file.size.toLong()
                 )
             } ?: emptyList()
 

@@ -674,9 +674,10 @@ constructor(
               return@withContext Result.failure(IOException("HTTP error: ${response.code}"))
             }
 
-            val jsonString =
-                response.body?.string()
-                    ?: return@withContext Result.failure(Exception("Empty response"))
+            val jsonString = response.body.string()
+            if (jsonString.isBlank()) {
+              return@withContext Result.failure(Exception("Empty response"))
+            }
             val json = Json.parseToJsonElement(jsonString).jsonObject
 
             val toptracks = json["toptracks"]?.jsonObject
@@ -729,9 +730,10 @@ constructor(
               return@withContext Result.failure(IOException("HTTP error: ${response.code}"))
             }
 
-            val jsonString =
-                response.body?.string()
-                    ?: return@withContext Result.failure(Exception("Empty response"))
+            val jsonString = response.body.string()
+            if (jsonString.isBlank()) {
+              return@withContext Result.failure(Exception("Empty response"))
+            }
             val json = Json.parseToJsonElement(jsonString).jsonObject
 
             val topartists = json["topartists"]?.jsonObject

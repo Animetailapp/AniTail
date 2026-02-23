@@ -32,8 +32,8 @@ import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Computer
-import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -378,7 +378,7 @@ fun HostModeContent(
                             contentPadding = ButtonDefaults.ButtonWithIconContentPadding
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.Send,
+                                imageVector = Icons.AutoMirrored.Outlined.Send,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -736,7 +736,7 @@ fun HostItem(
                     contentPadding = ButtonDefaults.ButtonWithIconContentPadding
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Send,
+                        imageVector = Icons.AutoMirrored.Outlined.Send,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp)
                     )
@@ -870,7 +870,7 @@ fun ClientModeContent(
                                     modifier = Modifier.size(32.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Outlined.Send,
+                                        imageVector = Icons.AutoMirrored.Outlined.Send,
                                         contentDescription = "Conectar",
                                         modifier = Modifier.size(16.dp)
                                     )
@@ -1048,7 +1048,7 @@ fun ClientModeContent(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.Send,
+                                imageVector = Icons.AutoMirrored.Outlined.Send,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )

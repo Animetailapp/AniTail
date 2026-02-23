@@ -693,6 +693,7 @@ fun BottomSheetPlayer(
                             .basicMarquee()
                             .padding(end = 12.dp)
                     ) {
+                        @Suppress("DEPRECATION")
                         ClickableText(
                             text = annotatedString,
                             style = MaterialTheme.typography.titleMedium.copy(color = TextBackgroundColor),

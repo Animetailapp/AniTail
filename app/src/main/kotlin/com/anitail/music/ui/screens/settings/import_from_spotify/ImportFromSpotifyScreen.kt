@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -68,7 +67,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -100,6 +98,7 @@ fun ImportFromSpotifyScreen(
     val textFieldPaddingValues = remember {
         PaddingValues(start = 15.dp, end = 15.dp, top = 7.5.dp, bottom = 7.5.dp)
     }
+    @Suppress("DEPRECATION")
     val localClipBoardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val localUriHandler = LocalUriHandler.current
@@ -389,15 +388,14 @@ fun ImportFromSpotifyScreen(
                     val instructionPadding = remember {
                         PaddingValues(start = 15.dp, bottom = 7.5.dp, end = 7.5.dp)
                     }
-                    ClickableText(
-                        text = buildAnnotatedString {
-                            append(stringResource(id = R.string.instruction_1))
-                        },
-                        onClick = { offset ->
-                            localUriHandler.openUri("https://developer.spotify.com/dashboard/")
-                        },
+                    Text(
+                        text = stringResource(id = R.string.instruction_1),
                         style = TextStyle(fontSize = 16.sp, color = LocalContentColor.current),
-                        modifier = Modifier.padding(instructionPadding)
+                        modifier = Modifier
+                            .padding(instructionPadding)
+                            .tvClickable {
+                                localUriHandler.openUri("https://developer.spotify.com/dashboard/")
+                            }
                     )
                     SelectionContainer {
                         Text(

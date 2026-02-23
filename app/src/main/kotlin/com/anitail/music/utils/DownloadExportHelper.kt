@@ -136,9 +136,10 @@ class DownloadExportHelper @Inject constructor(
                     var trackNumber = 0
                     var totalTracks = 0
 
-                    if ((albumName == null || year == null) && song.song.albumId != null) {
+                    val albumId = song.song.albumId
+                    if ((albumName == null || year == null) && albumId != null) {
                         try {
-                            val albumPage = YouTube.album(song.song.albumId!!).getOrNull()
+                            val albumPage = YouTube.album(albumId).getOrNull()
                             if (albumPage != null) {
                                 if (albumName == null) albumName = albumPage.album.title
                                 if (year == null) year = albumPage.album.year?.toString()
