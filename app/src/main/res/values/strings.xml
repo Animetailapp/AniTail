@@ -981,4 +981,19 @@
     <string name="sound_capsule_period_afternoon">Afternoon</string>
     <string name="sound_capsule_period_evening">Evening</string>
     <string name="sound_capsule_period_night">Night</string>
+
+    <!-- Local Music -->
+    <string name="local_music">Local music</string>
+    <string name="filter_local">Local</string>
+    <string name="local_music_permission_title">Access local music</string>
+    <string name="local_music_permission_desc">AniTail needs permission to read audio files on your device.</string>
+    <string name="local_music_permission_needed">Permission needed to access local music files</string>
+    <string name="local_playback_blocked_listen_together">Local files cannot be played during Listen Together</string>
+    <string name="no_local_artists">No local music found</string>
+    <string name="no_local_folders">No folders found</string>
+    <string name="folders">Folders</string>
+    <string name="grant_permission">Grant permission</string>
+    <string name="syncing_local_music">Scanning local music library…</string>
+    <string name="file_path">File path</string>
+    <string name="year">Year</string>
 </resources>

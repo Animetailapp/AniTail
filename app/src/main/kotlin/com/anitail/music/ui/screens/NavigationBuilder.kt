@@ -16,6 +16,10 @@ import com.anitail.music.ui.screens.artist.ArtistAlbumsScreen
 import com.anitail.music.ui.screens.artist.ArtistItemsScreen
 import com.anitail.music.ui.screens.artist.ArtistScreen
 import com.anitail.music.ui.screens.artist.ArtistSongsScreen
+import com.anitail.music.ui.screens.library.LocalAlbumScreen
+import com.anitail.music.ui.screens.library.LocalArtistScreen
+import com.anitail.music.ui.screens.library.LocalFolderScreen
+import com.anitail.music.ui.screens.library.LocalMusicScreen
 import com.anitail.music.ui.screens.library.LibraryScreen
 import com.anitail.music.ui.screens.playlist.AutoPlaylistScreen
 import com.anitail.music.ui.screens.playlist.CachePlaylistScreen
@@ -202,6 +206,47 @@ fun NavGraphBuilder.navigationBuilder(
         ),
     ) {
         ArtistSongsScreen(navController, scrollBehavior)
+    }
+    composable("local_music") {
+        LocalMusicScreen(navController, scrollBehavior)
+    }
+    composable(
+        route = "local_artist/{artistId}",
+        arguments =
+        listOf(
+            navArgument("artistId") {
+                type = NavType.StringType
+            },
+        ),
+    ) {
+        LocalArtistScreen(navController, scrollBehavior)
+    }
+    composable(
+        route = "local_album/{albumId}",
+        arguments =
+        listOf(
+            navArgument("albumId") {
+                type = NavType.StringType
+            },
+        ),
+    ) {
+        LocalAlbumScreen(navController, scrollBehavior)
+    }
+    composable(
+        route = "local_folder/{folderPath}",
+        arguments = listOf(
+            navArgument("folderPath") {
+                type = NavType.StringType
+            },
+        ),
+    ) {
+        LocalFolderScreen(
+            navController = navController,
+            scrollBehavior = scrollBehavior,
+            folderPath = it.arguments?.getString("folderPath")?.let { path ->
+                java.net.URLDecoder.decode(path, "UTF-8")
+            } ?: "",
+        )
     }
     composable(
         route = "artist/{artistId}/albums",

@@ -1,0 +1,311 @@
+/**
+ * Metrolist Project (C) 2026
+ * Licensed under GPL-3.0 | See git history for contributors
+ */
+
+package com.anitail.music.ui.screens.library
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
+import coil3.compose.AsyncImage
+import android.widget.Toast
+import com.anitail.music.LocalListenTogetherManager
+import com.anitail.music.LocalPlayerAwareWindowInsets
+import com.anitail.music.LocalPlayerConnection
+import com.anitail.music.R
+import com.anitail.music.constants.CONTENT_TYPE_HEADER
+import com.anitail.music.constants.CONTENT_TYPE_SONG
+import com.anitail.music.constants.ThumbnailCornerRadius
+import com.anitail.music.extensions.toMediaItem
+import com.anitail.music.playback.queues.ListQueue
+import com.anitail.music.ui.component.EmptyPlaceholder
+import com.anitail.music.ui.component.LocalMenuState
+import com.anitail.music.ui.component.SongListItem
+import com.anitail.music.ui.menu.SongMenu
+import com.anitail.music.utils.makeTimeString
+import com.anitail.music.viewmodels.LocalAlbumViewModel
+import timber.log.Timber
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun LocalAlbumScreen(
+    navController: NavController,
+    scrollBehavior: TopAppBarScrollBehavior,
+    viewModel: LocalAlbumViewModel = hiltViewModel(),
+) {
+    val menuState = LocalMenuState.current
+    val playerConnection = LocalPlayerConnection.current ?: return
+    val listenTogetherManager = LocalListenTogetherManager.current
+    val context = LocalContext.current
+
+    val album by viewModel.album.collectAsState()
+    val songs by viewModel.songs.collectAsState()
+
+    Timber.d("LocalAlbumScreen: COMPOSE - album=${album?.album?.title}, songCount=${songs.size}")
+
+    val totalDuration = songs.sumOf { it.song.duration }
+    Timber.d("LocalAlbumScreen: totalDuration=$totalDuration seconds")
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection)
+    ) {
+        LazyColumn(
+            contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
+        ) {
+            item(key = "header", contentType = CONTENT_TYPE_HEADER) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    AsyncImage(
+                        model = album?.album?.thumbnailUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(200.dp)
+                            .clip(RoundedCornerShape(ThumbnailCornerRadius))
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = album?.album?.title ?: "",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    album?.artists?.firstOrNull()?.let { artist ->
+                        Text(
+                            text = artist.name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        album?.album?.year?.let { year ->
+                            Text(
+                                text = year.toString(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            text = pluralStringResource(R.plurals.n_song, songs.size, songs.size),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = makeTimeString(totalDuration * 1000L),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                if (listenTogetherManager?.isInRoom == true) {
+                                    Toast.makeText(context, R.string.local_playback_blocked_listen_together, Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                Timber.d("LocalAlbumScreen: Play button clicked - ${songs.size} songs")
+                                if (songs.isNotEmpty()) {
+                                    val mediaItems = songs.map { it.toMediaItem() }
+                                    Timber.d("LocalAlbumScreen: Playing queue with ${mediaItems.size} items")
+                                    mediaItems.forEachIndexed { idx, item ->
+                                        Timber.d("LocalAlbumScreen: MediaItem[$idx] id=${item.mediaId}, uri=${item.localConfiguration?.uri}")
+                                    }
+                                    playerConnection.playQueue(
+                                        ListQueue(
+                                            title = album?.album?.title ?: "Local Album",
+                                            items = mediaItems
+                                        )
+                                    )
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.play),
+                                contentDescription = null,
+                                modifier = Modifier.size(ButtonDefaults.IconSize)
+                            )
+                            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                            Text(stringResource(R.string.play))
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                if (listenTogetherManager?.isInRoom == true) {
+                                    Toast.makeText(context, R.string.local_playback_blocked_listen_together, Toast.LENGTH_SHORT).show()
+                                    return@OutlinedButton
+                                }
+                                Timber.d("LocalAlbumScreen: Shuffle button clicked - ${songs.size} songs")
+                                if (songs.isNotEmpty()) {
+                                    playerConnection.playQueue(
+                                        ListQueue(
+                                            title = album?.album?.title ?: "Local Album",
+                                            items = songs.shuffled().map { it.toMediaItem() }
+                                        )
+                                    )
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.shuffle),
+                                contentDescription = null,
+                                modifier = Modifier.size(ButtonDefaults.IconSize)
+                            )
+                            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                            Text(stringResource(R.string.shuffle))
+                        }
+                    }
+                }
+            }
+
+            if (songs.isEmpty()) {
+                item(key = "empty") {
+                    EmptyPlaceholder(
+                        icon = R.drawable.music_note,
+                        text = stringResource(R.string.no_results_found)
+                    )
+                }
+            }
+
+            itemsIndexed(
+                items = songs,
+                key = { _, song -> song.id },
+                contentType = { _, _ -> CONTENT_TYPE_SONG }
+            ) { index, song ->
+                SongListItem(
+                    song = song,
+                    albumIndex = index + 1,
+                    showInLibraryIcon = true,
+                    trailingContent = {
+                        IconButton(
+                            onClick = {
+                                menuState.show {
+                                    SongMenu(
+                                        originalSong = song,
+                                        navController = navController,
+                                        onDismiss = menuState::dismiss
+                                    )
+                                }
+                            }
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.more_vert),
+                                contentDescription = null
+                            )
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .combinedClickable(
+                            onClick = {
+                                if (listenTogetherManager?.isInRoom == true) {
+                                    Toast.makeText(context, R.string.local_playback_blocked_listen_together, Toast.LENGTH_SHORT).show()
+                                    return@combinedClickable
+                                }
+                                Timber.d("LocalAlbumScreen: Song clicked - index=$index, id=${song.id}, title=${song.song.title}")
+                                val mediaItem = song.toMediaItem()
+                                Timber.d("LocalAlbumScreen: Song MediaItem uri=${mediaItem.localConfiguration?.uri}")
+                                playerConnection.playQueue(
+                                    ListQueue(
+                                        title = album?.album?.title ?: "Local Album",
+                                        items = songs.map { it.toMediaItem() },
+                                        startIndex = index
+                                    )
+                                )
+                            },
+                            onLongClick = {
+                                menuState.show {
+                                    SongMenu(
+                                        originalSong = song,
+                                        navController = navController,
+                                        onDismiss = menuState::dismiss
+                                    )
+                                }
+                            }
+                        )
+                        .animateItem()
+                )
+            }
+        }
+    }
+
+    TopAppBar(
+        title = {
+            Text(
+                text = album?.album?.title ?: "",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = navController::navigateUp) {
+                Icon(
+                    painterResource(R.drawable.arrow_back),
+                    contentDescription = null
+                )
+            }
+        },
+        scrollBehavior = scrollBehavior
+    )
+}

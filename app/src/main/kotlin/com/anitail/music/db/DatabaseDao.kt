@@ -1385,6 +1385,181 @@ interface DatabaseDao {
         from: Int,
     ): List<PlaylistSongMap>
 
+    // Local Music Queries
+    @Transaction
+    @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
+    @Query(
+        """
+        SELECT artist.*,
+               (SELECT COUNT(1)
+                FROM song_artist_map sam
+                JOIN song ON sam.songId = song.id
+                WHERE sam.artistId = artist.id AND song.isLocal = 1) AS songCount
+        FROM artist
+        WHERE EXISTS (
+            SELECT 1
+            FROM song_artist_map sam
+            JOIN song ON sam.songId = song.id
+            WHERE sam.artistId = artist.id AND song.isLocal = 1
+        )
+        ORDER BY artist.name COLLATE NOCASE ASC
+    """
+    )
+    fun localArtists(): Flow<List<Artist>>
+
+    @Transaction
+    @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
+    @Query(
+        """
+        SELECT album.*
+        FROM album
+        WHERE album.id IN (
+            SELECT DISTINCT sam.albumId
+            FROM song_album_map sam
+            JOIN song ON sam.songId = song.id
+            JOIN song_artist_map sarm ON song.id = sarm.songId
+            WHERE sarm.artistId = :artistId AND song.isLocal = 1
+        )
+        ORDER BY album.title COLLATE NOCASE ASC
+    """
+    )
+    fun localAlbumsByArtist(artistId: String): Flow<List<Album>>
+
+    @Transaction
+    @Query(
+        """
+        SELECT song.*
+        FROM song
+        JOIN song_album_map sam ON song.id = sam.songId
+        WHERE sam.albumId = :albumId AND song.isLocal = 1
+        ORDER BY sam.`index` ASC, song.title COLLATE NOCASE ASC
+    """
+    )
+    fun localSongsByAlbum(albumId: String): Flow<List<Song>>
+
+    @Transaction
+    @Query("SELECT * FROM song WHERE isLocal = 1 ORDER BY title COLLATE NOCASE ASC")
+    fun allLocalSongs(): Flow<List<Song>>
+
+    @Transaction
+    @Query(
+        """
+        SELECT song.*
+        FROM song
+        JOIN song_artist_map sam ON song.id = sam.songId
+        WHERE sam.artistId = :artistId AND song.isLocal = 1
+        ORDER BY song.title COLLATE NOCASE ASC
+    """
+    )
+    fun localSongsByArtist(artistId: String): Flow<List<Song>>
+
+    @Transaction
+    @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
+    @Query(
+        """
+        SELECT album.*
+        FROM album
+        WHERE album.id IN (
+            SELECT DISTINCT sam.albumId
+            FROM song_album_map sam
+            JOIN song ON sam.songId = song.id
+            WHERE song.isLocal = 1
+        )
+        ORDER BY album.title COLLATE NOCASE ASC
+    """
+    )
+    fun allLocalAlbums(): Flow<List<Album>>
+
+    @Transaction
+    @Query(
+        """
+        SELECT * FROM song
+        WHERE isLocal = 1 AND (
+            title LIKE '%' || :query || '%'
+            OR albumName LIKE '%' || :query || '%'
+        )
+        ORDER BY title COLLATE NOCASE ASC
+        LIMIT :limit
+    """
+    )
+    fun searchLocalSongs(query: String, limit: Int = Int.MAX_VALUE): Flow<List<Song>>
+
+    @Transaction
+    @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
+    @Query(
+        """
+        SELECT artist.*,
+               (SELECT COUNT(1)
+                FROM song_artist_map sam
+                JOIN song ON sam.songId = song.id
+                WHERE sam.artistId = artist.id AND song.isLocal = 1) AS songCount
+        FROM artist
+        WHERE artist.name LIKE '%' || :query || '%'
+          AND EXISTS (
+              SELECT 1
+              FROM song_artist_map sam
+              JOIN song ON sam.songId = song.id
+              WHERE sam.artistId = artist.id AND song.isLocal = 1
+          )
+        ORDER BY artist.name COLLATE NOCASE ASC
+        LIMIT :limit
+    """
+    )
+    fun searchLocalArtists(query: String, limit: Int = Int.MAX_VALUE): Flow<List<Artist>>
+
+    @Transaction
+    @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
+    @Query(
+        """
+        SELECT album.*
+        FROM album
+        WHERE album.title LIKE '%' || :query || '%'
+          AND album.id IN (
+              SELECT DISTINCT sam.albumId
+              FROM song_album_map sam
+              JOIN song ON sam.songId = song.id
+              WHERE song.isLocal = 1
+          )
+        ORDER BY album.title COLLATE NOCASE ASC
+        LIMIT :limit
+    """
+    )
+    fun searchLocalAlbums(query: String, limit: Int = Int.MAX_VALUE): Flow<List<Album>>
+
+    // Folder browsing queries
+    @Query(
+        """
+        SELECT DISTINCT localPath
+        FROM song
+        WHERE isLocal = 1 AND localPath IS NOT NULL
+        ORDER BY localPath COLLATE NOCASE ASC
+    """
+    )
+    fun localSongPaths(): Flow<List<String>>
+
+    @Transaction
+    @Query(
+        """
+        SELECT * FROM song
+        WHERE isLocal = 1
+        AND localPath LIKE :folderPath || '/%'
+        AND localPath NOT LIKE :folderPath || '/%/%'
+        ORDER BY title COLLATE NOCASE ASC
+    """
+    )
+    fun localSongsInFolder(folderPath: String): Flow<List<Song>>
+
+    @Transaction
+    @Query(
+        """
+        SELECT * FROM song
+        WHERE isLocal = 1
+        AND localPath LIKE :folderPath || '/%'
+        ORDER BY localPath COLLATE NOCASE ASC, title COLLATE NOCASE ASC
+    """
+    )
+    fun localSongsInFolderRecursive(folderPath: String): Flow<List<Song>>
+
     @RawQuery
     fun raw(supportSQLiteQuery: SupportSQLiteQuery): Int
 

@@ -62,6 +62,10 @@ fun LibraryScreen(navController: NavController) {
                 navController,
                 { filterType = LibraryFilter.LIBRARY })
 
+            LibraryFilter.LOCAL -> {
+                // Local entry lives in LibraryMixScreen as a dedicated card.
+            }
+
             LibraryFilter.DOWNLOADED -> LibraryDownloadedScreen(
                 navController,
                 { filterType = LibraryFilter.LIBRARY })
