@@ -54,8 +54,7 @@ import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.SilenceSkippingAudioProcessor
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
-import androidx.media3.extractor.mkv.MatroskaExtractor
-import androidx.media3.extractor.mp4.FragmentedMp4Extractor
+import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaController
@@ -1949,13 +1948,18 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   private fun createDataSourceFactory(): DataSource.Factory {
     return ResolvingDataSource.Factory(createCacheDataSource()) { dataSpec ->
       val mediaId = dataSpec.key ?: error("No media id")
-        // Check for MediaStore URI first (local playback)
+        // Check local URIs first (local playback)
         val song = database.getSongByIdBlocking(mediaId)
-
-        if (song?.song?.mediaStoreUri != null) {
-            Timber.d("Playing from MediaStore: ${song.song.mediaStoreUri}")
+        val localUri =
+            when {
+                song?.song?.mediaStoreUri != null -> song.song.mediaStoreUri
+                song?.song?.isLocal == true && song.song.downloadUri != null -> song.song.downloadUri
+                else -> null
+            }
+        if (localUri != null) {
+            Timber.d("Playing local media from URI: $localUri")
             scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
-            return@Factory dataSpec.withUri(song.song.mediaStoreUri.toUri())
+            return@Factory dataSpec.withUri(localUri.toUri())
         }
 
         // Check if cached and validate cache content exists
@@ -2051,9 +2055,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   private fun createMediaSourceFactory() =
       DefaultMediaSourceFactory(
           createDataSourceFactory(),
-      ) {
-        arrayOf(MatroskaExtractor(), FragmentedMp4Extractor())
-      }
+          DefaultExtractorsFactory(),
+      )
 
   private fun createRenderersFactory() =
       object : DefaultRenderersFactory(this) {
