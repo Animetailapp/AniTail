@@ -141,11 +141,11 @@ object BetterLyrics {
             }
         }
 
-        if (ttml.isNullOrBlank()) {
-            throw IllegalStateException("Lyrics unavailable after all fallbacks")
-        }
+        val finalTtml =
+            ttml?.takeIf { it.isNotBlank() }
+                ?: throw IllegalStateException("Lyrics unavailable after all fallbacks")
 
-        val parsedLines = TTMLParser.parseTTML(ttml)
+        val parsedLines = TTMLParser.parseTTML(finalTtml)
         if (parsedLines.isEmpty()) {
             throw IllegalStateException("Failed to parse lyrics")
         }
