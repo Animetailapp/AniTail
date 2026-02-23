@@ -7,17 +7,21 @@ plugins {
 
 kotlin {
     applyDefaultHierarchyTemplate()
-    androidLibrary()
+    android {
+        namespace = "com.anitail.shared"
+        compileSdk = 36
+        minSdk = 23
+    }
     jvm("desktop")
 
     sourceSets {
         val commonMain by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-                implementation(compose.runtime)
-                implementation(compose.foundation)
-                implementation(compose.material3)
-                implementation(compose.ui)
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.foundation)
+                implementation(libs.compose.material3)
+                implementation(libs.compose.ui)
                 api(libs.ktor.serialization.json)
             }
         }
@@ -34,10 +38,4 @@ kotlin {
         }
         val desktopTest by getting
     }
-}
-
-android {
-    namespace = "com.anitail.shared"
-    compileSdk = 36
-    minSdk = 23
 }
