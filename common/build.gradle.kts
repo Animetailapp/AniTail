@@ -20,7 +20,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 implementation(libs.compose.runtime)
                 implementation(libs.compose.foundation)
-                implementation(libs.compose.material3)
+                implementation(libs.material3)
                 implementation(libs.compose.ui)
                 api(libs.ktor.serialization.json)
             }
