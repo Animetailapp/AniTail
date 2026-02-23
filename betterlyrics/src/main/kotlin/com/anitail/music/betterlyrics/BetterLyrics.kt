@@ -74,7 +74,7 @@ object BetterLyrics {
         }
         println("[BetterLyrics] Fetching: $params")
 
-        try {
+        return try {
             val response = client.get("/getLyrics") {
                 parameter("s", query.title)
                 parameter("a", query.artist)
