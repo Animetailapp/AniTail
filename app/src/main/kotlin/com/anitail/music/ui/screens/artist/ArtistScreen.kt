@@ -4,8 +4,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +41,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -53,6 +56,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -417,6 +421,23 @@ fun ArtistScreen(
                     }
                 }
 
+                val aboutArtistDescription = artistPage?.description
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+
+                if (!showLocal && aboutArtistDescription != null) {
+                    item(key = "about_artist") {
+                        AboutArtistSection(
+                            description = aboutArtistDescription,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .padding(bottom = 16.dp)
+                                .animateItem(),
+                        )
+                    }
+                }
+
                 if (showLocal) {
                     if (librarySongs.isNotEmpty()) {
                         item {
@@ -740,4 +761,115 @@ fun ArtistScreen(
             TopAppBarDefaults.topAppBarColors()
         }
     )
+}
+
+@Composable
+private fun AboutArtistSection(
+    description: String,
+    modifier: Modifier = Modifier,
+    collapsedMaxLines: Int = 4,
+) {
+    var isExpanded by rememberSaveable(description) { mutableStateOf(false) }
+    var canExpand by remember(description) { mutableStateOf(false) }
+
+    Column(
+        modifier = modifier
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(24.dp),
+            )
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                    )
+                ),
+                shape = RoundedCornerShape(24.dp),
+            )
+            .animateContentSize()
+            .padding(16.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.45f),
+                            Color.Transparent,
+                        )
+                    ),
+                    shape = RoundedCornerShape(999.dp),
+                )
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f),
+                        RoundedCornerShape(999.dp),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.info),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+
+            Text(
+                text = stringResource(R.string.about_artist),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = if (isExpanded) Int.MAX_VALUE else collapsedMaxLines,
+            overflow = TextOverflow.Ellipsis,
+            onTextLayout = { textLayoutResult ->
+                if (!isExpanded) {
+                    canExpand = textLayoutResult.hasVisualOverflow
+                }
+            },
+        )
+
+        if (canExpand || isExpanded) {
+            TextButton(
+                onClick = { isExpanded = !isExpanded },
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Icon(
+                    painter = painterResource(
+                        if (isExpanded) R.drawable.expand_less else R.drawable.expand_more
+                    ),
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = stringResource(if (isExpanded) R.string.collapse else R.string.expand),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
+        }
+    }
 }
