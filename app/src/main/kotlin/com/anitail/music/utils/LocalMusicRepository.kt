@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
+import android.database.Cursor
 import android.database.ContentObserver
 import android.net.Uri
 import android.os.Build
@@ -58,6 +59,7 @@ class LocalMusicRepository @Inject constructor(
     private val _syncProgress = MutableStateFlow(0f)
     val syncProgress: StateFlow<Float> = _syncProgress.asStateFlow()
 
+    private val mediaStoreHelper = MediaStoreHelper(context)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val syncMutex = Mutex()
     private var pendingMediaStoreSyncJob: Job? = null
@@ -101,7 +103,7 @@ class LocalMusicRepository @Inject constructor(
     private fun registerMediaStoreObserver() {
         runCatching {
             context.contentResolver.registerContentObserver(
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                mediaStoreHelper.audioCollectionUri(),
                 true,
                 mediaStoreObserver,
             )
@@ -152,12 +154,13 @@ class LocalMusicRepository @Inject constructor(
             _syncProgress.value = 0f
 
             val contentResolver = context.contentResolver
+            val audioCollectionUri = mediaStoreHelper.audioCollectionUri()
             Timber.d("LocalMusic: syncLocalMusic() - Got contentResolver: $contentResolver")
             val existingLocalSongIds = database.localSongIds().toSet()
             val scannedLocalSongIds = mutableSetOf<String>()
             var mediaStoreScanSucceeded = false
 
-            val projection = arrayOf(
+            val projection = mutableListOf(
                 MediaStore.Audio.Media._ID,
                 MediaStore.Audio.Media.TITLE,
                 MediaStore.Audio.Media.ARTIST,
@@ -166,20 +169,25 @@ class LocalMusicRepository @Inject constructor(
                 MediaStore.Audio.Media.DURATION,
                 MediaStore.Audio.Media.TRACK,
                 MediaStore.Audio.Media.YEAR,
-                MediaStore.Audio.Media.DATA,  // Full file path for folder browsing
+                MediaStore.Audio.Media.DISPLAY_NAME,
             )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                projection += MediaStore.Audio.Media.RELATIVE_PATH
+            } else {
+                projection += MediaStore.Audio.Media.DATA
+            }
 
             // Include all audio files (m4a, webm, mp3, flac, etc.)
             val selection = "(${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.MIME_TYPE} LIKE 'audio/%')"
             val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
 
-            Timber.d("LocalMusic: syncLocalMusic() - Querying MediaStore.Audio.Media.EXTERNAL_CONTENT_URI")
-            Timber.d("LocalMusic: syncLocalMusic() - URI: ${MediaStore.Audio.Media.EXTERNAL_CONTENT_URI}")
+            Timber.d("LocalMusic: syncLocalMusic() - Querying MediaStore audio collection")
+            Timber.d("LocalMusic: syncLocalMusic() - URI: $audioCollectionUri")
             Timber.d("LocalMusic: syncLocalMusic() - Selection: $selection")
 
             contentResolver.query(
-                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                projection,
+                audioCollectionUri,
+                projection.toTypedArray(),
                 selection,
                 null,
                 sortOrder
@@ -193,7 +201,13 @@ class LocalMusicRepository @Inject constructor(
                 val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
                 val trackCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TRACK)
                 val yearCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR)
-                val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+                val displayNameCol = cursor.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME)
+                val dataCol = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+                val relativePathCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    cursor.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
+                } else {
+                    -1
+                }
 
                 val totalCount = cursor.count
                 var processedCount = 0
@@ -228,7 +242,12 @@ class LocalMusicRepository @Inject constructor(
                         val duration = cursor.getInt(durationCol) / 1000
                         val trackNumber = cursor.getInt(trackCol)
                         val year = cursor.getInt(yearCol).takeIf { it > 0 }
-                        val filePath = cursor.getString(dataCol)
+                        val filePath = resolveLocalPath(
+                            cursor = cursor,
+                            dataCol = dataCol,
+                            relativePathCol = relativePathCol,
+                            displayNameCol = displayNameCol,
+                        )
 
                         val songId = "LOCAL_$mediaStoreId"
                         scannedLocalSongIds += songId
@@ -240,7 +259,7 @@ class LocalMusicRepository @Inject constructor(
                         }
 
                         val contentUri = ContentUris.withAppendedId(
-                            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                            audioCollectionUri,
                             mediaStoreId
                         ).toString()
 
@@ -361,6 +380,39 @@ class LocalMusicRepository @Inject constructor(
             _syncStatus.value = LocalSyncStatus.Error(e.message ?: "Unknown error")
         } finally {
             syncMutex.unlock()
+        }
+    }
+
+    private fun resolveLocalPath(
+        cursor: Cursor,
+        dataCol: Int,
+        relativePathCol: Int,
+        displayNameCol: Int,
+    ): String? {
+        if (dataCol >= 0) {
+            return cursor.getString(dataCol)
+        }
+
+        val relativePath = if (relativePathCol >= 0) {
+            cursor.getString(relativePathCol)
+                ?.trim()
+                ?.trimEnd('/')
+        } else {
+            null
+        }
+        val displayName = if (displayNameCol >= 0) {
+            cursor.getString(displayNameCol)?.trim()
+        } else {
+            null
+        }
+
+        return when {
+            !relativePath.isNullOrEmpty() && !displayName.isNullOrEmpty() ->
+                "$relativePath/$displayName"
+
+            !relativePath.isNullOrEmpty() -> relativePath
+            !displayName.isNullOrEmpty() -> displayName
+            else -> null
         }
     }
 
