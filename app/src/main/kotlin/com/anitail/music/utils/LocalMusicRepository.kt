@@ -170,11 +170,10 @@ class LocalMusicRepository @Inject constructor(
                 MediaStore.Audio.Media.TRACK,
                 MediaStore.Audio.Media.YEAR,
                 MediaStore.Audio.Media.DISPLAY_NAME,
+                MediaStore.Audio.Media.DATA,
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 projection += MediaStore.Audio.Media.RELATIVE_PATH
-            } else {
-                projection += MediaStore.Audio.Media.DATA
             }
 
             // Include all audio files (m4a, webm, mp3, flac, etc.)
@@ -247,6 +246,7 @@ class LocalMusicRepository @Inject constructor(
                             dataCol = dataCol,
                             relativePathCol = relativePathCol,
                             displayNameCol = displayNameCol,
+                            fallbackFileName = "local_$mediaStoreId",
                         )
 
                         val songId = "LOCAL_$mediaStoreId"
@@ -388,9 +388,11 @@ class LocalMusicRepository @Inject constructor(
         dataCol: Int,
         relativePathCol: Int,
         displayNameCol: Int,
+        fallbackFileName: String,
     ): String? {
         if (dataCol >= 0) {
-            return cursor.getString(dataCol)
+            val dataPath = cursor.getString(dataCol)?.trim()
+            if (!dataPath.isNullOrEmpty()) return dataPath
         }
 
         val relativePath = if (relativePathCol >= 0) {
@@ -410,7 +412,7 @@ class LocalMusicRepository @Inject constructor(
             !relativePath.isNullOrEmpty() && !displayName.isNullOrEmpty() ->
                 "$relativePath/$displayName"
 
-            !relativePath.isNullOrEmpty() -> relativePath
+            !relativePath.isNullOrEmpty() -> "$relativePath/$fallbackFileName"
             else -> null
         }
     }

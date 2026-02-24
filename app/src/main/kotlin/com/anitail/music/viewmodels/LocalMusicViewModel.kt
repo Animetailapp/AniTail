@@ -83,11 +83,16 @@ class LocalMusicViewModel @Inject constructor(
 
             // Get immediate children of the common prefix as root folders
             val rootFolders = allFolders.mapNotNull { folder ->
-                if (folder.startsWith("$commonPrefix/")) {
-                    val remaining = folder.removePrefix("$commonPrefix/")
-                    val firstChild = remaining.split("/").firstOrNull()
-                    if (firstChild != null) "$commonPrefix/$firstChild" else null
-                } else null
+                when {
+                    commonPrefix.isEmpty() -> folder
+                    folder == commonPrefix -> folder
+                    folder.startsWith("$commonPrefix/") -> {
+                        val remaining = folder.removePrefix("$commonPrefix/")
+                        val firstChild = remaining.split("/").firstOrNull()
+                        if (firstChild != null) "$commonPrefix/$firstChild" else null
+                    }
+                    else -> null
+                }
             }.distinct()
 
             Timber.d("LocalMusicViewModel: Found ${rootFolders.size} root folders")
