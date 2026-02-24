@@ -1353,9 +1353,15 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         syncUtils.likeSong(song)
 
         // Check if auto-download on like is enabled and the song is now liked
-        if (dataStore.get(AutoDownloadOnLikeKey, false) && song.liked) {
-          // Trigger download for the liked song
-            downloadUtil.downloadToMediaStore(it)
+        if (dataStore.get(AutoDownloadOnLikeKey, false) &&
+            song.liked &&
+            !song.isLocal &&
+            !song.id.startsWith("LOCAL_")
+        ) {
+          // Trigger download for the liked song using metadata-capable format when available
+            scope.launch(Dispatchers.IO) {
+              downloadUtil.downloadToMediaStoreWithMetadataPreference(it)
+            }
 
           // Download lyrics if auto-download lyrics is enabled
           if (dataStore.get(AutoDownloadLyricsKey, false)) {
