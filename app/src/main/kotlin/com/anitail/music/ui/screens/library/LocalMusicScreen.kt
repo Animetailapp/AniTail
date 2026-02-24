@@ -5,14 +5,17 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,14 +27,15 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -48,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -55,11 +60,14 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
@@ -75,12 +83,9 @@ import com.anitail.music.constants.GridItemSize
 import com.anitail.music.constants.GridItemsSizeKey
 import com.anitail.music.constants.GridThumbnailHeight
 import com.anitail.music.constants.LibraryViewType
-import com.anitail.music.db.entities.Album
 import com.anitail.music.db.entities.Artist
-import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.playback.queues.ListQueue
-import com.anitail.music.ui.component.ArtistGridItem
 import com.anitail.music.ui.component.ArtistListItem
 import com.anitail.music.ui.component.DefaultDialog
 import com.anitail.music.ui.component.EmptyPlaceholder
@@ -88,7 +93,6 @@ import com.anitail.music.ui.component.LocalMenuState
 import com.anitail.music.ui.component.SongListItem
 import com.anitail.music.ui.component.SortHeader
 import com.anitail.music.ui.component.AlbumListItem
-import com.anitail.music.ui.component.AlbumGridItem
 import com.anitail.music.ui.component.ChipsRow
 import com.anitail.music.ui.menu.AlbumMenu
 import com.anitail.music.ui.menu.SongMenu
@@ -167,6 +171,15 @@ fun LocalMusicScreen(
     }
 
     val isActiveSearch = isSearching && searchQuery.text.isNotEmpty()
+    val totalSearchResults = filteredArtists.size + filteredAlbums.size + filteredSongs.size
+    val artistCountLabel = pluralStringResource(R.plurals.n_artist, filteredArtists.size, filteredArtists.size)
+    val folderCountLabel = "${rootFolders.size} ${stringResource(R.string.folders).lowercase()}"
+    val songCountLabel = pluralStringResource(R.plurals.n_song, allLocalSongs.size, allLocalSongs.size)
+    val activeCollectionLabel = when {
+        isActiveSearch -> "$totalSearchResults ${stringResource(R.string.search).lowercase()}"
+        selectedTab == 0 -> artistCountLabel
+        else -> folderCountLabel
+    }
 
     // Auto-focus search field when search is opened
     LaunchedEffect(isSearching) {
@@ -243,81 +256,118 @@ fun LocalMusicScreen(
     }
 
     val headerContent = @Composable {
-        Column {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
             if (syncStatus is LocalSyncStatus.Syncing) {
                 LinearProgressIndicator(
                     progress = { syncProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
 
-            // Tab chips for Artists/Folders
-            ChipsRow(
-                chips = listOf(
-                    0 to stringResource(R.string.artists),
-                    1 to stringResource(R.string.folders)
-                ),
-                currentValue = selectedTab,
-                onValueUpdate = { selectedTab = it },
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 16.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                SortHeader(
-                    sortType = sortType,
-                    sortDescending = sortDescending,
-                    onSortTypeChange = onSortTypeChange,
-                    onSortDescendingChange = onSortDescendingChange,
-                    sortTypeText = { sortType ->
-                        when (sortType) {
-                            ArtistSortType.CREATE_DATE -> R.string.sort_by_create_date
-                            ArtistSortType.NAME -> R.string.sort_by_name
-                            ArtistSortType.SONG_COUNT -> R.string.sort_by_song_count
-                            ArtistSortType.PLAY_TIME -> R.string.sort_by_play_time
-                        }
-                    },
+                LocalMusicStatPill(
+                    label = stringResource(R.string.artists),
+                    value = artistCountLabel,
+                    modifier = Modifier.weight(1f),
                 )
+                LocalMusicStatPill(
+                    label = stringResource(R.string.folders),
+                    value = folderCountLabel,
+                    modifier = Modifier.weight(1f),
+                )
+                LocalMusicStatPill(
+                    label = stringResource(R.string.songs),
+                    value = songCountLabel,
+                    modifier = Modifier.weight(1f),
+                )
+            }
 
-                Spacer(Modifier.weight(1f))
-
-                Text(
-                    text = pluralStringResource(
-                        R.plurals.n_artist,
-                        filteredArtists.size,
-                        filteredArtists.size
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+            ) {
+                ChipsRow(
+                    chips = listOf(
+                        0 to stringResource(R.string.artists),
+                        1 to stringResource(R.string.folders),
                     ),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.secondary,
+                    currentValue = selectedTab,
+                    onValueUpdate = { selectedTab = it },
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
                 )
+            }
 
-                IconButton(
-                    onClick = { isSearching = !isSearching },
-                    modifier = Modifier.padding(horizontal = 4.dp),
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                tonalElevation = 1.dp,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 8.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.search),
-                        contentDescription = null,
+                    SortHeader(
+                        sortType = sortType,
+                        sortDescending = sortDescending,
+                        onSortTypeChange = onSortTypeChange,
+                        onSortDescendingChange = onSortDescendingChange,
+                        sortTypeText = { currentSortType ->
+                            when (currentSortType) {
+                                ArtistSortType.CREATE_DATE -> R.string.sort_by_create_date
+                                ArtistSortType.NAME -> R.string.sort_by_name
+                                ArtistSortType.SONG_COUNT -> R.string.sort_by_song_count
+                                ArtistSortType.PLAY_TIME -> R.string.sort_by_play_time
+                            }
+                        },
                     )
-                }
 
-                IconButton(
-                    onClick = { viewType = viewType.toggle() },
-                    modifier = Modifier.padding(end = 6.dp),
-                ) {
-                    Icon(
-                        painter = painterResource(
-                            when (viewType) {
-                                LibraryViewType.LIST -> R.drawable.list
-                                LibraryViewType.GRID -> R.drawable.grid_view
-                            },
-                        ),
-                        contentDescription = null,
+                    Spacer(Modifier.weight(1f))
+
+                    Text(
+                        text = activeCollectionLabel,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+
+                    IconButton(
+                        onClick = {
+                            isSearching = !isSearching
+                            if (!isSearching) {
+                                searchQuery = TextFieldValue("")
+                            }
+                        },
+                    ) {
+                        Icon(
+                            painter = painterResource(if (isSearching) R.drawable.close else R.drawable.search),
+                            contentDescription = null,
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { viewType = viewType.toggle() },
+                    ) {
+                        Icon(
+                            painter = painterResource(
+                                when (viewType) {
+                                    LibraryViewType.LIST -> R.drawable.grid_view
+                                    LibraryViewType.GRID -> R.drawable.list
+                                },
+                            ),
+                            contentDescription = null,
+                        )
+                    }
                 }
             }
         }
@@ -386,7 +436,7 @@ fun LocalMusicScreen(
                         singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
                             .focusRequester(searchFocusRequester)
                     )
                 }
@@ -440,6 +490,7 @@ fun LocalMusicScreen(
                                         ArtistListItem(
                                             artist = artist,
                                             modifier = Modifier
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
                                                 .fillMaxWidth()
                                                 .clickable {
                                                     navController.navigate("local_artist/${artist.id}")
@@ -465,6 +516,7 @@ fun LocalMusicScreen(
                                         AlbumListItem(
                                             album = album,
                                             modifier = Modifier
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
                                                 .fillMaxWidth()
                                                 .combinedClickable(
                                                     onClick = {
@@ -520,6 +572,7 @@ fun LocalMusicScreen(
                                                 }
                                             },
                                             modifier = Modifier
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
                                                 .fillMaxWidth()
                                                 .combinedClickable(
                                                     onClick = {
@@ -567,6 +620,7 @@ fun LocalMusicScreen(
                                             ArtistListItem(
                                                 artist = artist,
                                                 modifier = Modifier
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
                                                     .fillMaxWidth()
                                                     .combinedClickable(
                                                         onClick = {
@@ -615,7 +669,9 @@ fun LocalMusicScreen(
                     LibraryViewType.GRID ->
                         LazyVerticalGrid(
                             state = lazyGridState,
-                            columns = GridCells.Fixed(3),
+                            columns = GridCells.Adaptive(
+                                minSize = GridThumbnailHeight + if (gridItemSize == GridItemSize.BIG) 24.dp else (-24).dp,
+                            ),
                             contentPadding = PaddingValues(bottom = bottomPadding),
                         ) {
                             item(
@@ -643,9 +699,8 @@ fun LocalMusicScreen(
                                         key = { it.id },
                                         contentType = { CONTENT_TYPE_ARTIST },
                                     ) { artist ->
-                                        ArtistGridItem(
+                                        LocalArtistGridItem(
                                             artist = artist,
-                                            fillMaxWidth = true,
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .combinedClickable(
@@ -676,9 +731,8 @@ fun LocalMusicScreen(
                                     items(
                                         items = rootFolders,
                                         key = { "folder_${it.first}" },
-                                        span = { GridItemSpan(maxLineSpan) },
                                     ) { (folderPath, songCount) ->
-                                        FolderListItem(
+                                        LocalFolderGridItem(
                                             folderPath = folderPath,
                                             songCount = songCount,
                                             onClick = {
@@ -714,24 +768,193 @@ fun LocalMusicScreen(
 }
 
 @Composable
+private fun LocalMusicStatPill(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocalArtistGridItem(
+    artist: Artist,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        modifier = modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = artist.artist.thumbnailUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                if (artist.artist.thumbnailUrl.isNullOrBlank()) {
+                    Icon(
+                        painter = painterResource(R.drawable.artist),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Text(
+                text = artist.artist.name,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = pluralStringResource(R.plurals.n_song, artist.songCount, artist.songCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocalFolderGridItem(
+    folderPath: String,
+    songCount: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        modifier = modifier
+            .padding(horizontal = 4.dp, vertical = 6.dp)
+            .clickable(onClick = onClick),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.library_music_outlined),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(8.dp),
+                )
+            }
+            Text(
+                text = folderPath.substringAfterLast('/').ifBlank { folderPath },
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = pluralStringResource(R.plurals.n_song, songCount, songCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
 fun FolderListItem(
     folderPath: String,
     songCount: Int,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
-    ListItem(
-        headlineContent = { Text(folderPath.substringAfterLast('/')) },
-        supportingContent = { Text(pluralStringResource(R.plurals.n_song, songCount, songCount)) },
-        leadingContent = {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp, vertical = 3.dp)
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.library_music_outlined),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(8.dp),
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = folderPath.substringAfterLast('/').ifBlank { folderPath },
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = pluralStringResource(R.plurals.n_song, songCount, songCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             Icon(
-                painter = painterResource(R.drawable.library_music),
+                painter = painterResource(R.drawable.arrow_forward),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        },
-        modifier = modifier.clickable(onClick = onClick)
-    )
+        }
+    }
 }
 
 
