@@ -1,20 +1,18 @@
 package com.anitail.music.ui.screens.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -22,11 +20,16 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -39,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -110,7 +114,7 @@ fun LocalArtistScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection)
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
     ) {
         when (viewType) {
             LibraryViewType.LIST ->
@@ -118,144 +122,66 @@ fun LocalArtistScreen(
                     contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
                 ) {
                     item(key = "header", contentType = CONTENT_TYPE_HEADER) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            artist?.let { a ->
-                                AsyncImage(
-                                    model = a.artist.thumbnailUrl,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .size(120.dp)
-                                        .clip(CircleShape)
-                                )
-                                Text(
-                                    text = a.artist.name,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    modifier = Modifier.padding(top = 16.dp)
-                                )
-                                if (songs.isEmpty()) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier
-                                            .padding(top = 8.dp)
-                                            .size(16.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                } else {
-                                    Text(
-                                        text = pluralStringResource(
-                                            R.plurals.n_song,
-                                            songs.size,
-                                            songs.size
+                        LocalArtistHeroCard(
+                            artistName = artist?.artist?.name.orEmpty(),
+                            thumbnailUrl = artist?.artist?.thumbnailUrl,
+                            songCount = songs.size,
+                            albumCount = sortedAlbums.size,
+                            showLoading = songs.isEmpty(),
+                            onPlayAll = {
+                                Timber.d("LocalArtistScreen: [LIST] Play all clicked - ${songs.size} songs")
+                                if (songs.isNotEmpty()) {
+                                    val mediaItems = songs.map { it.toMediaItem() }
+                                    Timber.d("LocalArtistScreen: [LIST] Playing queue with ${mediaItems.size} items")
+                                    mediaItems.forEachIndexed { idx, item ->
+                                        Timber.d("LocalArtistScreen: [LIST] MediaItem[$idx] id=${item.mediaId}, uri=${item.localConfiguration?.uri}")
+                                    }
+                                    playerConnection.playQueue(
+                                        ListQueue(
+                                            title = artist?.artist?.name ?: "Local Artist",
+                                            items = mediaItems,
                                         ),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.secondary
                                     )
                                 }
-                            }
-
-                            Row(
-                                modifier = Modifier.padding(top = 16.dp)
-                            ) {
-                                IconButton(
-                                    onClick = {
-                                        Timber.d("LocalArtistScreen: [LIST] Play all clicked - ${songs.size} songs")
-                                        if (songs.isNotEmpty()) {
-                                            val mediaItems = songs.map { it.toMediaItem() }
-                                            Timber.d("LocalArtistScreen: [LIST] Playing queue with ${mediaItems.size} items")
-                                            mediaItems.forEachIndexed { idx, item ->
-                                                Timber.d("LocalArtistScreen: [LIST] MediaItem[$idx] id=${item.mediaId}, uri=${item.localConfiguration?.uri}")
-                                            }
-                                            playerConnection.playQueue(
-                                                ListQueue(
-                                                    title = artist?.artist?.name ?: "Local Artist",
-                                                    items = mediaItems
-                                                )
-                                            )
-                                        }
-                                    }
-                                ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.play),
-                                        contentDescription = stringResource(R.string.play)
+                            },
+                            onShuffle = {
+                                Timber.d("LocalArtistScreen: [LIST] Shuffle clicked - ${songs.size} songs")
+                                if (songs.isNotEmpty()) {
+                                    playerConnection.playQueue(
+                                        ListQueue(
+                                            title = artist?.artist?.name ?: "Local Artist",
+                                            items = songs.shuffled().map { it.toMediaItem() },
+                                        ),
                                     )
                                 }
-                                IconButton(
-                                    onClick = {
-                                        Timber.d("LocalArtistScreen: [LIST] Shuffle clicked - ${songs.size} songs")
-                                        if (songs.isNotEmpty()) {
-                                            playerConnection.playQueue(
-                                                ListQueue(
-                                                    title = artist?.artist?.name ?: "Local Artist",
-                                                    items = songs.shuffled().map { it.toMediaItem() }
-                                                )
-                                            )
-                                        }
-                                    }
-                                ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.shuffle),
-                                        contentDescription = stringResource(R.string.shuffle)
-                                    )
-                                }
-                            }
-                        }
+                            },
+                        )
                     }
 
-                    if (albums.isNotEmpty()) {
+                    if (sortedAlbums.isNotEmpty()) {
                         item(key = "albums_header", contentType = CONTENT_TYPE_HEADER) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(start = 16.dp),
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.albums),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                SortHeader(
-                                    sortType = sortType,
-                                    sortDescending = sortDescending,
-                                    onSortTypeChange = onSortTypeChange,
-                                    onSortDescendingChange = onSortDescendingChange,
-                                    sortTypeText = { sortType ->
-                                        when (sortType) {
-                                            AlbumSortType.CREATE_DATE -> R.string.sort_by_create_date
-                                            AlbumSortType.NAME -> R.string.sort_by_name
-                                            AlbumSortType.ARTIST -> R.string.sort_by_artist
-                                            AlbumSortType.YEAR -> R.string.sort_by_year
-                                            AlbumSortType.SONG_COUNT -> R.string.sort_by_song_count
-                                            AlbumSortType.LENGTH -> R.string.sort_by_length
-                                            AlbumSortType.PLAY_TIME -> R.string.sort_by_play_time
-                                        }
-                                    },
-                                )
-                                IconButton(
-                                    onClick = { viewType = viewType.toggle() },
-                                ) {
-                                    Icon(
-                                        painter = painterResource(
-                                            when (viewType) {
-                                                LibraryViewType.LIST -> R.drawable.list
-                                                LibraryViewType.GRID -> R.drawable.grid_view
-                                            }
-                                        ),
-                                        contentDescription = null,
-                                    )
-                                }
-                            }
+                            LocalArtistAlbumsHeader(
+                                albumCount = sortedAlbums.size,
+                                sortType = sortType,
+                                sortDescending = sortDescending,
+                                onSortTypeChange = onSortTypeChange,
+                                onSortDescendingChange = onSortDescendingChange,
+                                viewType = viewType,
+                                onToggleView = { viewType = viewType.toggle() },
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            )
                         }
 
                         items(
                             items = sortedAlbums,
                             key = { it.id },
-                            contentType = { CONTENT_TYPE_ALBUM }
+                            contentType = { CONTENT_TYPE_ALBUM },
                         ) { album ->
                             AlbumListItem(
                                 album = album,
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
                                     .combinedClickable(
                                         onClick = {
                                             Timber.d("LocalArtistScreen: [LIST] Album clicked - id=${album.id}, title=${album.album.title}")
@@ -266,29 +192,41 @@ fun LocalArtistScreen(
                                                 AlbumMenu(
                                                     originalAlbum = album,
                                                     navController = navController,
-                                                    onDismiss = menuState::dismiss
+                                                    onDismiss = menuState::dismiss,
                                                 )
                                             }
-                                        }
+                                        },
                                     )
-                                    .animateItem()
+                                    .animateItem(),
                             )
                         }
                     }
 
                     if (songs.isNotEmpty()) {
                         item(key = "songs_header", contentType = CONTENT_TYPE_HEADER) {
-                            Text(
-                                text = stringResource(R.string.songs),
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(16.dp)
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.songs),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Spacer(modifier = Modifier.weight(1f))
+                                Text(
+                                    text = pluralStringResource(R.plurals.n_song, songs.size, songs.size),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
 
                         items(
                             items = songs,
                             key = { it.id },
-                            contentType = { CONTENT_TYPE_SONG }
+                            contentType = { CONTENT_TYPE_SONG },
                         ) { song ->
                             SongListItem(
                                 song = song,
@@ -300,19 +238,20 @@ fun LocalArtistScreen(
                                                 SongMenu(
                                                     originalSong = song,
                                                     navController = navController,
-                                                    onDismiss = menuState::dismiss
+                                                    onDismiss = menuState::dismiss,
                                                 )
                                             }
-                                        }
+                                        },
                                     ) {
                                         Icon(
                                             painter = painterResource(R.drawable.more_vert),
-                                            contentDescription = null
+                                            contentDescription = null,
                                         )
                                     }
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
                                     .combinedClickable(
                                         onClick = {
                                             Timber.d("LocalArtistScreen: [LIST] Song clicked - id=${song.id}, title=${song.song.title}")
@@ -322,8 +261,8 @@ fun LocalArtistScreen(
                                                 ListQueue(
                                                     title = artist?.artist?.name ?: "Local Artist",
                                                     items = songs.map { it.toMediaItem() },
-                                                    startIndex = songs.indexOf(song)
-                                                )
+                                                    startIndex = songs.indexOf(song),
+                                                ),
                                             )
                                         },
                                         onLongClick = {
@@ -331,21 +270,21 @@ fun LocalArtistScreen(
                                                 SongMenu(
                                                     originalSong = song,
                                                     navController = navController,
-                                                    onDismiss = menuState::dismiss
+                                                    onDismiss = menuState::dismiss,
                                                 )
                                             }
-                                        }
+                                        },
                                     )
-                                    .animateItem()
+                                    .animateItem(),
                             )
                         }
                     }
 
-                    if (albums.isEmpty() && songs.isEmpty()) {
+                    if (sortedAlbums.isEmpty() && songs.isEmpty()) {
                         item(key = "empty") {
                             EmptyPlaceholder(
                                 icon = R.drawable.music_note,
-                                text = stringResource(R.string.no_results_found)
+                                text = stringResource(R.string.no_results_found),
                             )
                         }
                     }
@@ -361,142 +300,63 @@ fun LocalArtistScreen(
                     item(
                         key = "header",
                         span = { GridItemSpan(maxLineSpan) },
-                        contentType = CONTENT_TYPE_HEADER
+                        contentType = CONTENT_TYPE_HEADER,
                     ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            artist?.let { a ->
-                                AsyncImage(
-                                    model = a.artist.thumbnailUrl,
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .size(120.dp)
-                                        .clip(CircleShape)
-                                )
-                                Text(
-                                    text = a.artist.name,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    modifier = Modifier.padding(top = 16.dp)
-                                )
-                                if (songs.isEmpty()) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier
-                                            .padding(top = 8.dp)
-                                            .size(16.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                } else {
-                                    Text(
-                                        text = pluralStringResource(
-                                            R.plurals.n_song,
-                                            songs.size,
-                                            songs.size
+                        LocalArtistHeroCard(
+                            artistName = artist?.artist?.name.orEmpty(),
+                            thumbnailUrl = artist?.artist?.thumbnailUrl,
+                            songCount = songs.size,
+                            albumCount = sortedAlbums.size,
+                            showLoading = songs.isEmpty(),
+                            onPlayAll = {
+                                Timber.d("LocalArtistScreen: [GRID] Play all clicked - ${songs.size} songs")
+                                if (songs.isNotEmpty()) {
+                                    val mediaItems = songs.map { it.toMediaItem() }
+                                    Timber.d("LocalArtistScreen: [GRID] Playing queue with ${mediaItems.size} items")
+                                    playerConnection.playQueue(
+                                        ListQueue(
+                                            title = artist?.artist?.name ?: "Local Artist",
+                                            items = mediaItems,
                                         ),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.secondary
                                     )
                                 }
-                            }
-
-                            Row(
-                                modifier = Modifier.padding(top = 16.dp)
-                            ) {
-                                IconButton(
-                                    onClick = {
-                                        Timber.d("LocalArtistScreen: [GRID] Play all clicked - ${songs.size} songs")
-                                        if (songs.isNotEmpty()) {
-                                            val mediaItems = songs.map { it.toMediaItem() }
-                                            Timber.d("LocalArtistScreen: [GRID] Playing queue with ${mediaItems.size} items")
-                                            playerConnection.playQueue(
-                                                ListQueue(
-                                                    title = artist?.artist?.name ?: "Local Artist",
-                                                    items = mediaItems
-                                                )
-                                            )
-                                        }
-                                    }
-                                ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.play),
-                                        contentDescription = stringResource(R.string.play)
+                            },
+                            onShuffle = {
+                                Timber.d("LocalArtistScreen: [GRID] Shuffle clicked - ${songs.size} songs")
+                                if (songs.isNotEmpty()) {
+                                    playerConnection.playQueue(
+                                        ListQueue(
+                                            title = artist?.artist?.name ?: "Local Artist",
+                                            items = songs.shuffled().map { it.toMediaItem() },
+                                        ),
                                     )
                                 }
-                                IconButton(
-                                    onClick = {
-                                        Timber.d("LocalArtistScreen: [GRID] Shuffle clicked - ${songs.size} songs")
-                                        if (songs.isNotEmpty()) {
-                                            playerConnection.playQueue(
-                                                ListQueue(
-                                                    title = artist?.artist?.name ?: "Local Artist",
-                                                    items = songs.shuffled().map { it.toMediaItem() }
-                                                )
-                                            )
-                                        }
-                                    }
-                                ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.shuffle),
-                                        contentDescription = stringResource(R.string.shuffle)
-                                    )
-                                }
-                            }
-                        }
+                            },
+                        )
                     }
 
-                    if (albums.isNotEmpty()) {
+                    if (sortedAlbums.isNotEmpty()) {
                         item(
                             key = "albums_header",
                             span = { GridItemSpan(maxLineSpan) },
-                            contentType = CONTENT_TYPE_HEADER
+                            contentType = CONTENT_TYPE_HEADER,
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(start = 16.dp),
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.albums),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                SortHeader(
-                                    sortType = sortType,
-                                    sortDescending = sortDescending,
-                                    onSortTypeChange = onSortTypeChange,
-                                    onSortDescendingChange = onSortDescendingChange,
-                                    sortTypeText = { sortType ->
-                                        when (sortType) {
-                                            AlbumSortType.CREATE_DATE -> R.string.sort_by_create_date
-                                            AlbumSortType.NAME -> R.string.sort_by_name
-                                            AlbumSortType.ARTIST -> R.string.sort_by_artist
-                                            AlbumSortType.YEAR -> R.string.sort_by_year
-                                            AlbumSortType.SONG_COUNT -> R.string.sort_by_song_count
-                                            AlbumSortType.LENGTH -> R.string.sort_by_length
-                                            AlbumSortType.PLAY_TIME -> R.string.sort_by_play_time
-                                        }
-                                    },
-                                )
-                                IconButton(
-                                    onClick = { viewType = viewType.toggle() },
-                                ) {
-                                    Icon(
-                                        painter = painterResource(
-                                            when (viewType) {
-                                                LibraryViewType.LIST -> R.drawable.list
-                                                LibraryViewType.GRID -> R.drawable.grid_view
-                                            }
-                                        ),
-                                        contentDescription = null,
-                                    )
-                                }
-                            }
+                            LocalArtistAlbumsHeader(
+                                albumCount = sortedAlbums.size,
+                                sortType = sortType,
+                                sortDescending = sortDescending,
+                                onSortTypeChange = onSortTypeChange,
+                                onSortDescendingChange = onSortDescendingChange,
+                                viewType = viewType,
+                                onToggleView = { viewType = viewType.toggle() },
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            )
                         }
 
                         items(
                             items = sortedAlbums,
                             key = { it.id },
-                            contentType = { CONTENT_TYPE_ALBUM }
+                            contentType = { CONTENT_TYPE_ALBUM },
                         ) { album ->
                             AlbumGridItem(
                                 album = album,
@@ -504,6 +364,7 @@ fun LocalArtistScreen(
                                 coroutineScope = coroutineScope,
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .padding(horizontal = 4.dp, vertical = 4.dp)
                                     .combinedClickable(
                                         onClick = {
                                             Timber.d("LocalArtistScreen: [GRID] Album clicked - id=${album.id}, title=${album.album.title}")
@@ -514,12 +375,25 @@ fun LocalArtistScreen(
                                                 AlbumMenu(
                                                     originalAlbum = album,
                                                     navController = navController,
-                                                    onDismiss = menuState::dismiss
+                                                    onDismiss = menuState::dismiss,
                                                 )
                                             }
-                                        }
+                                        },
                                     )
-                                    .animateItem()
+                                    .animateItem(),
+                            )
+                        }
+                    }
+
+                    if (sortedAlbums.isEmpty() && songs.isEmpty()) {
+                        item(
+                            key = "empty_grid",
+                            span = { GridItemSpan(maxLineSpan) },
+                            contentType = CONTENT_TYPE_HEADER,
+                        ) {
+                            EmptyPlaceholder(
+                                icon = R.drawable.music_note,
+                                text = stringResource(R.string.no_results_found),
                             )
                         }
                     }
@@ -532,18 +406,221 @@ fun LocalArtistScreen(
             Text(
                 text = artist?.artist?.name ?: "",
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
         },
         navigationIcon = {
             IconButton(onClick = navController::navigateUp) {
                 Icon(
                     painterResource(R.drawable.arrow_back),
-                    contentDescription = null
+                    contentDescription = null,
                 )
             }
         },
-        scrollBehavior = scrollBehavior
+        scrollBehavior = scrollBehavior,
     )
 }
 
+@Composable
+private fun LocalArtistHeroCard(
+    artistName: String,
+    thumbnailUrl: String?,
+    songCount: Int,
+    albumCount: Int,
+    showLoading: Boolean,
+    onPlayAll: () -> Unit,
+    onShuffle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        tonalElevation = 1.dp,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = thumbnailUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                if (thumbnailUrl.isNullOrBlank()) {
+                    Icon(
+                        painter = painterResource(R.drawable.artist),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+            }
+
+            Text(
+                text = artistName,
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            if (showLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text(
+                    text = pluralStringResource(R.plurals.n_song, songCount, songCount),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                LocalArtistInfoChip(
+                    text = pluralStringResource(R.plurals.n_album, albumCount, albumCount),
+                    modifier = Modifier.weight(1f),
+                )
+                LocalArtistInfoChip(
+                    text = pluralStringResource(R.plurals.n_song, songCount, songCount),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Button(
+                    onClick = onPlayAll,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.play),
+                        contentDescription = null,
+                        modifier = Modifier.size(ButtonDefaults.IconSize),
+                    )
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text(stringResource(R.string.play))
+                }
+                OutlinedButton(
+                    onClick = onShuffle,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.shuffle),
+                        contentDescription = null,
+                        modifier = Modifier.size(ButtonDefaults.IconSize),
+                    )
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text(stringResource(R.string.shuffle))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocalArtistAlbumsHeader(
+    albumCount: Int,
+    sortType: AlbumSortType,
+    sortDescending: Boolean,
+    onSortTypeChange: (AlbumSortType) -> Unit,
+    onSortDescendingChange: (Boolean) -> Unit,
+    viewType: LibraryViewType,
+    onToggleView: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        tonalElevation = 1.dp,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 8.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+        ) {
+            SortHeader(
+                sortType = sortType,
+                sortDescending = sortDescending,
+                onSortTypeChange = onSortTypeChange,
+                onSortDescendingChange = onSortDescendingChange,
+                sortTypeText = ::localArtistAlbumSortLabel,
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Text(
+                text = pluralStringResource(R.plurals.n_album, albumCount, albumCount),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.secondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            IconButton(onClick = onToggleView) {
+                Icon(
+                    painter = painterResource(
+                        when (viewType) {
+                            LibraryViewType.LIST -> R.drawable.grid_view
+                            LibraryViewType.GRID -> R.drawable.list
+                        },
+                    ),
+                    contentDescription = null,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocalArtistInfoChip(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.42f),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private fun localArtistAlbumSortLabel(sortType: AlbumSortType): Int =
+    when (sortType) {
+        AlbumSortType.CREATE_DATE -> R.string.sort_by_create_date
+        AlbumSortType.NAME -> R.string.sort_by_name
+        AlbumSortType.ARTIST -> R.string.sort_by_artist
+        AlbumSortType.YEAR -> R.string.sort_by_year
+        AlbumSortType.SONG_COUNT -> R.string.sort_by_song_count
+        AlbumSortType.LENGTH -> R.string.sort_by_length
+        AlbumSortType.PLAY_TIME -> R.string.sort_by_play_time
+    }
