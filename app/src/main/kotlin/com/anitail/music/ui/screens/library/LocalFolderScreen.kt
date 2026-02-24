@@ -72,7 +72,7 @@ fun LocalFolderScreen(
     val allSongs by viewModel.allSongs.collectAsState()
     val subfolders by viewModel.subfolders.collectAsState()
 
-    val folderName = folderPath.substringAfterLast('/')
+    val folderName = folderPath.substringAfterLast('/').ifBlank { folderPath }
 
     Timber.d("LocalFolderScreen: COMPOSE - folderPath='$folderPath', directSongs=${songs.size}, allSongs=${allSongs.size}, subfolders=${subfolders.size}")
     Timber.d("LocalFolderScreen: Subfolders = $subfolders")
@@ -118,6 +118,15 @@ fun LocalFolderScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        if (folderPath != folderName) {
+                            Text(
+                                text = folderPath,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                         Text(
                             text = pluralStringResource(R.plurals.n_song, allSongs.size, allSongs.size),
                             style = MaterialTheme.typography.bodyMedium,
@@ -178,22 +187,30 @@ fun LocalFolderScreen(
 
             if (subfolders.isNotEmpty()) {
                 item(key = "subfolders_header") {
-                    Row(
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            text = stringResource(R.string.folders),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        Text(
-                            text = "${subfolders.size}",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.folders),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            Text(
+                                text = "${subfolders.size}",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
 
@@ -214,22 +231,30 @@ fun LocalFolderScreen(
 
             if (songs.isNotEmpty()) {
                 item(key = "songs_header") {
-                    Row(
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            text = stringResource(R.string.songs),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        Text(
-                            text = pluralStringResource(R.plurals.n_song, songs.size, songs.size),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.songs),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            Text(
+                                text = pluralStringResource(R.plurals.n_song, songs.size, songs.size),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
 

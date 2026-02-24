@@ -204,22 +204,30 @@ fun LocalArtistScreen(
 
                     if (songs.isNotEmpty()) {
                         item(key = "songs_header", contentType = CONTENT_TYPE_HEADER) {
-                            Row(
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.18f),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(
-                                    text = stringResource(R.string.songs),
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                                Spacer(modifier = Modifier.weight(1f))
-                                Text(
-                                    text = pluralStringResource(R.plurals.n_song, songs.size, songs.size),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.songs),
+                                        style = MaterialTheme.typography.titleMedium,
+                                    )
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Text(
+                                        text = pluralStringResource(R.plurals.n_song, songs.size, songs.size),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
 
@@ -276,7 +284,7 @@ fun LocalArtistScreen(
                                         },
                                     )
                                     .animateItem(),
-                            )
+                                )
                         }
                     }
 
@@ -432,6 +440,8 @@ private fun LocalArtistHeroCard(
     onShuffle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val displayArtistName = artistName.ifBlank { stringResource(R.string.unknown_artist) }
+
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
@@ -471,7 +481,7 @@ private fun LocalArtistHeroCard(
             }
 
             Text(
-                text = artistName,
+                text = displayArtistName,
                 style = MaterialTheme.typography.headlineSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
