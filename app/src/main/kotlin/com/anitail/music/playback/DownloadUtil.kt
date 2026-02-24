@@ -491,7 +491,7 @@ constructor(
         if (songs.isEmpty()) return MediaStoreCollectionStatus.NotDownloaded
 
         val songStates = songs.mapNotNull { states[it.id] }
-        val allPersistedInMediaStore = songs.all { !it.song.mediaStoreUri.isNullOrEmpty() }
+        val allPersistedInMediaStore = songs.all { !it.song.isLocal && !it.song.mediaStoreUri.isNullOrEmpty() }
 
         return when {
             allPersistedInMediaStore -> MediaStoreCollectionStatus.Completed

@@ -93,7 +93,7 @@ fun YouTubeSongMenu(
     val librarySong by database.song(song.id).collectAsState(initial = null)
     val download by downloadUtil.getDownload(song.id).collectAsState(initial = null)
     val effectiveDownloadState = download?.state
-        ?: if (!librarySong?.song?.mediaStoreUri.isNullOrEmpty()) {
+        ?: if (librarySong?.song?.isLocal != true && !librarySong?.song?.mediaStoreUri.isNullOrEmpty()) {
             Download.STATE_COMPLETED
         } else {
             null

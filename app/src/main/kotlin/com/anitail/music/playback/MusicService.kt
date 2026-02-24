@@ -938,7 +938,9 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     val song = database.song(mediaId).first()
     val mediaMetadata =
         withContext(Dispatchers.Main) { player.findNextMediaItemById(mediaId)?.metadata } ?: return
-      val localMetadata = song?.song?.mediaStoreUri?.let { loadLocalAudioMetadata(it.toUri()) }
+      val localSourceUri =
+          song?.song?.mediaStoreUri ?: song?.song?.takeIf { it.isLocal }?.downloadUri
+      val localMetadata = localSourceUri?.let { loadLocalAudioMetadata(it.toUri()) }
       if (localMetadata != null) {
           val localDurationSeconds =
               localMetadata.durationMs?.takeIf { it > 0 }?.div(1000L)?.toInt()

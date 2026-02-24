@@ -112,7 +112,7 @@ fun SongMenu(
     val download by downloadUtil.getDownload(originalSong.id)
         .collectAsState(initial = null)
     val effectiveDownloadState = download?.state
-        ?: if (!song.song.mediaStoreUri.isNullOrEmpty()) {
+        ?: if (!song.song.isLocal && !song.song.mediaStoreUri.isNullOrEmpty()) {
             Download.STATE_COMPLETED
         } else {
             null

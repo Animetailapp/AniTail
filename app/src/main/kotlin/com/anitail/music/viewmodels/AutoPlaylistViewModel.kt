@@ -59,7 +59,7 @@ constructor(
                             .map { allSongs ->
                                 allSongs.filter { song ->
                                     downloads[song.id]?.state == Download.STATE_COMPLETED ||
-                                        !song.song.mediaStoreUri.isNullOrEmpty()
+                                        (!song.song.isLocal && !song.song.mediaStoreUri.isNullOrEmpty())
                                 }.distinctBy { it.id }
                             }
                             .map { songs ->

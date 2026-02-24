@@ -210,9 +210,9 @@ class LocalMusicRepository @Inject constructor(
                                 albumName = albumName,
                                 year = year,
                                 isLocal = true,
-                                mediaStoreUri = contentUri,
                                 downloadUri = contentUri,
                                 localPath = filePath,
+                                dateDownload = null,
                                 inLibrary = LocalDateTime.now()
                             )
                         )

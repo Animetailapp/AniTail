@@ -165,11 +165,11 @@ interface DatabaseDao {
     fun likedSongsCount(): Flow<Int>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE mediaStoreUri IS NOT NULL ORDER BY dateDownload DESC")
+    @Query("SELECT * FROM song WHERE isLocal = 0 AND mediaStoreUri IS NOT NULL ORDER BY dateDownload DESC")
     suspend fun songsWithMediaStoreUri(): List<Song>
 
     @Transaction
-    @Query("SELECT * FROM song WHERE mediaStoreUri IS NOT NULL ORDER BY dateDownload DESC")
+    @Query("SELECT * FROM song WHERE isLocal = 0 AND mediaStoreUri IS NOT NULL ORDER BY dateDownload DESC")
     fun songsWithMediaStoreUriFlow(): Flow<List<Song>>
 
     @Transaction
@@ -193,7 +193,7 @@ interface DatabaseDao {
             WHEN COUNT(1) = 0 THEN 0
             WHEN SUM(
                 CASE
-                    WHEN song.mediaStoreUri IS NOT NULL OR song.downloadUri IS NOT NULL THEN 1
+                    WHEN song.isLocal = 0 AND (song.mediaStoreUri IS NOT NULL OR song.downloadUri IS NOT NULL) THEN 1
                     ELSE 0
                 END
             ) = COUNT(1) THEN 1
