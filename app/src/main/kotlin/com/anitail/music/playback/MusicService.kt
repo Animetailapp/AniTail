@@ -936,25 +936,26 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       playbackData: YTPlayerUtils.PlaybackData? = null
   ) {
     val song = database.song(mediaId).first()
+    val songEntity = song?.song
     val mediaMetadata =
         withContext(Dispatchers.Main) { player.findNextMediaItemById(mediaId)?.metadata } ?: return
       val localSourceUri =
-          song?.song?.mediaStoreUri ?: song?.song?.takeIf { it.isLocal }?.downloadUri
+          songEntity?.mediaStoreUri ?: songEntity?.takeIf { it.isLocal }?.downloadUri
       val localMetadata = localSourceUri?.let { loadLocalAudioMetadata(it.toUri()) }
-      if (localMetadata != null) {
+      if (localMetadata != null && songEntity != null) {
           val localDurationSeconds =
               localMetadata.durationMs?.takeIf { it > 0 }?.div(1000L)?.toInt()
-          val updatedSongEntity = song.song.copy(
-              title = song.song.title.ifBlank { localMetadata.title ?: song.song.title },
-              artistName = song.song.artistName ?: localMetadata.artist,
-              albumName = song.song.albumName ?: localMetadata.album,
+          val updatedSongEntity = songEntity.copy(
+              title = songEntity.title.ifBlank { localMetadata.title ?: songEntity.title },
+              artistName = songEntity.artistName ?: localMetadata.artist,
+              albumName = songEntity.albumName ?: localMetadata.album,
               duration = when {
-                  song.song.duration > 0 -> song.song.duration
+                  songEntity.duration > 0 -> songEntity.duration
                   localDurationSeconds != null && localDurationSeconds > 0 -> localDurationSeconds
-                  else -> song.song.duration
+                  else -> songEntity.duration
               }
           )
-          if (updatedSongEntity != song.song) {
+          if (updatedSongEntity != songEntity) {
               database.query { upsert(updatedSongEntity) }
           }
           if (playbackData == null) {
@@ -962,7 +963,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
           }
       }
     val duration =
-        song?.song?.duration?.takeIf { it != -1 }
+        songEntity?.duration?.takeIf { it != -1 }
             ?: mediaMetadata.duration.takeIf { it != -1 }
             ?: (playbackData?.videoDetails
                     ?: YTPlayerUtils.playerResponseForMetadata(mediaId).getOrNull()?.videoDetails)
@@ -971,7 +972,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             ?: -1
     database.query {
       if (song == null) insert(mediaMetadata.copy(duration = duration))
-      else if (song.song.duration == -1) update(song.song.copy(duration = duration))
+      else if (songEntity != null && songEntity.duration == -1) update(songEntity.copy(duration = duration))
     }
     if (!database.hasRelatedSongs(mediaId)) {
       val relatedEndpoint =
