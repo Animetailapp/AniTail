@@ -411,7 +411,6 @@ class LocalMusicRepository @Inject constructor(
                 "$relativePath/$displayName"
 
             !relativePath.isNullOrEmpty() -> relativePath
-            !displayName.isNullOrEmpty() -> displayName
             else -> null
         }
     }
