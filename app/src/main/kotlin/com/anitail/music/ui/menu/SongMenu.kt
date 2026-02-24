@@ -121,6 +121,7 @@ fun SongMenu(
     val syncUtils = LocalSyncUtils.current
     val scope = rememberCoroutineScope()
     var refetchIconDegree by remember { mutableFloatStateOf(0f) }
+    val isLocalSong = song.song.isLocal
 
     val cacheViewModel = viewModel<CachePlaylistViewModel>()
     val lastFmViewModel: LastFmViewModel = hiltViewModel()
@@ -455,40 +456,42 @@ fun SongMenu(
             )
         }
 
-        // Share button
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(8.dp)
-                )
-                .clip(RoundedCornerShape(8.dp))
-                .tvClickable {
-                    onDismiss()
-                    val intent = Intent().apply {
-                        action = Intent.ACTION_SEND
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_TEXT, "https://music.youtube.com/watch?v=${song.id}")
-                    }
-                    context.startActivity(Intent.createChooser(intent, null))
-                }
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.share),
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-            )
-            Text(
-                text = stringResource(R.string.share),
-                style = MaterialTheme.typography.labelMedium,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        if (!isLocalSong) {
+            // Share button
+            Column(
                 modifier = Modifier
-                    .basicMarquee()
-                    .padding(top = 4.dp),
-            )
+                    .weight(1f)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .clip(RoundedCornerShape(8.dp))
+                    .tvClickable {
+                        onDismiss()
+                        val intent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, "https://music.youtube.com/watch?v=${song.id}")
+                        }
+                        context.startActivity(Intent.createChooser(intent, null))
+                    }
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.share),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                )
+                Text(
+                    text = stringResource(R.string.share),
+                    style = MaterialTheme.typography.labelMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier
+                        .basicMarquee()
+                        .padding(top = 4.dp),
+                )
+            }
         }
     }
 
@@ -636,97 +639,99 @@ fun SongMenu(
                 )
             }
         }
-        item {
-            when (effectiveDownloadState) {
-                Download.STATE_COMPLETED -> {
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                text = stringResource(R.string.remove_download),
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        },
-                        leadingContent = {
-                            Icon(
-                                painter = painterResource(R.drawable.offline),
-                                contentDescription = null,
-                            )
-                        },
-                        modifier = Modifier.tvClickable {
-                            downloadUtil.removeDownload(song.id)
-                        }
-                    )
-
-                    ListItem(
-                        headlineContent = { Text(text = stringResource(R.string.swap_download)) },
-                        supportingContent = { Text(text = stringResource(R.string.swap_download_desc)) },
-                        leadingContent = {
-                            Icon(
-                                painter = painterResource(R.drawable.sync),
-                                contentDescription = null,
-                            )
-                        },
-                        modifier = Modifier.tvClickable {
-                            downloadUtil.removeDownload(song.id)
-                            showDownloadFormatDialog = true
-                            isLoadingFormats = true
-                            availableFormats = emptyList()
-                            coroutineScope.launch {
-                                val formats = withContext(Dispatchers.IO) {
-                                    YTPlayerUtils.getAllAvailableAudioFormats(song.id)
-                                        .getOrElse {
-                                            Timber.tag("SongMenu").e(it, "Failed to load download formats")
-                                            emptyList()
-                                        }
-                                }
-                                availableFormats = formats
-                                isLoadingFormats = false
+        if (!isLocalSong) {
+            item {
+                when (effectiveDownloadState) {
+                    Download.STATE_COMPLETED -> {
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = stringResource(R.string.remove_download),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            },
+                            leadingContent = {
+                                Icon(
+                                    painter = painterResource(R.drawable.offline),
+                                    contentDescription = null,
+                                )
+                            },
+                            modifier = Modifier.tvClickable {
+                                downloadUtil.removeDownload(song.id)
                             }
-                        }
-                    )
-                }
+                        )
 
-                Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
-                    ListItem(
-                        headlineContent = { Text(text = stringResource(R.string.downloading)) },
-                        leadingContent = {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        },
-                        modifier = Modifier.tvClickable {
-                            downloadUtil.removeDownload(song.id)
-                        }
-                    )
-                }
-
-                else -> {
-                    ListItem(
-                        headlineContent = { Text(text = stringResource(R.string.download)) },
-                        leadingContent = {
-                            Icon(
-                                painter = painterResource(R.drawable.download),
-                                contentDescription = null,
-                            )
-                        },
-                        modifier = Modifier.tvClickable {
-                            showDownloadFormatDialog = true
-                            isLoadingFormats = true
-                            availableFormats = emptyList()
-                            coroutineScope.launch {
-                                val formats = withContext(Dispatchers.IO) {
-                                    YTPlayerUtils.getAllAvailableAudioFormats(song.id)
-                                        .getOrElse {
-                                            Timber.tag("SongMenu").e(it, "Failed to load download formats")
-                                            emptyList()
-                                        }
+                        ListItem(
+                            headlineContent = { Text(text = stringResource(R.string.swap_download)) },
+                            supportingContent = { Text(text = stringResource(R.string.swap_download_desc)) },
+                            leadingContent = {
+                                Icon(
+                                    painter = painterResource(R.drawable.sync),
+                                    contentDescription = null,
+                                )
+                            },
+                            modifier = Modifier.tvClickable {
+                                downloadUtil.removeDownload(song.id)
+                                showDownloadFormatDialog = true
+                                isLoadingFormats = true
+                                availableFormats = emptyList()
+                                coroutineScope.launch {
+                                    val formats = withContext(Dispatchers.IO) {
+                                        YTPlayerUtils.getAllAvailableAudioFormats(song.id)
+                                            .getOrElse {
+                                                Timber.tag("SongMenu").e(it, "Failed to load download formats")
+                                                emptyList()
+                                            }
+                                    }
+                                    availableFormats = formats
+                                    isLoadingFormats = false
                                 }
-                                availableFormats = formats
-                                isLoadingFormats = false
                             }
-                        }
-                    )
+                        )
+                    }
+
+                    Download.STATE_QUEUED, Download.STATE_DOWNLOADING -> {
+                        ListItem(
+                            headlineContent = { Text(text = stringResource(R.string.downloading)) },
+                            leadingContent = {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            },
+                            modifier = Modifier.tvClickable {
+                                downloadUtil.removeDownload(song.id)
+                            }
+                        )
+                    }
+
+                    else -> {
+                        ListItem(
+                            headlineContent = { Text(text = stringResource(R.string.download)) },
+                            leadingContent = {
+                                Icon(
+                                    painter = painterResource(R.drawable.download),
+                                    contentDescription = null,
+                                )
+                            },
+                            modifier = Modifier.tvClickable {
+                                showDownloadFormatDialog = true
+                                isLoadingFormats = true
+                                availableFormats = emptyList()
+                                coroutineScope.launch {
+                                    val formats = withContext(Dispatchers.IO) {
+                                        YTPlayerUtils.getAllAvailableAudioFormats(song.id)
+                                            .getOrElse {
+                                                Timber.tag("SongMenu").e(it, "Failed to load download formats")
+                                                emptyList()
+                                            }
+                                    }
+                                    availableFormats = formats
+                                    isLoadingFormats = false
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -766,30 +771,32 @@ fun SongMenu(
                 )
             }
         }
-        item {
-            ListItem(
-                headlineContent = { Text(text = stringResource(R.string.refetch)) },
-                leadingContent = {
-                    Icon(
-                        painter = painterResource(R.drawable.sync),
-                        contentDescription = null,
-                        modifier = Modifier.graphicsLayer(rotationZ = rotationAnimation),
-                    )
-                },
-                modifier = Modifier.tvClickable {
-                    refetchIconDegree -= 360
-                    scope.launch(Dispatchers.IO) {
-                        YouTube.queue(listOf(song.id)).onSuccess {
-                            val newSong = it.firstOrNull()
-                            if (newSong != null) {
-                                database.transaction {
-                                    update(song, newSong.toMediaMetadata())
+        if (!isLocalSong) {
+            item {
+                ListItem(
+                    headlineContent = { Text(text = stringResource(R.string.refetch)) },
+                    leadingContent = {
+                        Icon(
+                            painter = painterResource(R.drawable.sync),
+                            contentDescription = null,
+                            modifier = Modifier.graphicsLayer(rotationZ = rotationAnimation),
+                        )
+                    },
+                    modifier = Modifier.tvClickable {
+                        refetchIconDegree -= 360
+                        scope.launch(Dispatchers.IO) {
+                            YouTube.queue(listOf(song.id)).onSuccess {
+                                val newSong = it.firstOrNull()
+                                if (newSong != null) {
+                                    database.transaction {
+                                        update(song, newSong.toMediaMetadata())
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            )
+                )
+            }
         }
         item {
             ListItem(
