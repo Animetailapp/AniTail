@@ -540,6 +540,20 @@ constructor(
                         clearDownloadState(song.id)
                         return@withContext
                     }
+
+                    val metadataEmbedded = downloadExportHelper.embedMetadataForDownloadedFile(
+                        songId = song.id,
+                        fileUri = persistedUri.toUri(),
+                        mimeType = mimeType,
+                        bitrate = format.bitrate,
+                    )
+                    if (!metadataEmbedded &&
+                        mimeType.contains("audio/mp4", ignoreCase = true) &&
+                        format.bitrate >= 128000
+                    ) {
+                        Timber.w("Metadata embedding was expected but not applied for %s", song.id)
+                    }
+
                     updateDownloadState(
                         song.id,
                         DownloadState(

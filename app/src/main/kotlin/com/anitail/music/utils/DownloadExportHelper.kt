@@ -12,6 +12,7 @@ import coil.request.SuccessResult
 import com.anitail.innertube.YouTube
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.FormatEntity
+import com.anitail.music.db.entities.Song
 import com.anitail.music.di.DownloadCache
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -52,8 +53,6 @@ class DownloadExportHelper @Inject constructor(
             val extension = getExtensionFromFormat(format, song.song.mediaStoreUri)
 
             val firstArtist = song.artists.firstOrNull()?.name ?: "Unknown Artist"
-            val allArtists = song.artists.joinToString(", ") { it.name }
-                .ifEmpty { "Unknown Artist" }
             val title = song.song.title
             val sanitizedArtistFolder = sanitizeFilename(firstArtist)
             val sanitizedFilename = sanitizeFilename("$title.$extension")
@@ -125,56 +124,13 @@ class DownloadExportHelper @Inject constructor(
             }
 
             val exportedUri = newFile.uri.toString()
-
-            val bitrateKbps = (format?.bitrate ?: 0) / 1000
-            if (extension == "m4a" && bitrateKbps >= 128) {
-                try {
-                    val artworkData = fetchArtworkData(song.song.thumbnailUrl)
-
-                    var albumName = song.album?.title ?: song.song.albumName
-                    var year = (song.album?.year ?: song.song.year)?.toString()
-                    var albumArtist: String? = null
-                    var trackNumber = 0
-                    var totalTracks = 0
-
-                    val albumId = song.song.albumId
-                    if ((albumName == null || year == null) && albumId != null) {
-                        try {
-                            val albumPage = YouTube.album(albumId).getOrNull()
-                            if (albumPage != null) {
-                                if (albumName == null) albumName = albumPage.album.title
-                                if (year == null) year = albumPage.album.year?.toString()
-                                albumArtist = albumPage.album.artists?.firstOrNull()?.name
-                                totalTracks = albumPage.songs.size
-                                val trackIndex = albumPage.songs.indexOfFirst { it.id == songId }
-                                if (trackIndex >= 0) {
-                                    trackNumber = trackIndex + 1
-                                }
-                            }
-                        } catch (e: Exception) {
-                            Timber.tag(TAG).w(e, "Failed to fetch album info from YouTube")
-                        }
-                    }
-
-                    val embedSuccess = coverArtEmbedder.embedMetadataIntoFile(
-                        fileUri = newFile.uri,
-                        artworkData = artworkData,
-                        title = song.song.title,
-                        artist = allArtists,
-                        album = albumName,
-                        year = year,
-                        albumArtist = albumArtist,
-                        trackNumber = trackNumber,
-                        totalTracks = totalTracks
-                    )
-
-                    if (!embedSuccess) {
-                        Timber.tag(TAG).w("Metadata embedding failed, file exported without metadata")
-                    }
-                } catch (e: Exception) {
-                    Timber.tag(TAG).e(e, "Error embedding metadata, continuing without metadata")
-                }
-            }
+            embedMetadataIfSupported(
+                songId = songId,
+                song = song,
+                fileUri = newFile.uri,
+                mimeType = mimeType,
+                bitrate = format?.bitrate ?: 0,
+            )
 
             database.query {
                 database.upsert(
@@ -193,6 +149,25 @@ class DownloadExportHelper @Inject constructor(
             Timber.tag(TAG).e(e, "Error exporting song: %s", songId)
             null
         }
+    }
+
+    suspend fun embedMetadataForDownloadedFile(
+        songId: String,
+        fileUri: Uri,
+        mimeType: String,
+        bitrate: Int,
+    ): Boolean = withContext(Dispatchers.IO) {
+        val song = database.song(songId).first() ?: run {
+            Timber.tag(TAG).w("Song not found while embedding metadata: %s", songId)
+            return@withContext false
+        }
+        embedMetadataIfSupported(
+            songId = songId,
+            song = song,
+            fileUri = fileUri,
+            mimeType = mimeType,
+            bitrate = bitrate,
+        )
     }
 
     suspend fun deleteFromCustomPath(songId: String): Boolean = withContext(Dispatchers.IO) {
@@ -249,11 +224,87 @@ class DownloadExportHelper @Inject constructor(
         else -> "m4a"
     }
 
+    private suspend fun embedMetadataIfSupported(
+        songId: String,
+        song: Song,
+        fileUri: Uri,
+        mimeType: String,
+        bitrate: Int,
+    ): Boolean {
+        val extension = inferExtensionFromMimeType(mimeType) ?: return false
+        val bitrateKbps = bitrate / 1000
+        val supportsEmbeddedMetadata = extension == "m4a" && bitrateKbps >= 128
+        if (!supportsEmbeddedMetadata) {
+            Timber.tag(TAG).d(
+                "Skipping metadata embedding for %s (mimeType=%s, bitrate=%d)",
+                songId,
+                mimeType,
+                bitrate
+            )
+            return false
+        }
+
+        return try {
+            val allArtists = song.artists.joinToString(", ") { it.name }.ifEmpty { "Unknown Artist" }
+            val artworkData = fetchArtworkData(song.song.thumbnailUrl)
+
+            var albumName = song.album?.title ?: song.song.albumName
+            var year = (song.album?.year ?: song.song.year)?.toString()
+            var albumArtist: String? = null
+            var trackNumber = 0
+            var totalTracks = 0
+
+            val albumId = song.song.albumId
+            if ((albumName == null || year == null) && albumId != null) {
+                try {
+                    val albumPage = YouTube.album(albumId).getOrNull()
+                    if (albumPage != null) {
+                        if (albumName == null) albumName = albumPage.album.title
+                        if (year == null) year = albumPage.album.year?.toString()
+                        albumArtist = albumPage.album.artists?.firstOrNull()?.name
+                        totalTracks = albumPage.songs.size
+                        val trackIndex = albumPage.songs.indexOfFirst { it.id == songId }
+                        if (trackIndex >= 0) {
+                            trackNumber = trackIndex + 1
+                        }
+                    }
+                } catch (e: Exception) {
+                    Timber.tag(TAG).w(e, "Failed to fetch album info from YouTube")
+                }
+            }
+
+            val embedded = coverArtEmbedder.embedMetadataIntoFile(
+                fileUri = fileUri,
+                artworkData = artworkData,
+                title = song.song.title,
+                artist = allArtists,
+                album = albumName,
+                year = year,
+                albumArtist = albumArtist,
+                trackNumber = trackNumber,
+                totalTracks = totalTracks,
+            )
+
+            if (!embedded) {
+                Timber.tag(TAG).w("Metadata embedding failed for: %s", fileUri)
+            }
+            embedded
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "Error embedding metadata, continuing without metadata")
+            false
+        }
+    }
+
     private fun inferExtensionFromMediaStoreUri(mediaStoreUri: String?): String? {
         if (mediaStoreUri.isNullOrBlank()) return null
         val mimeType = runCatching {
             context.contentResolver.getType(Uri.parse(mediaStoreUri))
         }.getOrNull() ?: return null
+        return inferExtensionFromMimeType(mimeType)
+    }
+
+    private fun inferExtensionFromMimeType(mimeType: String?): String? {
+        if (mimeType.isNullOrBlank()) return null
         return when {
             mimeType.contains("audio/mpeg") -> "mp3"
             mimeType.contains("audio/mp4") -> "m4a"
