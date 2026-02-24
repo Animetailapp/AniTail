@@ -116,7 +116,7 @@ kuromoji-ipadic = { group = "com.atilika.kuromoji", name = "kuromoji-ipadic", ve
 work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version = "21.5.1" }
 google-api-client-android = { module = "com.google.api-client:google-api-client-android", version = "2.8.1" }
-google-api-services-drive = { module = "com.google.apis:google-api-services-drive", version = "v3-rev20251210-2.0.0" }
+google-api-services-drive = { module = "com.google.apis:google-api-services-drive", version = "v3-rev20260128-2.0.0" }
 google-auth-library-oauth2-http = { module = "com.google.auth:google-auth-library-oauth2-http", version = "1.43.0" }
 compose-multiplatform-media-player = { module = "network.chaintech:compose-multiplatform-media-player", version = "1.0.53" }
 
