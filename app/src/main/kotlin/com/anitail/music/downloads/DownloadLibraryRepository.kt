@@ -65,7 +65,7 @@ class DownloadLibraryRepository @Inject constructor(
             refreshDownloads()
         }
         scope.launch {
-            database.songsWithMediaStoreUriFlow().collectLatest {
+            database.songsWithPersistedUriFlow().collectLatest {
                 refreshDownloads()
             }
         }
@@ -79,7 +79,7 @@ class DownloadLibraryRepository @Inject constructor(
     fun observeDownloads(): StateFlow<List<DownloadedTrack>> = downloads
 
     suspend fun cleanupOrphans(): CleanupStats = withContext(Dispatchers.IO) {
-        val songs = runCatching { database.songsWithMediaStoreUri() }
+        val songs = runCatching { database.songsWithPersistedUri() }
             .onFailure { Timber.e(it, "Failed to load downloaded songs from database") }
             .getOrDefault(emptyList())
 
@@ -87,7 +87,7 @@ class DownloadLibraryRepository @Inject constructor(
         var removedMediaStore = 0
 
         songs.forEach { song ->
-            val uriString = song.song.mediaStoreUri ?: return@forEach
+            val uriString = persistedUriOf(song) ?: return@forEach
             val uri = uriString.toUri()
             val exists = isUriReadable(uriString)
 
@@ -126,11 +126,14 @@ class DownloadLibraryRepository @Inject constructor(
 
     private suspend fun queryDownloads(): List<DownloadedTrack> = withContext(Dispatchers.IO) {
         val songsWithUris = runCatching {
-            database.songsWithMediaStoreUri()
+            database.songsWithPersistedUri()
         }.onFailure {
-            Timber.e(it, "Failed to load songs with mediaStoreUri from database")
+            Timber.e(it, "Failed to load songs with persisted URI from database")
         }.getOrDefault(emptyList())
-        val songsByUri = songsWithUris.associateBy { it.song.mediaStoreUri }
+        val songsByUri = songsWithUris
+            .mapNotNull { song ->
+                persistedUriOf(song)?.let { uri -> uri to song }
+            }.toMap()
 
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
@@ -212,7 +215,7 @@ class DownloadLibraryRepository @Inject constructor(
 
         val mappedUris = mappedTracks.mapTo(mutableSetOf()) { it.mediaUri.toString() }
         val customOnlyTracks = songsWithUris.mapNotNull { song ->
-            val uriString = song.song.mediaStoreUri ?: return@mapNotNull null
+            val uriString = persistedUriOf(song) ?: return@mapNotNull null
             if (uriString in mappedUris) return@mapNotNull null
             if (!isUriReadable(uriString)) return@mapNotNull null
 
@@ -237,6 +240,10 @@ class DownloadLibraryRepository @Inject constructor(
 
     private fun isMediaStoreUri(uriString: String): Boolean {
         return uriString.startsWith("content://media/")
+    }
+
+    private fun persistedUriOf(song: Song): String? {
+        return song.song.mediaStoreUri ?: song.song.downloadUri
     }
 
     private fun isUriReadable(uriString: String): Boolean {

@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.time.LocalDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -175,7 +176,15 @@ class DownloadExportHelper @Inject constructor(
                 }
             }
 
-            database.updateDownloadUri(songId, exportedUri)
+            database.query {
+                database.upsert(
+                    song.song.copy(
+                        mediaStoreUri = exportedUri,
+                        downloadUri = exportedUri,
+                        dateDownload = song.song.dateDownload ?: LocalDateTime.now(),
+                    )
+                )
+            }
             exportedUri
         } catch (e: IOException) {
             Timber.tag(TAG).e(e, "IO error exporting song: %s", songId)

@@ -173,6 +173,18 @@ interface DatabaseDao {
     fun songsWithMediaStoreUriFlow(): Flow<List<Song>>
 
     @Transaction
+    @Query(
+        "SELECT * FROM song WHERE isLocal = 0 AND (mediaStoreUri IS NOT NULL OR downloadUri IS NOT NULL) ORDER BY dateDownload DESC",
+    )
+    suspend fun songsWithPersistedUri(): List<Song>
+
+    @Transaction
+    @Query(
+        "SELECT * FROM song WHERE isLocal = 0 AND (mediaStoreUri IS NOT NULL OR downloadUri IS NOT NULL) ORDER BY dateDownload DESC",
+    )
+    fun songsWithPersistedUriFlow(): Flow<List<Song>>
+
+    @Transaction
     @Query("SELECT * FROM song WHERE mediaStoreUri = :mediaStoreUri LIMIT 1")
     suspend fun songByMediaStoreUri(mediaStoreUri: String): Song?
 

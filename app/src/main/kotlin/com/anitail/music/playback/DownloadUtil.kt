@@ -491,7 +491,10 @@ constructor(
         if (songs.isEmpty()) return MediaStoreCollectionStatus.NotDownloaded
 
         val songStates = songs.mapNotNull { states[it.id] }
-        val allPersistedInMediaStore = songs.all { !it.song.isLocal && !it.song.mediaStoreUri.isNullOrEmpty() }
+        val allPersistedInMediaStore = songs.all { song ->
+            !song.song.isLocal &&
+                (!song.song.mediaStoreUri.isNullOrEmpty() || !song.song.downloadUri.isNullOrEmpty())
+        }
 
         return when {
             allPersistedInMediaStore -> MediaStoreCollectionStatus.Completed
@@ -647,7 +650,9 @@ constructor(
                 val hasInMemoryMediaStoreState =
                     mediaStoreDownloadManager.downloadStates.value[songId] != null
                 val hasPersistedMediaStoreUri = runCatching {
-                    !database.getSongByIdBlocking(songId)?.song?.mediaStoreUri.isNullOrEmpty()
+                    val dbSong = database.getSongByIdBlocking(songId)?.song
+                    dbSong != null &&
+                        (!dbSong.mediaStoreUri.isNullOrEmpty() || !dbSong.downloadUri.isNullOrEmpty())
                 }.getOrDefault(false)
                 hasInMemoryMediaStoreState || hasPersistedMediaStoreUri
             }
