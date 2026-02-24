@@ -1465,6 +1465,12 @@ interface DatabaseDao {
     @Query("SELECT * FROM song WHERE isLocal = 1 ORDER BY title COLLATE NOCASE ASC")
     fun allLocalSongs(): Flow<List<Song>>
 
+    @Query("SELECT id FROM song WHERE isLocal = 1")
+    suspend fun localSongIds(): List<String>
+
+    @Query("DELETE FROM song WHERE isLocal = 1 AND id IN (:songIds)")
+    fun deleteLocalSongsByIds(songIds: List<String>): Int
+
     @Transaction
     @Query(
         """

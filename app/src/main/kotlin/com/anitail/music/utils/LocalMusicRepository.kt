@@ -4,7 +4,11 @@ import android.Manifest
 import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
+import android.database.ContentObserver
+import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import androidx.core.content.ContextCompat
 import com.anitail.music.db.MusicDatabase
@@ -15,10 +19,16 @@ import com.anitail.music.db.entities.SongAlbumMap
 import com.anitail.music.db.entities.SongArtistMap
 import com.anitail.music.db.entities.SongEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.time.LocalDateTime
@@ -37,11 +47,35 @@ class LocalMusicRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val database: MusicDatabase,
 ) {
+    private companion object {
+        private const val MEDIASTORE_SYNC_DEBOUNCE_MS = 750L
+        private const val SQLITE_IN_CLAUSE_BATCH = 900
+    }
+
     private val _syncStatus = MutableStateFlow<LocalSyncStatus>(LocalSyncStatus.Idle)
     val syncStatus: StateFlow<LocalSyncStatus> = _syncStatus.asStateFlow()
 
     private val _syncProgress = MutableStateFlow(0f)
     val syncProgress: StateFlow<Float> = _syncProgress.asStateFlow()
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val syncMutex = Mutex()
+    private var pendingMediaStoreSyncJob: Job? = null
+
+    private val mediaStoreObserver =
+        object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                onMediaStoreChanged(null)
+            }
+
+            override fun onChange(selfChange: Boolean, uri: Uri?) {
+                onMediaStoreChanged(uri)
+            }
+        }
+
+    init {
+        registerMediaStoreObserver()
+    }
 
     fun hasPermission(): Boolean {
         val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -64,21 +98,64 @@ class LocalMusicRepository @Inject constructor(
         return perm
     }
 
-    suspend fun syncLocalMusic() = withContext(Dispatchers.IO) {
-        Timber.d("LocalMusic: syncLocalMusic() STARTED")
+    private fun registerMediaStoreObserver() {
+        runCatching {
+            context.contentResolver.registerContentObserver(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                true,
+                mediaStoreObserver,
+            )
+            Timber.d("LocalMusic: MediaStore observer registered")
+        }.onFailure { error ->
+            Timber.w(error, "LocalMusic: Failed to register MediaStore observer")
+        }
+    }
+
+    private fun onMediaStoreChanged(uri: Uri?) {
+        val uriText = uri?.toString()
+        val isAudioUri = uriText == null || uriText.contains("/audio/media")
+        if (!isAudioUri) return
+
+        scheduleSyncFromMediaStore("uri=${uriText ?: "<all>"}")
+    }
+
+    private fun scheduleSyncFromMediaStore(reason: String) {
         if (!hasPermission()) {
-            Timber.e("LocalMusic: syncLocalMusic() - Permission NOT granted, aborting")
-            _syncStatus.value = LocalSyncStatus.Error("Permission not granted")
+            Timber.v("LocalMusic: skip scheduled sync (%s) - permission missing", reason)
+            return
+        }
+
+        pendingMediaStoreSyncJob?.cancel()
+        pendingMediaStoreSyncJob = scope.launch {
+            delay(MEDIASTORE_SYNC_DEBOUNCE_MS)
+            Timber.d("LocalMusic: running scheduled sync from MediaStore change (%s)", reason)
+            syncLocalMusic()
+        }
+    }
+
+    suspend fun syncLocalMusic() = withContext(Dispatchers.IO) {
+        if (!syncMutex.tryLock()) {
+            Timber.d("LocalMusic: syncLocalMusic() skipped - sync already in progress")
             return@withContext
         }
 
-        Timber.d("LocalMusic: syncLocalMusic() - Permission granted, starting sync")
-        _syncStatus.value = LocalSyncStatus.Syncing
-        _syncProgress.value = 0f
-
+        Timber.d("LocalMusic: syncLocalMusic() STARTED")
         try {
+            if (!hasPermission()) {
+                Timber.e("LocalMusic: syncLocalMusic() - Permission NOT granted, aborting")
+                _syncStatus.value = LocalSyncStatus.Error("Permission not granted")
+                return@withContext
+            }
+
+            Timber.d("LocalMusic: syncLocalMusic() - Permission granted, starting sync")
+            _syncStatus.value = LocalSyncStatus.Syncing
+            _syncProgress.value = 0f
+
             val contentResolver = context.contentResolver
             Timber.d("LocalMusic: syncLocalMusic() - Got contentResolver: $contentResolver")
+            val existingLocalSongIds = database.localSongIds().toSet()
+            val scannedLocalSongIds = mutableSetOf<String>()
+            var mediaStoreScanSucceeded = false
 
             val projection = arrayOf(
                 MediaStore.Audio.Media._ID,
@@ -154,6 +231,7 @@ class LocalMusicRepository @Inject constructor(
                         val filePath = cursor.getString(dataCol)
 
                         val songId = "LOCAL_$mediaStoreId"
+                        scannedLocalSongIds += songId
                         val localArtistId = artistCache.getOrPut(artistName.lowercase()) {
                             "LA_LOCAL_${artistName.lowercase().hashCode()}"
                         }
@@ -230,6 +308,7 @@ class LocalMusicRepository @Inject constructor(
                         Timber.e(e, "LocalMusic: Error processing local song at index $processedCount")
                     }
                 }
+                mediaStoreScanSucceeded = true
 
                 Timber.d("LocalMusic: Collected ${songEntities.size} songs, ${artistEntities.size} artists, ${albumEntities.size} albums - starting batch insert")
 
@@ -252,6 +331,18 @@ class LocalMusicRepository @Inject constructor(
 
                     Timber.d("LocalMusic: Batch inserting ${albumArtistMaps.size} album-artist maps")
                     albumArtistMaps.distinctBy { it.albumId to it.artistId }.forEach { upsert(it) }
+
+                    if (mediaStoreScanSucceeded) {
+                        val staleLocalSongIds = (existingLocalSongIds - scannedLocalSongIds).toList()
+                        if (staleLocalSongIds.isNotEmpty()) {
+                            Timber.d("LocalMusic: Removing ${staleLocalSongIds.size} stale local songs")
+                            staleLocalSongIds.chunked(SQLITE_IN_CLAUSE_BATCH).forEach { chunk ->
+                                deleteLocalSongsByIds(chunk)
+                            }
+                        } else {
+                            Timber.d("LocalMusic: No stale local songs to remove")
+                        }
+                    }
                 }
 
                 Timber.d("LocalMusic: Batch transaction submitted")
@@ -268,6 +359,8 @@ class LocalMusicRepository @Inject constructor(
             Timber.e(e, "LocalMusic: syncLocalMusic() FAILED with exception: ${e.message}")
             e.printStackTrace()
             _syncStatus.value = LocalSyncStatus.Error(e.message ?: "Unknown error")
+        } finally {
+            syncMutex.unlock()
         }
     }
 
