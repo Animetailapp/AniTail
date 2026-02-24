@@ -7,7 +7,6 @@ import android.widget.Toast
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +31,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,7 +57,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -772,103 +772,67 @@ private fun AboutArtistSection(
     var isExpanded by rememberSaveable(description) { mutableStateOf(false) }
     var canExpand by remember(description) { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                shape = RoundedCornerShape(24.dp),
-            )
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                    )
-                ),
-                shape = RoundedCornerShape(24.dp),
-            )
-            .animateContentSize()
-            .padding(16.dp),
+    Card(
+        modifier = modifier.animateContentSize(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+        ),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
-                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.45f),
-                            Color.Transparent,
-                        )
-                    ),
-                    shape = RoundedCornerShape(999.dp),
-                )
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        Column(
+            modifier = Modifier.padding(16.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(30.dp)
-                    .background(
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f),
-                        RoundedCornerShape(999.dp),
-                    ),
-                contentAlignment = Alignment.Center,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Icon(
                     painter = painterResource(R.drawable.info),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+
+                Text(
+                    text = stringResource(R.string.about_artist),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
 
+            Spacer(modifier = Modifier.height(12.dp))
+
             Text(
-                text = stringResource(R.string.about_artist),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = if (isExpanded) Int.MAX_VALUE else collapsedMaxLines,
+                overflow = TextOverflow.Ellipsis,
+                onTextLayout = { textLayoutResult ->
+                    if (!isExpanded) {
+                        canExpand = textLayoutResult.hasVisualOverflow
+                    }
+                },
             )
-        }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = if (isExpanded) Int.MAX_VALUE else collapsedMaxLines,
-            overflow = TextOverflow.Ellipsis,
-            onTextLayout = { textLayoutResult ->
-                if (!isExpanded) {
-                    canExpand = textLayoutResult.hasVisualOverflow
+            if (canExpand || isExpanded) {
+                TextButton(
+                    onClick = { isExpanded = !isExpanded },
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Icon(
+                        painter = painterResource(
+                            if (isExpanded) R.drawable.expand_less else R.drawable.expand_more
+                        ),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(if (isExpanded) R.string.collapse else R.string.expand),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
                 }
-            },
-        )
-
-        if (canExpand || isExpanded) {
-            TextButton(
-                onClick = { isExpanded = !isExpanded },
-                modifier = Modifier.align(Alignment.End),
-            ) {
-                Icon(
-                    painter = painterResource(
-                        if (isExpanded) R.drawable.expand_less else R.drawable.expand_more
-                    ),
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = stringResource(if (isExpanded) R.string.collapse else R.string.expand),
-                    style = MaterialTheme.typography.labelLarge,
-                )
             }
         }
     }
