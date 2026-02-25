@@ -12,6 +12,9 @@ class DatabaseMerger @Inject constructor(
     @ApplicationContext private val context: Context,
     private val musicDatabase: MusicDatabase
 ) {
+    companion object {
+        private const val REMOTE_SCHEMA = "remote_db"
+    }
 
     /**
      * Merges a remote backup database into the current local database.
@@ -19,7 +22,6 @@ class DatabaseMerger @Inject constructor(
      */
     suspend fun mergeDatabase(remoteDbFile: File) {
         val currentDb = musicDatabase.openHelper.writableDatabase
-        var remoteAttached = false
 
         try {
             // Ensure WAL checkpoint is done before merge to avoid conflicts
@@ -32,16 +34,22 @@ class DatabaseMerger @Inject constructor(
             // Small delay to allow any pending transactions to complete
             delay(100)
 
+            // Defensive cleanup: a previous failed merge may have left remote_db attached.
+            runCatching {
+                detachDatabaseIfAttached(currentDb, REMOTE_SCHEMA)
+            }.onFailure { detachError ->
+                Timber.w(detachError, "Failed to pre-clean attached %s", REMOTE_SCHEMA)
+            }
+
             currentDb.beginTransaction()
             try {
                 // ATTACH must happen on the same connection that runs merge queries.
                 val remotePath = remoteDbFile.absolutePath.replace("'", "''")
-                currentDb.execSQL("ATTACH DATABASE '$remotePath' AS remote_db")
-                remoteAttached = true
+                currentDb.execSQL("ATTACH DATABASE '$remotePath' AS $REMOTE_SCHEMA")
                 Timber.d("Attached remote database for merging")
 
-                if (!isDatabaseAttached(currentDb, "remote_db")) {
-                    throw IllegalStateException("Failed to attach remote_db on active transaction connection")
+                if (!isDatabaseAttached(currentDb, REMOTE_SCHEMA)) {
+                    throw IllegalStateException("Failed to attach $REMOTE_SCHEMA on active transaction connection")
                 }
 
                 // 1. Merge Songs (Favorited status mainly)
@@ -77,15 +85,12 @@ class DatabaseMerger @Inject constructor(
                 currentDb.setTransactionSuccessful()
                 Timber.d("Database merge completed successfully")
             } finally {
-                if (remoteAttached) {
-                    runCatching {
-                        currentDb.execSQL("DETACH DATABASE remote_db")
-                    }.onFailure { detachError ->
-                        Timber.w(detachError, "Failed to detach remote database after merge")
-                    }
-                    remoteAttached = false
-                }
                 currentDb.endTransaction()
+                runCatching {
+                    detachDatabaseIfAttached(currentDb, REMOTE_SCHEMA)
+                }.onFailure { detachError ->
+                    Timber.w(detachError, "Failed to detach %s after merge", REMOTE_SCHEMA)
+                }
             }
 
         } catch (e: Exception) {
@@ -450,5 +455,14 @@ class DatabaseMerger @Inject constructor(
             }
         }
         return false
+    }
+
+    private fun detachDatabaseIfAttached(
+        db: SupportSQLiteDatabase,
+        schemaName: String,
+    ) {
+        if (!isDatabaseAttached(db, schemaName)) return
+        db.execSQL("DETACH DATABASE $schemaName")
+        Timber.d("Detached %s", schemaName)
     }
 }
