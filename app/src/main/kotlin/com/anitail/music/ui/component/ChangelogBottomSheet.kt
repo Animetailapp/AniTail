@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -397,8 +396,8 @@ private fun ReleaseCardItem(
             .fillMaxWidth()
             .animateContentSize(
                 animationSpec = spring(
-                    stiffness = Spring.StiffnessMediumHigh,
-                    dampingRatio = Spring.DampingRatioNoBouncy
+                    stiffness = 420f,
+                    dampingRatio = 1f
                 )
             ),
         colors = CardDefaults.cardColors(
@@ -558,8 +557,8 @@ private fun CommitCardItem(
             .fillMaxWidth()
             .animateContentSize(
                 animationSpec = spring(
-                    stiffness = Spring.StiffnessMediumHigh,
-                    dampingRatio = Spring.DampingRatioNoBouncy
+                    stiffness = 420f,
+                    dampingRatio = 1f
                 )
             ),
         colors = CardDefaults.cardColors(
