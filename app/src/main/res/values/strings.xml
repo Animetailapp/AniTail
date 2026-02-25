@@ -557,6 +557,9 @@
     <string name="open_app_settings_error">Couldn\'t open app settings</string>
 
     <string name="release_notes">Release Notes</string>
+    <string name="changelog">Changelog</string>
+    <string name="changelog_loading">Loading changelog…</string>
+    <string name="changelog_load_failed">Couldn\'t load changelog</string>
     <!--about screen-->
     <string name="about">About</string>
     <string name="links_about" translatable="false">Links</string>

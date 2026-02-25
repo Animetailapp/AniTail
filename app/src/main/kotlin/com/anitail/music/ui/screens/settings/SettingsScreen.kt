@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -34,26 +35,33 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.colorScheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +69,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -75,11 +84,13 @@ import com.anitail.music.R
 import com.anitail.music.constants.AvatarSource
 import com.anitail.music.constants.PreferredAvatarSourceKey
 import com.anitail.music.ui.component.IconButton
+import com.anitail.music.ui.component.fetchReleaseNotesText
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.viewmodels.HomeViewModel
 import java.util.Calendar
+import kotlinx.coroutines.launch
 import androidx.compose.material3.IconButton as M3IconButton
 
 // Data class para definir cada opción de configuración y poder buscarla
@@ -107,6 +118,12 @@ data class SettingItemData(
     val subtitle: String? = null,
     val optionsProvider: (() -> List<SettingOptionData>)? = null,
 )
+
+private sealed class ChangelogUiState {
+    data object Loading : ChangelogUiState()
+    data object Error : ChangelogUiState()
+    data class Success(val notes: List<String>) : ChangelogUiState()
+}
 
 @SuppressLint("LocalContextGetResourceValueCall")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -152,6 +169,7 @@ fun SettingsScreen(
             else -> colorScheme.primary.copy(alpha = 0.1f)
         }
     }
+    var showChangelogSheet by remember { mutableStateOf(false) }
 
     val allSettings = remember(latestVersionName) {
         val list = mutableListOf<SettingItemData>()
@@ -304,6 +322,18 @@ fun SettingsScreen(
                     })
             )
         }
+        list.add(
+            SettingItemData(
+                "changelog",
+                context.getString(R.string.changelog),
+                R.drawable.history,
+                "More",
+                Color(0xFF42A5F5),
+                { showChangelogSheet = true },
+                subtitle = context.getString(R.string.release_notes),
+                optionsProvider = optionsFor("changelog")
+            )
+        )
         list.add(
             SettingItemData(
                 "about",
@@ -528,9 +558,182 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
+
+    if (showChangelogSheet) {
+        ChangelogBottomSheet(
+            onDismissRequest = { showChangelogSheet = false }
+        )
+    }
 }
 
 // --- COMPONENTES AUXILIARES ---
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChangelogBottomSheet(
+    onDismissRequest: () -> Unit,
+) {
+    val uriHandler = LocalUriHandler.current
+    val coroutineScope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var uiState by remember { mutableStateOf<ChangelogUiState>(ChangelogUiState.Loading) }
+
+    fun isErrorResponse(notes: List<String>): Boolean {
+        return notes.size == 1 && notes.first().startsWith("Error loading release notes")
+    }
+
+    fun loadChangelog() {
+        coroutineScope.launch {
+            uiState = ChangelogUiState.Loading
+            val notes = fetchReleaseNotesText()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+
+            uiState = if (notes.isEmpty() || isErrorResponse(notes)) {
+                ChangelogUiState.Error
+            } else {
+                ChangelogUiState.Success(notes)
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        loadChangelog()
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismissRequest,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 1.dp,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = {
+            BottomSheetDefaults.DragHandle(
+                modifier = Modifier
+                    .width(32.dp)
+                    .height(4.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+            )
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.changelog),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                M3IconButton(onClick = onDismissRequest) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = stringResource(R.string.close),
+                    )
+                }
+            }
+
+            AnimatedContent(
+                targetState = uiState,
+                label = "changelog_sheet_content"
+            ) { state ->
+                when (state) {
+                    ChangelogUiState.Loading -> {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 20.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = stringResource(R.string.changelog_loading),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    ChangelogUiState.Error -> {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.changelog_load_failed),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                TextButton(
+                                    onClick = ::loadChangelog,
+                                    modifier = Modifier.align(Alignment.End)
+                                ) {
+                                    Text(stringResource(R.string.retry))
+                                }
+                            }
+                        }
+                    }
+
+                    is ChangelogUiState.Success -> {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.release_notes),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                state.notes.forEach { note ->
+                                    Text(
+                                        text = "\u2022 $note",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            TextButton(
+                onClick = { uriHandler.openUri("https://github.com/Animetailapp/Anitail/releases/latest") },
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text(stringResource(R.string.about_source_code_desc))
+            }
+        }
+    }
+}
 
 @Composable
 fun SearchBarField(
