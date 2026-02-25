@@ -376,8 +376,10 @@ private fun ReleaseCardItem(
 ) {
     val releaseBody = remember(release.body) { release.body.toReadableReleaseBody() }
     val hasBody = releaseBody.isNotBlank()
-    val collapsedLines = 3
-    val canExpand = remember(releaseBody) { releaseBody.lineSequence().count() > collapsedLines }
+    val shouldShowTitle = release.title.isNotBlank() && !release.title.isSameVersionAs(release.tagName)
+    val canExpand = remember(releaseBody, release.title, release.tagName, release.htmlUrl) {
+        hasBody || shouldShowTitle || release.htmlUrl.isNotBlank()
+    }
     var expanded by rememberSaveable(release.tagName) { mutableStateOf(false) }
 
     Card(
@@ -402,7 +404,18 @@ private fun ReleaseCardItem(
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
         )
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    if (canExpand) {
+                        Modifier.tvClickable(shape = RoundedCornerShape(20.dp)) {
+                            expanded = !expanded
+                        }
+                    } else {
+                        Modifier
+                    }
+                )
+                .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
@@ -431,48 +444,40 @@ private fun ReleaseCardItem(
                 }
             }
 
-            Text(
-                text = release.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = if (expanded) Int.MAX_VALUE else 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = if (canExpand) {
-                    Modifier.tvClickable { expanded = !expanded }
-                } else {
-                    Modifier
+            if (expanded) {
+                if (shouldShowTitle) {
+                    Text(
+                        text = release.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
-            )
 
-            if (hasBody) {
-                Text(
-                    text = releaseBody,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = if (expanded) Int.MAX_VALUE else collapsedLines,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = if (canExpand) {
-                        Modifier.tvClickable { expanded = !expanded }
-                    } else {
-                        Modifier
-                    }
-                )
-            }
+                if (hasBody) {
+                    Text(
+                        text = releaseBody,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = Int.MAX_VALUE,
+                        overflow = TextOverflow.Clip
+                    )
+                }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (release.htmlUrl.isNotBlank()) {
-                    TextButton(
-                        onClick = { onOpenLink(release.htmlUrl) },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text(stringResource(R.string.open_in_browser))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (release.htmlUrl.isNotBlank()) {
+                        TextButton(
+                            onClick = { onOpenLink(release.htmlUrl) },
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text(stringResource(R.string.open_in_browser))
+                        }
                     }
                 }
             }
@@ -523,7 +528,7 @@ private fun CommitCardItem(
     onOpenLink: (String) -> Unit,
 ) {
     val hasDetails = commit.details.isNotBlank()
-    val canExpand = hasDetails || commit.title.length > 72
+    val canExpand = hasDetails || commit.title.length > 72 || commit.htmlUrl.isNotBlank()
     var expanded by rememberSaveable(commit.shortSha) { mutableStateOf(false) }
 
     Card(
@@ -611,7 +616,7 @@ private fun CommitCardItem(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                if (commit.htmlUrl.isNotBlank()) {
+                if (expanded && commit.htmlUrl.isNotBlank()) {
                     TextButton(
                         onClick = { onOpenLink(commit.htmlUrl) },
                         colors = ButtonDefaults.textButtonColors(
@@ -827,6 +832,12 @@ private fun getResponseBody(url: String): String {
 private fun String.toShortDate(): String {
     if (isBlank()) return ""
     return substringBefore('T')
+}
+
+private fun String.isSameVersionAs(tag: String): Boolean {
+    val left = trim().removePrefix("v").lowercase(Locale.getDefault())
+    val right = tag.trim().removePrefix("v").lowercase(Locale.getDefault())
+    return left == right
 }
 
 private fun String.toReadableReleaseBody(): String {
