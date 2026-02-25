@@ -211,28 +211,47 @@ class MediaStoreHelper(private val context: Context) {
      *
      * @param title Song title to search for
      * @param artist Artist name to search for
+     * @param durationMs Duration in milliseconds to reduce false positives (optional)
      * @return Uri of existing file, or null if not found
      */
-    suspend fun findExistingFile(title: String, artist: String): Uri? =
+    suspend fun findExistingFile(
+        title: String,
+        artist: String,
+        durationMs: Long? = null,
+    ): Uri? =
         withContext(Dispatchers.IO) {
             try {
                 val projection = arrayOf(
                     MediaStore.Audio.Media._ID,
                     MediaStore.Audio.Media.TITLE,
                     MediaStore.Audio.Media.ARTIST,
+                    MediaStore.Audio.Media.DURATION,
                     MediaStore.Audio.Media.RELATIVE_PATH
                 )
 
                 // Search only in Anitail folder
-                val selection =
-                    "${MediaStore.Audio.Media.TITLE} = ? AND ${MediaStore.Audio.Media.ARTIST} = ? AND ${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ?"
-                val selectionArgs = arrayOf(title, artist, anitailRelativePathLikeArg())
+                val selectionParts = mutableListOf(
+                    "${MediaStore.Audio.Media.TITLE} = ?",
+                    "${MediaStore.Audio.Media.ARTIST} = ?",
+                    "${MediaStore.Audio.Media.RELATIVE_PATH} LIKE ?"
+                )
+                val selectionArgs = mutableListOf(title, artist, anitailRelativePathLikeArg())
+                val durationToleranceMs = 2_000L
+                if (durationMs != null && durationMs > 0L) {
+                    val minDuration = (durationMs - durationToleranceMs).coerceAtLeast(0L)
+                    val maxDuration = durationMs + durationToleranceMs
+                    selectionParts += "${MediaStore.Audio.Media.DURATION} BETWEEN ? AND ?"
+                    selectionArgs += minDuration.toString()
+                    selectionArgs += maxDuration.toString()
+                }
+
+                val selection = selectionParts.joinToString(" AND ")
 
                 context.contentResolver.query(
                     audioCollectionUri(),
                     projection,
                     selection,
-                    selectionArgs,
+                    selectionArgs.toTypedArray(),
                     null
                 )?.use { cursor ->
                     if (cursor.moveToFirst()) {

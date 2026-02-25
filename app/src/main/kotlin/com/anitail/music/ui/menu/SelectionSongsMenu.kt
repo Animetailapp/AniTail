@@ -42,7 +42,9 @@ import com.anitail.music.models.MediaMetadata
 import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.DefaultDialog
+import com.anitail.music.ui.component.DownloadFormatDialog
 import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.utils.YTPlayerUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -82,6 +84,40 @@ fun SelectionSongMenu(
     val selectedSongIds = remember(songSelection) { songSelection.map { it.id } }
     val downloadState by downloadUtil.getDownloadState(selectedSongIds)
         .collectAsState(initial = Download.STATE_STOPPED)
+    var showDownloadFormatDialog by rememberSaveable { mutableStateOf(false) }
+    var isLoadingFormats by remember { mutableStateOf(false) }
+    var availableFormats by remember { mutableStateOf<List<YTPlayerUtils.AudioFormatOption>>(emptyList()) }
+    var pendingSongsForDownload by remember { mutableStateOf<List<Song>>(emptyList()) }
+
+    if (showDownloadFormatDialog) {
+        DownloadFormatDialog(
+            isLoading = isLoadingFormats,
+            formats = availableFormats,
+            onFormatSelected = { format ->
+                showDownloadFormatDialog = false
+                downloadUtil.downloadSongsToMediaStore(pendingSongsForDownload, targetItag = format.itag)
+                onDismiss()
+            },
+            onDismiss = { showDownloadFormatDialog = false }
+        )
+    }
+
+    fun openBatchDownloadDialog(targetSongs: List<Song>) {
+        val remoteSongs = targetSongs.filterNot { it.song.isLocal || it.id.startsWith("LOCAL_") }
+        if (remoteSongs.isEmpty()) return
+
+        pendingSongsForDownload = remoteSongs
+        showDownloadFormatDialog = true
+        isLoadingFormats = true
+        availableFormats = emptyList()
+
+        coroutineScope.launch {
+            availableFormats = withContext(Dispatchers.IO) {
+                YTPlayerUtils.getAllAvailableAudioFormats(remoteSongs.first().id).getOrDefault(emptyList())
+            }
+            isLoadingFormats = false
+        }
+    }
 
     var showChoosePlaylistDialog by rememberSaveable {
         mutableStateOf(false)
@@ -299,7 +335,7 @@ fun SelectionSongMenu(
                             )
                         },
                         modifier = Modifier.tvClickable {
-                            downloadUtil.downloadSongsToMediaStore(songSelection)
+                            openBatchDownloadDialog(songSelection)
                         }
                     )
                 }
@@ -399,6 +435,40 @@ fun SelectionMediaMetadataMenu(
     val selectedMetadataSongIds = remember(songSelection) { songSelection.map { it.id } }
     val downloadState by downloadUtil.getDownloadState(selectedMetadataSongIds)
         .collectAsState(initial = Download.STATE_STOPPED)
+    var showDownloadFormatDialog by rememberSaveable { mutableStateOf(false) }
+    var isLoadingFormats by remember { mutableStateOf(false) }
+    var availableFormats by remember { mutableStateOf<List<YTPlayerUtils.AudioFormatOption>>(emptyList()) }
+    var pendingSongsForDownload by remember { mutableStateOf<List<Song>>(emptyList()) }
+
+    if (showDownloadFormatDialog) {
+        DownloadFormatDialog(
+            isLoading = isLoadingFormats,
+            formats = availableFormats,
+            onFormatSelected = { format ->
+                showDownloadFormatDialog = false
+                downloadUtil.downloadSongsToMediaStore(pendingSongsForDownload, targetItag = format.itag)
+                onDismiss()
+            },
+            onDismiss = { showDownloadFormatDialog = false }
+        )
+    }
+
+    fun openBatchDownloadDialog(targetSongs: List<Song>) {
+        val remoteSongs = targetSongs.filterNot { it.song.isLocal || it.id.startsWith("LOCAL_") }
+        if (remoteSongs.isEmpty()) return
+
+        pendingSongsForDownload = remoteSongs
+        showDownloadFormatDialog = true
+        isLoadingFormats = true
+        availableFormats = emptyList()
+
+        coroutineScope.launch {
+            availableFormats = withContext(Dispatchers.IO) {
+                YTPlayerUtils.getAllAvailableAudioFormats(remoteSongs.first().id).getOrDefault(emptyList())
+            }
+            isLoadingFormats = false
+        }
+    }
 
     var showRemoveDownloadDialog by remember {
         mutableStateOf(false)
@@ -614,11 +684,14 @@ fun SelectionMediaMetadataMenu(
                             )
                         },
                         modifier = Modifier.tvClickable {
-                            coroutineScope.launch(Dispatchers.IO) {
-                                songSelection.forEach { mediaMetadata ->
-                                    val song = database.song(mediaMetadata.id).first()
-                                    song?.let { downloadUtil.downloadToMediaStore(it) }
+                            coroutineScope.launch {
+                                val songsToDownload = withContext(Dispatchers.IO) {
+                                    songSelection.forEach(database::insert)
+                                    songSelection.mapNotNull { mediaMetadata ->
+                                        database.song(mediaMetadata.id).first()
+                                    }
                                 }
+                                openBatchDownloadDialog(songsToDownload)
                             }
                         }
                     )

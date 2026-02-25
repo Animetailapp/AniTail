@@ -493,7 +493,7 @@ constructor(
         val songStates = songs.mapNotNull { states[it.id] }
         val allPersistedInMediaStore = songs.all { song ->
             !song.song.isLocal &&
-                (!song.song.mediaStoreUri.isNullOrEmpty() || !song.song.downloadUri.isNullOrEmpty())
+                hasAccessiblePersistedUri(song)
         }
 
         return when {
@@ -538,6 +538,20 @@ constructor(
 
             else -> MediaStoreCollectionStatus.NotDownloaded
         }
+    }
+
+    private fun hasAccessiblePersistedUri(song: Song): Boolean {
+        val mediaStoreUri = song.song.mediaStoreUri
+        if (!mediaStoreUri.isNullOrBlank() && downloadExportHelper.verifyFileAccess(mediaStoreUri)) {
+            return true
+        }
+
+        val downloadUri = song.song.downloadUri
+        if (!downloadUri.isNullOrBlank() && downloadExportHelper.verifyFileAccess(downloadUri)) {
+            return true
+        }
+
+        return false
     }
 
     private fun calculateDownloadState(
@@ -621,12 +635,22 @@ constructor(
         mediaStoreDownloadManager.downloadSongs(listOf(song))
     }
 
-    fun downloadSongsToMediaStore(songs: Collection<com.anitail.music.db.entities.Song>) {
+    fun downloadSongsToMediaStore(
+        songs: Collection<com.anitail.music.db.entities.Song>,
+        targetItag: Int? = null,
+    ) {
         val remoteSongs = songs.filterNot { it.song.isLocal || it.id.startsWith("LOCAL_") }
         if (remoteSongs.isEmpty()) {
             Timber.d("Skipping MediaStore batch download: no remote songs to download")
             return
         }
+
+        targetItag?.let { itag ->
+            remoteSongs.forEach { song ->
+                mediaStoreDownloadManager.setTargetItag(song.id, itag)
+            }
+        }
+
         mediaStoreDownloadManager.downloadSongs(remoteSongs)
     }
 
