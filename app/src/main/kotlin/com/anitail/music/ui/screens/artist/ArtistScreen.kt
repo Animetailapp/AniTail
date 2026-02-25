@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +31,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +42,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -417,6 +421,36 @@ fun ArtistScreen(
                     }
                 }
 
+                val aboutArtistDescription = artistPage?.description
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                val aboutSubscriberCount = artistPage?.subscriberCountText
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                val aboutMonthlyListenerCount = artistPage?.monthlyListenerCount
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+
+                if (!showLocal && (
+                        aboutArtistDescription != null ||
+                            aboutSubscriberCount != null ||
+                            aboutMonthlyListenerCount != null
+                        )
+                ) {
+                    item(key = "about_artist") {
+                        AboutArtistSection(
+                            description = aboutArtistDescription,
+                            subscriberCountText = aboutSubscriberCount,
+                            monthlyListenerCount = aboutMonthlyListenerCount,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .padding(bottom = 16.dp)
+                                .animateItem(),
+                        )
+                    }
+                }
+
                 if (showLocal) {
                     if (librarySongs.isNotEmpty()) {
                         item {
@@ -740,4 +774,106 @@ fun ArtistScreen(
             TopAppBarDefaults.topAppBarColors()
         }
     )
+}
+
+@Composable
+private fun AboutArtistSection(
+    description: String?,
+    subscriberCountText: String?,
+    monthlyListenerCount: String?,
+    modifier: Modifier = Modifier,
+    collapsedMaxLines: Int = 4,
+) {
+    var isExpanded by rememberSaveable(description) { mutableStateOf(false) }
+    var canExpand by remember(description) { mutableStateOf(false) }
+    val hasDescription = !description.isNullOrBlank()
+    val hasInfoRows = !subscriberCountText.isNullOrBlank() || !monthlyListenerCount.isNullOrBlank()
+
+    Card(
+        modifier = modifier.animateContentSize(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.info),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+
+                Text(
+                    text = stringResource(R.string.about_artist),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (!subscriberCountText.isNullOrBlank()) {
+                Text(
+                    text = subscriberCountText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+
+            if (!monthlyListenerCount.isNullOrBlank()) {
+                Text(
+                    text = monthlyListenerCount,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            if (hasInfoRows && hasDescription) {
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
+            if (hasDescription) {
+                Text(
+                    text = description.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = if (isExpanded) Int.MAX_VALUE else collapsedMaxLines,
+                    overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { textLayoutResult ->
+                        if (!isExpanded) {
+                            canExpand = textLayoutResult.hasVisualOverflow
+                        }
+                    },
+                )
+            }
+
+            if (hasDescription && (canExpand || isExpanded)) {
+                TextButton(
+                    onClick = { isExpanded = !isExpanded },
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Icon(
+                        painter = painterResource(
+                            if (isExpanded) R.drawable.expand_less else R.drawable.expand_more
+                        ),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(if (isExpanded) R.string.collapse else R.string.expand),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+        }
+    }
 }

@@ -284,6 +284,17 @@ object YouTube {
 
     suspend fun artist(browseId: String): Result<ArtistPage> = runCatching {
         val response = innerTube.browse(WEB_REMIX, browseId).body<BrowseResponse>()
+        val descriptionRuns = response.contents?.sectionListRenderer?.contents
+            ?.firstOrNull { it.musicDescriptionShelfRenderer != null }
+            ?.musicDescriptionShelfRenderer?.description?.runs
+            ?: response.header?.musicImmersiveHeaderRenderer?.description?.runs
+
+        val subscriberCountText = response.header?.musicImmersiveHeaderRenderer?.subscriptionButton2
+            ?.subscribeButtonRenderer?.subscriberCountWithSubscribeText?.runs?.firstOrNull()?.text
+            ?: response.header?.musicImmersiveHeaderRenderer?.subscriptionButton
+                ?.subscribeButtonRenderer?.longSubscriberCountText?.runs?.firstOrNull()?.text
+            ?: response.header?.musicImmersiveHeaderRenderer?.subscriptionButton
+                ?.subscribeButtonRenderer?.shortSubscriberCountText?.runs?.firstOrNull()?.text
 
         ArtistPage(
             artist = ArtistItem(
@@ -307,7 +318,10 @@ object YouTube {
             sections = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
                 ?.tabRenderer?.content?.sectionListRenderer?.contents
                 ?.mapNotNull(ArtistPage::fromSectionListRendererContent)!!,
-            description = response.header?.musicImmersiveHeaderRenderer?.description?.runs?.firstOrNull()?.text
+            description = descriptionRuns?.joinToString(separator = "") { it.text },
+            subscriberCountText = subscriberCountText,
+            monthlyListenerCount = response.header?.musicImmersiveHeaderRenderer
+                ?.monthlyListenerCount?.runs?.firstOrNull()?.text
         )
     }
 
