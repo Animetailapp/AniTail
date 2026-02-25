@@ -67,6 +67,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.media3.exoplayer.offline.Download
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.anitail.innertube.YouTube
+import com.anitail.music.LocalDatabase
 import com.anitail.music.LocalDownloadUtil
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.LocalPlayerConnection
@@ -77,6 +79,7 @@ import com.anitail.music.constants.ThumbnailCornerRadius
 import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.extensions.togglePlayPause
+import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.AutoResizeText
 import com.anitail.music.ui.component.DefaultDialog
@@ -152,11 +155,13 @@ fun TopPlaylistScreen(
     val sortType by viewModel.topPeriod.collectAsState()
     val name = stringResource(R.string.my_top) + " $maxSize"
 
+    val database = LocalDatabase.current
     val downloadUtil = LocalDownloadUtil.current
     val coroutineScope = rememberCoroutineScope()
     val playlistSongIds = remember(songs) { songs?.map { it.song.id }.orEmpty() }
     val downloadState by downloadUtil.getDownloadState(playlistSongIds)
         .collectAsState(initial = Download.STATE_STOPPED)
+    var isRefreshingAllSongs by remember { mutableStateOf(false) }
     var showDownloadFormatDialog by remember { mutableStateOf(false) }
     var isLoadingFormats by remember { mutableStateOf(false) }
     var availableFormats by remember { mutableStateOf<List<YTPlayerUtils.AudioFormatOption>>(emptyList()) }
@@ -188,6 +193,39 @@ fun TopPlaylistScreen(
                 YTPlayerUtils.getAllAvailableAudioFormats(remoteSongs.first().id).getOrDefault(emptyList())
             }
             isLoadingFormats = false
+        }
+    }
+
+    fun refreshAllSongsMetadata(targetSongs: List<Song>) {
+        val remoteSongs = targetSongs
+            .filterNot { it.song.isLocal || it.id.startsWith("LOCAL_") }
+            .distinctBy { it.id }
+
+        if (remoteSongs.isEmpty() || isRefreshingAllSongs) return
+
+        isRefreshingAllSongs = true
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                remoteSongs.chunked(YouTube.MAX_GET_QUEUE_SIZE).forEach { chunk ->
+                    val refreshedSongsById = YouTube
+                        .queue(videoIds = chunk.map { it.id })
+                        .getOrNull()
+                        ?.associateBy { it.id }
+                        ?: return@forEach
+
+                    database.transaction {
+                        chunk.forEach { originalSong ->
+                            refreshedSongsById[originalSong.id]?.let { refreshedSong ->
+                                update(originalSong, refreshedSong.toMediaMetadata())
+                            }
+                        }
+                    }
+                }
+            } finally {
+                withContext(Dispatchers.Main) {
+                    isRefreshingAllSongs = false
+                }
+            }
         }
     }
 
@@ -347,6 +385,25 @@ fun TopPlaylistScreen(
                                                             contentDescription = null,
                                                         )
                                                     }
+                                                }
+                                            }
+
+                                            IconButton(
+                                                onClick = {
+                                                    refreshAllSongsMetadata(songs!!)
+                                                },
+                                                enabled = !isRefreshingAllSongs,
+                                            ) {
+                                                if (isRefreshingAllSongs) {
+                                                    CircularProgressIndicator(
+                                                        strokeWidth = 2.dp,
+                                                        modifier = Modifier.size(24.dp),
+                                                    )
+                                                } else {
+                                                    Icon(
+                                                        painter = painterResource(R.drawable.sync),
+                                                        contentDescription = null,
+                                                    )
                                                 }
                                             }
 
