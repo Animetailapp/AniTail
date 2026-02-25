@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -80,7 +81,8 @@ private data class GithubRelease(
 )
 
 private data class GithubCommit(
-    val message: String,
+    val title: String,
+    val details: String,
     val authorName: String,
     val date: String,
     val htmlUrl: String,
@@ -283,7 +285,7 @@ private fun ChangelogTabs(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer
+        color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
         Row(
             modifier = Modifier
@@ -295,7 +297,7 @@ private fun ChangelogTabs(
                 val isSelected = selectedTab == tab
                 val containerColor by animateColorAsState(
                     targetValue = if (isSelected) {
-                        MaterialTheme.colorScheme.secondaryContainer
+                        MaterialTheme.colorScheme.surfaceContainerHighest
                     } else {
                         Color.Transparent
                     },
@@ -303,7 +305,7 @@ private fun ChangelogTabs(
                 )
                 val labelColor by animateColorAsState(
                     targetValue = if (isSelected) {
-                        MaterialTheme.colorScheme.onSecondaryContainer
+                        MaterialTheme.colorScheme.onSurface
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
@@ -381,6 +383,8 @@ private fun ReleaseCardItem(
 ) {
     val releaseBody = remember(release.body) { release.body.toReadableReleaseBody() }
     val hasBody = releaseBody.isNotBlank()
+    val collapsedLines = 5
+    val canExpand = remember(releaseBody) { releaseBody.lineSequence().count() > collapsedLines }
     var expanded by rememberSaveable(release.tagName) { mutableStateOf(false) }
 
     Card(
@@ -389,10 +393,6 @@ private fun ReleaseCardItem(
             .animateContentSize(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
         ),
         shape = RoundedCornerShape(20.dp)
     ) {
@@ -407,12 +407,12 @@ private fun ReleaseCardItem(
             ) {
                 Surface(
                     shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.secondaryContainer
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest
                 ) {
                     Text(
                         text = release.tagName,
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
@@ -438,7 +438,7 @@ private fun ReleaseCardItem(
                     text = releaseBody,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = if (expanded) Int.MAX_VALUE else 8,
+                    maxLines = if (expanded) Int.MAX_VALUE else collapsedLines,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -448,8 +448,13 @@ private fun ReleaseCardItem(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (hasBody) {
-                    TextButton(onClick = { expanded = !expanded }) {
+                if (hasBody && canExpand) {
+                    TextButton(
+                        onClick = { expanded = !expanded },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
                         Text(
                             text = stringResource(
                                 if (expanded) R.string.collapse else R.string.expand
@@ -459,7 +464,12 @@ private fun ReleaseCardItem(
                 }
 
                 if (release.htmlUrl.isNotBlank()) {
-                    TextButton(onClick = { onOpenLink(release.htmlUrl) }) {
+                    TextButton(
+                        onClick = { onOpenLink(release.htmlUrl) },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
                         Text(stringResource(R.string.open_in_browser))
                     }
                 }
@@ -510,14 +520,13 @@ private fun CommitCardItem(
     commit: GithubCommit,
     onOpenLink: (String) -> Unit,
 ) {
+    val hasDetails = commit.details.isNotBlank()
+    var expanded by rememberSaveable(commit.shortSha) { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
         ),
         shape = RoundedCornerShape(20.dp)
     ) {
@@ -531,13 +540,13 @@ private fun CommitCardItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
                     shape = RoundedCornerShape(999.dp)
                 ) {
                     Text(
                         text = commit.shortSha,
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
@@ -552,12 +561,22 @@ private fun CommitCardItem(
             }
 
             Text(
-                text = commit.message,
+                text = commit.title,
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 5,
+                maxLines = if (expanded) Int.MAX_VALUE else 2,
                 overflow = TextOverflow.Ellipsis
             )
+
+            if (hasDetails && expanded) {
+                Text(
+                    text = commit.details,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 8,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
 
             Text(
                 text = commit.authorName,
@@ -565,12 +584,32 @@ private fun CommitCardItem(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            if (commit.htmlUrl.isNotBlank()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = { onOpenLink(commit.htmlUrl) }) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                if (hasDetails) {
+                    TextButton(
+                        onClick = { expanded = !expanded },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    ) {
+                        Text(
+                            text = stringResource(
+                                if (expanded) R.string.collapse else R.string.expand
+                            )
+                        )
+                    }
+                }
+
+                if (commit.htmlUrl.isNotBlank()) {
+                    TextButton(
+                        onClick = { onOpenLink(commit.htmlUrl) },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
                         Text(stringResource(R.string.open_in_browser))
                     }
                 }
@@ -716,14 +755,31 @@ private suspend fun fetchGithubCommits(
             val commit = commitWrapper.optJSONObject("commit")
             val author = commit?.optJSONObject("author")
             val fullMessage = commit?.optString("message").orEmpty()
-            val message = fullMessage
+            val cleanedLines = fullMessage
                 .replace("\r\n", "\n")
+                .lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .filterNot { line ->
+                    line.startsWith("Co-authored-by:", ignoreCase = true) ||
+                        line.startsWith("Signed-off-by:", ignoreCase = true)
+                }
+                .toList()
+            val fallbackTitle = fullMessage
+                .lineSequence()
+                .firstOrNull()
+                .orEmpty()
                 .trim()
+            val title = cleanedLines.firstOrNull().orEmpty().ifBlank {
+                fallbackTitle.ifBlank { "No commit message" }
+            }
+            val details = cleanedLines.drop(1).joinToString("\n").trim()
             val sha = commitWrapper.optString("sha")
 
             add(
                 GithubCommit(
-                    message = message,
+                    title = title,
+                    details = details,
                     authorName = author?.optString("name").orEmpty().ifBlank { "Unknown" },
                     date = author?.optString("date").orEmpty().toShortDate(),
                     htmlUrl = commitWrapper.optString("html_url"),
@@ -768,14 +824,27 @@ private fun String.toShortDate(): String {
 private fun String.toReadableReleaseBody(): String {
     if (isBlank()) return ""
 
-    return lineSequence()
-        .map { it.trim() }
-        .filter { it.isNotBlank() }
-        .map { line ->
+    val markdownLinkRegex = Regex("\\[([^\\]]+)]\\(([^)]+)\\)")
+    val urlRegex = Regex("https?://\\S+")
+
+    val normalized = replace("\r\n", "\n")
+        .lineSequence()
+        .map { raw ->
+            var line = raw.trim()
+            if (line.isBlank()) return@map ""
+
+            line = line.replace(Regex("^>+\\s*"), "")
+            line = line.removePrefix("### ").removePrefix("## ").removePrefix("# ")
+            line = line.replace(markdownLinkRegex, "$1")
+            line = line.replace("**", "").replace("__", "").replace("`", "")
+            line = line.replace(urlRegex, "")
+            line = line.trim()
+
+            if (line == "---" || line == "***" || line == "___") {
+                return@map ""
+            }
+
             when {
-                line.startsWith("### ") -> line.removePrefix("### ").trim()
-                line.startsWith("## ") -> line.removePrefix("## ").trim()
-                line.startsWith("# ") -> line.removePrefix("# ").trim()
                 line.startsWith("- [x] ", ignoreCase = true) -> "- ${line.substring(6).trim()}"
                 line.startsWith("- [ ] ") -> "- ${line.substring(6).trim()}"
                 line.startsWith("- ") -> "- ${line.removePrefix("- ").trim()}"
@@ -783,7 +852,25 @@ private fun String.toReadableReleaseBody(): String {
                 else -> line
             }
         }
+        .toList()
+
+    return normalized
+        .fold(mutableListOf<String>()) { acc, line ->
+            if (line.isBlank()) {
+                if (acc.isNotEmpty() && acc.last().isNotBlank()) {
+                    acc.add("")
+                }
+            } else {
+                acc.add(line)
+            }
+            acc
+        }
+        .asSequence()
+        .map { line ->
+            if (line == "-") "" else line
+        }
         .joinToString("\n")
+        .trim()
 }
 
 private fun currentTimestamp(): String {
