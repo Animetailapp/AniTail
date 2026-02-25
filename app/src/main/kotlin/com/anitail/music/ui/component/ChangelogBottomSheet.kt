@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -106,6 +107,11 @@ private data class ChangelogSheetState(
     val commitsError: String? = null,
     val lastUpdated: String? = null,
 )
+
+private val ReleaseTagChipColor = Color(0xFF1B5E20)
+private val ReleaseTagTextColor = Color(0xFFF1F8E9)
+private val CommitTagChipColor = Color(0xFFB71C1C)
+private val CommitTagTextColor = Color(0xFFFFEBEE)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -437,12 +443,12 @@ private fun ReleaseCardItem(
             ) {
                 Surface(
                     shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    color = ReleaseTagChipColor
                 ) {
                     Text(
                         text = release.tagName,
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = ReleaseTagTextColor,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
@@ -551,6 +557,11 @@ private fun CommitCardItem(
     val hasDetails = commit.details.isNotBlank()
     val canExpand = hasDetails || commit.title.length > 72 || commit.htmlUrl.isNotBlank()
     var expanded by rememberSaveable(commit.shortSha) { mutableStateOf(false) }
+    val authorColor = if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) {
+        Color(0xFFFFD180)
+    } else {
+        Color(0xFF7A3E00)
+    }
 
     Card(
         modifier = Modifier
@@ -597,13 +608,13 @@ private fun CommitCardItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    color = CommitTagChipColor,
                     shape = RoundedCornerShape(999.dp)
                 ) {
                     Text(
                         text = commit.shortSha,
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        color = CommitTagTextColor,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
@@ -638,7 +649,8 @@ private fun CommitCardItem(
             Text(
                 text = commit.authorName,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = authorColor,
+                fontWeight = FontWeight.Medium
             )
 
             Row(
