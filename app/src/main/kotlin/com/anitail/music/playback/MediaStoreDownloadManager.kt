@@ -405,7 +405,7 @@ constructor(
                     )
                 } else {
                     if (song.song.mediaStoreUri != song.song.downloadUri) {
-                        markSongAsDownloaded(song.id, song.song.downloadUri)
+                        markSongAsDownloaded(song.id, downloadUri)
                     }
                     statesToClear += song.id
                     continue
