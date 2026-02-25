@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -14,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,9 +25,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.BottomSheetDefaults
@@ -178,7 +180,6 @@ fun ChangelogBottomSheet(
                 modifier = Modifier
                     .widthIn(max = 640.dp)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 8.dp)
                     .padding(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -357,8 +358,17 @@ private fun ChangelogReleasesContent(
         }
 
         else -> {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                releases.forEach { release ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 520.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 8.dp)
+            ) {
+                items(
+                    items = releases,
+                    key = { release -> release.tagName.ifBlank { release.htmlUrl } }
+                ) { release ->
                     ReleaseCardItem(
                         release = release,
                         onOpenLink = onOpenLink
@@ -386,7 +396,10 @@ private fun ReleaseCardItem(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(
-                animationSpec = spring(stiffness = 420f, dampingRatio = 0.85f)
+                animationSpec = spring(
+                    stiffness = Spring.StiffnessMediumHigh,
+                    dampingRatio = Spring.DampingRatioNoBouncy
+                )
             ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
@@ -510,8 +523,17 @@ private fun ChangelogCommitsContent(
         }
 
         else -> {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                commits.forEach { commit ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 520.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 8.dp)
+            ) {
+                items(
+                    items = commits,
+                    key = { commit -> commit.htmlUrl.ifBlank { "${commit.shortSha}-${commit.date}" } }
+                ) { commit ->
                     CommitCardItem(
                         commit = commit,
                         onOpenLink = onOpenLink
@@ -535,7 +557,10 @@ private fun CommitCardItem(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(
-                animationSpec = spring(stiffness = 420f, dampingRatio = 0.85f)
+                animationSpec = spring(
+                    stiffness = Spring.StiffnessMediumHigh,
+                    dampingRatio = Spring.DampingRatioNoBouncy
+                )
             ),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.44f)
@@ -553,7 +578,18 @@ private fun CommitCardItem(
                 .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f))
         )
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    if (canExpand) {
+                        Modifier.tvClickable(shape = RoundedCornerShape(20.dp)) {
+                            expanded = !expanded
+                        }
+                    } else {
+                        Modifier
+                    }
+                )
+                .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
@@ -587,12 +623,7 @@ private fun CommitCardItem(
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = if (expanded) Int.MAX_VALUE else 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = if (canExpand) {
-                    Modifier.tvClickable { expanded = !expanded }
-                } else {
-                    Modifier
-                }
+                overflow = TextOverflow.Ellipsis
             )
 
             if (hasDetails && expanded) {
@@ -601,8 +632,7 @@ private fun CommitCardItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 8,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.tvClickable { expanded = false }
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
@@ -759,7 +789,7 @@ private suspend fun fetchGithubCommits(
     repositoryOwner: String,
     repositoryName: String,
 ): List<GithubCommit> = withContext(Dispatchers.IO) {
-    val body = getResponseBody("https://api.github.com/repos/$repositoryOwner/$repositoryName/commits?per_page=30")
+    val body = getResponseBody("https://api.github.com/repos/$repositoryOwner/$repositoryName/commits?per_page=20")
     val json = JSONArray(body)
 
     buildList {
