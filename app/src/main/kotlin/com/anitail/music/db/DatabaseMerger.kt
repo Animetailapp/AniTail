@@ -13,7 +13,7 @@ class DatabaseMerger @Inject constructor(
     private val musicDatabase: MusicDatabase
 ) {
     companion object {
-        private const val REMOTE_SCHEMA = "remote_db"
+        private const val REMOTE_SCHEMA_PREFIX = "remote_db_"
     }
 
     /**
@@ -22,6 +22,7 @@ class DatabaseMerger @Inject constructor(
      */
     suspend fun mergeDatabase(remoteDbFile: File) {
         val currentDb = musicDatabase.openHelper.writableDatabase
+        val remoteSchema = buildRemoteSchemaName()
 
         try {
             // Ensure WAL checkpoint is done before merge to avoid conflicts
@@ -34,67 +35,67 @@ class DatabaseMerger @Inject constructor(
             // Small delay to allow any pending transactions to complete
             delay(100)
 
-            // Defensive cleanup: a previous failed merge may have left remote_db attached.
+            // Defensive cleanup in case this exact schema name already exists.
             runCatching {
-                detachDatabaseIfAttached(currentDb, REMOTE_SCHEMA)
+                detachDatabaseIfAttached(currentDb, remoteSchema)
             }.onFailure { detachError ->
-                Timber.w(detachError, "Failed to pre-clean attached %s", REMOTE_SCHEMA)
+                Timber.w(detachError, "Failed to pre-clean attached %s", remoteSchema)
             }
 
             currentDb.beginTransaction()
             try {
                 // ATTACH must happen on the same connection that runs merge queries.
                 val remotePath = remoteDbFile.absolutePath.replace("'", "''")
-                attachRemoteDatabase(currentDb, remotePath, REMOTE_SCHEMA)
-                Timber.d("Attached remote database for merging")
+                attachRemoteDatabase(currentDb, remotePath, remoteSchema)
+                Timber.d("Attached remote database for merging as %s", remoteSchema)
 
-                if (!isDatabaseAttached(currentDb, REMOTE_SCHEMA)) {
-                    throw IllegalStateException("Failed to attach $REMOTE_SCHEMA on active transaction connection")
+                if (!isDatabaseAttached(currentDb, remoteSchema)) {
+                    throw IllegalStateException("Failed to attach $remoteSchema on active transaction connection")
                 }
 
                 // 1. Merge Songs (Favorited status mainly)
                 // If song exists in both but only remote is favorite, update local
                 // If song doesn't exist locally but exists in remote (and is favorite), insert it
-                mergeFavorites(currentDb)
+                mergeFavorites(currentDb, remoteSchema)
 
                 // 2. Merge Playlists
                 // Insert playlists that don't exist locally
-                mergePlaylists(currentDb)
+                mergePlaylists(currentDb, remoteSchema)
 
                 // 3. Merge Playlist Items
-                mergePlaylistItems(currentDb)
+                mergePlaylistItems(currentDb, remoteSchema)
 
                 // 4. Merge Youtube Watch History (Event table)
-                mergeHistory(currentDb)
+                mergeHistory(currentDb, remoteSchema)
 
                 // 5. Merge Artists (bookmarked)
-                mergeArtists(currentDb)
+                mergeArtists(currentDb, remoteSchema)
 
                 // 6. Merge Albums (bookmarked)
-                mergeAlbums(currentDb)
+                mergeAlbums(currentDb, remoteSchema)
 
                 // 7. Merge Search History
-                mergeSearchHistory(currentDb)
+                mergeSearchHistory(currentDb, remoteSchema)
 
                 // 8. Merge Lyrics
-                mergeLyrics(currentDb)
+                mergeLyrics(currentDb, remoteSchema)
 
                 // 9. Merge Format (audio quality cache)
-                mergeFormats(currentDb)
+                mergeFormats(currentDb, remoteSchema)
 
                 currentDb.setTransactionSuccessful()
                 Timber.d("Database merge completed successfully")
             } finally {
                 runCatching {
-                    detachDatabaseIfAttached(currentDb, REMOTE_SCHEMA)
+                    detachDatabaseIfAttached(currentDb, remoteSchema)
                 }.onFailure { detachError ->
-                    Timber.w(detachError, "Failed to detach %s before endTransaction", REMOTE_SCHEMA)
+                    Timber.w(detachError, "Failed to detach %s before endTransaction", remoteSchema)
                 }
                 currentDb.endTransaction()
                 runCatching {
-                    detachDatabaseIfAttached(currentDb, REMOTE_SCHEMA)
+                    detachDatabaseIfAttached(currentDb, remoteSchema)
                 }.onFailure { detachError ->
-                    Timber.w(detachError, "Failed to detach %s after endTransaction", REMOTE_SCHEMA)
+                    Timber.w(detachError, "Failed to detach %s after endTransaction", remoteSchema)
                 }
             }
 
@@ -104,10 +105,14 @@ class DatabaseMerger @Inject constructor(
         }
     }
 
-    private fun mergeFavorites(db: SupportSQLiteDatabase) {
-        val hasLiked = hasColumn(db, "remote_db", "song", "liked")
-        val hasLikedDate = hasColumn(db, "remote_db", "song", "likedDate")
-        val hasInLibrary = hasColumn(db, "remote_db", "song", "inLibrary")
+    private fun mergeFavorites(
+        db: SupportSQLiteDatabase,
+        remoteSchema: String,
+    ) {
+        val remoteSongTable = "$remoteSchema.song"
+        val hasLiked = hasColumn(db, remoteSchema, "song", "liked")
+        val hasLikedDate = hasColumn(db, remoteSchema, "song", "likedDate")
+        val hasInLibrary = hasColumn(db, remoteSchema, "song", "inLibrary")
 
         val remoteSongConditions = mutableListOf<String>()
         if (hasLiked) remoteSongConditions += "remoteSong.liked = 1"
@@ -118,12 +123,13 @@ class DatabaseMerger @Inject constructor(
             insertOrIgnoreBySharedColumns(
                 db = db,
                 table = "song",
+                remoteSchema = remoteSchema,
                 sourceAlias = "remoteSong",
                 whereClause = songFilter
             )
 
             // Ensure songs merged from favorites/library preserve artist relations.
-            mergeSongArtistDataForSongs(db, songFilter)
+            mergeSongArtistDataForSongs(db, remoteSchema, songFilter)
         }
 
         // B. Update existing local songs if remote has them as liked/inLibrary (and local doesn't)
@@ -135,14 +141,14 @@ class DatabaseMerger @Inject constructor(
                 """
                 UPDATE song 
                 SET liked = 1, 
-                    likedDate = COALESCE(likedDate, (SELECT likedDate FROM remote_db.song WHERE remote_db.song.id = main.song.id))
-                WHERE id IN (SELECT id FROM remote_db.song WHERE liked = 1) AND liked = 0
+                    likedDate = COALESCE(likedDate, (SELECT likedDate FROM $remoteSongTable WHERE $remoteSongTable.id = main.song.id))
+                WHERE id IN (SELECT id FROM $remoteSongTable WHERE liked = 1) AND liked = 0
             """
             } else {
                 """
                 UPDATE song 
                 SET liked = 1
-                WHERE id IN (SELECT id FROM remote_db.song WHERE liked = 1) AND liked = 0
+                WHERE id IN (SELECT id FROM $remoteSongTable WHERE liked = 1) AND liked = 0
             """
             }
             db.execSQL(updateLikedQuery)
@@ -151,35 +157,45 @@ class DatabaseMerger @Inject constructor(
         if (hasInLibrary) {
             val updateLibraryQuery = """
                 UPDATE song 
-                SET inLibrary = COALESCE(inLibrary, (SELECT inLibrary FROM remote_db.song WHERE remote_db.song.id = main.song.id))
-                WHERE id IN (SELECT id FROM remote_db.song WHERE inLibrary IS NOT NULL) AND inLibrary IS NULL
+                SET inLibrary = COALESCE(inLibrary, (SELECT inLibrary FROM $remoteSongTable WHERE $remoteSongTable.id = main.song.id))
+                WHERE id IN (SELECT id FROM $remoteSongTable WHERE inLibrary IS NOT NULL) AND inLibrary IS NULL
             """
             db.execSQL(updateLibraryQuery)
         }
     }
 
-    private fun mergePlaylists(db: SupportSQLiteDatabase) {
-        insertOrIgnoreBySharedColumns(db, "playlist")
+    private fun mergePlaylists(
+        db: SupportSQLiteDatabase,
+        remoteSchema: String,
+    ) {
+        insertOrIgnoreBySharedColumns(db, "playlist", remoteSchema = remoteSchema)
     }
 
-    private fun mergePlaylistItems(db: SupportSQLiteDatabase) {
-        insertOrIgnoreBySharedColumns(db, "playlist_song_map")
+    private fun mergePlaylistItems(
+        db: SupportSQLiteDatabase,
+        remoteSchema: String,
+    ) {
+        insertOrIgnoreBySharedColumns(db, "playlist_song_map", remoteSchema = remoteSchema)
     }
 
-    private fun mergeHistory(db: SupportSQLiteDatabase) {
-        val historySongFilter = "remoteSong.id IN (SELECT DISTINCT songId FROM remote_db.event)"
+    private fun mergeHistory(
+        db: SupportSQLiteDatabase,
+        remoteSchema: String,
+    ) {
+        val remoteEventTable = "$remoteSchema.event"
+        val remoteSongTable = "$remoteSchema.song"
+        val historySongFilter = "remoteSong.id IN (SELECT DISTINCT songId FROM $remoteEventTable)"
 
         // Insert albums that are referenced by songs in remote events
         insertOrIgnoreBySharedColumns(
             db = db,
             table = "album",
+            remoteSchema = remoteSchema,
             sourceAlias = "a",
             whereClause = """
-                a.id IN (
-                    SELECT DISTINCT s.albumId FROM remote_db.song s
-                    WHERE s.id IN (SELECT DISTINCT songId FROM remote_db.event)
-                    AND s.albumId IS NOT NULL
-                )
+                a.id IN (SELECT DISTINCT s.albumId FROM $remoteSongTable s
+                         WHERE s.id IN (SELECT DISTINCT songId FROM $remoteEventTable)
+                         AND s.albumId IS NOT NULL)
             """.trimIndent()
         )
 
@@ -188,35 +204,37 @@ class DatabaseMerger @Inject constructor(
         insertOrIgnoreBySharedColumns(
             db = db,
             table = "song",
+            remoteSchema = remoteSchema,
             sourceAlias = "s",
             whereClause = """
-                s.id IN (SELECT DISTINCT songId FROM remote_db.event)
+                s.id IN (SELECT DISTINCT songId FROM $remoteEventTable)
                 AND s.id NOT IN (SELECT id FROM main.song)
             """.trimIndent()
         )
 
         // Ensure artist entities and song-artist mappings exist for merged history songs.
-        mergeSongArtistDataForSongs(db, historySongFilter)
+        mergeSongArtistDataForSongs(db, remoteSchema, historySongFilter)
 
         // Insert song-album mappings for those songs
         insertOrIgnoreBySharedColumns(
             db = db,
             table = "song_album_map",
-            whereClause = "songId IN (SELECT DISTINCT songId FROM remote_db.event)"
+            remoteSchema = remoteSchema,
+            whereClause = "songId IN (SELECT DISTINCT songId FROM $remoteEventTable)"
         )
         
         // Insert events that don't exist locally.
         val insertHistoryQuery = """
              INSERT INTO main.event (songId, timestamp, playTime)
-             SELECT songId, timestamp, playTime FROM remote_db.event
+             SELECT songId, timestamp, playTime FROM $remoteEventTable
              WHERE NOT EXISTS (
                 SELECT 1 FROM main.event 
-                WHERE main.event.songId = remote_db.event.songId 
-                AND main.event.timestamp = remote_db.event.timestamp
+                WHERE main.event.songId = $remoteEventTable.songId 
+                AND main.event.timestamp = $remoteEventTable.timestamp
              )
              AND EXISTS (
                 SELECT 1 FROM main.song
-                WHERE main.song.id = remote_db.event.songId
+                WHERE main.song.id = $remoteEventTable.songId
              )
          """
         db.execSQL(insertHistoryQuery)
@@ -230,11 +248,16 @@ class DatabaseMerger @Inject constructor(
         db.execSQL(cleanupOrphansQuery)
     }
 
-    private fun mergeArtists(db: SupportSQLiteDatabase) {
+    private fun mergeArtists(
+        db: SupportSQLiteDatabase,
+        remoteSchema: String,
+    ) {
+        val remoteArtistTable = "$remoteSchema.artist"
         // Merge artists table while deduplicating generated local IDs (LA*) by name.
         insertOrIgnoreBySharedColumns(
             db = db,
             table = "artist",
+            remoteSchema = remoteSchema,
             sourceAlias = "remoteArtist",
             whereClause = """
                 NOT EXISTS (
@@ -249,7 +272,7 @@ class DatabaseMerger @Inject constructor(
             """.trimIndent()
         )
 
-        if (!hasColumn(db, "remote_db", "artist", "bookmarkedAt")) {
+        if (!hasColumn(db, remoteSchema, "artist", "bookmarkedAt")) {
             return
         }
 
@@ -258,7 +281,7 @@ class DatabaseMerger @Inject constructor(
             UPDATE artist
             SET bookmarkedAt = (
                 SELECT remoteArtist.bookmarkedAt
-                FROM remote_db.artist remoteArtist
+                FROM $remoteArtistTable remoteArtist
                 WHERE remoteArtist.bookmarkedAt IS NOT NULL
                   AND (
                         remoteArtist.id = main.artist.id
@@ -273,7 +296,7 @@ class DatabaseMerger @Inject constructor(
             WHERE bookmarkedAt IS NULL
               AND EXISTS (
                     SELECT 1
-                    FROM remote_db.artist remoteArtist
+                    FROM $remoteArtistTable remoteArtist
                     WHERE remoteArtist.bookmarkedAt IS NOT NULL
                       AND (
                             remoteArtist.id = main.artist.id
@@ -287,50 +310,68 @@ class DatabaseMerger @Inject constructor(
         db.execSQL(updateBookmarkedQuery)
     }
 
-    private fun mergeAlbums(db: SupportSQLiteDatabase) {
+    private fun mergeAlbums(
+        db: SupportSQLiteDatabase,
+        remoteSchema: String,
+    ) {
+        val remoteAlbumTable = "$remoteSchema.album"
         // Insert albums that exist in remote but not locally
-        insertOrIgnoreBySharedColumns(db, "album")
+        insertOrIgnoreBySharedColumns(db, "album", remoteSchema = remoteSchema)
 
         // Update bookmarkedAt for albums that are bookmarked in remote but not local
         val updateBookmarkedQuery = """
             UPDATE album 
-            SET bookmarkedAt = (SELECT bookmarkedAt FROM remote_db.album WHERE remote_db.album.id = main.album.id)
-            WHERE id IN (SELECT id FROM remote_db.album WHERE bookmarkedAt IS NOT NULL) 
+            SET bookmarkedAt = (SELECT bookmarkedAt FROM $remoteAlbumTable WHERE $remoteAlbumTable.id = main.album.id)
+            WHERE id IN (SELECT id FROM $remoteAlbumTable WHERE bookmarkedAt IS NOT NULL) 
             AND bookmarkedAt IS NULL
         """
         db.execSQL(updateBookmarkedQuery)
     }
 
-    private fun mergeSearchHistory(db: SupportSQLiteDatabase) {
+    private fun mergeSearchHistory(
+        db: SupportSQLiteDatabase,
+        remoteSchema: String,
+    ) {
         // Insert search history entries that don't exist locally
-        insertOrIgnoreBySharedColumns(db, "search_history")
+        insertOrIgnoreBySharedColumns(db, "search_history", remoteSchema = remoteSchema)
     }
 
-    private fun mergeLyrics(db: SupportSQLiteDatabase) {
+    private fun mergeLyrics(
+        db: SupportSQLiteDatabase,
+        remoteSchema: String,
+    ) {
         // Insert lyrics for songs that don't have lyrics locally but have them in remote
-        insertOrIgnoreBySharedColumns(db, "lyrics")
+        insertOrIgnoreBySharedColumns(db, "lyrics", remoteSchema = remoteSchema)
     }
 
-    private fun mergeFormats(db: SupportSQLiteDatabase) {
+    private fun mergeFormats(
+        db: SupportSQLiteDatabase,
+        remoteSchema: String,
+    ) {
         // Insert format entries that don't exist locally
-        insertOrIgnoreBySharedColumns(db, "format")
+        insertOrIgnoreBySharedColumns(db, "format", remoteSchema = remoteSchema)
     }
 
     private fun mergeSongArtistDataForSongs(
         db: SupportSQLiteDatabase,
+        remoteSchema: String,
         remoteSongWhereClause: String,
     ) {
+        val remoteSongArtistMapTable = "$remoteSchema.song_artist_map"
+        val remoteSongTable = "$remoteSchema.song"
+        val remoteArtistTable = "$remoteSchema.artist"
         // Insert missing artists referenced by matching songs.
         // For generated IDs (LA*), dedupe by normalized artist name.
         insertOrIgnoreBySharedColumns(
             db = db,
             table = "artist",
+            remoteSchema = remoteSchema,
             sourceAlias = "remoteArtist",
             whereClause = """
                 remoteArtist.id IN (
                     SELECT DISTINCT remoteMap.artistId
-                    FROM remote_db.song_artist_map remoteMap
-                    JOIN remote_db.song remoteSong ON remoteSong.id = remoteMap.songId
+                    FROM $remoteSongArtistMapTable remoteMap
+                    JOIN $remoteSongTable remoteSong ON remoteSong.id = remoteMap.songId
                     WHERE $remoteSongWhereClause
                 )
                 AND NOT EXISTS (
@@ -377,9 +418,9 @@ class DatabaseMerger @Inject constructor(
                     )
                 END AS resolvedArtistId,
                 remoteMap.position
-            FROM remote_db.song_artist_map remoteMap
-            JOIN remote_db.song remoteSong ON remoteSong.id = remoteMap.songId
-            JOIN remote_db.artist remoteArtist ON remoteArtist.id = remoteMap.artistId
+            FROM $remoteSongArtistMapTable remoteMap
+            JOIN $remoteSongTable remoteSong ON remoteSong.id = remoteMap.songId
+            JOIN $remoteArtistTable remoteArtist ON remoteArtist.id = remoteMap.artistId
             WHERE $remoteSongWhereClause
               AND EXISTS (
                     SELECT 1
@@ -393,11 +434,12 @@ class DatabaseMerger @Inject constructor(
     private fun insertOrIgnoreBySharedColumns(
         db: SupportSQLiteDatabase,
         table: String,
+        remoteSchema: String,
         whereClause: String? = null,
         sourceAlias: String? = null,
     ) {
         val mainColumns = tableColumns(db, "main", table)
-        val remoteColumns = tableColumns(db, "remote_db", table).toSet()
+        val remoteColumns = tableColumns(db, remoteSchema, table).toSet()
         val sharedColumns = mainColumns.filter { it in remoteColumns }
 
         if (sharedColumns.isEmpty()) {
@@ -412,9 +454,9 @@ class DatabaseMerger @Inject constructor(
             sharedColumns.joinToString(", ") { "$sourceAlias.`$it`" }
         }
         val sourceTable = if (sourceAlias.isNullOrBlank()) {
-            "remote_db.`$table`"
+            "$remoteSchema.`$table`"
         } else {
-            "remote_db.`$table` $sourceAlias"
+            "$remoteSchema.`$table` $sourceAlias"
         }
         val whereSql = whereClause?.trim()?.takeIf { it.isNotEmpty() }?.let { " WHERE $it" } ?: ""
         val sql = """
@@ -444,6 +486,13 @@ class DatabaseMerger @Inject constructor(
             }
         }
         return columns
+    }
+
+    private fun buildRemoteSchemaName(): String {
+        val now = System.currentTimeMillis()
+        val threadId = Thread.currentThread().id
+        val nonce = (System.nanoTime() and 0xFFFF).toString()
+        return "${REMOTE_SCHEMA_PREFIX}${threadId}_${now}_$nonce"
     }
 
     private fun isDatabaseAttached(
@@ -481,7 +530,12 @@ class DatabaseMerger @Inject constructor(
             db.execSQL(attachSql)
         }.onFailure { attachError ->
             if (!isAlreadyInUseAttachError(attachError)) {
-                throw attachError
+                throw attachFailureException(
+                    db = db,
+                    schemaName = schemaName,
+                    phase = "initial",
+                    cause = attachError,
+                )
             }
 
             Timber.w(
@@ -497,12 +551,46 @@ class DatabaseMerger @Inject constructor(
             }
 
             // Retry ATTACH on the same active connection.
-            db.execSQL(attachSql)
+            runCatching {
+                db.execSQL(attachSql)
+            }.getOrElse { retryError ->
+                throw attachFailureException(
+                    db = db,
+                    schemaName = schemaName,
+                    phase = "retry",
+                    cause = retryError,
+                )
+            }
         }
     }
 
     private fun isAlreadyInUseAttachError(error: Throwable): Boolean {
         val message = error.message ?: return false
         return message.contains("already in use", ignoreCase = true)
+    }
+
+    private fun attachFailureException(
+        db: SupportSQLiteDatabase,
+        schemaName: String,
+        phase: String,
+        cause: Throwable,
+    ): IllegalStateException {
+        val attachedSchemas = attachedSchemaNames(db).joinToString(", ")
+        return IllegalStateException(
+            "ATTACH failed ($phase) for schema '$schemaName'. Attached schemas: [$attachedSchemas]",
+            cause,
+        )
+    }
+
+    private fun attachedSchemaNames(db: SupportSQLiteDatabase): List<String> {
+        val result = mutableListOf<String>()
+        db.query("PRAGMA database_list").use { cursor ->
+            val nameIndex = cursor.getColumnIndex("name")
+            if (nameIndex == -1) return emptyList()
+            while (cursor.moveToNext()) {
+                result += cursor.getString(nameIndex)
+            }
+        }
+        return result
     }
 }
