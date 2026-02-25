@@ -2,13 +2,15 @@ package com.anitail.music.ui.component
 
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,7 +34,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -182,12 +184,13 @@ fun ChangelogBottomSheet(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 ChangelogHeader(
-                    lastUpdated = state.lastUpdated,
                     onDismissRequest = onDismissRequest
                 )
 
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                ChangelogHeroBanner(
+                    lastUpdated = state.lastUpdated,
+                    releaseCount = state.releases.size,
+                    commitCount = state.commits.size
                 )
 
                 ChangelogTabs(
@@ -229,7 +232,6 @@ fun ChangelogBottomSheet(
 
 @Composable
 private fun ChangelogHeader(
-    lastUpdated: String?,
     onDismissRequest: () -> Unit,
 ) {
     Row(
@@ -243,29 +245,10 @@ private fun ChangelogHeader(
         ) {
             Text(
                 text = stringResource(R.string.changelog),
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Text(
-                text = stringResource(R.string.changelog_sheet_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            AnimatedVisibility(
-                visible = lastUpdated != null,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                Text(
-                    text = stringResource(
-                        R.string.changelog_last_updated,
-                        lastUpdated.orEmpty()
-                    ),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
 
         IconButton(onClick = onDismissRequest) {
@@ -297,7 +280,10 @@ private fun ChangelogTabs(
                 val isSelected = selectedTab == tab
                 val containerColor by animateColorAsState(
                     targetValue = if (isSelected) {
-                        MaterialTheme.colorScheme.primaryContainer
+                        when (tab) {
+                            ChangelogTab.RELEASES -> MaterialTheme.colorScheme.primaryContainer
+                            ChangelogTab.COMMITS -> MaterialTheme.colorScheme.tertiaryContainer
+                        }
                     } else {
                         Color.Transparent
                     },
@@ -305,11 +291,18 @@ private fun ChangelogTabs(
                 )
                 val labelColor by animateColorAsState(
                     targetValue = if (isSelected) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
+                        when (tab) {
+                            ChangelogTab.RELEASES -> MaterialTheme.colorScheme.onPrimaryContainer
+                            ChangelogTab.COMMITS -> MaterialTheme.colorScheme.onTertiaryContainer
+                        }
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
                     label = "changelog_tab_label"
+                )
+                val corner by animateDpAsState(
+                    targetValue = if (isSelected) 18.dp else 12.dp,
+                    label = "changelog_tab_corner"
                 )
 
                 Surface(
@@ -317,7 +310,7 @@ private fun ChangelogTabs(
                         .weight(1f)
                         .heightIn(min = 48.dp)
                         .tvClickable { onTabSelected(tab) },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(corner),
                     color = containerColor
                 ) {
                     Box(
@@ -390,16 +383,24 @@ private fun ReleaseCardItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(),
+            .animateContentSize(
+                animationSpec = spring(stiffness = 420f, dampingRatio = 0.85f)
+            ),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f)
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
         ),
         border = BorderStroke(
             width = 1.dp,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
         ),
         shape = RoundedCornerShape(20.dp)
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+        )
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -526,16 +527,26 @@ private fun CommitCardItem(
     var expanded by rememberSaveable(commit.shortSha) { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(
+                animationSpec = spring(stiffness = 420f, dampingRatio = 0.85f)
+            ),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.26f)
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.44f)
         ),
         border = BorderStroke(
             width = 1.dp,
-            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.24f)
+            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.34f)
         ),
         shape = RoundedCornerShape(20.dp)
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f))
+        )
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -604,7 +615,7 @@ private fun CommitCardItem(
                     TextButton(
                         onClick = { onOpenLink(commit.htmlUrl) },
                         colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
+                            contentColor = MaterialTheme.colorScheme.tertiary
                         )
                     ) {
                         Text(stringResource(R.string.open_in_browser))
@@ -873,5 +884,81 @@ private fun String.toReadableReleaseBody(): String {
 private fun currentTimestamp(): String {
     val formatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
     return formatter.format(Date())
+}
+
+@Composable
+private fun ChangelogHeroBanner(
+    lastUpdated: String?,
+    releaseCount: Int,
+    commitCount: Int,
+) {
+    val heroShape = RoundedCornerShape(24.dp)
+    val heroBrush = Brush.linearGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f),
+            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.9f)
+        )
+    )
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = heroShape,
+        color = Color.Transparent,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(brush = heroBrush)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.changelog_sheet_subtitle),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            if (lastUpdated != null) {
+                Text(
+                    text = stringResource(R.string.changelog_last_updated, lastUpdated),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f)
+                )
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                ) {
+                    Text(
+                        text = "${stringResource(R.string.changelog_tab_releases)} $releaseCount",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f)
+                ) {
+                    Text(
+                        text = "${stringResource(R.string.changelog_tab_commits)} $commitCount",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+            }
+        }
+    }
 }
 
