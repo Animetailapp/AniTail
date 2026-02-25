@@ -74,6 +74,7 @@ import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.R
 import com.anitail.music.constants.AvatarSource
 import com.anitail.music.constants.PreferredAvatarSourceKey
+import com.anitail.music.ui.component.ChangelogBottomSheet
 import com.anitail.music.ui.component.IconButton
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.ui.utils.tvClickable
@@ -152,6 +153,7 @@ fun SettingsScreen(
             else -> colorScheme.primary.copy(alpha = 0.1f)
         }
     }
+    var showChangelogSheet by remember { mutableStateOf(false) }
 
     val allSettings = remember(latestVersionName) {
         val list = mutableListOf<SettingItemData>()
@@ -304,6 +306,18 @@ fun SettingsScreen(
                     })
             )
         }
+        list.add(
+            SettingItemData(
+                "changelog",
+                context.getString(R.string.changelog),
+                R.drawable.history,
+                "More",
+                Color(0xFF42A5F5),
+                { showChangelogSheet = true },
+                subtitle = context.getString(R.string.release_notes),
+                optionsProvider = optionsFor("changelog")
+            )
+        )
         list.add(
             SettingItemData(
                 "about",
@@ -527,6 +541,12 @@ fun SettingsScreen(
             )
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+
+    if (showChangelogSheet) {
+        ChangelogBottomSheet(
+            onDismissRequest = { showChangelogSheet = false }
+        )
     }
 }
 

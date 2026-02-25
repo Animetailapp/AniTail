@@ -16,6 +16,7 @@ object SettingsSearchOptions {
         "storage" to ::storage,
         "backup" to ::backup,
         "update" to ::update,
+        "changelog" to ::changelog,
         "about" to ::about,
     )
 
@@ -321,6 +322,11 @@ object SettingsSearchOptions {
         ),
         option(context, "update_check_frequency", R.string.update_check_frequency),
         option(context, "new_version_available", R.string.new_version_available)
+    )
+
+    private fun changelog(context: Context): List<SettingOptionData> = listOf(
+        option(context, "changelog", R.string.changelog),
+        option(context, "release_notes", R.string.release_notes)
     )
 
     private fun about(context: Context): List<SettingOptionData> = listOf(

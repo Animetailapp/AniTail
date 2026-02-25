@@ -557,6 +557,15 @@
     <string name="open_app_settings_error">Couldn\'t open app settings</string>
 
     <string name="release_notes">Release Notes</string>
+    <string name="changelog">Changelog</string>
+    <string name="changelog_loading">Loading changelog…</string>
+    <string name="changelog_load_failed">Couldn\'t load changelog</string>
+    <string name="changelog_tab_releases">Releases</string>
+    <string name="changelog_tab_commits">Commits</string>
+    <string name="changelog_sheet_subtitle">Latest updates from GitHub</string>
+    <string name="changelog_empty_releases">No releases available</string>
+    <string name="changelog_empty_commits">No commits available</string>
+    <string name="changelog_last_updated">Updated %1$s</string>
     <!--about screen-->
     <string name="about">About</string>
     <string name="links_about" translatable="false">Links</string>
