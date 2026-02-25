@@ -45,7 +45,7 @@ class DatabaseMerger @Inject constructor(
             try {
                 // ATTACH must happen on the same connection that runs merge queries.
                 val remotePath = remoteDbFile.absolutePath.replace("'", "''")
-                currentDb.execSQL("ATTACH DATABASE '$remotePath' AS $REMOTE_SCHEMA")
+                attachRemoteDatabase(currentDb, remotePath, REMOTE_SCHEMA)
                 Timber.d("Attached remote database for merging")
 
                 if (!isDatabaseAttached(currentDb, REMOTE_SCHEMA)) {
@@ -85,11 +85,16 @@ class DatabaseMerger @Inject constructor(
                 currentDb.setTransactionSuccessful()
                 Timber.d("Database merge completed successfully")
             } finally {
+                runCatching {
+                    detachDatabaseIfAttached(currentDb, REMOTE_SCHEMA)
+                }.onFailure { detachError ->
+                    Timber.w(detachError, "Failed to detach %s before endTransaction", REMOTE_SCHEMA)
+                }
                 currentDb.endTransaction()
                 runCatching {
                     detachDatabaseIfAttached(currentDb, REMOTE_SCHEMA)
                 }.onFailure { detachError ->
-                    Timber.w(detachError, "Failed to detach %s after merge", REMOTE_SCHEMA)
+                    Timber.w(detachError, "Failed to detach %s after endTransaction", REMOTE_SCHEMA)
                 }
             }
 
@@ -464,5 +469,40 @@ class DatabaseMerger @Inject constructor(
         if (!isDatabaseAttached(db, schemaName)) return
         db.execSQL("DETACH DATABASE $schemaName")
         Timber.d("Detached %s", schemaName)
+    }
+
+    private fun attachRemoteDatabase(
+        db: SupportSQLiteDatabase,
+        escapedRemotePath: String,
+        schemaName: String,
+    ) {
+        val attachSql = "ATTACH DATABASE '$escapedRemotePath' AS $schemaName"
+        runCatching {
+            db.execSQL(attachSql)
+        }.onFailure { attachError ->
+            if (!isAlreadyInUseAttachError(attachError)) {
+                throw attachError
+            }
+
+            Timber.w(
+                attachError,
+                "Schema %s already in use, retrying ATTACH after DETACH",
+                schemaName
+            )
+
+            runCatching {
+                db.execSQL("DETACH DATABASE $schemaName")
+            }.onFailure { detachError ->
+                Timber.w(detachError, "Retry DETACH failed for %s", schemaName)
+            }
+
+            // Retry ATTACH on the same active connection.
+            db.execSQL(attachSql)
+        }
+    }
+
+    private fun isAlreadyInUseAttachError(error: Throwable): Boolean {
+        val message = error.message ?: return false
+        return message.contains("already in use", ignoreCase = true)
     }
 }
