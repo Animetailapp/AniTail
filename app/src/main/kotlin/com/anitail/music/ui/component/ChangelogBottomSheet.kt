@@ -1,15 +1,14 @@
 package com.anitail.music.ui.component
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,7 +31,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -48,10 +50,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -70,7 +70,6 @@ import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import androidx.compose.material3.IconButton as M3IconButton
 
 private data class GithubRelease(
     val title: String,
@@ -88,9 +87,9 @@ private data class GithubCommit(
     val shortSha: String,
 )
 
-private enum class ChangelogTab {
-    RELEASES,
-    COMMITS,
+private enum class ChangelogTab(@StringRes val labelRes: Int) {
+    RELEASES(R.string.changelog_tab_releases),
+    COMMITS(R.string.changelog_tab_commits),
 }
 
 private data class ChangelogSheetState(
@@ -178,70 +177,16 @@ fun ChangelogBottomSheet(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 8.dp)
                     .padding(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = stringResource(R.string.changelog),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        AnimatedVisibility(
-                            visible = state.lastUpdated != null,
-                            enter = fadeIn(),
-                            exit = fadeOut()
-                        ) {
-                            Text(
-                                text = stringResource(
-                                    R.string.changelog_last_updated,
-                                    state.lastUpdated.orEmpty()
-                                ),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                ChangelogHeader(
+                    lastUpdated = state.lastUpdated,
+                    onDismissRequest = onDismissRequest
+                )
 
-                    M3IconButton(onClick = onDismissRequest) {
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = stringResource(R.string.close)
-                        )
-                    }
-                }
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    ),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.history),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = stringResource(R.string.changelog_sheet_subtitle),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                )
 
                 ChangelogTabs(
                     selectedTab = selectedTab,
@@ -250,11 +195,8 @@ fun ChangelogBottomSheet(
 
                 AnimatedContent(
                     targetState = selectedTab,
-                    transitionSpec = {
-                        (fadeIn() + slideInVertically(initialOffsetY = { it / 8 })) togetherWith
-                            (fadeOut() + slideOutVertically(targetOffsetY = { -it / 8 }))
-                    },
-                    label = "changelog_tab_content"
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "changelog_content"
                 ) { tab ->
                     when (tab) {
                         ChangelogTab.RELEASES -> {
@@ -284,16 +226,64 @@ fun ChangelogBottomSheet(
 }
 
 @Composable
+private fun ChangelogHeader(
+    lastUpdated: String?,
+    onDismissRequest: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.changelog),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = stringResource(R.string.changelog_sheet_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            AnimatedVisibility(
+                visible = lastUpdated != null,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Text(
+                    text = stringResource(
+                        R.string.changelog_last_updated,
+                        lastUpdated.orEmpty()
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        IconButton(onClick = onDismissRequest) {
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = stringResource(R.string.close)
+            )
+        }
+    }
+}
+
+@Composable
 private fun ChangelogTabs(
     selectedTab: ChangelogTab,
     onTabSelected: (ChangelogTab) -> Unit,
 ) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer
     ) {
         Row(
             modifier = Modifier
@@ -305,7 +295,7 @@ private fun ChangelogTabs(
                 val isSelected = selectedTab == tab
                 val containerColor by animateColorAsState(
                     targetValue = if (isSelected) {
-                        MaterialTheme.colorScheme.primary
+                        MaterialTheme.colorScheme.secondaryContainer
                     } else {
                         Color.Transparent
                     },
@@ -313,37 +303,34 @@ private fun ChangelogTabs(
                 )
                 val labelColor by animateColorAsState(
                     targetValue = if (isSelected) {
-                        MaterialTheme.colorScheme.onPrimary
+                        MaterialTheme.colorScheme.onSecondaryContainer
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
                     label = "changelog_tab_label"
                 )
-                val tabElevation by animateDpAsState(
-                    targetValue = if (isSelected) 1.dp else 0.dp,
-                    label = "changelog_tab_elevation"
-                )
+
                 Surface(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(10.dp))
+                        .heightIn(min = 48.dp)
                         .tvClickable { onTabSelected(tab) },
-                    color = containerColor,
-                    shape = RoundedCornerShape(10.dp),
-                    tonalElevation = tabElevation
+                    shape = RoundedCornerShape(12.dp),
+                    color = containerColor
                 ) {
-                    Text(
-                        text = when (tab) {
-                            ChangelogTab.RELEASES -> stringResource(R.string.changelog_tab_releases)
-                            ChangelogTab.COMMITS -> stringResource(R.string.changelog_tab_commits)
-                        },
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 10.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = labelColor,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
-                    )
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(tab.labelRes),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = labelColor,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
@@ -392,57 +379,74 @@ private fun ReleaseCardItem(
     release: GithubRelease,
     onOpenLink: (String) -> Unit,
 ) {
+    val releaseBody = remember(release.body) { release.body.toReadableReleaseBody() }
+    val hasBody = releaseBody.isNotBlank()
     var expanded by rememberSaveable(release.tagName) { mutableStateOf(false) }
-    val hasBody = release.body.isNotBlank()
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
         ),
-        shape = RoundedCornerShape(16.dp)
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        ),
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = release.tagName,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = release.publishedAt,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Text(
+                        text = release.tagName,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+
+                if (release.publishedAt.isNotBlank()) {
+                    Text(
+                        text = release.publishedAt,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             Text(
                 text = release.title,
                 style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
             if (hasBody) {
                 Text(
-                    text = release.body,
+                    text = releaseBody,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = if (expanded) Int.MAX_VALUE else 4,
+                    maxLines = if (expanded) Int.MAX_VALUE else 8,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 if (hasBody) {
                     TextButton(onClick = { expanded = !expanded }) {
@@ -453,8 +457,11 @@ private fun ReleaseCardItem(
                         )
                     }
                 }
-                TextButton(onClick = { onOpenLink(release.htmlUrl) }) {
-                    Text(stringResource(R.string.open_in_browser))
+
+                if (release.htmlUrl.isNotBlank()) {
+                    TextButton(onClick = { onOpenLink(release.htmlUrl) }) {
+                        Text(stringResource(R.string.open_in_browser))
+                    }
                 }
             }
         }
@@ -488,44 +495,83 @@ private fun ChangelogCommitsContent(
         else -> {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 commits.forEach { commit ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                shape = RoundedCornerShape(999.dp)
-                            ) {
-                                Text(
-                                    text = commit.shortSha,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                )
-                            }
-                            Text(
-                                text = commit.message,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "${commit.authorName} • ${commit.date}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            TextButton(
-                                onClick = { onOpenLink(commit.htmlUrl) },
-                                modifier = Modifier.align(Alignment.End)
-                            ) {
-                                Text(stringResource(R.string.open_in_browser))
-                            }
-                        }
+                    CommitCardItem(
+                        commit = commit,
+                        onOpenLink = onOpenLink
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommitCardItem(
+    commit: GithubCommit,
+    onOpenLink: (String) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        ),
+        shape = RoundedCornerShape(20.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    shape = RoundedCornerShape(999.dp)
+                ) {
+                    Text(
+                        text = commit.shortSha,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+
+                if (commit.date.isNotBlank()) {
+                    Text(
+                        text = commit.date,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Text(
+                text = commit.message,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 5,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Text(
+                text = commit.authorName,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            if (commit.htmlUrl.isNotBlank()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = { onOpenLink(commit.htmlUrl) }) {
+                        Text(stringResource(R.string.open_in_browser))
                     }
                 }
             }
@@ -537,23 +583,33 @@ private fun ChangelogCommitsContent(
 private fun ChangelogLoadingState(
     message: String,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 20.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        )
     ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(20.dp),
-            strokeWidth = 2.dp
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 18.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -563,10 +619,15 @@ private fun ChangelogErrorState(
     onRetry: () -> Unit,
 ) {
     Card(
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
         ),
-        modifier = Modifier.fillMaxWidth()
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+        ),
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -575,18 +636,20 @@ private fun ChangelogErrorState(
             Text(
                 text = stringResource(R.string.changelog_load_failed),
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onErrorContainer
+                color = MaterialTheme.colorScheme.error
             )
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onErrorContainer
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            TextButton(
-                onClick = onRetry,
-                modifier = Modifier.align(Alignment.End)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Text(stringResource(R.string.retry))
+                TextButton(onClick = onRetry) {
+                    Text(stringResource(R.string.retry))
+                }
             }
         }
     }
@@ -596,21 +659,21 @@ private fun ChangelogErrorState(
 private fun ChangelogEmptyState(
     message: String,
 ) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        ),
-        modifier = Modifier.fillMaxWidth()
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        )
     ) {
-        Column(
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        )
     }
 }
 
@@ -654,9 +717,7 @@ private suspend fun fetchGithubCommits(
             val author = commit?.optJSONObject("author")
             val fullMessage = commit?.optString("message").orEmpty()
             val message = fullMessage
-                .lineSequence()
-                .firstOrNull()
-                .orEmpty()
+                .replace("\r\n", "\n")
                 .trim()
             val sha = commitWrapper.optString("sha")
 
@@ -704,7 +765,29 @@ private fun String.toShortDate(): String {
     return substringBefore('T')
 }
 
+private fun String.toReadableReleaseBody(): String {
+    if (isBlank()) return ""
+
+    return lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .map { line ->
+            when {
+                line.startsWith("### ") -> line.removePrefix("### ").trim()
+                line.startsWith("## ") -> line.removePrefix("## ").trim()
+                line.startsWith("# ") -> line.removePrefix("# ").trim()
+                line.startsWith("- [x] ", ignoreCase = true) -> "- ${line.substring(6).trim()}"
+                line.startsWith("- [ ] ") -> "- ${line.substring(6).trim()}"
+                line.startsWith("- ") -> "- ${line.removePrefix("- ").trim()}"
+                line.startsWith("* ") -> "- ${line.removePrefix("* ").trim()}"
+                else -> line
+            }
+        }
+        .joinToString("\n")
+}
+
 private fun currentTimestamp(): String {
     val formatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
     return formatter.format(Date())
 }
+
