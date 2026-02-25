@@ -285,7 +285,7 @@ private fun ChangelogTabs(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow
+        color = MaterialTheme.colorScheme.surfaceContainer
     ) {
         Row(
             modifier = Modifier
@@ -297,7 +297,7 @@ private fun ChangelogTabs(
                 val isSelected = selectedTab == tab
                 val containerColor by animateColorAsState(
                     targetValue = if (isSelected) {
-                        MaterialTheme.colorScheme.surfaceContainerHighest
+                        MaterialTheme.colorScheme.primaryContainer
                     } else {
                         Color.Transparent
                     },
@@ -305,7 +305,7 @@ private fun ChangelogTabs(
                 )
                 val labelColor by animateColorAsState(
                     targetValue = if (isSelected) {
-                        MaterialTheme.colorScheme.onSurface
+                        MaterialTheme.colorScheme.onPrimaryContainer
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
@@ -383,7 +383,7 @@ private fun ReleaseCardItem(
 ) {
     val releaseBody = remember(release.body) { release.body.toReadableReleaseBody() }
     val hasBody = releaseBody.isNotBlank()
-    val collapsedLines = 5
+    val collapsedLines = 3
     val canExpand = remember(releaseBody) { releaseBody.lineSequence().count() > collapsedLines }
     var expanded by rememberSaveable(release.tagName) { mutableStateOf(false) }
 
@@ -392,13 +392,17 @@ private fun ReleaseCardItem(
             .fillMaxWidth()
             .animateContentSize(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f)
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
         ),
         shape = RoundedCornerShape(20.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -407,12 +411,12 @@ private fun ReleaseCardItem(
             ) {
                 Surface(
                     shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest
+                    color = MaterialTheme.colorScheme.primaryContainer
                 ) {
                     Text(
                         text = release.tagName,
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
@@ -430,7 +434,14 @@ private fun ReleaseCardItem(
                 text = release.title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = if (expanded) Int.MAX_VALUE else 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = if (canExpand) {
+                    Modifier.tvClickable { expanded = !expanded }
+                } else {
+                    Modifier
+                }
             )
 
             if (hasBody) {
@@ -439,7 +450,12 @@ private fun ReleaseCardItem(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = if (expanded) Int.MAX_VALUE else collapsedLines,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = if (canExpand) {
+                        Modifier.tvClickable { expanded = !expanded }
+                    } else {
+                        Modifier
+                    }
                 )
             }
 
@@ -448,26 +464,11 @@ private fun ReleaseCardItem(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (hasBody && canExpand) {
-                    TextButton(
-                        onClick = { expanded = !expanded },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    ) {
-                        Text(
-                            text = stringResource(
-                                if (expanded) R.string.collapse else R.string.expand
-                            )
-                        )
-                    }
-                }
-
                 if (release.htmlUrl.isNotBlank()) {
                     TextButton(
                         onClick = { onOpenLink(release.htmlUrl) },
                         colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurface
+                            contentColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
                         Text(stringResource(R.string.open_in_browser))
@@ -521,18 +522,23 @@ private fun CommitCardItem(
     onOpenLink: (String) -> Unit,
 ) {
     val hasDetails = commit.details.isNotBlank()
+    val canExpand = hasDetails || commit.title.length > 72
     var expanded by rememberSaveable(commit.shortSha) { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.26f)
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.24f)
         ),
         shape = RoundedCornerShape(20.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -540,13 +546,13 @@ private fun CommitCardItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
                     shape = RoundedCornerShape(999.dp)
                 ) {
                     Text(
                         text = commit.shortSha,
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
@@ -564,8 +570,13 @@ private fun CommitCardItem(
                 text = commit.title,
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = if (expanded) Int.MAX_VALUE else 2,
-                overflow = TextOverflow.Ellipsis
+                maxLines = if (expanded) Int.MAX_VALUE else 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = if (canExpand) {
+                    Modifier.tvClickable { expanded = !expanded }
+                } else {
+                    Modifier
+                }
             )
 
             if (hasDetails && expanded) {
@@ -574,7 +585,8 @@ private fun CommitCardItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 8,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.tvClickable { expanded = false }
                 )
             }
 
@@ -588,26 +600,11 @@ private fun CommitCardItem(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                if (hasDetails) {
-                    TextButton(
-                        onClick = { expanded = !expanded },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    ) {
-                        Text(
-                            text = stringResource(
-                                if (expanded) R.string.collapse else R.string.expand
-                            )
-                        )
-                    }
-                }
-
                 if (commit.htmlUrl.isNotBlank()) {
                     TextButton(
                         onClick = { onOpenLink(commit.htmlUrl) },
                         colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurface
+                            contentColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
                         Text(stringResource(R.string.open_in_browser))
