@@ -424,11 +424,24 @@ fun ArtistScreen(
                 val aboutArtistDescription = artistPage?.description
                     ?.trim()
                     ?.takeIf { it.isNotEmpty() }
+                val aboutSubscriberCount = artistPage?.subscriberCountText
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                val aboutMonthlyListenerCount = artistPage?.monthlyListenerCount
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
 
-                if (!showLocal && aboutArtistDescription != null) {
+                if (!showLocal && (
+                        aboutArtistDescription != null ||
+                            aboutSubscriberCount != null ||
+                            aboutMonthlyListenerCount != null
+                        )
+                ) {
                     item(key = "about_artist") {
                         AboutArtistSection(
                             description = aboutArtistDescription,
+                            subscriberCountText = aboutSubscriberCount,
+                            monthlyListenerCount = aboutMonthlyListenerCount,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp)
@@ -765,12 +778,16 @@ fun ArtistScreen(
 
 @Composable
 private fun AboutArtistSection(
-    description: String,
+    description: String?,
+    subscriberCountText: String?,
+    monthlyListenerCount: String?,
     modifier: Modifier = Modifier,
     collapsedMaxLines: Int = 4,
 ) {
     var isExpanded by rememberSaveable(description) { mutableStateOf(false) }
     var canExpand by remember(description) { mutableStateOf(false) }
+    val hasDescription = !description.isNullOrBlank()
+    val hasInfoRows = !subscriberCountText.isNullOrBlank() || !monthlyListenerCount.isNullOrBlank()
 
     Card(
         modifier = modifier.animateContentSize(),
@@ -802,20 +819,42 @@ private fun AboutArtistSection(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = if (isExpanded) Int.MAX_VALUE else collapsedMaxLines,
-                overflow = TextOverflow.Ellipsis,
-                onTextLayout = { textLayoutResult ->
-                    if (!isExpanded) {
-                        canExpand = textLayoutResult.hasVisualOverflow
-                    }
-                },
-            )
+            if (!subscriberCountText.isNullOrBlank()) {
+                Text(
+                    text = subscriberCountText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
 
-            if (canExpand || isExpanded) {
+            if (!monthlyListenerCount.isNullOrBlank()) {
+                Text(
+                    text = monthlyListenerCount,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            if (hasInfoRows && hasDescription) {
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
+            if (hasDescription) {
+                Text(
+                    text = description.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = if (isExpanded) Int.MAX_VALUE else collapsedMaxLines,
+                    overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { textLayoutResult ->
+                        if (!isExpanded) {
+                            canExpand = textLayoutResult.hasVisualOverflow
+                        }
+                    },
+                )
+            }
+
+            if (hasDescription && (canExpand || isExpanded)) {
                 TextButton(
                     onClick = { isExpanded = !isExpanded },
                     modifier = Modifier.align(Alignment.End),
