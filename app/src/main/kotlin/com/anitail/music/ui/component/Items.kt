@@ -263,7 +263,7 @@ fun SongListItem(
         }
         if (showDownloadIcon) {
             val download by LocalDownloadUtil.current.getDownload(song.id).collectAsState(initial = null)
-            val effectiveDownloadState = download?.state ?: if (!song.song.mediaStoreUri.isNullOrEmpty()) {
+            val effectiveDownloadState = download?.state ?: if (!song.song.isLocal && !song.song.mediaStoreUri.isNullOrEmpty()) {
                 Download.STATE_COMPLETED
             } else {
                 null
@@ -336,7 +336,7 @@ fun SongGridItem(
         if (showDownloadIcon) {
             val download by LocalDownloadUtil.current.getDownload(song.id)
                 .collectAsState(initial = null)
-            val effectiveDownloadState = download?.state ?: if (!song.song.mediaStoreUri.isNullOrEmpty()) {
+            val effectiveDownloadState = download?.state ?: if (!song.song.isLocal && !song.song.mediaStoreUri.isNullOrEmpty()) {
                 Download.STATE_COMPLETED
             } else {
                 null
@@ -694,7 +694,7 @@ fun YouTubeListItem(
         if (item is SongItem) {
             val download by LocalDownloadUtil.current.getDownload(item.id).collectAsState(initial = null)
             val effectiveDownloadState = download?.state
-                ?: if (!song?.song?.mediaStoreUri.isNullOrEmpty()) Download.STATE_COMPLETED else null
+                ?: if (song?.song?.isLocal != true && !song?.song?.mediaStoreUri.isNullOrEmpty()) Download.STATE_COMPLETED else null
             Icon.Download(effectiveDownloadState)
         }
     },
@@ -760,7 +760,7 @@ fun YouTubeGridItem(
         if (item is SongItem) {
             val download by LocalDownloadUtil.current.getDownload(item.id).collectAsState(initial = null)
             val effectiveDownloadState = download?.state
-                ?: if (!song?.song?.mediaStoreUri.isNullOrEmpty()) Download.STATE_COMPLETED else null
+                ?: if (song?.song?.isLocal != true && !song?.song?.mediaStoreUri.isNullOrEmpty()) Download.STATE_COMPLETED else null
             Icon.Download(effectiveDownloadState)
         }
     },

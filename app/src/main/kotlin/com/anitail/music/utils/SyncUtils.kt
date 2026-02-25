@@ -50,9 +50,6 @@ constructor(
 
   fun likeSong(s: SongEntity) {
     syncScope.launch {
-      // Sincronizar con YouTube
-      YouTube.likeVideo(s.id, s.liked)
-
       // Sincronizar con Last.fm
       try {
         val song = database.song(s.id).firstOrNull()
@@ -72,11 +69,17 @@ constructor(
   suspend fun syncLikedSongs() = coroutineScope {
     YouTube.playlist("LM").completed().onSuccess { page ->
       val remoteSongs = page.songs
-      val remoteIds = remoteSongs.map { it.id }
+      val remoteIds = remoteSongs.map { it.id }.toSet()
       val localSongs = database.likedSongsByNameAsc().first()
+      val recentlyLikedThreshold = LocalDateTime.now().minusMinutes(5)
 
       localSongs
-          .filterNot { it.id in remoteIds }
+          .filter { localSong ->
+            val entity = localSong.song
+            val isLocalOnlySong = entity.isLocal || localSong.id.startsWith("LOCAL_")
+            val wasRecentlyLiked = entity.likedDate?.isAfter(recentlyLikedThreshold) == true
+            !isLocalOnlySong && !wasRecentlyLiked && localSong.id !in remoteIds
+          }
           .forEach { database.update(it.song.localToggleLike()) }
 
         LocalDateTime.now()

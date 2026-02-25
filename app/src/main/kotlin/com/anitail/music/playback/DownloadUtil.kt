@@ -491,7 +491,10 @@ constructor(
         if (songs.isEmpty()) return MediaStoreCollectionStatus.NotDownloaded
 
         val songStates = songs.mapNotNull { states[it.id] }
-        val allPersistedInMediaStore = songs.all { !it.song.mediaStoreUri.isNullOrEmpty() }
+        val allPersistedInMediaStore = songs.all { song ->
+            !song.song.isLocal &&
+                hasAccessiblePersistedUri(song)
+        }
 
         return when {
             allPersistedInMediaStore -> MediaStoreCollectionStatus.Completed
@@ -535,6 +538,20 @@ constructor(
 
             else -> MediaStoreCollectionStatus.NotDownloaded
         }
+    }
+
+    private fun hasAccessiblePersistedUri(song: Song): Boolean {
+        val mediaStoreUri = song.song.mediaStoreUri
+        if (!mediaStoreUri.isNullOrBlank() && downloadExportHelper.verifyFileAccess(mediaStoreUri)) {
+            return true
+        }
+
+        val downloadUri = song.song.downloadUri
+        if (!downloadUri.isNullOrBlank() && downloadExportHelper.verifyFileAccess(downloadUri)) {
+            return true
+        }
+
+        return false
     }
 
     private fun calculateDownloadState(
@@ -610,12 +627,54 @@ constructor(
             .flowOn(Dispatchers.Default)
 
     fun downloadToMediaStore(song: com.anitail.music.db.entities.Song, targetItag: Int? = null) {
+        if (song.song.isLocal || song.id.startsWith("LOCAL_")) {
+            Timber.d("Skipping MediaStore download for local song: %s", song.id)
+            return
+        }
         targetItag?.let { mediaStoreDownloadManager.setTargetItag(song.id, it) }
         mediaStoreDownloadManager.downloadSongs(listOf(song))
     }
 
-    fun downloadSongsToMediaStore(songs: Collection<com.anitail.music.db.entities.Song>) {
-        mediaStoreDownloadManager.downloadSongs(songs)
+    fun downloadSongsToMediaStore(
+        songs: Collection<com.anitail.music.db.entities.Song>,
+        targetItag: Int? = null,
+    ) {
+        val remoteSongs = songs.filterNot { it.song.isLocal || it.id.startsWith("LOCAL_") }
+        if (remoteSongs.isEmpty()) {
+            Timber.d("Skipping MediaStore batch download: no remote songs to download")
+            return
+        }
+
+        targetItag?.let { itag ->
+            remoteSongs.forEach { song ->
+                mediaStoreDownloadManager.setTargetItag(song.id, itag)
+            }
+        }
+
+        mediaStoreDownloadManager.downloadSongs(remoteSongs)
+    }
+
+    suspend fun downloadToMediaStoreWithMetadataPreference(song: com.anitail.music.db.entities.Song) {
+        if (song.song.isLocal || song.id.startsWith("LOCAL_")) {
+            Timber.d("Skipping metadata-preferred download for local song: %s", song.id)
+            return
+        }
+
+        val preferredItag = YTPlayerUtils.getAllAvailableAudioFormats(song.id)
+            .getOrElse { error ->
+                Timber.tag("DownloadUtil").w(error, "Failed to resolve formats for metadata preference")
+                emptyList()
+            }
+            .firstOrNull { it.supportsMetadata }
+            ?.itag
+
+        if (preferredItag != null) {
+            Timber.d("Auto-like download using metadata-capable itag %d for %s", preferredItag, song.id)
+        } else {
+            Timber.w("No metadata-capable format found for %s, using default selection", song.id)
+        }
+
+        downloadToMediaStore(song, targetItag = preferredItag)
     }
 
     fun cancelMediaStoreDownload(songId: String) {
@@ -647,7 +706,9 @@ constructor(
                 val hasInMemoryMediaStoreState =
                     mediaStoreDownloadManager.downloadStates.value[songId] != null
                 val hasPersistedMediaStoreUri = runCatching {
-                    !database.getSongByIdBlocking(songId)?.song?.mediaStoreUri.isNullOrEmpty()
+                    val dbSong = database.getSongByIdBlocking(songId)?.song
+                    dbSong != null &&
+                        (!dbSong.mediaStoreUri.isNullOrEmpty() || !dbSong.downloadUri.isNullOrEmpty())
                 }.getOrDefault(false)
                 hasInMemoryMediaStoreState || hasPersistedMediaStoreUri
             }

@@ -41,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
@@ -79,6 +80,7 @@ import com.anitail.music.extensions.togglePlayPause
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.AutoResizeText
 import com.anitail.music.ui.component.DefaultDialog
+import com.anitail.music.ui.component.DownloadFormatDialog
 import com.anitail.music.ui.component.DraggableScrollbar
 import com.anitail.music.ui.component.EmptyPlaceholder
 import com.anitail.music.ui.component.FontSizeRange
@@ -92,7 +94,11 @@ import com.anitail.music.ui.utils.ItemWrapper
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.utils.makeTimeString
+import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.viewmodels.TopPlaylistViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -147,9 +153,43 @@ fun TopPlaylistScreen(
     val name = stringResource(R.string.my_top) + " $maxSize"
 
     val downloadUtil = LocalDownloadUtil.current
+    val coroutineScope = rememberCoroutineScope()
     val playlistSongIds = remember(songs) { songs?.map { it.song.id }.orEmpty() }
     val downloadState by downloadUtil.getDownloadState(playlistSongIds)
         .collectAsState(initial = Download.STATE_STOPPED)
+    var showDownloadFormatDialog by remember { mutableStateOf(false) }
+    var isLoadingFormats by remember { mutableStateOf(false) }
+    var availableFormats by remember { mutableStateOf<List<YTPlayerUtils.AudioFormatOption>>(emptyList()) }
+    var pendingSongsForDownload by remember { mutableStateOf<List<Song>>(emptyList()) }
+
+    if (showDownloadFormatDialog) {
+        DownloadFormatDialog(
+            isLoading = isLoadingFormats,
+            formats = availableFormats,
+            onFormatSelected = { format ->
+                showDownloadFormatDialog = false
+                downloadUtil.downloadSongsToMediaStore(pendingSongsForDownload, targetItag = format.itag)
+            },
+            onDismiss = { showDownloadFormatDialog = false }
+        )
+    }
+
+    fun openBatchDownloadDialog(targetSongs: List<Song>) {
+        val remoteSongs = targetSongs.filterNot { it.song.isLocal || it.id.startsWith("LOCAL_") }
+        if (remoteSongs.isEmpty()) return
+
+        pendingSongsForDownload = remoteSongs
+        showDownloadFormatDialog = true
+        isLoadingFormats = true
+        availableFormats = emptyList()
+
+        coroutineScope.launch {
+            availableFormats = withContext(Dispatchers.IO) {
+                YTPlayerUtils.getAllAvailableAudioFormats(remoteSongs.first().id).getOrDefault(emptyList())
+            }
+            isLoadingFormats = false
+        }
+    }
 
     LaunchedEffect(songs) {
         mutableSongs.apply {
@@ -299,7 +339,7 @@ fun TopPlaylistScreen(
                                                 else -> {
                                                     IconButton(
                                                         onClick = {
-                                                            downloadUtil.downloadSongsToMediaStore(songs!!)
+                                                            openBatchDownloadDialog(songs!!)
                                                         },
                                                     ) {
                                                         Icon(

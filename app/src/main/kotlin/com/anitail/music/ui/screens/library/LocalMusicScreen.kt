@@ -1,0 +1,975 @@
+package com.anitail.music.ui.screens.library
+
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarScrollBehavior
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.navigation.NavController
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import com.anitail.music.LocalPlayerAwareWindowInsets
+import com.anitail.music.LocalPlayerConnection
+import com.anitail.music.R
+import com.anitail.music.constants.ArtistSortDescendingKey
+import com.anitail.music.constants.ArtistSortType
+import com.anitail.music.constants.ArtistSortTypeKey
+import com.anitail.music.constants.ArtistViewTypeKey
+import com.anitail.music.constants.CONTENT_TYPE_ALBUM
+import com.anitail.music.constants.CONTENT_TYPE_ARTIST
+import com.anitail.music.constants.CONTENT_TYPE_HEADER
+import com.anitail.music.constants.CONTENT_TYPE_SONG
+import com.anitail.music.constants.GridItemSize
+import com.anitail.music.constants.GridItemsSizeKey
+import com.anitail.music.constants.GridThumbnailHeight
+import com.anitail.music.constants.LibraryViewType
+import com.anitail.music.db.entities.Artist
+import com.anitail.music.extensions.toMediaItem
+import com.anitail.music.playback.queues.ListQueue
+import com.anitail.music.ui.component.ArtistListItem
+import com.anitail.music.ui.component.DefaultDialog
+import com.anitail.music.ui.component.EmptyPlaceholder
+import com.anitail.music.ui.component.LocalMenuState
+import com.anitail.music.ui.component.SongListItem
+import com.anitail.music.ui.component.SortHeader
+import com.anitail.music.ui.component.AlbumListItem
+import com.anitail.music.ui.component.ChipsRow
+import com.anitail.music.ui.menu.AlbumMenu
+import com.anitail.music.ui.menu.SongMenu
+import com.anitail.music.utils.LocalSyncStatus
+import com.anitail.music.utils.rememberEnumPreference
+import com.anitail.music.utils.rememberPreference
+import com.anitail.music.viewmodels.LocalMusicViewModel
+import kotlinx.coroutines.launch
+import timber.log.Timber
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun LocalMusicScreen(
+    navController: NavController,
+    scrollBehavior: TopAppBarScrollBehavior,
+    viewModel: LocalMusicViewModel = hiltViewModel(),
+) {
+    val menuState = LocalMenuState.current
+    val playerConnection = LocalPlayerConnection.current
+    val haptic = LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var viewType by rememberEnumPreference(ArtistViewTypeKey, LibraryViewType.GRID)
+    val (sortType, onSortTypeChange) = rememberEnumPreference(
+        ArtistSortTypeKey,
+        ArtistSortType.NAME
+    )
+    val (sortDescending, onSortDescendingChange) = rememberPreference(ArtistSortDescendingKey, false)
+    val gridItemSize by rememberEnumPreference(GridItemsSizeKey, GridItemSize.BIG)
+
+    val hasPermission by viewModel.hasPermission.collectAsState()
+    val syncStatus by viewModel.syncStatus.collectAsState()
+    val syncProgress by viewModel.syncProgress.collectAsState()
+    val localArtists by viewModel.localArtists.collectAsState()
+    val allLocalAlbums by viewModel.allLocalAlbums.collectAsState()
+    val allLocalSongs by viewModel.allLocalSongs.collectAsState()
+    val rootFolders by viewModel.rootFolders.collectAsState()
+
+    // Tab state: 0=Artists, 1=Folders
+    var selectedTab by rememberSaveable { mutableStateOf(0) }
+
+    Timber.d("LocalMusicScreen: COMPOSE - hasPermission=$hasPermission, syncStatus=$syncStatus, syncProgress=$syncProgress, artistCount=${localArtists.size}")
+
+    var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
+    var isSearching by remember { mutableStateOf(false) }
+    val searchFocusRequester = remember { FocusRequester() }
+    var showPermissionDialog by remember { mutableStateOf(false) }
+
+    val filteredArtists = remember(localArtists, searchQuery.text, sortType, sortDescending) {
+        localArtists
+            .filter { artist ->
+                searchQuery.text.isEmpty() || artist.artist.name.contains(searchQuery.text, ignoreCase = true)
+            }
+            .let { artists ->
+                when (sortType) {
+                    ArtistSortType.NAME -> artists.sortedBy { it.artist.name.lowercase() }
+                    ArtistSortType.SONG_COUNT -> artists.sortedBy { it.songCount }
+                    else -> artists
+                }.let { if (sortDescending) it.reversed() else it }
+            }
+    }
+
+    val filteredAlbums = remember(allLocalAlbums, searchQuery.text) {
+        if (searchQuery.text.isEmpty()) emptyList()
+        else allLocalAlbums.filter { album ->
+            album.album.title.contains(searchQuery.text, ignoreCase = true)
+        }
+    }
+
+    val filteredSongs = remember(allLocalSongs, searchQuery.text) {
+        if (searchQuery.text.isEmpty()) emptyList()
+        else allLocalSongs.filter { song ->
+            song.song.title.contains(searchQuery.text, ignoreCase = true) ||
+            song.song.albumName?.contains(searchQuery.text, ignoreCase = true) == true
+        }
+    }
+
+    val isActiveSearch = isSearching && searchQuery.text.isNotEmpty()
+    val totalSearchResults = filteredArtists.size + filteredAlbums.size + filteredSongs.size
+    val artistCountLabel = pluralStringResource(R.plurals.n_artist, filteredArtists.size, filteredArtists.size)
+    val folderCountLabel = "${rootFolders.size} ${stringResource(R.string.folders).lowercase()}"
+    val songCountLabel = pluralStringResource(R.plurals.n_song, allLocalSongs.size, allLocalSongs.size)
+    val activeCollectionLabel = when {
+        isActiveSearch -> "$totalSearchResults ${stringResource(R.string.search).lowercase()}"
+        selectedTab == 0 -> artistCountLabel
+        else -> folderCountLabel
+    }
+
+    // Auto-focus search field when search is opened
+    LaunchedEffect(isSearching) {
+        if (isSearching) {
+            searchFocusRequester.requestFocus()
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        Timber.d("LocalMusicScreen: Permission result callback - granted=$granted")
+        if (granted) {
+            Timber.d("LocalMusicScreen: Permission granted, updating state and launching sync")
+            viewModel.refreshPermissionState()
+            coroutineScope.launch {
+                viewModel.syncLocalMusic()
+            }
+        } else {
+            Timber.w("LocalMusicScreen: Permission DENIED by user")
+        }
+    }
+
+    LaunchedEffect(hasPermission) {
+        Timber.d("LocalMusicScreen: LaunchedEffect(hasPermission=$hasPermission)")
+        if (!hasPermission) {
+            Timber.d("LocalMusicScreen: Showing permission dialog")
+            showPermissionDialog = true
+        } else {
+            Timber.d("LocalMusicScreen: Permission already granted, no request needed")
+        }
+    }
+
+    if (showPermissionDialog) {
+        DefaultDialog(
+            onDismiss = { showPermissionDialog = false },
+            title = { Text(stringResource(R.string.local_music_permission_title)) },
+            buttons = {
+                TextButton(onClick = { showPermissionDialog = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+                TextButton(onClick = {
+                    showPermissionDialog = false
+                    val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        Manifest.permission.READ_MEDIA_AUDIO
+                    } else {
+                        Manifest.permission.READ_EXTERNAL_STORAGE
+                    }
+                    Timber.d("LocalMusicScreen: Launching permission request for $permission")
+                    permissionLauncher.launch(permission)
+                }) {
+                    Text(stringResource(R.string.grant_permission))
+                }
+            }
+        ) {
+            Text(stringResource(R.string.local_music_permission_desc))
+        }
+    }
+
+    val lazyListState = rememberLazyListState()
+    val lazyGridState = rememberLazyGridState()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val scrollToTop =
+        backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)?.collectAsState()
+
+    LaunchedEffect(scrollToTop?.value) {
+        if (scrollToTop?.value == true) {
+            when (viewType) {
+                LibraryViewType.LIST -> lazyListState.animateScrollToItem(0)
+                LibraryViewType.GRID -> lazyGridState.animateScrollToItem(0)
+            }
+            backStackEntry?.savedStateHandle?.set("scrollToTop", false)
+        }
+    }
+
+    val headerContent = @Composable {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (syncStatus is LocalSyncStatus.Syncing) {
+                LinearProgressIndicator(
+                    progress = { syncProgress },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                LocalMusicStatPill(
+                    label = stringResource(R.string.artists),
+                    value = artistCountLabel,
+                    modifier = Modifier.weight(1f),
+                )
+                LocalMusicStatPill(
+                    label = stringResource(R.string.folders),
+                    value = folderCountLabel,
+                    modifier = Modifier.weight(1f),
+                )
+                LocalMusicStatPill(
+                    label = stringResource(R.string.songs),
+                    value = songCountLabel,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+            ) {
+                ChipsRow(
+                    chips = listOf(
+                        0 to stringResource(R.string.artists),
+                        1 to stringResource(R.string.folders),
+                    ),
+                    currentValue = selectedTab,
+                    onValueUpdate = { selectedTab = it },
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                )
+            }
+
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                tonalElevation = 1.dp,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 8.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                ) {
+                    SortHeader(
+                        sortType = sortType,
+                        sortDescending = sortDescending,
+                        onSortTypeChange = onSortTypeChange,
+                        onSortDescendingChange = onSortDescendingChange,
+                        sortTypeText = { currentSortType ->
+                            when (currentSortType) {
+                                ArtistSortType.CREATE_DATE -> R.string.sort_by_create_date
+                                ArtistSortType.NAME -> R.string.sort_by_name
+                                ArtistSortType.SONG_COUNT -> R.string.sort_by_song_count
+                                ArtistSortType.PLAY_TIME -> R.string.sort_by_play_time
+                            }
+                        },
+                    )
+
+                    Spacer(Modifier.weight(1f))
+
+                    Text(
+                        text = activeCollectionLabel,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+
+                    IconButton(
+                        onClick = {
+                            isSearching = !isSearching
+                            if (!isSearching) {
+                                searchQuery = TextFieldValue("")
+                            }
+                        },
+                    ) {
+                        Icon(
+                            painter = painterResource(if (isSearching) R.drawable.close else R.drawable.search),
+                            contentDescription = null,
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { viewType = viewType.toggle() },
+                    ) {
+                        Icon(
+                            painter = painterResource(
+                                when (viewType) {
+                                    LibraryViewType.LIST -> R.drawable.grid_view
+                                    LibraryViewType.GRID -> R.drawable.list
+                                },
+                            ),
+                            contentDescription = null,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Show full-screen loading during initial sync (no data yet)
+    val isInitialSync = hasPermission && syncStatus is LocalSyncStatus.Syncing && localArtists.isEmpty()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (!hasPermission) {
+            // Permission dialog handles permission request
+        } else if (isInitialSync) {
+            // Full-screen loading for initial sync
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(modifier = Modifier.weight(1f))
+                CircularProgressIndicator()
+                Spacer(modifier = Modifier.padding(16.dp))
+                Text(
+                    text = stringResource(R.string.syncing_local_music),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.padding(8.dp))
+                Text(
+                    text = "${(syncProgress * 100).toInt()}%",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.weight(1f))
+            }
+        } else {
+            val windowInsets = LocalPlayerAwareWindowInsets.current
+            val bottomPadding = windowInsets.asPaddingValues().calculateBottomPadding()
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = windowInsets.asPaddingValues().calculateTopPadding())
+            ) {
+                // Search TextField outside lazy content to prevent recreation on view type change
+                if (isSearching) {
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text(stringResource(R.string.search)) },
+                        leadingIcon = {
+                            Icon(
+                                painter = painterResource(R.drawable.search),
+                                contentDescription = null
+                            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.text.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = TextFieldValue("") }) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.close),
+                                        contentDescription = null
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(18.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.16f),
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                            focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
+                            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            focusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .focusRequester(searchFocusRequester)
+                    )
+                }
+
+                PullToRefreshBox(
+                    isRefreshing = syncStatus is LocalSyncStatus.Syncing,
+                    onRefresh = {
+                        Timber.d("LocalMusicScreen: Pull-to-refresh triggered")
+                        coroutineScope.launch {
+                            viewModel.syncLocalMusic()
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    // Force list view when actively searching to show albums and songs
+                    val effectiveViewType = if (isActiveSearch) LibraryViewType.LIST else viewType
+                when (effectiveViewType) {
+                    LibraryViewType.LIST ->
+                        LazyColumn(
+                            state = lazyListState,
+                            contentPadding = PaddingValues(bottom = bottomPadding),
+                        ) {
+                            item(key = "header", contentType = CONTENT_TYPE_HEADER) {
+                                headerContent()
+                            }
+
+                            if (isActiveSearch) {
+                                // Search results mode
+                                if (filteredArtists.isEmpty() && filteredAlbums.isEmpty() && filteredSongs.isEmpty()) {
+                                    item(key = "no_results") {
+                                        EmptyPlaceholder(
+                                            icon = R.drawable.search,
+                                            text = stringResource(R.string.no_results_found),
+                                        )
+                                    }
+                                }
+
+                                if (filteredArtists.isNotEmpty()) {
+                                    item(key = "artists_header") {
+                                        Text(
+                                            text = stringResource(R.string.artists),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                        )
+                                    }
+                                    items(
+                                        items = filteredArtists,
+                                        key = { "artist_${it.id}" },
+                                        contentType = { CONTENT_TYPE_ARTIST },
+                                    ) { artist ->
+                                        ArtistListItem(
+                                            artist = artist,
+                                            modifier = Modifier
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    navController.navigate("local_artist/${artist.id}")
+                                                }
+                                                .animateItem()
+                                        )
+                                    }
+                                }
+
+                                if (filteredAlbums.isNotEmpty()) {
+                                    item(key = "albums_header") {
+                                        Text(
+                                            text = stringResource(R.string.albums),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                        )
+                                    }
+                                    items(
+                                        items = filteredAlbums,
+                                        key = { "album_${it.id}" },
+                                        contentType = { CONTENT_TYPE_ALBUM },
+                                    ) { album ->
+                                        AlbumListItem(
+                                            album = album,
+                                            modifier = Modifier
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                .fillMaxWidth()
+                                                .combinedClickable(
+                                                    onClick = {
+                                                        navController.navigate("local_album/${album.id}")
+                                                    },
+                                                    onLongClick = {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        menuState.show {
+                                                            AlbumMenu(
+                                                                originalAlbum = album,
+                                                                navController = navController,
+                                                                onDismiss = menuState::dismiss
+                                                            )
+                                                        }
+                                                    }
+                                                )
+                                                .animateItem()
+                                        )
+                                    }
+                                }
+
+                                if (filteredSongs.isNotEmpty()) {
+                                    item(key = "songs_header") {
+                                        Text(
+                                            text = stringResource(R.string.songs),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                        )
+                                    }
+                                    items(
+                                        items = filteredSongs,
+                                        key = { "song_${it.id}" },
+                                        contentType = { CONTENT_TYPE_SONG },
+                                    ) { song ->
+                                        SongListItem(
+                                            song = song,
+                                            trailingContent = {
+                                                IconButton(
+                                                    onClick = {
+                                                        menuState.show {
+                                                            SongMenu(
+                                                                originalSong = song,
+                                                                navController = navController,
+                                                                onDismiss = menuState::dismiss
+                                                            )
+                                                        }
+                                                    }
+                                                ) {
+                                                    Icon(
+                                                        painter = painterResource(R.drawable.more_vert),
+                                                        contentDescription = null
+                                                    )
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                .fillMaxWidth()
+                                                .combinedClickable(
+                                                    onClick = {
+                                                        playerConnection?.playQueue(
+                                                            ListQueue(
+                                                                title = song.song.title,
+                                                                items = listOf(song.toMediaItem())
+                                                            )
+                                                        )
+                                                    },
+                                                    onLongClick = {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        menuState.show {
+                                                            SongMenu(
+                                                                originalSong = song,
+                                                                navController = navController,
+                                                                onDismiss = menuState::dismiss
+                                                            )
+                                                        }
+                                                    }
+                                                )
+                                                .animateItem()
+                                        )
+                                    }
+                                }
+                            } else {
+                                // Normal mode - show artists or folders based on selected tab
+                                when (selectedTab) {
+                                    0 -> {
+                                        // Artists tab
+                                        if (filteredArtists.isEmpty() && syncStatus !is LocalSyncStatus.Syncing) {
+                                            item(key = "empty_placeholder") {
+                                                EmptyPlaceholder(
+                                                    icon = R.drawable.artist,
+                                                    text = stringResource(R.string.no_local_artists),
+                                                )
+                                            }
+                                        }
+
+                                        items(
+                                            items = filteredArtists,
+                                            key = { it.id },
+                                            contentType = { CONTENT_TYPE_ARTIST },
+                                        ) { artist ->
+                                            ArtistListItem(
+                                                artist = artist,
+                                                modifier = Modifier
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    .fillMaxWidth()
+                                                    .combinedClickable(
+                                                        onClick = {
+                                                            Timber.d("LocalMusicScreen: Artist clicked - id=${artist.id}, name=${artist.artist.name}")
+                                                            navController.navigate("local_artist/${artist.id}")
+                                                        },
+                                                        onLongClick = {
+                                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                            Timber.d("LocalMusicScreen: Artist long-pressed - id=${artist.id}")
+                                                        },
+                                                    )
+                                                    .animateItem()
+                                            )
+                                        }
+                                    }
+                                    1 -> {
+                                        // Folders tab
+                                        if (rootFolders.isEmpty() && syncStatus !is LocalSyncStatus.Syncing) {
+                                            item(key = "empty_folders") {
+                                                EmptyPlaceholder(
+                                                    icon = R.drawable.library_music,
+                                                    text = stringResource(R.string.no_local_folders),
+                                                )
+                                            }
+                                        }
+
+                                        items(
+                                            items = rootFolders,
+                                            key = { "folder_${it.first}" },
+                                        ) { (folderPath, songCount) ->
+                                            FolderListItem(
+                                                folderPath = folderPath,
+                                                songCount = songCount,
+                                                onClick = {
+                                                    val encodedPath = java.net.URLEncoder.encode(folderPath, "UTF-8")
+                                                    navController.navigate("local_folder/$encodedPath")
+                                                },
+                                                modifier = Modifier.animateItem()
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                    LibraryViewType.GRID ->
+                        LazyVerticalGrid(
+                            state = lazyGridState,
+                            columns = GridCells.Adaptive(
+                                minSize = GridThumbnailHeight + if (gridItemSize == GridItemSize.BIG) 24.dp else (-24).dp,
+                            ),
+                            contentPadding = PaddingValues(bottom = bottomPadding),
+                        ) {
+                            item(
+                                key = "header",
+                                span = { GridItemSpan(maxLineSpan) },
+                                contentType = CONTENT_TYPE_HEADER,
+                            ) {
+                                headerContent()
+                            }
+
+                            when (selectedTab) {
+                                0 -> {
+                                    // Artists tab
+                                    if (filteredArtists.isEmpty() && syncStatus !is LocalSyncStatus.Syncing) {
+                                        item(span = { GridItemSpan(maxLineSpan) }) {
+                                            EmptyPlaceholder(
+                                                icon = R.drawable.artist,
+                                                text = stringResource(R.string.no_local_artists),
+                                            )
+                                        }
+                                    }
+
+                                    items(
+                                        items = filteredArtists,
+                                        key = { it.id },
+                                        contentType = { CONTENT_TYPE_ARTIST },
+                                    ) { artist ->
+                                        LocalArtistGridItem(
+                                            artist = artist,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .combinedClickable(
+                                                    onClick = {
+                                                        Timber.d("LocalMusicScreen: Artist grid item clicked - id=${artist.id}, name=${artist.artist.name}")
+                                                        navController.navigate("local_artist/${artist.id}")
+                                                    },
+                                                    onLongClick = {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        Timber.d("LocalMusicScreen: Artist long-pressed - id=${artist.id}")
+                                                    },
+                                                )
+                                                .animateItem()
+                                        )
+                                    }
+                                }
+                                1 -> {
+                                    // Folders tab - use list layout in grid for better folder display
+                                    if (rootFolders.isEmpty() && syncStatus !is LocalSyncStatus.Syncing) {
+                                        item(span = { GridItemSpan(maxLineSpan) }) {
+                                            EmptyPlaceholder(
+                                                icon = R.drawable.library_music,
+                                                text = stringResource(R.string.no_local_folders),
+                                            )
+                                        }
+                                    }
+
+                                    items(
+                                        items = rootFolders,
+                                        key = { "folder_${it.first}" },
+                                    ) { (folderPath, songCount) ->
+                                        LocalFolderGridItem(
+                                            folderPath = folderPath,
+                                            songCount = songCount,
+                                            onClick = {
+                                                val encodedPath = java.net.URLEncoder.encode(folderPath, "UTF-8")
+                                                navController.navigate("local_folder/$encodedPath")
+                                            },
+                                            modifier = Modifier.animateItem()
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                }
+            }
+            }
+        }
+    }
+
+    TopAppBar(
+        title = { Text(stringResource(R.string.local_music)) },
+        navigationIcon = {
+            IconButton(
+                onClick = navController::navigateUp,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.arrow_back),
+                    contentDescription = null,
+                )
+            }
+        },
+        scrollBehavior = scrollBehavior,
+    )
+}
+
+@Composable
+private fun LocalMusicStatPill(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocalArtistGridItem(
+    artist: Artist,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        modifier = modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                AsyncImage(
+                    model = artist.artist.thumbnailUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                if (artist.artist.thumbnailUrl.isNullOrBlank()) {
+                    Icon(
+                        painter = painterResource(R.drawable.artist),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Text(
+                text = artist.artist.name,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = pluralStringResource(R.plurals.n_song, artist.songCount, artist.songCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocalFolderGridItem(
+    folderPath: String,
+    songCount: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        modifier = modifier
+            .padding(horizontal = 4.dp, vertical = 6.dp)
+            .clickable(onClick = onClick),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.library_music_outlined),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(8.dp),
+                )
+            }
+            Text(
+                text = folderPath.substringAfterLast('/').ifBlank { folderPath },
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = pluralStringResource(R.plurals.n_song, songCount, songCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+fun FolderListItem(
+    folderPath: String,
+    songCount: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp, vertical = 3.dp)
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.library_music_outlined),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(8.dp),
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = folderPath.substringAfterLast('/').ifBlank { folderPath },
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = pluralStringResource(R.plurals.n_song, songCount, songCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Icon(
+                painter = painterResource(R.drawable.arrow_forward),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+

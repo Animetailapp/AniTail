@@ -87,7 +87,7 @@ constructor(
                                 .map { songs ->
                                     songs.filter {
                                         downloads[it.id]?.state == Download.STATE_COMPLETED ||
-                                            !it.song.mediaStoreUri.isNullOrEmpty()
+                                            (!it.song.isLocal && !it.song.mediaStoreUri.isNullOrEmpty())
                                     }
                                 }.map { songs ->
                                     when (sortType) {

@@ -61,13 +61,16 @@ import com.anitail.music.db.entities.Song
 import com.anitail.music.playback.DownloadUtil
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.ui.component.AlbumListItem
+import com.anitail.music.ui.component.DownloadFormatDialog
 import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.component.ListItem
 import com.anitail.music.ui.component.SongListItem
 import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.utils.YTPlayerUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @SuppressLint("MutableCollectionMutableState")
 @Composable
@@ -88,6 +91,40 @@ fun AlbumMenu(
     }
 
     val coroutineScope = rememberCoroutineScope()
+    var showDownloadFormatDialog by rememberSaveable { mutableStateOf(false) }
+    var isLoadingFormats by remember { mutableStateOf(false) }
+    var availableFormats by remember { mutableStateOf<List<YTPlayerUtils.AudioFormatOption>>(emptyList()) }
+    var pendingSongsForDownload by remember { mutableStateOf<List<Song>>(emptyList()) }
+
+    if (showDownloadFormatDialog) {
+        DownloadFormatDialog(
+            isLoading = isLoadingFormats,
+            formats = availableFormats,
+            onFormatSelected = { format ->
+                showDownloadFormatDialog = false
+                downloadUtil.downloadSongsToMediaStore(pendingSongsForDownload, targetItag = format.itag)
+                onDismiss()
+            },
+            onDismiss = { showDownloadFormatDialog = false }
+        )
+    }
+
+    fun openBatchDownloadDialog(targetSongs: List<Song>) {
+        val remoteSongs = targetSongs.filterNot { it.song.isLocal || it.id.startsWith("LOCAL_") }
+        if (remoteSongs.isEmpty()) return
+
+        pendingSongsForDownload = remoteSongs
+        showDownloadFormatDialog = true
+        isLoadingFormats = true
+        availableFormats = emptyList()
+
+        coroutineScope.launch {
+            availableFormats = withContext(Dispatchers.IO) {
+                YTPlayerUtils.getAllAvailableAudioFormats(remoteSongs.first().id).getOrDefault(emptyList())
+            }
+            isLoadingFormats = false
+        }
+    }
 
     LaunchedEffect(Unit) {
         database.albumSongs(album.id).collect {
@@ -387,8 +424,7 @@ fun AlbumMenu(
                             )
                         },
                         modifier = Modifier.tvClickable {
-                            downloadUtil.downloadSongsToMediaStore(songs)
-                            onDismiss()
+                            openBatchDownloadDialog(songs)
                         }
                     )
                 }

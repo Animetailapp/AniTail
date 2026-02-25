@@ -360,41 +360,67 @@ constructor(
                 continue
             }
 
-            if (!song.song.mediaStoreUri.isNullOrEmpty()) {
-                Timber.Forest.d(
-                    "Song ${song.song.title} is already downloaded in database: ${song.song.mediaStoreUri}"
-                )
-                val movedToCustomPath = exportToCustomPathIfEnabled(
-                    song.id,
-                    sourceMediaStoreUri = song.song.mediaStoreUri
-                )
-                if (!movedToCustomPath && customDownloadPathEnabled) {
-                    failedStates[song.id] =
-                        DownloadState(
-                            songId = song.id,
-                            status = DownloadState.Status.FAILED,
-                            error = "Unable to move existing file to custom folder"
-                        )
+            val mediaStoreUri = song.song.mediaStoreUri
+            val downloadUri = song.song.downloadUri
+            val hasAccessibleMediaStoreUri =
+                !mediaStoreUri.isNullOrBlank() && downloadExportHelper.verifyFileAccess(mediaStoreUri)
+            val hasAccessibleDownloadUri =
+                !downloadUri.isNullOrBlank() && downloadExportHelper.verifyFileAccess(downloadUri)
+
+            if (!mediaStoreUri.isNullOrEmpty()) {
+                if (!hasAccessibleMediaStoreUri) {
+                    Timber.Forest.w(
+                        "Skipping stale mediaStoreUri marker for %s: %s",
+                        song.id,
+                        mediaStoreUri
+                    )
                 } else {
-                    statesToClear += song.id
+                    Timber.Forest.d(
+                        "Song ${song.song.title} is already downloaded in database: ${song.song.mediaStoreUri}"
+                    )
+                    val movedToCustomPath = exportToCustomPathIfEnabled(
+                        song.id,
+                        sourceMediaStoreUri = song.song.mediaStoreUri
+                    )
+                    if (!movedToCustomPath && customDownloadPathEnabled) {
+                        failedStates[song.id] =
+                            DownloadState(
+                                songId = song.id,
+                                status = DownloadState.Status.FAILED,
+                                error = "Unable to move existing file to custom folder"
+                            )
+                    } else {
+                        statesToClear += song.id
+                    }
+                    continue
                 }
-                continue
             }
 
-            if (!song.song.downloadUri.isNullOrEmpty() &&
-                downloadExportHelper.verifyFileAccess(song.song.downloadUri)
-            ) {
-                if (song.song.mediaStoreUri != song.song.downloadUri) {
-                    markSongAsDownloaded(song.id, song.song.downloadUri)
+            if (!downloadUri.isNullOrEmpty()) {
+                if (!hasAccessibleDownloadUri) {
+                    Timber.Forest.w(
+                        "Skipping stale downloadUri marker for %s: %s",
+                        song.id,
+                        downloadUri
+                    )
+                } else {
+                    if (song.song.mediaStoreUri != song.song.downloadUri) {
+                        markSongAsDownloaded(song.id, downloadUri)
+                    }
+                    statesToClear += song.id
+                    continue
                 }
-                statesToClear += song.id
-                continue
+            }
+
+            if (!mediaStoreUri.isNullOrEmpty() || !downloadUri.isNullOrEmpty()) {
+                clearPersistedDownloadMarkers(song)
             }
 
             if (!customDownloadPathEnabled) {
                 val existingFile = mediaStoreHelper.findExistingFile(
                     title = song.song.title,
-                    artist = resolvePrimaryArtist(song)
+                    artist = resolvePrimaryArtist(song),
+                    durationMs = song.song.duration.takeIf { it > 0 }?.times(1000L)
                 )
                 if (existingFile != null) {
                     Timber.Forest.d("Song ${song.song.title} already exists in MediaStore: $existingFile")
@@ -412,6 +438,26 @@ constructor(
             statesToClear = statesToClear
         )
         return songsToQueue
+    }
+
+    private suspend fun clearPersistedDownloadMarkers(song: Song) {
+        if (song.song.mediaStoreUri.isNullOrEmpty() &&
+            song.song.downloadUri.isNullOrEmpty() &&
+            song.song.dateDownload == null
+        ) {
+            return
+        }
+
+        database.query {
+            database.upsert(
+                song.song.copy(
+                    mediaStoreUri = null,
+                    downloadUri = null,
+                    dateDownload = null,
+                )
+            )
+        }
+        Timber.Forest.d("Cleared stale download markers for song: %s", song.id)
     }
 
     /**
@@ -540,6 +586,20 @@ constructor(
                         clearDownloadState(song.id)
                         return@withContext
                     }
+
+                    val metadataEmbedded = downloadExportHelper.embedMetadataForDownloadedFile(
+                        songId = song.id,
+                        fileUri = persistedUri.toUri(),
+                        mimeType = mimeType,
+                        bitrate = format.bitrate,
+                    )
+                    if (!metadataEmbedded &&
+                        mimeType.contains("audio/mp4", ignoreCase = true) &&
+                        format.bitrate >= 128000
+                    ) {
+                        Timber.w("Metadata embedding was expected but not applied for %s", song.id)
+                    }
+
                     updateDownloadState(
                         song.id,
                         DownloadState(

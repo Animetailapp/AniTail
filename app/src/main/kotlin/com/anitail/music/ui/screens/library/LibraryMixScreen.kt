@@ -51,6 +51,7 @@ import com.anitail.music.constants.MixSortTypeKey
 import com.anitail.music.constants.ShowCachedPlaylistKey
 import com.anitail.music.constants.ShowDownloadedPlaylistKey
 import com.anitail.music.constants.ShowLikedPlaylistKey
+import com.anitail.music.constants.ShowLocalPlaylistKey
 import com.anitail.music.constants.ShowTopPlaylistKey
 import com.anitail.music.constants.YtmSyncKey
 import com.anitail.music.db.entities.Album
@@ -150,10 +151,21 @@ fun LibraryMixScreen(
             songThumbnails = emptyList(),
         )
 
+    val localPlaylist =
+        Playlist(
+            playlist = PlaylistEntity(
+                id = UUID.randomUUID().toString(),
+                name = stringResource(R.string.filter_local),
+            ),
+            songCount = 0,
+            songThumbnails = emptyList(),
+        )
+
     val (showLiked) = rememberPreference(ShowLikedPlaylistKey, true)
     val (showDownloaded) = rememberPreference(ShowDownloadedPlaylistKey, true)
     val (showTop) = rememberPreference(ShowTopPlaylistKey, true)
     val (showCached) = rememberPreference(ShowCachedPlaylistKey, true)
+    val (showLocal) = rememberPreference(ShowLocalPlaylistKey, true)
 
     val albums = viewModel.albums.collectAsState()
     val artist = viewModel.artists.collectAsState()
@@ -357,6 +369,25 @@ fun LibraryMixScreen(
                                     .fillMaxWidth()
                                     .tvClickable {
                                         navController.navigate("cache_playlist/cached")
+                                    }
+                                    .animateItem(),
+                            )
+                        }
+                    }
+
+                    if (showLocal) {
+                        item(
+                            key = "localPlaylist",
+                            contentType = { CONTENT_TYPE_PLAYLIST },
+                        ) {
+                            PlaylistListItem(
+                                playlist = localPlaylist,
+                                autoPlaylist = true,
+                                modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .tvClickable {
+                                        navController.navigate("local_music")
                                     }
                                     .animateItem(),
                             )
@@ -611,6 +642,28 @@ fun LibraryMixScreen(
                                     .tvCombinedClickable(
                                         onClick = {
                                             navController.navigate("cache_playlist/cached")
+                                        },
+                                    )
+                                    .animateItem(),
+                            )
+                        }
+                    }
+
+                    if (showLocal) {
+                        item(
+                            key = "localPlaylist",
+                            contentType = { CONTENT_TYPE_PLAYLIST },
+                        ) {
+                            PlaylistGridItem(
+                                playlist = localPlaylist,
+                                fillMaxWidth = true,
+                                autoPlaylist = true,
+                                modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .tvCombinedClickable(
+                                        onClick = {
+                                            navController.navigate("local_music")
                                         },
                                     )
                                     .animateItem(),

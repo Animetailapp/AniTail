@@ -111,7 +111,7 @@ fun PlayerMenu(
         .collectAsState(initial = null)
     val librarySong by database.song(mediaMetadata.id).collectAsState(initial = null)
     val effectiveDownloadState = download?.state
-        ?: if (!librarySong?.song?.mediaStoreUri.isNullOrEmpty()) {
+        ?: if (librarySong?.song?.isLocal != true && !librarySong?.song?.mediaStoreUri.isNullOrEmpty()) {
             Download.STATE_COMPLETED
         } else {
             null

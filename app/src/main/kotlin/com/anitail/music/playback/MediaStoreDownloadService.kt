@@ -171,31 +171,23 @@ class MediaStoreDownloadService : Service() {
 
         if (activeDownloads.size == 1) {
             clearChildNotifications()
+            val singleKey = buildNotificationKey(activeDownloads)
+            if (singleKey == lastNotificationKey) return
+
             val singleNotification = createSingleDownloadNotification(activeDownloads.first())
             notificationManager.notify(NOTIFICATION_ID, singleNotification)
-            lastNotificationKey = buildNotificationKey(activeDownloads)
+            lastNotificationKey = singleKey
             return
         }
 
-        val currentChildIds = mutableSetOf<Int>()
-        activeDownloads.forEach { downloadState ->
-            val notificationId = notificationIdForSong(downloadState.songId)
-            currentChildIds += notificationId
-            notificationManager.notify(
-                notificationId,
-                createSingleDownloadNotification(
-                    state = downloadState,
-                    asGroupChild = true
-                )
-            )
-        }
-        cancelStaleChildNotifications(currentChildIds)
+        // For large batch downloads, avoid posting one notification per song.
+        // Keep a single summarized foreground notification to prevent notification spam.
+        clearChildNotifications()
 
         val summaryKey = buildNotificationKey(activeDownloads)
-        if (summaryKey != lastNotificationKey) {
-            lastNotificationKey = summaryKey
-        }
+        if (summaryKey == lastNotificationKey) return
 
+        lastNotificationKey = summaryKey
         notificationManager.notify(NOTIFICATION_ID, createMultipleDownloadsNotification(activeDownloads))
     }
 
@@ -204,13 +196,14 @@ class MediaStoreDownloadService : Service() {
     ): String {
         if (activeDownloads.size == 1) {
             val single = activeDownloads.first()
+            val coarseProgressBucket = (single.progress.coerceIn(0f, 1f) * 20f).toInt()
             return buildString {
                 append("single:")
                 append(single.songId)
                 append(':')
                 append(single.status.name)
                 append(':')
-                append((single.progress * 100f).toInt())
+                append(coarseProgressBucket)
             }
         }
 
@@ -223,7 +216,8 @@ class MediaStoreDownloadService : Service() {
             .map { it.progress }
             .average()
             .let { if (it.isNaN()) 0.0 else it }
-        return "multi:$downloadingCount:$queuedCount:${(avgProgress * 100.0).toInt()}"
+        val coarseProgressBucket = (avgProgress * 20.0).toInt()
+        return "multi:$downloadingCount:$queuedCount:$coarseProgressBucket"
     }
 
     private suspend fun createSingleDownloadNotification(
@@ -334,8 +328,6 @@ class MediaStoreDownloadService : Service() {
             .setProgress(100, (avgProgress * 100).toInt(), avgProgress == 0f)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setGroup(NOTIFICATION_GROUP_KEY)
-            .setGroupSummary(true)
             .setOnlyAlertOnce(true)
             .addAction(
                 R.drawable.close,

@@ -54,8 +54,7 @@ import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.SilenceSkippingAudioProcessor
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
-import androidx.media3.extractor.mkv.MatroskaExtractor
-import androidx.media3.extractor.mp4.FragmentedMp4Extractor
+import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaController
@@ -937,23 +936,26 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       playbackData: YTPlayerUtils.PlaybackData? = null
   ) {
     val song = database.song(mediaId).first()
+    val songEntity = song?.song
     val mediaMetadata =
         withContext(Dispatchers.Main) { player.findNextMediaItemById(mediaId)?.metadata } ?: return
-      val localMetadata = song?.song?.mediaStoreUri?.let { loadLocalAudioMetadata(it.toUri()) }
-      if (localMetadata != null) {
+      val localSourceUri =
+          songEntity?.mediaStoreUri ?: songEntity?.takeIf { it.isLocal }?.downloadUri
+      val localMetadata = localSourceUri?.let { loadLocalAudioMetadata(it.toUri()) }
+      if (localMetadata != null && songEntity != null) {
           val localDurationSeconds =
               localMetadata.durationMs?.takeIf { it > 0 }?.div(1000L)?.toInt()
-          val updatedSongEntity = song.song.copy(
-              title = song.song.title.ifBlank { localMetadata.title ?: song.song.title },
-              artistName = song.song.artistName ?: localMetadata.artist,
-              albumName = song.song.albumName ?: localMetadata.album,
+          val updatedSongEntity = songEntity.copy(
+              title = songEntity.title.ifBlank { localMetadata.title ?: songEntity.title },
+              artistName = songEntity.artistName ?: localMetadata.artist,
+              albumName = songEntity.albumName ?: localMetadata.album,
               duration = when {
-                  song.song.duration > 0 -> song.song.duration
+                  songEntity.duration > 0 -> songEntity.duration
                   localDurationSeconds != null && localDurationSeconds > 0 -> localDurationSeconds
-                  else -> song.song.duration
+                  else -> songEntity.duration
               }
           )
-          if (updatedSongEntity != song.song) {
+          if (updatedSongEntity != songEntity) {
               database.query { upsert(updatedSongEntity) }
           }
           if (playbackData == null) {
@@ -961,7 +963,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
           }
       }
     val duration =
-        song?.song?.duration?.takeIf { it != -1 }
+        songEntity?.duration?.takeIf { it != -1 }
             ?: mediaMetadata.duration.takeIf { it != -1 }
             ?: (playbackData?.videoDetails
                     ?: YTPlayerUtils.playerResponseForMetadata(mediaId).getOrNull()?.videoDetails)
@@ -970,7 +972,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             ?: -1
     database.query {
       if (song == null) insert(mediaMetadata.copy(duration = duration))
-      else if (song.song.duration == -1) update(song.song.copy(duration = duration))
+      else if (songEntity != null && songEntity.duration == -1) update(songEntity.copy(duration = duration))
     }
     if (!database.hasRelatedSongs(mediaId)) {
       val relatedEndpoint =
@@ -1351,9 +1353,15 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         syncUtils.likeSong(song)
 
         // Check if auto-download on like is enabled and the song is now liked
-        if (dataStore.get(AutoDownloadOnLikeKey, false) && song.liked) {
-          // Trigger download for the liked song
-            downloadUtil.downloadToMediaStore(it)
+        if (dataStore.get(AutoDownloadOnLikeKey, false) &&
+            song.liked &&
+            !song.isLocal &&
+            !song.id.startsWith("LOCAL_")
+        ) {
+          // Trigger download for the liked song using metadata-capable format when available
+            scope.launch(Dispatchers.IO) {
+              downloadUtil.downloadToMediaStoreWithMetadataPreference(it)
+            }
 
           // Download lyrics if auto-download lyrics is enabled
           if (dataStore.get(AutoDownloadLyricsKey, false)) {
@@ -1949,13 +1957,18 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   private fun createDataSourceFactory(): DataSource.Factory {
     return ResolvingDataSource.Factory(createCacheDataSource()) { dataSpec ->
       val mediaId = dataSpec.key ?: error("No media id")
-        // Check for MediaStore URI first (local playback)
+        // Check local URIs first (local playback)
         val song = database.getSongByIdBlocking(mediaId)
-
-        if (song?.song?.mediaStoreUri != null) {
-            Timber.d("Playing from MediaStore: ${song.song.mediaStoreUri}")
+        val localUri =
+            when {
+                song?.song?.mediaStoreUri != null -> song.song.mediaStoreUri
+                song?.song?.isLocal == true && song.song.downloadUri != null -> song.song.downloadUri
+                else -> null
+            }
+        if (localUri != null) {
+            Timber.d("Playing local media from URI: $localUri")
             scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
-            return@Factory dataSpec.withUri(song.song.mediaStoreUri.toUri())
+            return@Factory dataSpec.withUri(localUri.toUri())
         }
 
         // Check if cached and validate cache content exists
@@ -2051,9 +2064,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   private fun createMediaSourceFactory() =
       DefaultMediaSourceFactory(
           createDataSourceFactory(),
-      ) {
-        arrayOf(MatroskaExtractor(), FragmentedMp4Extractor())
-      }
+          DefaultExtractorsFactory(),
+      )
 
   private fun createRenderersFactory() =
       object : DefaultRenderersFactory(this) {

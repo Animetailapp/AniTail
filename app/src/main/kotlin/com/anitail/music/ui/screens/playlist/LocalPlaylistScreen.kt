@@ -116,6 +116,7 @@ import com.anitail.music.db.entities.Playlist
 import com.anitail.music.db.entities.PlaylistEntity
 import com.anitail.music.db.entities.PlaylistSong
 import com.anitail.music.db.entities.PlaylistSongMap
+import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.move
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.extensions.togglePlayPause
@@ -123,6 +124,7 @@ import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.ui.component.AutoResizeText
 import com.anitail.music.ui.component.DefaultDialog
+import com.anitail.music.ui.component.DownloadFormatDialog
 import com.anitail.music.ui.component.DraggableScrollbar
 import com.anitail.music.ui.component.EmptyPlaceholder
 import com.anitail.music.ui.component.FontSizeRange
@@ -140,11 +142,13 @@ import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.utils.makeTimeString
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.utils.rememberPreference
+import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.viewmodels.LocalPlaylistViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.time.LocalDateTime
@@ -1008,6 +1012,39 @@ fun LocalPlaylistHeader(
     }
     val downloadState by downloadUtil.getDownloadState(playlistSongIds)
         .collectAsState(initial = Download.STATE_STOPPED)
+    var showDownloadFormatDialog by rememberSaveable { mutableStateOf(false) }
+    var isLoadingFormats by remember { mutableStateOf(false) }
+    var availableFormats by remember { mutableStateOf<List<YTPlayerUtils.AudioFormatOption>>(emptyList()) }
+    var pendingSongsForDownload by remember { mutableStateOf<List<Song>>(emptyList()) }
+
+    if (showDownloadFormatDialog) {
+        DownloadFormatDialog(
+            isLoading = isLoadingFormats,
+            formats = availableFormats,
+            onFormatSelected = { format ->
+                showDownloadFormatDialog = false
+                downloadUtil.downloadSongsToMediaStore(pendingSongsForDownload, targetItag = format.itag)
+            },
+            onDismiss = { showDownloadFormatDialog = false }
+        )
+    }
+
+    fun openBatchDownloadDialog(targetSongs: List<Song>) {
+        val remoteSongs = targetSongs.filterNot { it.song.isLocal || it.id.startsWith("LOCAL_") }
+        if (remoteSongs.isEmpty()) return
+
+        pendingSongsForDownload = remoteSongs
+        showDownloadFormatDialog = true
+        isLoadingFormats = true
+        availableFormats = emptyList()
+
+        scope.launch {
+            availableFormats = withContext(Dispatchers.IO) {
+                YTPlayerUtils.getAllAvailableAudioFormats(remoteSongs.first().id).getOrDefault(emptyList())
+            }
+            isLoadingFormats = false
+        }
+    }
 
     val liked = playlist.playlist.bookmarkedAt != null
     val editable: Boolean = playlist.playlist.isEditable
@@ -1213,7 +1250,7 @@ fun LocalPlaylistHeader(
                         else -> {
                             IconButton(
                                 onClick = {
-                                    downloadUtil.downloadSongsToMediaStore(songs.map { it.song })
+                                    openBatchDownloadDialog(songs.map { it.song })
                                 },
                                 modifier = Modifier.size(40.dp)
                             ) {

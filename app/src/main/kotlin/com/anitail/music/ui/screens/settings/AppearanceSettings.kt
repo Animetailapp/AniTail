@@ -839,6 +839,7 @@ fun AppearanceSettings(
                     LibraryFilter.ALBUMS -> stringResource(R.string.albums)
                     LibraryFilter.PLAYLISTS -> stringResource(R.string.playlists)
                     LibraryFilter.LIBRARY -> stringResource(R.string.filter_library)
+                    LibraryFilter.LOCAL -> stringResource(R.string.filter_local)
                     LibraryFilter.DOWNLOADED -> stringResource(R.string.filter_downloaded)
                 }
             },

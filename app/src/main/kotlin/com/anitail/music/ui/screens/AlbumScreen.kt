@@ -38,6 +38,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
@@ -69,9 +70,11 @@ import com.anitail.music.R
 import com.anitail.music.constants.AlbumThumbnailSize
 import com.anitail.music.constants.ThumbnailCornerRadius
 import com.anitail.music.db.entities.Album
+import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.togglePlayPause
 import com.anitail.music.playback.queues.LocalAlbumRadio
 import com.anitail.music.ui.component.AutoResizeText
+import com.anitail.music.ui.component.DownloadFormatDialog
 import com.anitail.music.ui.component.FontSizeRange
 import com.anitail.music.ui.component.IconButton
 import com.anitail.music.ui.component.LocalMenuState
@@ -89,7 +92,11 @@ import com.anitail.music.ui.menu.YouTubeAlbumMenu
 import com.anitail.music.ui.utils.ItemWrapper
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.ui.utils.tvCombinedClickable
+import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.viewmodels.AlbumViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -128,6 +135,39 @@ fun AlbumScreen(
     }
 
     val downloadUtil = LocalDownloadUtil.current
+    var showDownloadFormatDialog by rememberSaveable { mutableStateOf(false) }
+    var isLoadingFormats by remember { mutableStateOf(false) }
+    var availableFormats by remember { mutableStateOf<List<YTPlayerUtils.AudioFormatOption>>(emptyList()) }
+    var pendingSongsForDownload by remember { mutableStateOf<List<Song>>(emptyList()) }
+
+    if (showDownloadFormatDialog) {
+        DownloadFormatDialog(
+            isLoading = isLoadingFormats,
+            formats = availableFormats,
+            onFormatSelected = { format ->
+                showDownloadFormatDialog = false
+                downloadUtil.downloadSongsToMediaStore(pendingSongsForDownload, targetItag = format.itag)
+            },
+            onDismiss = { showDownloadFormatDialog = false }
+        )
+    }
+
+    fun openBatchDownloadDialog(targetSongs: List<Song>) {
+        val remoteSongs = targetSongs.filterNot { it.song.isLocal || it.id.startsWith("LOCAL_") }
+        if (remoteSongs.isEmpty()) return
+
+        pendingSongsForDownload = remoteSongs
+        showDownloadFormatDialog = true
+        isLoadingFormats = true
+        availableFormats = emptyList()
+
+        scope.launch {
+            availableFormats = withContext(Dispatchers.IO) {
+                YTPlayerUtils.getAllAvailableAudioFormats(remoteSongs.first().id).getOrDefault(emptyList())
+            }
+            isLoadingFormats = false
+        }
+    }
     val albumSongIds = remember(albumWithSongs) {
         albumWithSongs?.songs?.map { it.id }.orEmpty()
     }
@@ -258,7 +298,7 @@ fun AlbumScreen(
                                     else -> {
                                         IconButton(
                                             onClick = {
-                                                downloadUtil.downloadSongsToMediaStore(albumWithSongs.songs)
+                                                openBatchDownloadDialog(albumWithSongs.songs)
                                             },
                                         ) {
                                             Icon(

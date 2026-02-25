@@ -1,0 +1,447 @@
+package com.anitail.music.utils
+
+import android.Manifest
+import android.content.ContentUris
+import android.content.Context
+import android.content.pm.PackageManager
+import android.database.Cursor
+import android.database.ContentObserver
+import android.net.Uri
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.provider.MediaStore
+import androidx.core.content.ContextCompat
+import com.anitail.music.db.MusicDatabase
+import com.anitail.music.db.entities.AlbumArtistMap
+import com.anitail.music.db.entities.AlbumEntity
+import com.anitail.music.db.entities.ArtistEntity
+import com.anitail.music.db.entities.SongAlbumMap
+import com.anitail.music.db.entities.SongArtistMap
+import com.anitail.music.db.entities.SongEntity
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withContext
+import timber.log.Timber
+import java.time.LocalDateTime
+import javax.inject.Inject
+import javax.inject.Singleton
+
+sealed class LocalSyncStatus {
+    data object Idle : LocalSyncStatus()
+    data object Syncing : LocalSyncStatus()
+    data object Completed : LocalSyncStatus()
+    data class Error(val message: String) : LocalSyncStatus()
+}
+
+@Singleton
+class LocalMusicRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val database: MusicDatabase,
+) {
+    private companion object {
+        private const val MEDIASTORE_SYNC_DEBOUNCE_MS = 750L
+        private const val SQLITE_IN_CLAUSE_BATCH = 900
+    }
+
+    private val _syncStatus = MutableStateFlow<LocalSyncStatus>(LocalSyncStatus.Idle)
+    val syncStatus: StateFlow<LocalSyncStatus> = _syncStatus.asStateFlow()
+
+    private val _syncProgress = MutableStateFlow(0f)
+    val syncProgress: StateFlow<Float> = _syncProgress.asStateFlow()
+
+    private val mediaStoreHelper = MediaStoreHelper(context)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val syncMutex = Mutex()
+    private var pendingMediaStoreSyncJob: Job? = null
+
+    private val mediaStoreObserver =
+        object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                onMediaStoreChanged(null)
+            }
+
+            override fun onChange(selfChange: Boolean, uri: Uri?) {
+                onMediaStoreChanged(uri)
+            }
+        }
+
+    init {
+        registerMediaStoreObserver()
+    }
+
+    fun hasPermission(): Boolean {
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        val hasIt = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        Timber.d("LocalMusic: hasPermission() called - permission=$permission, granted=$hasIt, SDK=${Build.VERSION.SDK_INT}")
+        return hasIt
+    }
+
+    fun getRequiredPermission(): String {
+        val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        Timber.d("LocalMusic: getRequiredPermission() = $perm")
+        return perm
+    }
+
+    private fun registerMediaStoreObserver() {
+        runCatching {
+            context.contentResolver.registerContentObserver(
+                mediaStoreHelper.audioCollectionUri(),
+                true,
+                mediaStoreObserver,
+            )
+            Timber.d("LocalMusic: MediaStore observer registered")
+        }.onFailure { error ->
+            Timber.w(error, "LocalMusic: Failed to register MediaStore observer")
+        }
+    }
+
+    private fun onMediaStoreChanged(uri: Uri?) {
+        val uriText = uri?.toString()
+        val isAudioUri = uriText == null || uriText.contains("/audio/media")
+        if (!isAudioUri) return
+
+        scheduleSyncFromMediaStore("uri=${uriText ?: "<all>"}")
+    }
+
+    private fun scheduleSyncFromMediaStore(reason: String) {
+        if (!hasPermission()) {
+            Timber.v("LocalMusic: skip scheduled sync (%s) - permission missing", reason)
+            return
+        }
+
+        pendingMediaStoreSyncJob?.cancel()
+        pendingMediaStoreSyncJob = scope.launch {
+            delay(MEDIASTORE_SYNC_DEBOUNCE_MS)
+            Timber.d("LocalMusic: running scheduled sync from MediaStore change (%s)", reason)
+            syncLocalMusic()
+        }
+    }
+
+    suspend fun syncLocalMusic() = withContext(Dispatchers.IO) {
+        if (!syncMutex.tryLock()) {
+            Timber.d("LocalMusic: syncLocalMusic() skipped - sync already in progress")
+            return@withContext
+        }
+
+        Timber.d("LocalMusic: syncLocalMusic() STARTED")
+        try {
+            if (!hasPermission()) {
+                Timber.e("LocalMusic: syncLocalMusic() - Permission NOT granted, aborting")
+                _syncStatus.value = LocalSyncStatus.Error("Permission not granted")
+                return@withContext
+            }
+
+            Timber.d("LocalMusic: syncLocalMusic() - Permission granted, starting sync")
+            _syncStatus.value = LocalSyncStatus.Syncing
+            _syncProgress.value = 0f
+
+            val contentResolver = context.contentResolver
+            val audioCollectionUri = mediaStoreHelper.audioCollectionUri()
+            Timber.d("LocalMusic: syncLocalMusic() - Got contentResolver: $contentResolver")
+            val existingLocalSongIds = database.localSongIds().toSet()
+            val scannedLocalSongIds = mutableSetOf<String>()
+            var mediaStoreScanSucceeded = false
+
+            val projection = mutableListOf(
+                MediaStore.Audio.Media._ID,
+                MediaStore.Audio.Media.TITLE,
+                MediaStore.Audio.Media.ARTIST,
+                MediaStore.Audio.Media.ALBUM,
+                MediaStore.Audio.Media.ALBUM_ID,
+                MediaStore.Audio.Media.DURATION,
+                MediaStore.Audio.Media.TRACK,
+                MediaStore.Audio.Media.YEAR,
+                MediaStore.Audio.Media.DISPLAY_NAME,
+                MediaStore.Audio.Media.DATA,
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                projection += MediaStore.Audio.Media.RELATIVE_PATH
+            }
+
+            // Include all audio files (m4a, webm, mp3, flac, etc.)
+            val selection = "(${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.MIME_TYPE} LIKE 'audio/%')"
+            val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
+
+            Timber.d("LocalMusic: syncLocalMusic() - Querying MediaStore audio collection")
+            Timber.d("LocalMusic: syncLocalMusic() - URI: $audioCollectionUri")
+            Timber.d("LocalMusic: syncLocalMusic() - Selection: $selection")
+
+            contentResolver.query(
+                audioCollectionUri,
+                projection.toTypedArray(),
+                selection,
+                null,
+                sortOrder
+            )?.use { cursor ->
+                Timber.d("LocalMusic: syncLocalMusic() - Query returned cursor with ${cursor.count} rows")
+                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
+                val artistCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
+                val albumCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
+                val albumIdCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
+                val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+                val trackCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TRACK)
+                val yearCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.YEAR)
+                val displayNameCol = cursor.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME)
+                val dataCol = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+                val relativePathCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    cursor.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
+                } else {
+                    -1
+                }
+
+                val totalCount = cursor.count
+                var processedCount = 0
+                Timber.d("LocalMusic: syncLocalMusic() - Total songs to process: $totalCount")
+
+                val artistCache = mutableMapOf<String, String>()
+                val albumCache = mutableMapOf<Long, String>()
+                val artistThumbnailCache = mutableMapOf<String, String?>() // Track first album art per artist
+                val createdArtistIds = mutableSetOf<String>()
+                val createdAlbumIds = mutableSetOf<String>()
+
+                // Collect all entities first, then batch insert in single transaction
+                val artistEntities = mutableListOf<ArtistEntity>()
+                val albumEntities = mutableListOf<AlbumEntity>()
+                val songEntities = mutableListOf<SongEntity>()
+                val songArtistMaps = mutableListOf<SongArtistMap>()
+                val songAlbumMaps = mutableListOf<SongAlbumMap>()
+                val albumArtistMaps = mutableListOf<AlbumArtistMap>()
+
+                while (cursor.moveToNext()) {
+                    try {
+                        val mediaStoreId = cursor.getLong(idCol)
+                        Timber.v("LocalMusic: Processing song mediaStoreId=$mediaStoreId")
+                        val title = cursor.getString(titleCol) ?: "Unknown"
+                        val artistName = cursor.getString(artistCol)?.takeIf {
+                            it.isNotBlank() && it != "<unknown>"
+                        } ?: "Unknown Artist"
+                        val albumName = cursor.getString(albumCol)?.takeIf {
+                            it.isNotBlank() && it != "<unknown>"
+                        } ?: "Unknown Album"
+                        val albumId = cursor.getLong(albumIdCol)
+                        val duration = cursor.getInt(durationCol) / 1000
+                        val trackNumber = cursor.getInt(trackCol)
+                        val year = cursor.getInt(yearCol).takeIf { it > 0 }
+                        val filePath = resolveLocalPath(
+                            cursor = cursor,
+                            dataCol = dataCol,
+                            relativePathCol = relativePathCol,
+                            displayNameCol = displayNameCol,
+                            fallbackFileName = "local_$mediaStoreId",
+                        )
+
+                        val songId = "LOCAL_$mediaStoreId"
+                        scannedLocalSongIds += songId
+                        val localArtistId = artistCache.getOrPut(artistName.lowercase()) {
+                            "LA_LOCAL_${artistName.lowercase().hashCode()}"
+                        }
+                        val localAlbumId = albumCache.getOrPut(albumId) {
+                            "LOCAL_ALBUM_$albumId"
+                        }
+
+                        val contentUri = ContentUris.withAppendedId(
+                            audioCollectionUri,
+                            mediaStoreId
+                        ).toString()
+
+                        val albumArtUri = getAlbumArtUri(albumId)
+
+                        Timber.d("LocalMusic: Song details - id=$songId, title=$title, artist=$artistName, album=$albumName, duration=$duration, contentUri=$contentUri")
+
+                        // Track first album art for this artist
+                        if (!artistThumbnailCache.containsKey(localArtistId) && albumArtUri != null) {
+                            artistThumbnailCache[localArtistId] = albumArtUri
+                        }
+
+                        // Collect artist entity (deduped by cache)
+                        if (createdArtistIds.add(localArtistId)) {
+                            artistEntities.add(
+                                ArtistEntity(
+                                    id = localArtistId,
+                                    name = artistName,
+                                    thumbnailUrl = albumArtUri, // Use first album art as thumbnail
+                                )
+                            )
+                        }
+
+                        // Collect album entity (deduped by cache)
+                        if (createdAlbumIds.add(localAlbumId)) {
+                            albumEntities.add(
+                                AlbumEntity(
+                                    id = localAlbumId,
+                                    title = albumName,
+                                    year = year,
+                                    thumbnailUrl = albumArtUri,
+                                    songCount = 0,
+                                    duration = 0,
+                                )
+                            )
+                        }
+
+                        songEntities.add(
+                            SongEntity(
+                                id = songId,
+                                title = title,
+                                duration = duration,
+                                thumbnailUrl = albumArtUri,
+                                albumId = localAlbumId,
+                                albumName = albumName,
+                                year = year,
+                                isLocal = true,
+                                downloadUri = contentUri,
+                                localPath = filePath,
+                                dateDownload = null,
+                                inLibrary = LocalDateTime.now()
+                            )
+                        )
+
+                        songArtistMaps.add(SongArtistMap(songId, localArtistId, 0))
+                        songAlbumMaps.add(SongAlbumMap(songId, localAlbumId, trackNumber))
+                        albumArtistMaps.add(AlbumArtistMap(localAlbumId, localArtistId, 0))
+
+                        processedCount++
+                        _syncProgress.value = processedCount.toFloat() / totalCount
+                        if (processedCount % 50 == 0) {
+                            Timber.d("LocalMusic: Sync progress - $processedCount / $totalCount songs collected")
+                        }
+                    } catch (e: Exception) {
+                        Timber.e(e, "LocalMusic: Error processing local song at index $processedCount")
+                    }
+                }
+                mediaStoreScanSucceeded = true
+
+                Timber.d("LocalMusic: Collected ${songEntities.size} songs, ${artistEntities.size} artists, ${albumEntities.size} albums - starting batch insert")
+
+                // Single transaction for all inserts - much faster and synchronous completion
+                database.transaction {
+                    Timber.d("LocalMusic: Batch inserting ${artistEntities.size} artists")
+                    artistEntities.forEach { upsert(it) }
+
+                    Timber.d("LocalMusic: Batch inserting ${albumEntities.size} albums")
+                    albumEntities.forEach { upsert(it) }
+
+                    Timber.d("LocalMusic: Batch inserting ${songEntities.size} songs")
+                    songEntities.forEach { upsert(it) }
+
+                    Timber.d("LocalMusic: Batch inserting ${songArtistMaps.size} song-artist maps")
+                    songArtistMaps.forEach { upsert(it) }
+
+                    Timber.d("LocalMusic: Batch inserting ${songAlbumMaps.size} song-album maps")
+                    songAlbumMaps.forEach { upsert(it) }
+
+                    Timber.d("LocalMusic: Batch inserting ${albumArtistMaps.size} album-artist maps")
+                    albumArtistMaps.distinctBy { it.albumId to it.artistId }.forEach { upsert(it) }
+
+                    if (mediaStoreScanSucceeded) {
+                        val staleLocalSongIds = (existingLocalSongIds - scannedLocalSongIds).toList()
+                        if (staleLocalSongIds.isNotEmpty()) {
+                            Timber.d("LocalMusic: Removing ${staleLocalSongIds.size} stale local songs")
+                            staleLocalSongIds.chunked(SQLITE_IN_CLAUSE_BATCH).forEach { chunk ->
+                                deleteLocalSongsByIds(chunk)
+                            }
+                        } else {
+                            Timber.d("LocalMusic: No stale local songs to remove")
+                        }
+                    }
+                }
+
+                Timber.d("LocalMusic: Batch transaction submitted")
+                Timber.d("LocalMusic: Finished processing all $processedCount songs")
+            } ?: run {
+                Timber.e("LocalMusic: syncLocalMusic() - MediaStore query returned NULL cursor!")
+            }
+
+            updateAlbumStats()
+            _syncStatus.value = LocalSyncStatus.Completed
+            _syncProgress.value = 1f
+            Timber.d("LocalMusic: syncLocalMusic() COMPLETED SUCCESSFULLY")
+        } catch (e: Exception) {
+            Timber.e(e, "LocalMusic: syncLocalMusic() FAILED with exception: ${e.message}")
+            e.printStackTrace()
+            _syncStatus.value = LocalSyncStatus.Error(e.message ?: "Unknown error")
+        } finally {
+            syncMutex.unlock()
+        }
+    }
+
+    private fun resolveLocalPath(
+        cursor: Cursor,
+        dataCol: Int,
+        relativePathCol: Int,
+        displayNameCol: Int,
+        fallbackFileName: String,
+    ): String? {
+        if (dataCol >= 0) {
+            val dataPath = cursor.getString(dataCol)?.trim()
+            if (!dataPath.isNullOrEmpty()) return dataPath
+        }
+
+        val relativePath = if (relativePathCol >= 0) {
+            cursor.getString(relativePathCol)
+                ?.trim()
+                ?.trimEnd('/')
+        } else {
+            null
+        }
+        val displayName = if (displayNameCol >= 0) {
+            cursor.getString(displayNameCol)?.trim()
+        } else {
+            null
+        }
+
+        return when {
+            !relativePath.isNullOrEmpty() && !displayName.isNullOrEmpty() ->
+                "$relativePath/$displayName"
+
+            !relativePath.isNullOrEmpty() -> "$relativePath/$fallbackFileName"
+            else -> null
+        }
+    }
+
+    private fun getAlbumArtUri(albumId: Long): String? {
+        return try {
+            val uri = ContentUris.withAppendedId(
+                MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI,
+                albumId
+            ).toString()
+            Timber.v("LocalMusic: getAlbumArtUri($albumId) = $uri")
+            uri
+        } catch (e: Exception) {
+            Timber.e(e, "LocalMusic: getAlbumArtUri($albumId) failed")
+            null
+        }
+    }
+
+    private suspend fun updateAlbumStats() = withContext(Dispatchers.IO) {
+        database.query {
+            // Update album song counts and durations via raw query would be complex,
+            // so we'll leave them as-is for now since they're not critical for display
+        }
+    }
+
+    fun resetSyncStatus() {
+        Timber.d("LocalMusic: resetSyncStatus() called")
+        _syncStatus.value = LocalSyncStatus.Idle
+        _syncProgress.value = 0f
+    }
+}
+
