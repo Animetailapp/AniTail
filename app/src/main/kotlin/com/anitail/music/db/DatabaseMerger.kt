@@ -99,16 +99,21 @@ class DatabaseMerger @Inject constructor(
         val hasLikedDate = hasColumn(db, "remote_db", "song", "likedDate")
         val hasInLibrary = hasColumn(db, "remote_db", "song", "inLibrary")
 
-        val conditions = mutableListOf<String>()
-        if (hasLiked) conditions += "liked = 1"
-        if (hasInLibrary) conditions += "inLibrary IS NOT NULL"
+        val remoteSongConditions = mutableListOf<String>()
+        if (hasLiked) remoteSongConditions += "remoteSong.liked = 1"
+        if (hasInLibrary) remoteSongConditions += "remoteSong.inLibrary IS NOT NULL"
 
-        if (conditions.isNotEmpty()) {
+        if (remoteSongConditions.isNotEmpty()) {
+            val songFilter = remoteSongConditions.joinToString(" OR ")
             insertOrIgnoreBySharedColumns(
                 db = db,
                 table = "song",
-                whereClause = conditions.joinToString(" OR ")
+                sourceAlias = "remoteSong",
+                whereClause = songFilter
             )
+
+            // Ensure songs merged from favorites/library preserve artist relations.
+            mergeSongArtistDataForSongs(db, songFilter)
         }
 
         // B. Update existing local songs if remote has them as liked/inLibrary (and local doesn't)
@@ -152,19 +157,7 @@ class DatabaseMerger @Inject constructor(
     }
 
     private fun mergeHistory(db: SupportSQLiteDatabase) {
-        // First, insert artists that are referenced by songs in remote events
-        // This must happen before inserting songs to avoid foreign key issues
-        insertOrIgnoreBySharedColumns(
-            db = db,
-            table = "artist",
-            sourceAlias = "a",
-            whereClause = """
-                a.id IN (
-                    SELECT DISTINCT sam.artistId FROM remote_db.song_artist_map sam
-                    WHERE sam.songId IN (SELECT DISTINCT songId FROM remote_db.event)
-                )
-            """.trimIndent()
-        )
+        val historySongFilter = "remoteSong.id IN (SELECT DISTINCT songId FROM remote_db.event)"
 
         // Insert albums that are referenced by songs in remote events
         insertOrIgnoreBySharedColumns(
@@ -192,12 +185,8 @@ class DatabaseMerger @Inject constructor(
             """.trimIndent()
         )
 
-        // Also need to insert related artist mappings for those songs
-        insertOrIgnoreBySharedColumns(
-            db = db,
-            table = "song_artist_map",
-            whereClause = "songId IN (SELECT DISTINCT songId FROM remote_db.event)"
-        )
+        // Ensure artist entities and song-artist mappings exist for merged history songs.
+        mergeSongArtistDataForSongs(db, historySongFilter)
 
         // Insert song-album mappings for those songs
         insertOrIgnoreBySharedColumns(
@@ -232,16 +221,59 @@ class DatabaseMerger @Inject constructor(
     }
 
     private fun mergeArtists(db: SupportSQLiteDatabase) {
-        // Insert artists that exist in remote but not locally
-        insertOrIgnoreBySharedColumns(db, "artist")
+        // Merge artists table while deduplicating generated local IDs (LA*) by name.
+        insertOrIgnoreBySharedColumns(
+            db = db,
+            table = "artist",
+            sourceAlias = "remoteArtist",
+            whereClause = """
+                NOT EXISTS (
+                    SELECT 1
+                    FROM main.artist localArtist
+                    WHERE localArtist.id = remoteArtist.id
+                       OR (
+                            remoteArtist.id LIKE 'LA%'
+                            AND LOWER(TRIM(localArtist.name)) = LOWER(TRIM(remoteArtist.name))
+                       )
+                )
+            """.trimIndent()
+        )
 
-        // Update bookmarkedAt for artists that are bookmarked in remote but not local
+        if (!hasColumn(db, "remote_db", "artist", "bookmarkedAt")) {
+            return
+        }
+
+        // Preserve bookmarked state from remote artists, including LA* name matches.
         val updateBookmarkedQuery = """
-            UPDATE artist 
-            SET bookmarkedAt = (SELECT bookmarkedAt FROM remote_db.artist WHERE remote_db.artist.id = main.artist.id)
-            WHERE id IN (SELECT id FROM remote_db.artist WHERE bookmarkedAt IS NOT NULL) 
-            AND bookmarkedAt IS NULL
-        """
+            UPDATE artist
+            SET bookmarkedAt = (
+                SELECT remoteArtist.bookmarkedAt
+                FROM remote_db.artist remoteArtist
+                WHERE remoteArtist.bookmarkedAt IS NOT NULL
+                  AND (
+                        remoteArtist.id = main.artist.id
+                        OR (
+                            remoteArtist.id LIKE 'LA%'
+                            AND LOWER(TRIM(remoteArtist.name)) = LOWER(TRIM(main.artist.name))
+                        )
+                  )
+                ORDER BY CASE WHEN remoteArtist.id = main.artist.id THEN 0 ELSE 1 END
+                LIMIT 1
+            )
+            WHERE bookmarkedAt IS NULL
+              AND EXISTS (
+                    SELECT 1
+                    FROM remote_db.artist remoteArtist
+                    WHERE remoteArtist.bookmarkedAt IS NOT NULL
+                      AND (
+                            remoteArtist.id = main.artist.id
+                            OR (
+                                remoteArtist.id LIKE 'LA%'
+                                AND LOWER(TRIM(remoteArtist.name)) = LOWER(TRIM(main.artist.name))
+                            )
+                      )
+              )
+        """.trimIndent()
         db.execSQL(updateBookmarkedQuery)
     }
 
@@ -272,6 +304,80 @@ class DatabaseMerger @Inject constructor(
     private fun mergeFormats(db: SupportSQLiteDatabase) {
         // Insert format entries that don't exist locally
         insertOrIgnoreBySharedColumns(db, "format")
+    }
+
+    private fun mergeSongArtistDataForSongs(
+        db: SupportSQLiteDatabase,
+        remoteSongWhereClause: String,
+    ) {
+        // Insert missing artists referenced by matching songs.
+        // For generated IDs (LA*), dedupe by normalized artist name.
+        insertOrIgnoreBySharedColumns(
+            db = db,
+            table = "artist",
+            sourceAlias = "remoteArtist",
+            whereClause = """
+                remoteArtist.id IN (
+                    SELECT DISTINCT remoteMap.artistId
+                    FROM remote_db.song_artist_map remoteMap
+                    JOIN remote_db.song remoteSong ON remoteSong.id = remoteMap.songId
+                    WHERE $remoteSongWhereClause
+                )
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM main.artist localArtist
+                    WHERE localArtist.id = remoteArtist.id
+                       OR (
+                            remoteArtist.id LIKE 'LA%'
+                            AND LOWER(TRIM(localArtist.name)) = LOWER(TRIM(remoteArtist.name))
+                       )
+                )
+            """.trimIndent()
+        )
+
+        val mergeSongArtistMapsQuery = """
+            INSERT OR IGNORE INTO main.song_artist_map (songId, artistId, position)
+            SELECT
+                remoteMap.songId,
+                CASE
+                    WHEN remoteArtist.id LIKE 'LA%' THEN COALESCE(
+                        (
+                            SELECT localByName.id
+                            FROM main.artist localByName
+                            WHERE LOWER(TRIM(localByName.name)) = LOWER(TRIM(remoteArtist.name))
+                            ORDER BY localByName.rowid
+                            LIMIT 1
+                        ),
+                        (
+                            SELECT localById.id
+                            FROM main.artist localById
+                            WHERE localById.id = remoteMap.artistId
+                            LIMIT 1
+                        ),
+                        remoteMap.artistId
+                    )
+                    ELSE COALESCE(
+                        (
+                            SELECT localById.id
+                            FROM main.artist localById
+                            WHERE localById.id = remoteMap.artistId
+                            LIMIT 1
+                        ),
+                        remoteMap.artistId
+                    )
+                END AS resolvedArtistId,
+                remoteMap.position
+            FROM remote_db.song_artist_map remoteMap
+            JOIN remote_db.song remoteSong ON remoteSong.id = remoteMap.songId
+            JOIN remote_db.artist remoteArtist ON remoteArtist.id = remoteMap.artistId
+            WHERE $remoteSongWhereClause
+              AND EXISTS (
+                    SELECT 1
+                    FROM main.song localSong
+                    WHERE localSong.id = remoteMap.songId
+              )
+        """.trimIndent()
+        db.execSQL(mergeSongArtistMapsQuery)
     }
 
     private fun insertOrIgnoreBySharedColumns(
