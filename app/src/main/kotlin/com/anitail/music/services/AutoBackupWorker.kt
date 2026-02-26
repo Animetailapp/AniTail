@@ -681,7 +681,7 @@ class AutoBackupWorker @AssistedInject constructor(
             return@withContext Result.failure()
         }
     }
-    private suspend fun createBackup(uri: Uri): Result<Unit> {
+    private suspend fun createBackup(uri: Uri): kotlin.Result<Unit> {
         val viewModel = BackupRestoreViewModel(
             database,
             googleDriveSyncManager,
