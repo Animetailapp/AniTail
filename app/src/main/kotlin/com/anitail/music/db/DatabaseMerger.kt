@@ -56,32 +56,50 @@ class DatabaseMerger @Inject constructor(
                 // 1. Merge Songs (Favorited status mainly)
                 // If song exists in both but only remote is favorite, update local
                 // If song doesn't exist locally but exists in remote (and is favorite), insert it
-                mergeFavorites(currentDb, remoteSchema)
+                runMergeStep("favorites") {
+                    mergeFavorites(currentDb, remoteSchema)
+                }
 
                 // 2. Merge Playlists
                 // Insert playlists that don't exist locally
-                mergePlaylists(currentDb, remoteSchema)
+                runMergeStep("playlists") {
+                    mergePlaylists(currentDb, remoteSchema)
+                }
 
                 // 3. Merge Playlist Items
-                mergePlaylistItems(currentDb, remoteSchema)
+                runMergeStep("playlist_items") {
+                    mergePlaylistItems(currentDb, remoteSchema)
+                }
 
                 // 4. Merge Youtube Watch History (Event table)
-                mergeHistory(currentDb, remoteSchema)
+                runMergeStep("history") {
+                    mergeHistory(currentDb, remoteSchema)
+                }
 
                 // 5. Merge Artists (bookmarked)
-                mergeArtists(currentDb, remoteSchema)
+                runMergeStep("artists") {
+                    mergeArtists(currentDb, remoteSchema)
+                }
 
                 // 6. Merge Albums (bookmarked)
-                mergeAlbums(currentDb, remoteSchema)
+                runMergeStep("albums") {
+                    mergeAlbums(currentDb, remoteSchema)
+                }
 
                 // 7. Merge Search History
-                mergeSearchHistory(currentDb, remoteSchema)
+                runMergeStep("search_history") {
+                    mergeSearchHistory(currentDb, remoteSchema)
+                }
 
                 // 8. Merge Lyrics
-                mergeLyrics(currentDb, remoteSchema)
+                runMergeStep("lyrics") {
+                    mergeLyrics(currentDb, remoteSchema)
+                }
 
                 // 9. Merge Format (audio quality cache)
-                mergeFormats(currentDb, remoteSchema)
+                runMergeStep("formats") {
+                    mergeFormats(currentDb, remoteSchema)
+                }
 
                 currentDb.setTransactionSuccessful()
                 Timber.d("Database merge completed successfully")
@@ -173,7 +191,55 @@ class DatabaseMerger @Inject constructor(
         db: SupportSQLiteDatabase,
         remoteSchema: String,
     ) {
-        insertOrIgnoreBySharedColumns(db, "playlist_song_map", remoteSchema = remoteSchema)
+        if (!hasTable(db, remoteSchema, "playlist_song_map")) {
+            Timber.w("Skipping playlist item merge: remote table %s.playlist_song_map not found", remoteSchema)
+            return
+        }
+
+        if (!hasTable(db, remoteSchema, "song")) {
+            Timber.w("Skipping playlist item merge: remote table %s.song not found", remoteSchema)
+            return
+        }
+
+        val remotePlaylistSongMapTable = "$remoteSchema.playlist_song_map"
+        val playlistSongFilter = """
+            remoteSong.id IN (
+                SELECT DISTINCT remoteMap.songId
+                FROM $remotePlaylistSongMapTable remoteMap
+            )
+        """.trimIndent()
+
+        // Ensure playlist songs exist locally before inserting child rows in playlist_song_map.
+        insertOrIgnoreBySharedColumns(
+            db = db,
+            table = "song",
+            remoteSchema = remoteSchema,
+            sourceAlias = "remoteSong",
+            whereClause = playlistSongFilter
+        )
+
+        // Ensure artist entities and song-artist mappings exist for playlist songs.
+        mergeSongArtistDataForSongs(db, remoteSchema, playlistSongFilter)
+
+        // Insert only rows whose parent playlist/song exists locally to avoid FK violations.
+        insertOrIgnoreBySharedColumns(
+            db = db,
+            table = "playlist_song_map",
+            remoteSchema = remoteSchema,
+            sourceAlias = "remoteMap",
+            whereClause = """
+                EXISTS (
+                    SELECT 1
+                    FROM main.playlist localPlaylist
+                    WHERE localPlaylist.id = remoteMap.playlistId
+                )
+                AND EXISTS (
+                    SELECT 1
+                    FROM main.song localSong
+                    WHERE localSong.id = remoteMap.songId
+                )
+            """.trimIndent()
+        )
     }
 
     private fun mergeHistory(
@@ -218,7 +284,20 @@ class DatabaseMerger @Inject constructor(
             db = db,
             table = "song_album_map",
             remoteSchema = remoteSchema,
-            whereClause = "songId IN (SELECT DISTINCT songId FROM $remoteEventTable)"
+            sourceAlias = "remoteMap",
+            whereClause = """
+                remoteMap.songId IN (SELECT DISTINCT songId FROM $remoteEventTable)
+                AND EXISTS (
+                    SELECT 1
+                    FROM main.song localSong
+                    WHERE localSong.id = remoteMap.songId
+                )
+                AND EXISTS (
+                    SELECT 1
+                    FROM main.album localAlbum
+                    WHERE localAlbum.id = remoteMap.albumId
+                )
+            """.trimIndent()
         )
         
         // Insert events that don't exist locally.
@@ -361,6 +440,16 @@ class DatabaseMerger @Inject constructor(
         remoteSchema: String,
         remoteSongWhereClause: String,
     ) {
+        if (!hasTable(db, remoteSchema, "song_artist_map")) {
+            Timber.w("Skipping song_artist_map merge: remote table %s.song_artist_map not found", remoteSchema)
+            return
+        }
+
+        if (!hasTable(db, remoteSchema, "artist")) {
+            Timber.w("Skipping song_artist_map merge: remote table %s.artist not found", remoteSchema)
+            return
+        }
+
         val remoteSongArtistMapTable = "$remoteSchema.song_artist_map"
         val remoteSongTable = "$remoteSchema.song"
         val remoteArtistTable = "$remoteSchema.artist"
@@ -431,6 +520,15 @@ class DatabaseMerger @Inject constructor(
                     FROM main.song localSong
                     WHERE localSong.id = remoteMap.songId
               )
+              AND EXISTS (
+                    SELECT 1
+                    FROM main.artist localArtist
+                    WHERE localArtist.id = remoteMap.artistId
+                       OR (
+                            remoteArtist.id LIKE 'LA%'
+                            AND LOWER(TRIM(localArtist.name)) = LOWER(TRIM(remoteArtist.name))
+                       )
+              )
         """.trimIndent()
         db.execSQL(mergeSongArtistMapsQuery)
     }
@@ -476,6 +574,26 @@ class DatabaseMerger @Inject constructor(
         table: String,
         column: String,
     ): Boolean = tableColumns(db, schema, table).any { it == column }
+
+    private fun hasTable(
+        db: SupportSQLiteDatabase,
+        schema: String,
+        table: String,
+    ): Boolean = tableColumns(db, schema, table).isNotEmpty()
+
+    private inline fun runMergeStep(
+        step: String,
+        block: () -> Unit,
+    ) {
+        Timber.d("Merge step started: %s", step)
+        try {
+            block()
+            Timber.d("Merge step completed: %s", step)
+        } catch (error: Exception) {
+            Timber.e(error, "Merge step failed: %s", step)
+            throw error
+        }
+    }
 
     private fun tableColumns(
         db: SupportSQLiteDatabase,
