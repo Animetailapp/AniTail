@@ -33,6 +33,8 @@ import timber.log.Timber
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.OutputStream
 import java.util.zip.ZipEntry
 import javax.inject.Inject
 import kotlin.system.exitProcess
@@ -122,19 +124,8 @@ class BackupRestoreViewModel @Inject constructor(
     }
 
     private suspend fun backupToFile(context: Context, file: File) = withContext(Dispatchers.IO) {
-        FileOutputStream(file).use { fos ->
-            fos.buffered().zipOutputStream().use { outputStream ->
-                (context.filesDir / "datastore" / SETTINGS_FILENAME).inputStream().buffered()
-                    .use { inputStream ->
-                        outputStream.putNextEntry(ZipEntry(SETTINGS_FILENAME))
-                        inputStream.copyTo(outputStream)
-                    }
-                database.checkpoint()
-                FileInputStream(database.openHelper.writableDatabase.path).use { inputStream ->
-                    outputStream.putNextEntry(ZipEntry(InternalDatabase.DB_NAME))
-                    inputStream.copyTo(outputStream)
-                }
-            }
+        FileOutputStream(file).use { outputStream ->
+            writeBackupArchive(context, outputStream)
         }
     }
 
@@ -164,75 +155,39 @@ class BackupRestoreViewModel @Inject constructor(
             // Cancel any running sync before closing the database
             SyncWorker.cancel(context)
             MusicDatabase.isRestoring.set(true)
-            
-            FileInputStream(file).use { fis ->
-                fis.zipInputStream().use { inputStream ->
-                    var entry = tryOrNull { inputStream.nextEntry }
-                    while (entry != null) {
-                        when (entry.name) {
-                            SETTINGS_FILENAME -> {
-                                (context.filesDir / "datastore" / SETTINGS_FILENAME).outputStream()
-                                    .use { outputStream ->
-                                        inputStream.copyTo(outputStream)
-                                    }
-                            }
-
-                            InternalDatabase.DB_NAME -> {
-                                withContext(Dispatchers.IO) {
-                                    database.checkpoint()
-                                }
-                                database.close()
-                                FileOutputStream(database.openHelper.writableDatabase.path).use { outputStream ->
-                                    inputStream.copyTo(outputStream)
-                                }
-                            }
-                        }
-                        entry = tryOrNull { inputStream.nextEntry }
-                    }
+            withContext(Dispatchers.IO) {
+                FileInputStream(file).use { backupInput ->
+                    restoreFromBackupArchive(context, backupInput)
                 }
             }
-            context.stopService(Intent(context, MusicService::class.java))
-            context.filesDir.resolve(PERSISTENT_QUEUE_FILE).delete()
-            context.startActivity(Intent(context, MainActivity::class.java))
-            exitProcess(0)
+            restartAppAfterRestore(context)
         }.onFailure {
             reportException(it)
             Toast.makeText(context, R.string.restore_failed, Toast.LENGTH_SHORT).show()
         }
     }
+
+    suspend fun backupNow(context: Context, uri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            context.applicationContext.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                writeBackupArchive(context, outputStream)
+            } ?: throw IllegalStateException("Unable to open backup output stream for URI: $uri")
+        }
+    }
+
     fun backup(context: Context, uri: Uri, showToast: Boolean = true) {
-        viewModelScope.launch(Dispatchers.IO) {
-            runCatching {
-                context.applicationContext.contentResolver.openOutputStream(uri)?.use {
-                    it.buffered().zipOutputStream().use { outputStream ->
-                        (context.filesDir / "datastore" / SETTINGS_FILENAME).inputStream()
-                            .buffered()
-                            .use { inputStream ->
-                                outputStream.putNextEntry(ZipEntry(SETTINGS_FILENAME))
-                                inputStream.copyTo(outputStream)
-                            }
-                        database.checkpoint()
-                        FileInputStream(database.openHelper.writableDatabase.path).use { inputStream ->
-                            outputStream.putNextEntry(ZipEntry(InternalDatabase.DB_NAME))
-                            inputStream.copyTo(outputStream)
-                        }
-                    }
-                }
-            }.onSuccess {
+        viewModelScope.launch {
+            backupNow(context, uri).onSuccess {
                 if (showToast) {
-                    withContext(Dispatchers.Main) {
-                        // Only show the toast if requested (not from background worker)
-                        Toast.makeText(context, R.string.backup_create_success, Toast.LENGTH_SHORT)
-                            .show()
-                    }
+                    // Only show the toast if requested (not from background worker)
+                    Toast.makeText(context, R.string.backup_create_success, Toast.LENGTH_SHORT)
+                        .show()
                 }
             }.onFailure {
                 reportException(it)
                 if (showToast) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(context, R.string.backup_create_failed, Toast.LENGTH_SHORT)
-                            .show()
-                    }
+                    Toast.makeText(context, R.string.backup_create_failed, Toast.LENGTH_SHORT)
+                        .show()
                 }
             }
         }
@@ -245,34 +200,10 @@ class BackupRestoreViewModel @Inject constructor(
                 SyncWorker.cancel(context)
                 MusicDatabase.isRestoring.set(true)
 
-                context.applicationContext.contentResolver.openInputStream(uri)?.use {
-                    it.zipInputStream().use { inputStream ->
-                        var entry = tryOrNull { inputStream.nextEntry } // prevent ZipException
-                        while (entry != null) {
-                            when (entry.name) {
-                                SETTINGS_FILENAME -> {
-                                    (context.filesDir / "datastore" / SETTINGS_FILENAME).outputStream()
-                                        .use { outputStream ->
-                                            inputStream.copyTo(outputStream)
-                                        }
-                                }
-
-                                InternalDatabase.DB_NAME -> {
-                                    database.checkpoint()
-                                    database.close()
-                                    FileOutputStream(database.openHelper.writableDatabase.path).use { outputStream ->
-                                        inputStream.copyTo(outputStream)
-                                    }
-                                }
-                            }
-                            entry = tryOrNull { inputStream.nextEntry } // prevent ZipException
-                        }
-                    }
-                }
-                context.stopService(Intent(context, MusicService::class.java))
-                context.filesDir.resolve(PERSISTENT_QUEUE_FILE).delete()
-                context.startActivity(Intent(context, MainActivity::class.java))
-                exitProcess(0)
+                context.applicationContext.contentResolver.openInputStream(uri)?.use { backupInput ->
+                    restoreFromBackupArchive(context, backupInput)
+                } ?: throw IllegalStateException("Unable to open backup input stream for URI: $uri")
+                restartAppAfterRestore(context)
             }.onFailure {
                 reportException(it)
                 withContext(Dispatchers.Main) {
@@ -280,6 +211,94 @@ class BackupRestoreViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun writeBackupArchive(context: Context, rawOutputStream: OutputStream) {
+        rawOutputStream.buffered().zipOutputStream().use { outputStream ->
+            (context.filesDir / "datastore" / SETTINGS_FILENAME).inputStream().buffered()
+                .use { inputStream ->
+                    outputStream.putNextEntry(ZipEntry(SETTINGS_FILENAME))
+                    inputStream.copyTo(outputStream)
+                    outputStream.closeEntry()
+                }
+
+            database.checkpoint()
+            val dbPath = database.openHelper.writableDatabase.path
+            val databaseFiles = listOf(
+                File(dbPath),
+                File("$dbPath-wal"),
+                File("$dbPath-shm")
+            )
+
+            databaseFiles.forEach { dbFile ->
+                if (!dbFile.exists()) return@forEach
+                FileInputStream(dbFile).use { inputStream ->
+                    outputStream.putNextEntry(ZipEntry(dbFile.name))
+                    inputStream.copyTo(outputStream)
+                    outputStream.closeEntry()
+                }
+            }
+        }
+    }
+
+    private fun restoreFromBackupArchive(context: Context, rawInputStream: InputStream) {
+        val dbPath = database.openHelper.writableDatabase.path
+        val databaseFile = File(dbPath)
+        val walFile = File("$dbPath-wal")
+        val shmFile = File("$dbPath-shm")
+
+        database.checkpoint()
+        database.close()
+        walFile.delete()
+        shmFile.delete()
+
+        var restoredDatabase = false
+
+        rawInputStream.zipInputStream().use { inputStream ->
+            var entry = tryOrNull { inputStream.nextEntry } // prevent ZipException
+            while (entry != null) {
+                when (entry.name) {
+                    SETTINGS_FILENAME -> {
+                        val settingsFile = context.filesDir / "datastore" / SETTINGS_FILENAME
+                        settingsFile.parentFile?.mkdirs()
+                        settingsFile.outputStream().use { outputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
+                    }
+
+                    InternalDatabase.DB_NAME -> {
+                        FileOutputStream(databaseFile).use { outputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
+                        restoredDatabase = true
+                    }
+
+                    InternalDatabase.DB_WAL_NAME -> {
+                        FileOutputStream(walFile).use { outputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
+                    }
+
+                    InternalDatabase.DB_SHM_NAME -> {
+                        FileOutputStream(shmFile).use { outputStream ->
+                            inputStream.copyTo(outputStream)
+                        }
+                    }
+                }
+                entry = tryOrNull { inputStream.nextEntry } // prevent ZipException
+            }
+        }
+
+        if (!restoredDatabase) {
+            throw IllegalStateException("Backup archive is missing ${InternalDatabase.DB_NAME}")
+        }
+    }
+
+    private fun restartAppAfterRestore(context: Context) {
+        context.stopService(Intent(context, MusicService::class.java))
+        context.filesDir.resolve(PERSISTENT_QUEUE_FILE).delete()
+        context.startActivity(Intent(context, MainActivity::class.java))
+        exitProcess(0)
     }
 
     fun importPlaylistFromCsv(context: Context, uri: Uri): ArrayList<Song> {

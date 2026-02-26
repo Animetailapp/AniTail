@@ -542,7 +542,15 @@ class AutoBackupWorker @AssistedInject constructor(
             val backupFile = File(backupDir, "AniTail_AutoBackup_$timestamp.backup")
 
             // Create the backup file
-            createBackup(Uri.fromFile(backupFile))
+            val backupResult = createBackup(Uri.fromFile(backupFile))
+            if (backupResult.isFailure) {
+                Timber.e(backupResult.exceptionOrNull(), "Auto backup file creation failed")
+                showNotification(
+                    title = context.getString(R.string.backup_create_failed),
+                    message = context.getString(R.string.error_unknown)
+                )
+                return@withContext Result.retry()
+            }
 
             // Upload to Drive if signed in
             if (googleDriveSyncManager.isSignedIn()) {
@@ -637,7 +645,11 @@ class AutoBackupWorker @AssistedInject constructor(
             }
 
             // Create the backup file at the custom location
-            createBackup(documentUri)
+            val backupResult = createBackup(documentUri)
+            if (backupResult.isFailure) {
+                Timber.e(backupResult.exceptionOrNull(), "Custom location backup file creation failed")
+                return@withContext Result.failure()
+            }
 
             // Upload to Drive if signed in
             if (googleDriveSyncManager.isSignedIn()) {
@@ -669,7 +681,7 @@ class AutoBackupWorker @AssistedInject constructor(
             return@withContext Result.failure()
         }
     }
-    private fun createBackup(uri: Uri) {
+    private suspend fun createBackup(uri: Uri): Result<Unit> {
         val viewModel = BackupRestoreViewModel(
             database,
             googleDriveSyncManager,
@@ -677,7 +689,7 @@ class AutoBackupWorker @AssistedInject constructor(
             syncUtils,
             context
         )
-        viewModel.backup(context, uri, showToast = false)
+        return viewModel.backupNow(context, uri)
     }
 
     private fun cleanupOldBackups(backupDir: File) {
