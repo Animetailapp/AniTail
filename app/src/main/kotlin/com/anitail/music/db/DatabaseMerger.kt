@@ -86,16 +86,14 @@ class DatabaseMerger @Inject constructor(
                 currentDb.setTransactionSuccessful()
                 Timber.d("Database merge completed successfully")
             } finally {
-                runCatching {
-                    detachDatabaseIfAttached(currentDb, remoteSchema)
-                }.onFailure { detachError ->
-                    Timber.w(detachError, "Failed to detach %s before endTransaction", remoteSchema)
-                }
-                currentDb.endTransaction()
-                runCatching {
-                    detachDatabaseIfAttached(currentDb, remoteSchema)
-                }.onFailure { detachError ->
-                    Timber.w(detachError, "Failed to detach %s after endTransaction", remoteSchema)
+                try {
+                    currentDb.endTransaction()
+                } finally {
+                    runCatching {
+                        detachDatabaseIfAttached(currentDb, remoteSchema)
+                    }.onFailure { detachError ->
+                        Timber.w(detachError, "Failed to detach %s after endTransaction", remoteSchema)
+                    }
                 }
             }
 
@@ -279,32 +277,38 @@ class DatabaseMerger @Inject constructor(
         // Preserve bookmarked state from remote artists, including LA* name matches.
         val updateBookmarkedQuery = """
             UPDATE artist
-            SET bookmarkedAt = (
-                SELECT remoteArtist.bookmarkedAt
-                FROM $remoteArtistTable remoteArtist
-                WHERE remoteArtist.bookmarkedAt IS NOT NULL
-                  AND (
-                        remoteArtist.id = main.artist.id
-                        OR (
-                            remoteArtist.id LIKE 'LA%'
-                            AND LOWER(TRIM(remoteArtist.name)) = LOWER(TRIM(main.artist.name))
-                        )
-                  )
-                ORDER BY CASE WHEN remoteArtist.id = main.artist.id THEN 0 ELSE 1 END
-                LIMIT 1
-            )
-            WHERE bookmarkedAt IS NULL
-              AND EXISTS (
-                    SELECT 1
+            SET bookmarkedAt = COALESCE(
+                (
+                    SELECT remoteArtist.bookmarkedAt
                     FROM $remoteArtistTable remoteArtist
                     WHERE remoteArtist.bookmarkedAt IS NOT NULL
-                      AND (
-                            remoteArtist.id = main.artist.id
-                            OR (
-                                remoteArtist.id LIKE 'LA%'
-                                AND LOWER(TRIM(remoteArtist.name)) = LOWER(TRIM(main.artist.name))
-                            )
-                      )
+                      AND remoteArtist.id = artist.id
+                    LIMIT 1
+                ),
+                (
+                    SELECT remoteArtist.bookmarkedAt
+                    FROM $remoteArtistTable remoteArtist
+                    WHERE remoteArtist.bookmarkedAt IS NOT NULL
+                      AND remoteArtist.id LIKE 'LA%'
+                      AND LOWER(TRIM(remoteArtist.name)) = LOWER(TRIM(artist.name))
+                    LIMIT 1
+                )
+            )
+            WHERE bookmarkedAt IS NULL
+              AND (
+                    EXISTS (
+                        SELECT 1
+                        FROM $remoteArtistTable remoteArtist
+                        WHERE remoteArtist.bookmarkedAt IS NOT NULL
+                          AND remoteArtist.id = artist.id
+                    )
+                    OR EXISTS (
+                        SELECT 1
+                        FROM $remoteArtistTable remoteArtist
+                        WHERE remoteArtist.bookmarkedAt IS NOT NULL
+                          AND remoteArtist.id LIKE 'LA%'
+                          AND LOWER(TRIM(remoteArtist.name)) = LOWER(TRIM(artist.name))
+                    )
               )
         """.trimIndent()
         db.execSQL(updateBookmarkedQuery)
