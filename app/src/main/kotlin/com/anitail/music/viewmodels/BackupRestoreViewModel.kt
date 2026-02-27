@@ -223,7 +223,7 @@ class BackupRestoreViewModel @Inject constructor(
                 }
 
             database.checkpoint()
-            val dbPath = database.openHelper.writableDatabase.path
+            val dbPath = requireDatabasePath()
             val databaseFiles = listOf(
                 File(dbPath),
                 File("$dbPath-wal"),
@@ -242,7 +242,7 @@ class BackupRestoreViewModel @Inject constructor(
     }
 
     private fun restoreFromBackupArchive(context: Context, rawInputStream: InputStream) {
-        val dbPath = database.openHelper.writableDatabase.path
+        val dbPath = requireDatabasePath()
         val databaseFile = File(dbPath)
         val walFile = File("$dbPath-wal")
         val shmFile = File("$dbPath-shm")
@@ -292,6 +292,11 @@ class BackupRestoreViewModel @Inject constructor(
         if (!restoredDatabase) {
             throw IllegalStateException("Backup archive is missing ${InternalDatabase.DB_NAME}")
         }
+    }
+
+    private fun requireDatabasePath(): String {
+        return database.openHelper.writableDatabase.path
+            ?: throw IllegalStateException("Database path is unavailable")
     }
 
     private fun restartAppAfterRestore(context: Context) {
