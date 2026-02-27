@@ -612,9 +612,9 @@ class DatabaseMerger @Inject constructor(
 
     private fun buildRemoteSchemaName(): String {
         val now = System.currentTimeMillis()
-        val threadId = Thread.currentThread().id
+        val threadToken = System.identityHashCode(Thread.currentThread()).toUInt().toString(16)
         val nonce = (System.nanoTime() and 0xFFFF).toString()
-        return "${REMOTE_SCHEMA_PREFIX}${threadId}_${now}_$nonce"
+        return "${REMOTE_SCHEMA_PREFIX}${threadToken}_${now}_$nonce"
     }
 
     private fun isDatabaseAttached(

@@ -16,6 +16,8 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.anitail.shazamkit.Shazam
 import com.anitail.shazamkit.models.RecognitionStatus
@@ -181,6 +183,7 @@ object MusicRecognitionService {
             message.contains("hostname aware", ignoreCase = true)
     }
 
+    @RequiresApi(Build.VERSION_CODES.CUPCAKE)
     @SuppressLint("MissingPermission")
     private suspend fun recordAudio(): ByteArray = withContext(Dispatchers.IO) {
         val bufferSize = AudioRecord.getMinBufferSize(
