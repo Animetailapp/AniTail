@@ -18,14 +18,25 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import org.json.JSONObject
+import timber.log.Timber
+import java.io.File
 
 
 object Updater {
     private val client = HttpClient()
     var lastCheckTime = -1L
         private set
-    
-    private var downloadID: Long = -1
+
+    private const val UPDATE_DIRECTORY_PATH = "AniTail/apk"
+    private const val UPDATE_FILE_NAME = "AniTail_update.apk"
+
+    @Volatile
+    private var activeDownloadId: Long = -1L
+
+    @Volatile
+    private var activeDownloadUrl: String? = null
+
+    private var downloadCompleteReceiver: BroadcastReceiver? = null
     
     data class ReleaseInfo(
         val versionName: String,
@@ -96,35 +107,87 @@ object Updater {
         return lastCheck == -1L || System.currentTimeMillis() - lastCheck > frequency.toMillis()
     }
     
-     fun downloadUpdate(context: Context, downloadUrl: String): Long {
-
-         val fileName = "AniTail_update.apk"
-         val dirPath = "AniTail/apk"
-         val file = java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), dirPath)
-
-        if (!file.exists()) {
-            file.mkdirs()
-        }
-        
-        val request = DownloadManager.Request(downloadUrl.toUri())
-            .setTitle(context.getString(R.string.update_notification_title))
-            .setDescription(context.getString(R.string.update_notification_description))
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "$dirPath/$fileName")
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(true)
-        
-        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        downloadID = downloadManager.enqueue(request)
-        
-        // Register a receiver to install the update once download completes
-        val onComplete = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
-                if (id == downloadID) {
-                    installUpdate(context, fileName)
-                    context.unregisterReceiver(this)
+    fun downloadUpdate(context: Context, downloadUrl: String): Long {
+        val appContext = context.applicationContext
+        val downloadManager = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        synchronized(this) {
+            val previousDownloadId = activeDownloadId
+            if (previousDownloadId != -1L) {
+                val previousStatus = getDownloadStatus(downloadManager, previousDownloadId)
+                if (previousStatus != null && isDownloadInProgress(previousStatus) && activeDownloadUrl == downloadUrl) {
+                    Timber.i(
+                        "Update download already in progress (id=%d), skipping duplicate request",
+                        previousDownloadId
+                    )
+                    return previousDownloadId
                 }
+                unregisterDownloadCompleteReceiver(appContext)
+                removeDownload(downloadManager, previousDownloadId)
+                activeDownloadId = -1L
+                activeDownloadUrl = null
+            }
+
+            if (!ensureUpdateDirectoryExists()) {
+                Timber.e("Unable to create update directory")
+                return -1L
+            }
+
+            val apkFile = getUpdateApkFile()
+            if (apkFile.exists() && !apkFile.delete()) {
+                Timber.e("Unable to delete old update APK: %s", apkFile.absolutePath)
+                return -1L
+            }
+
+            val request = DownloadManager.Request(downloadUrl.toUri())
+                .setTitle(context.getString(R.string.update_notification_title))
+                .setDescription(context.getString(R.string.update_notification_description))
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(
+                    Environment.DIRECTORY_DOWNLOADS,
+                    "$UPDATE_DIRECTORY_PATH/$UPDATE_FILE_NAME"
+                )
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(true)
+
+            val downloadId = downloadManager.enqueue(request)
+            activeDownloadId = downloadId
+            activeDownloadUrl = downloadUrl
+            registerDownloadCompleteReceiver(appContext, downloadManager, downloadId)
+            return downloadId
+        }
+    }
+
+    private fun registerDownloadCompleteReceiver(
+        context: Context,
+        downloadManager: DownloadManager,
+        expectedDownloadId: Long
+    ) {
+        val onComplete = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context, intent: Intent) {
+                val completedDownloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+                if (completedDownloadId != expectedDownloadId) {
+                    return
+                }
+
+                val status = getDownloadStatus(downloadManager, expectedDownloadId)
+                if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                    installUpdate(receiverContext, UPDATE_FILE_NAME)
+                } else {
+                    Timber.w(
+                        "Update download %d finished with status=%s. Installation skipped.",
+                        expectedDownloadId,
+                        status
+                    )
+                }
+
+                synchronized(this@Updater) {
+                    if (activeDownloadId == expectedDownloadId) {
+                        activeDownloadId = -1L
+                        activeDownloadUrl = null
+                    }
+                }
+
+                unregisterDownloadCompleteReceiver(context)
             }
         }
 
@@ -134,9 +197,69 @@ object Updater {
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
             ContextCompat.RECEIVER_EXPORTED
         )
-        return downloadID
+        synchronized(this) {
+            downloadCompleteReceiver = onComplete
+        }
     }
-      private fun installUpdate(context: Context, fileName: String) {
+
+    private fun unregisterDownloadCompleteReceiver(context: Context) {
+        val receiver = synchronized(this) {
+            val currentReceiver = downloadCompleteReceiver
+            downloadCompleteReceiver = null
+            currentReceiver
+        } ?: return
+
+        runCatching {
+            context.unregisterReceiver(receiver)
+        }.onFailure {
+            Timber.w(it, "Failed to unregister update download receiver")
+        }
+    }
+
+    private fun ensureUpdateDirectoryExists(): Boolean {
+        val updateDirectory =
+            File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                UPDATE_DIRECTORY_PATH
+            )
+        return updateDirectory.exists() || updateDirectory.mkdirs()
+    }
+
+    private fun getUpdateApkFile(): File =
+        File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "$UPDATE_DIRECTORY_PATH/$UPDATE_FILE_NAME"
+        )
+
+    private fun removeDownload(downloadManager: DownloadManager, downloadId: Long) {
+        runCatching {
+            downloadManager.remove(downloadId)
+        }.onFailure {
+            Timber.w(it, "Failed to remove download id=%d", downloadId)
+        }
+    }
+
+    private fun getDownloadStatus(downloadManager: DownloadManager, downloadId: Long): Int? {
+        val query = DownloadManager.Query().setFilterById(downloadId)
+        downloadManager.query(query)?.use { cursor ->
+            if (!cursor.moveToFirst()) {
+                return null
+            }
+            val statusColumn = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+            if (statusColumn < 0) {
+                return null
+            }
+            return cursor.getInt(statusColumn)
+        }
+        return null
+    }
+
+    private fun isDownloadInProgress(status: Int): Boolean =
+        status == DownloadManager.STATUS_PENDING ||
+            status == DownloadManager.STATUS_RUNNING ||
+            status == DownloadManager.STATUS_PAUSED
+
+    private fun installUpdate(context: Context, fileName: String) {
         // Launch the installer activity to handle the APK installation prompt
         val intent = Intent(context, Class.forName("com.anitail.music.installer.UpdateInstallerActivity"))
         intent.putExtra("extra_file_name", "AniTail/apk/$fileName")
