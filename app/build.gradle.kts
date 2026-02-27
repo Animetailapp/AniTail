@@ -14,7 +14,6 @@ plugins {
 android {
     namespace = "com.anitail.music"
     compileSdk = 36
-    ndkVersion = "27.0.12077973"
     defaultConfig {
         applicationId = "com.anitail.music"
         minSdk = 23
@@ -40,46 +39,25 @@ android {
             
         buildConfigField("String", "LASTFM_API_KEY", "\"$lastfmApiKey\"")
         buildConfigField("String", "LASTFM_API_SECRET", "\"$lastfmApiSecret\"")
-        
-        // NDK configuration for vibra_fp library
-        ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
-        }
-    }
-    // Native vibrafp build is optional. Enable by passing -PenableVibrafp=true
-    val enableVibrafp = (project.findProperty("enableVibrafp") as? String)?.toBoolean() ?: false
-    externalNativeBuild {
-        cmake {
-            path("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
-        }
-    }
 
+    }
+    val enableVibrafp = (project.findProperty("enableVibrafp") as? String)?.toBoolean() ?: false
     flavorDimensions += "abi"
     productFlavors {
         create("universal") {
             dimension = "abi"
-            ndk {
-                abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
-            }
             buildConfigField("String", "ARCHITECTURE", "\"universal\"")
         }
         create("arm64") {
             dimension = "abi"
-            //noinspection ChromeOsAbiSupport
-            ndk { abiFilters += "arm64-v8a" }
             buildConfigField("String", "ARCHITECTURE", "\"arm64\"")
         }
         create("armeabi") {
             dimension = "abi"
-            //noinspection ChromeOsAbiSupport
-            ndk { abiFilters += "armeabi-v7a" }
             buildConfigField("String", "ARCHITECTURE", "\"armeabi\"")
         }
         create("x86") {
             dimension = "abi"
-            //noinspection ChromeOsAbiSupport
-            ndk { abiFilters += "x86" }
             buildConfigField("String", "ARCHITECTURE", "\"x86\"")
         }
         create("x86_64") {
@@ -118,20 +96,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            if (enableVibrafp) {
-                externalNativeBuild {
-                    cmake {
-                        arguments += listOf(
-                            "-DENABLE_VIBRAFP=ON",
-                            "-DENABLE_LTO=ON",
-                            "-DCMAKE_BUILD_TYPE=Release"
-                        )
-                    }
-                }
-            }
-            ndk {
-                debugSymbolLevel = "NONE"
-            }
         }
         debug {
             applicationIdSuffix = ".debug"
