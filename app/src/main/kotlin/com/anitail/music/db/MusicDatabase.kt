@@ -143,6 +143,8 @@ abstract class InternalDatabase : RoomDatabase() {
 
     companion object {
         const val DB_NAME = "song.db"
+        const val DB_WAL_NAME = "$DB_NAME-wal"
+        const val DB_SHM_NAME = "$DB_NAME-shm"
 
         fun newInstance(context: Context): MusicDatabase =
             MusicDatabase(

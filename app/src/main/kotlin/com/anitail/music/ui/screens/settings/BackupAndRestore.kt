@@ -121,13 +121,31 @@ fun BackupAndRestore(
     
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-      val backupLauncher =
+    val backupLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
             if (uri != null) {
-                viewModel.backup(context, uri)
-                // Iniciar carga a filebin.net solo si está habilitado
-                if (enableBackupUpload) {
-                    coroutineScope.launch {
+                coroutineScope.launch {
+                    val backupResult = viewModel.backupNow(context, uri)
+                    backupResult.onSuccess {
+                        android.widget.Toast.makeText(
+                            context,
+                            R.string.backup_create_success,
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }.onFailure {
+                        android.widget.Toast.makeText(
+                            context,
+                            R.string.backup_create_failed,
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+
+                    // Iniciar carga a filebin.net solo si está habilitado y el backup se creó correctamente
+                    if (!enableBackupUpload || backupResult.isFailure) {
+                        return@launch
+                    }
+
+                    try {
                         uploadStatus = UploadStatus.Uploading
                         uploadProgress = 0f
                         val fileUrl = uploadBackupToFilebin(context, uri) { progress ->
@@ -138,6 +156,8 @@ fun BackupAndRestore(
                         } else {
                             UploadStatus.Failure
                         }
+                    } catch (_: Exception) {
+                        uploadStatus = UploadStatus.Failure
                     }
                 }
             }
