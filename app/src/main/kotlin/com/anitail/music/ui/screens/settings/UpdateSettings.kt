@@ -320,6 +320,7 @@ fun UpdateSettings(
                         }
                     }
                 },
+                enabled = !isChecking,
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.medium,
                 contentPadding = PaddingValues(vertical = 12.dp)
