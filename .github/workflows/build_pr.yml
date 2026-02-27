@@ -46,7 +46,7 @@ jobs:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
 
       - name: Upload APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: app-universal-debug
           path: app/build/outputs/apk/universal/debug/*.apk
@@ -223,7 +223,7 @@ jobs:
             "$APPDIR" "desktop/build/compose/binaries/main-release/${APP_NAME}-x86_64.AppImage"
 
       - name: Upload Desktop Release Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
           path: desktop/build/compose/binaries/**
