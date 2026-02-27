@@ -84,7 +84,23 @@ class AutoBackupWorker @AssistedInject constructor(
                 ) == PackageManager.PERMISSION_GRANTED
                 readPermission && writePermission
             }
-        }        /**
+        }
+
+        private fun defaultBackupDirectory(context: Context): File {
+            if (hasStoragePermission(context)) {
+                return File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    BACKUP_FOLDER_NAME
+                )
+            }
+
+            // Fallback for Android scoped storage when broad storage permission is unavailable.
+            val appExternalBase = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+            val fallbackBase = appExternalBase ?: context.filesDir
+            return File(fallbackBase, BACKUP_FOLDER_NAME)
+        }
+
+        /**
          * Schedule automatic backups. Will intelligently decide whether an immediate backup
          * should be performed based on when the last backup was made.
          */
@@ -108,10 +124,10 @@ class AutoBackupWorker @AssistedInject constructor(
                 return false
             }
 
-            // Check for storage permissions
+            // We can still schedule and backup without broad storage permissions
+            // by using an app-specific fallback directory.
             if (!hasStoragePermission(context)) {
-                Timber.w("Storage permissions not granted, cannot schedule auto backup")
-                return false
+                Timber.w("Storage permissions not granted, using app-specific backup directory")
             }
 
             // Get frequency from preferences (default to daily)
@@ -124,10 +140,7 @@ class AutoBackupWorker @AssistedInject constructor(
 
             if (!useCustomLocation) {
                 try {
-                    backupDir = File(
-                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                        BACKUP_FOLDER_NAME
-                    )
+                    backupDir = defaultBackupDirectory(context)
                     if (!backupDir.exists()) {
                         backupDir.mkdirs()
                     }
@@ -274,7 +287,7 @@ class AutoBackupWorker @AssistedInject constructor(
             sb.append("Storage permissions granted: $hasPermission\n")
 
             if (!hasPermission) {
-                sb.append("Storage permissions required for backup to work.\n")
+                sb.append("Using app-specific backup directory (scoped storage fallback).\n")
             }
 
             // Check backup settings
@@ -314,10 +327,7 @@ class AutoBackupWorker @AssistedInject constructor(
                 }
             } else {
                 // Check default location
-                val backupDir = File(
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                    BACKUP_FOLDER_NAME
-                )
+                val backupDir = defaultBackupDirectory(context)
                 sb.append("Default backup directory: ${backupDir.absolutePath}\n")
                 sb.append("Directory exists: ${backupDir.exists()}\n")
                 sb.append("Directory is writable: ${backupDir.canWrite()}\n")
@@ -357,9 +367,8 @@ class AutoBackupWorker @AssistedInject constructor(
 
             // Get status of scheduled work
             try {
-                val workInfoLiveData = workManager.getWorkInfosForUniqueWorkLiveData(AUTO_BACKUP_WORK_NAME)
-                val workInfos = workInfoLiveData.value
-                if (workInfos != null && workInfos.isNotEmpty()) {
+                val workInfos = workManager.getWorkInfosForUniqueWork(AUTO_BACKUP_WORK_NAME).get()
+                if (workInfos.isNotEmpty()) {
                     val workInfo = workInfos.firstOrNull()
                     sb.append("Scheduled work status: ${workInfo?.state}\n")
 
@@ -415,21 +424,14 @@ class AutoBackupWorker @AssistedInject constructor(
                 Timber.w("Auto backup is disabled in settings, cancelling work")
                 return Result.success() // Return success to avoid retries
             }
-              // Check storage permissions first
+
+            // Run with a fallback directory when broad storage permission is unavailable.
             if (!hasStoragePermission(context)) {
-                Timber.e("Storage permissions not granted, cannot perform backup")
-                showNotification(
-                    title = context.getString(R.string.backup_permission_error),
-                    message = context.getString(R.string.storage_permissions_required)
-                )
-                return Result.failure()
+                Timber.w("Storage permissions not granted, using app-specific backup directory")
             }
 
             // Check if there's a recent backup to prevent duplicate backups
-            val backupDir = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                BACKUP_FOLDER_NAME
-            )
+            val backupDir = defaultBackupDirectory(context)
             if (backupDir.exists()) {
                 val backupFiles = backupDir.listFiles { file ->
                     file.isFile && file.name.endsWith(".backup")
@@ -513,11 +515,8 @@ class AutoBackupWorker @AssistedInject constructor(
 
     private suspend fun createBackupToInternalStorage(): Result = withContext(Dispatchers.IO) {
         try {
-            // Create backup directory: Downloads/AniTail/AutoBackup
-            val backupDir = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                BACKUP_FOLDER_NAME
-            )
+            // Default backup location with scoped-storage fallback if needed.
+            val backupDir = defaultBackupDirectory(context)
 
             // Ensure the directory exists
             if (!backupDir.exists()) {
@@ -530,13 +529,15 @@ class AutoBackupWorker @AssistedInject constructor(
 
             // Verify we have write access
             if (!backupDir.canWrite()) {
-                Timber.e("No write permission for backup directory")
+                Timber.e("No write permission for backup directory: ${backupDir.absolutePath}")
                 showNotification(
-                    title = context.getString(R.string.backup_permission_error),
-                    message = context.getString(R.string.storage_permissions_required)
+                    title = context.getString(R.string.backup_create_failed),
+                    message = context.getString(R.string.error_unknown)
                 )
                 return@withContext Result.failure()
-            }            // Generate backup file name with timestamp
+            }
+
+            // Generate backup file name with timestamp
             val formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
             val timestamp = LocalDateTime.now().format(formatter)
             val backupFile = File(backupDir, "AniTail_AutoBackup_$timestamp.backup")
@@ -573,7 +574,9 @@ class AutoBackupWorker @AssistedInject constructor(
             }
 
             // Clean up old backups
-            cleanupOldBackups(backupDir)            // Show success notification
+            cleanupOldBackups(backupDir)
+
+            // Show success notification
             showNotification(
                 title = context.getString(R.string.backup_create_success),
                 message = backupFile.name
