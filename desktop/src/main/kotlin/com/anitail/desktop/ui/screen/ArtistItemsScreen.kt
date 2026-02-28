@@ -74,7 +74,9 @@ import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.Artist
 import com.anitail.innertube.models.ArtistItem
 import com.anitail.innertube.models.BrowseEndpoint
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.PodcastItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.innertube.models.YTItem
@@ -720,6 +722,8 @@ fun ArtistItemsScreen(
                                     )
                                 }
                             }
+                            is EpisodeItem -> {}
+                            is PodcastItem -> {}
                         }
 
                         BrowseGridItem(
@@ -741,8 +745,17 @@ fun ArtistItemsScreen(
                                             playerState.play(libraryItem)
                                         }
                                     }
+                                    is EpisodeItem -> {
+                                        val episodeItem = songItemToLibraryItem(item.asSongItem())
+                                        if (isActive) {
+                                            playerState.togglePlayPause()
+                                        } else {
+                                            playerState.play(episodeItem)
+                                        }
+                                    }
                                     is AlbumItem -> onOpenAlbum(item.browseId, item.title)
                                     is PlaylistItem -> onOpenPlaylist(item.id, item.title)
+                                    is PodcastItem -> onOpenPlaylist(item.id, item.title)
                                     is ArtistItem -> onOpenArtist(item.id, item.title)
                                 }
                             },

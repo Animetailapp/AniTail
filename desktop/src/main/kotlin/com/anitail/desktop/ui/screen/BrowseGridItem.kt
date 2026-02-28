@@ -286,6 +286,6 @@ fun YTItem.toBrowseLibraryItem(): LibraryItem {
         artist = artistName,
         artworkUrl = thumbnail,
         playbackUrl = shareLink,
-        durationMs = if (this is SongItem) duration?.times(1000L)?.toLong() else null,
+        durationMs = if (this is SongItem) duration?.times(1000L) else null,
     )
 }

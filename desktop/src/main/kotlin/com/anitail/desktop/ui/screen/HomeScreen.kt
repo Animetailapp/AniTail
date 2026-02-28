@@ -268,8 +268,7 @@ fun HomeScreen(
                         pendingArtists = artistCandidates
                     }
                     !libraryArtistId.isNullOrBlank() -> {
-                        val artistId = libraryArtistId ?: return@openArtist
-                        onOpenArtist(artistId, songEntity?.artistName)
+                        onOpenArtist(libraryArtistId, songEntity.artistName)
                     }
                 }
             },
@@ -280,8 +279,7 @@ fun HomeScreen(
                         onOpenAlbum(albumId, songItem.album?.name)
                     }
                     !songEntity?.albumId.isNullOrBlank() -> {
-                        val albumId = songEntity.albumId ?: return@openAlbum
-                        onOpenAlbum(albumId, songEntity.albumName)
+                        onOpenAlbum(songEntity.albumId, songEntity.albumName)
                     }
                 }
             },
@@ -487,17 +485,16 @@ fun HomeScreen(
                         } else null,
                         onClick = section.endpoint?.let { endpoint -> 
                             { 
-                                endpoint.browseId?.let { id ->
-                                    if (id == "FEmusic_moods_and_genres") onNavigate("moods_and_genres")
-                                    else if (id == "FEmusic_charts") onNavigate("charts")
-                                    else onNavigate("browse/$id")
-                                }
+                                val id = endpoint.browseId
+                                if (id == "FEmusic_moods_and_genres") onNavigate("moods_and_genres")
+                                else if (id == "FEmusic_charts") onNavigate("charts")
+                                else onNavigate("browse/$id")
                             } 
                         }
                     )
                 }
                 item {
-                    val isGrid = section.title?.equals("Quick picks", ignoreCase = true) == true
+                    val isGrid = section.title.equals("Quick picks", ignoreCase = true)
                     if (isGrid) {
                         val libraryItems = section.items.mapNotNull { it.toLibraryItem() }
                         val songItemsById = section.items.filterIsInstance<SongItem>().associateBy { it.id }
@@ -695,7 +692,7 @@ private fun HomeItemCard(
     val isArtist = item is ArtistItem
     val shape = if (isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
     val (title, subtitle) = when (item) {
-        is SongItem -> item.title to item.artists?.joinToString { it.name }.orEmpty()
+        is SongItem -> item.title to item.artists.joinToString { it.name }
         is AlbumItem -> item.title to item.artists?.joinToString { it.name }.orEmpty()
         is ArtistItem -> item.title to stringResource("artist")
         is PlaylistItem -> item.title to item.author?.name.orEmpty()
@@ -943,7 +940,7 @@ private fun YTItem.toLibraryItem(): LibraryItem? {
         is SongItem -> LibraryItem(
             id = id,
             title = title,
-            artist = artists?.joinToString { it.name }.orEmpty(),
+            artist = artists.joinToString { it.name },
             artworkUrl = thumbnail,
             playbackUrl = "https://music.youtube.com/watch?v=${id}",
             durationMs = duration?.toLong()?.times(1000L),
@@ -972,15 +969,6 @@ private fun YTItem.toLibraryItem(): LibraryItem? {
         else -> null
     }
 }
-
-private val YTItem.thumbnail: String?
-    get() = when (this) {
-        is SongItem -> thumbnail
-        is AlbumItem -> thumbnail
-        is ArtistItem -> thumbnail
-        is PlaylistItem -> thumbnail
-        else -> null
-    }
 
 data class DownloadMenuState(
     val label: String,

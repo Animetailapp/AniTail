@@ -37,6 +37,7 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -88,7 +89,6 @@ import com.anitail.desktop.update.DesktopUpdateBackgroundScheduler
 import com.anitail.desktop.update.DesktopUpdateInstaller
 import com.anitail.desktop.update.DesktopUpdater
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -130,6 +130,7 @@ import com.anitail.innertube.pages.ExplorePage
 import com.anitail.innertube.pages.HomePage
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.shared.model.LibraryItem
+import java.net.URI
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -141,7 +142,6 @@ import org.jetbrains.skia.Image
 import com.anitail.desktop.sync.LibrarySyncService
 import java.net.InetSocketAddress
 import java.net.Proxy
-import java.net.URL
 import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.rememberWindowState
@@ -2266,8 +2266,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
 }
 
 private suspend fun fetchThemeColorFromUrl(url: String): Color? = withContext(Dispatchers.IO) {
-    val bytes = runCatching { URL(url).readBytes() }.getOrNull() ?: return@withContext null
-    val bitmap = runCatching { Image.makeFromEncoded(bytes).asImageBitmap() }.getOrNull()
+    val bytes = runCatching { URI(url).toURL().readBytes() }.getOrNull() ?: return@withContext null
+    val bitmap = runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
         ?: return@withContext null
     runCatching { bitmap.extractThemeColor() }.getOrNull()
 }
@@ -2380,7 +2380,7 @@ private fun itemToLibraryItem(item: YTItem): LibraryItem? {
         is SongItem -> LibraryItem(
             id = item.id,
             title = item.title,
-            artist = item.artists?.joinToString { it.name }.orEmpty(),
+            artist = item.artists.joinToString { it.name },
             artworkUrl = item.thumbnail,
             playbackUrl = "https://music.youtube.com/watch?v=${item.id}",
         )

@@ -51,8 +51,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -77,6 +75,8 @@ import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.awt.Desktop
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.net.URI
 
 @Composable
@@ -111,7 +111,6 @@ fun PlayerQueueSheet(
         MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.9f)
     }
     val strings = LocalStrings.current
-    val clipboard = LocalClipboardManager.current
     val preferences = remember { DesktopPreferences.getInstance() }
     val queueEditLocked by preferences.queueEditLocked.collectAsState()
     val coroutineScope = rememberCoroutineScope()
@@ -145,7 +144,7 @@ fun PlayerQueueSheet(
     )
 
     fun copyLink(url: String) {
-        clipboard.setText(AnnotatedString(url))
+        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(url), null)
     }
 
     fun openInBrowser(url: String) {
@@ -607,6 +606,7 @@ fun PlayerQueueSheet(
                                 } else {
                                     Modifier
                                 }
+                            @Suppress("DEPRECATION")
                             val dismissState = rememberSwipeToDismissBoxState(
                                 confirmValueChange = { dismissValue ->
                                     if (dismissValue == SwipeToDismissBoxValue.StartToEnd ||

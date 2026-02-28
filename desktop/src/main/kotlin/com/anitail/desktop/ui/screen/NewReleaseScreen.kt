@@ -125,7 +125,7 @@ fun NewReleaseScreen(
             ) {
                 items(
                     items = albums!!,
-                    key = { it.id ?: it.title },
+                    key = { it.id },
                 ) { album ->
                     NewReleaseAlbumItem(
                         album = album,

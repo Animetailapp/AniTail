@@ -415,8 +415,7 @@ fun ExploreScreen(
                         pendingArtists = artistCandidates
                     }
                     !libraryArtistId.isNullOrBlank() -> {
-                        val artistId = libraryArtistId ?: return@openArtist
-                        onOpenArtist(artistId, songEntity?.artistName)
+                        onOpenArtist(libraryArtistId, songEntity.artistName)
                     }
                 }
             },
@@ -427,8 +426,7 @@ fun ExploreScreen(
                         onOpenAlbum(albumId, songItem.album?.name)
                     }
                     !songEntity?.albumId.isNullOrBlank() -> {
-                        val albumId = songEntity.albumId ?: return@openAlbum
-                        onOpenAlbum(albumId, songEntity.albumName)
+                        onOpenAlbum(songEntity.albumId, songEntity.albumName)
                     }
                 }
             },

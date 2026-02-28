@@ -134,7 +134,7 @@ fun ChartsScreen(
                                     "Trending" -> stringResource("trending")
                                     "Top songs" -> stringResource("top_songs")
                                     "Top artists" -> stringResource("top_artists")
-                                    else -> section.title ?: stringResource("charts")
+                                    else -> section.title
                                 }
                             )
                         }
@@ -159,8 +159,7 @@ fun ChartsScreen(
                                             val libraryItem = LibraryItem(
                                                 id = song.id,
                                                 title = song.title,
-                                                artist = song.artists?.joinToString { it.name }
-                                                    .orEmpty(),
+                                                artist = song.artists.joinToString { it.name },
                                                 artworkUrl = song.thumbnail,
                                                 playbackUrl = "https://music.youtube.com/watch?v=${song.id}",
                                             )
@@ -194,8 +193,7 @@ fun ChartsScreen(
                                         val libraryItem = LibraryItem(
                                             id = video.id,
                                             title = video.title,
-                                            artist = video.artists?.joinToString { it.name }
-                                                .orEmpty(),
+                                            artist = video.artists.joinToString { it.name },
                                             artworkUrl = video.thumbnail,
                                             playbackUrl = "https://music.youtube.com/watch?v=${video.id}",
                                         )
@@ -265,7 +263,7 @@ private fun ChartSongItem(
                     },
                 )
                 Text(
-                    text = song.artists?.joinToString { it.name }.orEmpty(),
+                    text = song.artists.joinToString { it.name },
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -322,7 +320,7 @@ private fun ChartVideoItem(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = video.artists?.joinToString { it.name }.orEmpty(),
+                    text = video.artists.joinToString { it.name },
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

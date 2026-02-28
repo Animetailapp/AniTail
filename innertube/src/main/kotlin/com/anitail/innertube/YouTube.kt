@@ -197,7 +197,6 @@ object YouTube {
                                     item.isVideoSong -> "Videos"
                                     else -> "Songs"
                                 }
-                                else -> YouTubeConstants.DEFAULT_OTHER_RESULTS
                             }
                         }
 
@@ -642,8 +641,9 @@ object YouTube {
             button.menuRenderer?.items?.forEachIndexed { j, item ->
                 logD("[PODCAST] Button[$i].menuItems[$j]: toggle=${item.toggleMenuServiceItemRenderer?.defaultIcon?.iconType}, nav=${item.menuNavigationItemRenderer?.icon?.iconType}")
                 // Check for SUBSCRIBE button (like artists have)
-                if (item.toggleMenuServiceItemRenderer?.defaultIcon?.iconType == "SUBSCRIBE") {
-                    val channelIds = item.toggleMenuServiceItemRenderer?.defaultServiceEndpoint?.subscribeEndpoint?.channelIds
+                val toggleMenu = item.toggleMenuServiceItemRenderer
+                if (toggleMenu?.defaultIcon?.iconType == "SUBSCRIBE") {
+                    val channelIds = toggleMenu.defaultServiceEndpoint.subscribeEndpoint?.channelIds
                     logD("[PODCAST] Found SUBSCRIBE button! channelIds=$channelIds")
                 }
             }
@@ -682,7 +682,7 @@ object YouTube {
                             // BOOKMARK: default=remove, toggled=add
                             PageHelper.LibraryFeedbackTokens(toggledToken, defaultToken)
                         }
-                        logD("[PODCAST] Found toggle button with library tokens - add: ${libraryTokens?.addToken != null}, remove: ${libraryTokens?.removeToken != null}")
+                        logD("[PODCAST] Found toggle button with library tokens - add: ${libraryTokens.addToken != null}, remove: ${libraryTokens.removeToken != null}")
                     }
                 }
             }
@@ -1480,7 +1480,7 @@ object YouTube {
         shelfContents?.mapNotNull { it.musicResponsiveListItemRenderer }
             ?.mapNotNull { renderer ->
                 val videoId = renderer.playlistItemData?.videoId ?: return@mapNotNull null
-                val setVideoId = renderer.playlistItemData?.playlistSetVideoId
+                val setVideoId = renderer.playlistItemData.playlistSetVideoId
                 val title = renderer.flexColumns.firstOrNull()
                     ?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()?.text
                     ?: return@mapNotNull null

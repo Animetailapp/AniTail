@@ -70,7 +70,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.AnnotatedString
@@ -105,12 +104,13 @@ import java.awt.Desktop
 import java.awt.Font
 import java.awt.Graphics2D
 import java.awt.RenderingHints
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.net.URI
 import java.net.URLEncoder
-import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -141,7 +141,9 @@ fun LyricsPanel(
     modifier: Modifier = Modifier,
 ) {
     val preferences = remember { DesktopPreferences.getInstance() }
-    val clipboard = LocalClipboardManager.current
+    fun copyToClipboard(text: String) {
+        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null)
+    }
     val lyricsTextPosition by preferences.lyricsTextPosition.collectAsState()
     val lyricsClick by preferences.lyricsClick.collectAsState()
     val lyricsScroll by preferences.lyricsScroll.collectAsState()
@@ -1167,7 +1169,7 @@ fun LyricsPanel(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                clipboard.setText(AnnotatedString(buildShareTextPayload(shareData)))
+                                copyToClipboard(buildShareTextPayload(shareData))
                                 actionMessage = copiedLabel
                                 showShareDialog = false
                                 shareDialogData = null
@@ -1325,7 +1327,7 @@ fun LyricsPanel(
                                 secondaryTextColor = previewSecondaryTextColor,
                             )
                             exportResult.onSuccess { imagePath ->
-                                clipboard.setText(AnnotatedString(imagePath.toAbsolutePath().toString()))
+                                copyToClipboard(imagePath.toAbsolutePath().toString())
                                 if (Desktop.isDesktopSupported()) {
                                     runCatching { Desktop.getDesktop().open(imagePath.toFile()) }
                                 }
@@ -2098,9 +2100,9 @@ private fun drawAppLogo(
 private fun loadRemoteImageBuffered(url: String?): BufferedImage? {
     if (url.isNullOrBlank()) return null
     return runCatching {
-        URL(url).openStream().use { stream -> ImageIO.read(stream) }
+        URI(url).toURL().openStream().use { stream -> ImageIO.read(stream) }
     }.getOrNull() ?: runCatching {
-        val bytes = URL(url).readBytes()
+        val bytes = URI(url).toURL().readBytes()
         val skiaImage = SkiaImage.makeFromEncoded(bytes)
         val pngData = skiaImage.encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG, 100) ?: return@runCatching null
         ImageIO.read(ByteArrayInputStream(pngData.bytes))

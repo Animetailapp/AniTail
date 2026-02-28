@@ -380,7 +380,7 @@ private fun DiscordPreviewCard(
                 Box(modifier = Modifier.size(108.dp)) {
                     if (!item?.artworkUrl.isNullOrBlank()) {
                         RemoteImage(
-                            url = item?.artworkUrl,
+                            url = item.artworkUrl,
                             contentDescription = null,
                             modifier = Modifier
                                 .size(96.dp)
@@ -424,7 +424,7 @@ private fun DiscordPreviewCard(
             Spacer(modifier = Modifier.height(16.dp))
 
             LinearProgressIndicator(
-                progress = progress,
+                progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(4.dp),
