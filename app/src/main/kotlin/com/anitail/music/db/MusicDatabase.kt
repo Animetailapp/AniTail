@@ -26,6 +26,7 @@ import com.anitail.music.db.entities.PlayCountEntity
 import com.anitail.music.db.entities.PlaylistEntity
 import com.anitail.music.db.entities.PlaylistSongMap
 import com.anitail.music.db.entities.PlaylistSongMapPreview
+import com.anitail.music.db.entities.PodcastEntity
 import com.anitail.music.db.entities.RecognitionHistory
 import com.anitail.music.db.entities.RelatedSongMap
 import com.anitail.music.db.entities.SearchHistory
@@ -98,14 +99,15 @@ class MusicDatabase(
         RelatedSongMap::class,
         SetVideoIdEntity::class,
         PlayCountEntity::class,
-        RecognitionHistory::class
+        RecognitionHistory::class,
+        PodcastEntity::class,
     ],
     views = [
         SortedSongArtistMap::class,
         SortedSongAlbumMap::class,
         PlaylistSongMapPreview::class,
     ],
-    version = 29,
+    version = 30,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 2, to = 3),
@@ -134,7 +136,6 @@ class MusicDatabase(
         AutoMigration(from = 25, to = 26),
         AutoMigration(from = 26, to = 27),
         AutoMigration(from = 27, to = 28),
-        AutoMigration(from = 28, to = 29),
     ],
 )
 @TypeConverters(Converters::class)
@@ -157,6 +158,8 @@ abstract class InternalDatabase : RoomDatabase() {
                         MIGRATION_25_26,
                         MIGRATION_26_27,
                         MIGRATION_27_28,
+                        MIGRATION_28_30,
+                        MIGRATION_29_30,
                     )
                     .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
                     .addCallback(object : Callback() {
@@ -559,6 +562,88 @@ val MIGRATION_27_28 =
             }
             database.execSQL(
                 "CREATE INDEX IF NOT EXISTS `index_recognition_history_trackId` ON `recognition_history` (`trackId`)",
+            )
+        }
+    }
+
+val MIGRATION_29_30 =
+    object : Migration(29, 30) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            val database = db
+
+            var isEpisodeExists = false
+            database.query("PRAGMA table_info(song)").use { cursor ->
+                val nameColumnIndex = cursor.getColumnIndex("name")
+                while (cursor.moveToNext()) {
+                    if (nameColumnIndex >= 0 && cursor.getString(nameColumnIndex) == "isEpisode") {
+                        isEpisodeExists = true
+                        break
+                    }
+                }
+            }
+            if (!isEpisodeExists) {
+                database.execSQL("ALTER TABLE song ADD COLUMN isEpisode INTEGER NOT NULL DEFAULT 0")
+            }
+
+            database.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `podcast` (
+                    `id` TEXT NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `author` TEXT,
+                    `thumbnailUrl` TEXT,
+                    `channelId` TEXT,
+                    `bookmarkedAt` INTEGER,
+                    `lastUpdateTime` INTEGER NOT NULL,
+                    `libraryAddToken` TEXT,
+                    `libraryRemoveToken` TEXT,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+        }
+    }
+
+val MIGRATION_28_30 =
+    object : Migration(28, 30) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            val database = db
+
+            fun hasColumn(table: String, column: String): Boolean {
+                database.query("PRAGMA table_info($table)").use { cursor ->
+                    val nameColumnIndex = cursor.getColumnIndex("name")
+                    while (cursor.moveToNext()) {
+                        if (nameColumnIndex >= 0 && cursor.getString(nameColumnIndex) == column) {
+                            return true
+                        }
+                    }
+                }
+                return false
+            }
+
+            if (!hasColumn("song", "localPath")) {
+                database.execSQL("ALTER TABLE song ADD COLUMN localPath TEXT DEFAULT NULL")
+            }
+
+            if (!hasColumn("song", "isEpisode")) {
+                database.execSQL("ALTER TABLE song ADD COLUMN isEpisode INTEGER NOT NULL DEFAULT 0")
+            }
+
+            database.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `podcast` (
+                    `id` TEXT NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `author` TEXT,
+                    `thumbnailUrl` TEXT,
+                    `channelId` TEXT,
+                    `bookmarkedAt` INTEGER,
+                    `lastUpdateTime` INTEGER NOT NULL,
+                    `libraryAddToken` TEXT,
+                    `libraryRemoveToken` TEXT,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
             )
         }
     }

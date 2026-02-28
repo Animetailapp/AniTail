@@ -28,6 +28,7 @@ fun LibraryScreen(navController: NavController) {
                     LibraryFilter.SONGS to stringResource(R.string.filter_songs),
                     LibraryFilter.ALBUMS to stringResource(R.string.filter_albums),
                     LibraryFilter.ARTISTS to stringResource(R.string.filter_artists),
+                    LibraryFilter.PODCASTS to stringResource(R.string.filter_podcasts),
                     LibraryFilter.DOWNLOADED to stringResource(R.string.filter_downloaded),
                 ),
                 currentValue = filterType,
@@ -61,6 +62,10 @@ fun LibraryScreen(navController: NavController) {
             LibraryFilter.ARTISTS -> LibraryArtistsScreen(
                 navController,
                 { filterType = LibraryFilter.LIBRARY })
+
+            LibraryFilter.PODCASTS -> LibraryPodcastsScreen(
+                navController,
+                filterContent)
 
             LibraryFilter.LOCAL -> {
                 // Local entry lives in LibraryMixScreen as a dedicated card.

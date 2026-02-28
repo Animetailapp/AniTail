@@ -1,6 +1,7 @@
 package com.anitail.music.models
 
 import androidx.compose.runtime.Immutable
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.music.db.entities.Song
 import com.anitail.music.db.entities.SongEntity
@@ -21,6 +22,7 @@ data class MediaMetadata(
     val setVideoId: String? = null,
     val explicit: Boolean = false,
     val liked: Boolean = false,
+    val isEpisode: Boolean = false,
 ) {
     @Serializable
     data class Artist(
@@ -44,6 +46,7 @@ data class MediaMetadata(
             albumName = album?.title,
             artistName = artistName,
             explicit = explicit,
+            isEpisode = isEpisode,
         )
 }
 
@@ -73,6 +76,7 @@ fun Song.toMediaMetadata() =
                 title = song.albumName.orEmpty(),
             )
         },
+        isEpisode = song.isEpisode,
     )
 
 fun SongItem.toMediaMetadata() =
@@ -97,5 +101,8 @@ fun SongItem.toMediaMetadata() =
             )
         },
         explicit = explicit,
-        setVideoId = setVideoId
+        setVideoId = setVideoId,
+        isEpisode = isEpisode
     )
+
+fun EpisodeItem.toMediaMetadata() = asSongItem().toMediaMetadata()

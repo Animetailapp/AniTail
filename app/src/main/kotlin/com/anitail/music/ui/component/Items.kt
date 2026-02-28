@@ -75,7 +75,9 @@ import coil.compose.AsyncImage
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.PodcastItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.YTItem
 import com.anitail.music.LocalDatabase
@@ -255,7 +257,8 @@ fun SongListItem(
     showInLibraryIcon: Boolean = false,
     showDownloadIcon: Boolean = true,
     badges: @Composable RowScope.() -> Unit = {
-        if (showLikedIcon && song.song.liked) {
+        val isFavorited = if (song.song.isEpisode) song.song.inLibrary != null else song.song.liked
+        if (showLikedIcon && isFavorited) {
             Icon.Favorite()
         }
         if (showInLibraryIcon && song.song.inLibrary != null) {
@@ -324,7 +327,8 @@ fun SongGridItem(
     showInLibraryIcon: Boolean = false,
     showDownloadIcon: Boolean = true,
     badges: @Composable RowScope.() -> Unit = {
-        if (showLikedIcon && song.song.liked) {
+        val isFavorited = if (song.song.isEpisode) song.song.inLibrary != null else song.song.liked
+        if (showLikedIcon && isFavorited) {
             Icon.Favorite()
         }
         if (song.song.explicit) {
@@ -682,16 +686,20 @@ fun YouTubeListItem(
         val song by database.song(item.id).collectAsState(initial = null)
         val album by database.album(item.id).collectAsState(initial = null)
 
-        if (item is SongItem && song?.song?.liked == true ||
-            item is AlbumItem && album?.album?.bookmarkedAt != null
-        ) {
+        val isFavoriteItem = when (item) {
+            is EpisodeItem -> song?.song?.inLibrary != null
+            is SongItem -> song?.song?.liked == true
+            else -> false
+        }
+
+        if (isFavoriteItem || (item is AlbumItem && album?.album?.bookmarkedAt != null)) {
             Icon.Favorite()
         }
         if (item.explicit) Icon.Explicit()
-        if (item is SongItem && song?.song?.inLibrary != null) {
+        if ((item is SongItem || item is EpisodeItem) && song?.song?.inLibrary != null) {
             Icon.Library()
         }
-        if (item is SongItem) {
+        if (item is SongItem || item is EpisodeItem) {
             val download by LocalDownloadUtil.current.getDownload(item.id).collectAsState(initial = null)
             val effectiveDownloadState = download?.state
                 ?: if (song?.song?.isLocal != true && !song?.song?.mediaStoreUri.isNullOrEmpty()) Download.STATE_COMPLETED else null
@@ -706,9 +714,11 @@ fun YouTubeListItem(
             title = item.title,
             subtitle = when (item) {
                 is SongItem -> joinByBullet(item.artists.joinToString { it.name }, makeTimeString(item.duration?.times(1000L)))
+                is EpisodeItem -> joinByBullet(item.author?.name, item.publishDateText, makeTimeString(item.duration?.times(1000L)))
                 is AlbumItem -> joinByBullet(item.artists?.joinToString { it.name }, item.year?.toString())
                 is ArtistItem -> null
                 is PlaylistItem -> joinByBullet(item.author?.name, item.songCountText)
+                is PodcastItem -> joinByBullet(item.author?.name, item.episodeCountText)
             },
             badges = badges,
             thumbnailContent = {
@@ -750,21 +760,25 @@ fun YouTubeGridItem(
         val song by database.song(item.id).collectAsState(initial = null)
         val album by database.album(item.id).collectAsState(initial = null)
 
-        if ((item is SongItem && song?.song?.liked == true) ||
-            (item is AlbumItem && album?.album?.bookmarkedAt != null)
-        ) {
+        val isFavoriteItem = when (item) {
+            is EpisodeItem -> song?.song?.inLibrary != null
+            is SongItem -> song?.song?.liked == true
+            else -> false
+        }
+
+        if (isFavoriteItem || (item is AlbumItem && album?.album?.bookmarkedAt != null)) {
             Icon.Favorite()
         }
         if (item.explicit) Icon.Explicit()
-        if (item is SongItem && song?.song?.inLibrary != null) Icon.Library()
-        if (item is SongItem) {
+        if ((item is SongItem || item is EpisodeItem) && song?.song?.inLibrary != null) Icon.Library()
+        if (item is SongItem || item is EpisodeItem) {
             val download by LocalDownloadUtil.current.getDownload(item.id).collectAsState(initial = null)
             val effectiveDownloadState = download?.state
                 ?: if (song?.song?.isLocal != true && !song?.song?.mediaStoreUri.isNullOrEmpty()) Download.STATE_COMPLETED else null
             Icon.Download(effectiveDownloadState)
         }
     },
-    thumbnailRatio: Float = if (item is SongItem) 16f / 9 else 1f,
+    thumbnailRatio: Float = if (item is SongItem || item is EpisodeItem) 16f / 9 else 1f,
     isActive: Boolean = false,
     isPlaying: Boolean = false,
     fillMaxWidth: Boolean = false,
@@ -785,9 +799,11 @@ fun YouTubeGridItem(
     subtitle = {
         val subtitle = when (item) {
             is SongItem -> joinByBullet(item.artists.joinToString { it.name }, makeTimeString(item.duration?.times(1000L)))
+            is EpisodeItem -> joinByBullet(item.author?.name, item.publishDateText, makeTimeString(item.duration?.times(1000L)))
             is AlbumItem -> joinByBullet(item.artists?.joinToString { it.name }, item.year?.toString())
             is ArtistItem -> null
             is PlaylistItem -> joinByBullet(item.author?.name, item.songCountText)
+            is PodcastItem -> joinByBullet(item.author?.name, item.episodeCountText)
         }
         if (subtitle != null) {
             Text(
@@ -812,7 +828,7 @@ fun YouTubeGridItem(
             shape = if (item is ArtistItem) CircleShape else RoundedCornerShape(ThumbnailCornerRadius),
         )
 
-        if (item is SongItem && !isActive) {
+        if ((item is SongItem || item is EpisodeItem) && !isActive) {
             OverlayPlayButton(
                 visible = true
             )

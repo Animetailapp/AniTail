@@ -439,7 +439,12 @@ private fun NewMiniPlayer(
                 // Favorite button (right side)
                 mediaMetadata?.let { metadata ->
                     val librarySong by database.song(metadata.id).collectAsState(initial = null)
-                    val isLiked = librarySong?.song?.liked == true
+                    val isLiked =
+                        if (librarySong?.song?.isEpisode == true) {
+                            librarySong?.song?.inLibrary != null
+                        } else {
+                            librarySong?.song?.liked == true
+                        }
 
                     Box(
                         contentAlignment = Alignment.Center,

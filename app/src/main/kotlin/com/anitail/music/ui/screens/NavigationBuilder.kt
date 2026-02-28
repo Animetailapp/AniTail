@@ -25,6 +25,7 @@ import com.anitail.music.ui.screens.playlist.AutoPlaylistScreen
 import com.anitail.music.ui.screens.playlist.CachePlaylistScreen
 import com.anitail.music.ui.screens.playlist.LocalPlaylistScreen
 import com.anitail.music.ui.screens.playlist.OnlinePlaylistScreen
+import com.anitail.music.ui.screens.podcast.OnlinePodcastScreen
 import com.anitail.music.ui.screens.playlist.TopPlaylistScreen
 import com.anitail.music.ui.screens.recognition.RecognitionHistoryScreen
 import com.anitail.music.ui.screens.recognition.RecognitionScreen
@@ -287,6 +288,17 @@ fun NavGraphBuilder.navigationBuilder(
         ),
     ) {
         OnlinePlaylistScreen(navController, scrollBehavior)
+    }
+    composable(
+        route = "online_podcast/{podcastId}",
+        arguments =
+        listOf(
+            navArgument("podcastId") {
+                type = NavType.StringType
+            },
+        ),
+    ) {
+        OnlinePodcastScreen(navController, scrollBehavior)
     }
     composable(
         route = "local_playlist/{playlistId}",

@@ -36,6 +36,7 @@ import com.anitail.music.db.entities.Playlist
 import com.anitail.music.db.entities.PlaylistEntity
 import com.anitail.music.db.entities.PlaylistSong
 import com.anitail.music.db.entities.PlaylistSongMap
+import com.anitail.music.db.entities.PodcastEntity
 import com.anitail.music.db.entities.RecognitionHistory
 import com.anitail.music.db.entities.RelatedSongMap
 import com.anitail.music.db.entities.SearchHistory
@@ -163,6 +164,56 @@ interface DatabaseDao {
     @Transaction
     @Query("SELECT COUNT(1) FROM song WHERE liked")
     fun likedSongsCount(): Flow<Int>
+
+    @Transaction
+    @Query("SELECT * FROM song WHERE isEpisode = 1 ORDER BY inLibrary")
+    fun podcastEpisodesByCreateDateAsc(): Flow<List<Song>>
+
+    @Transaction
+    @Query("SELECT * FROM song WHERE isEpisode = 1 ORDER BY title")
+    fun podcastEpisodesByNameAsc(): Flow<List<Song>>
+
+    @Transaction
+    @Query("SELECT * FROM song WHERE isEpisode = 1 ORDER BY totalPlayTime")
+    fun podcastEpisodesByPlayTimeAsc(): Flow<List<Song>>
+
+    @Transaction
+    @Query("SELECT * FROM song WHERE isEpisode = 1 ORDER BY rowId")
+    fun podcastEpisodesByRowIdAsc(): Flow<List<Song>>
+
+    fun podcastEpisodes(
+        sortType: SongSortType,
+        descending: Boolean,
+    ) = when (sortType) {
+        SongSortType.CREATE_DATE -> podcastEpisodesByCreateDateAsc()
+        SongSortType.NAME ->
+            podcastEpisodesByNameAsc().map { songs ->
+                val collator = Collator.getInstance(Locale.getDefault())
+                collator.strength = Collator.PRIMARY
+                songs.sortedWith(compareBy(collator) { it.song.title })
+            }
+
+        SongSortType.ARTIST ->
+            podcastEpisodesByRowIdAsc().map { songs ->
+                val collator = Collator.getInstance(Locale.getDefault())
+                collator.strength = Collator.PRIMARY
+                songs
+                    .sortedWith(
+                        compareBy(collator) { song ->
+                            song.artists.joinToString("") { it.name }
+                        },
+                    ).groupBy { it.album?.title }
+                    .flatMap { (_, songsByAlbum) ->
+                        songsByAlbum.sortedBy { album ->
+                            album.artists.joinToString(
+                                "",
+                            ) { it.name }
+                        }
+                    }
+            }
+
+        SongSortType.PLAY_TIME -> podcastEpisodesByPlayTimeAsc()
+    }.map { it.reversed(descending) }
 
     @Transaction
     @Query("SELECT * FROM song WHERE isLocal = 0 AND mediaStoreUri IS NOT NULL ORDER BY dateDownload DESC")
@@ -1596,4 +1647,22 @@ interface DatabaseDao {
     fun checkpoint() {
         raw("PRAGMA wal_checkpoint(FULL)".toSQLiteQuery())
     }
+
+    @Query("SELECT * FROM podcast WHERE bookmarkedAt IS NOT NULL ORDER BY bookmarkedAt DESC")
+    fun subscribedPodcasts(): Flow<List<PodcastEntity>>
+
+    @Query("SELECT * FROM podcast WHERE id = :id")
+    fun podcast(id: String): Flow<PodcastEntity?>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    fun insert(podcast: PodcastEntity): Long
+
+    @Update
+    fun update(podcast: PodcastEntity)
+
+    @Upsert
+    fun upsert(podcast: PodcastEntity)
+
+    @Delete
+    fun delete(podcast: PodcastEntity)
 }

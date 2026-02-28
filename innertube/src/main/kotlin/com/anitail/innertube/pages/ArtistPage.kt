@@ -10,11 +10,14 @@ import com.anitail.innertube.models.MusicResponsiveListItemRenderer
 import com.anitail.innertube.models.MusicShelfRenderer
 import com.anitail.innertube.models.MusicTwoRowItemRenderer
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.Run
 import com.anitail.innertube.models.SectionListRenderer
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.YTItem
+import com.anitail.innertube.models.filterExplicit
 import com.anitail.innertube.models.getItems
 import com.anitail.innertube.models.oddElements
+import com.anitail.innertube.models.splitBySeparator
 
 data class ArtistSection(
     val title: String,
@@ -26,8 +29,9 @@ data class ArtistPage(
     val artist: ArtistItem,
     val sections: List<ArtistSection>,
     val description: String?,
-    val subscriberCountText: String? = null,
+    val subscriberCountText: String?,
     val monthlyListenerCount: String? = null,
+    val descriptionRuns: List<Run>? = null,
 ) {
     companion object {
         fun fromSectionListRendererContent(content: SectionListRenderer.Content): ArtistSection? {
@@ -51,9 +55,11 @@ data class ArtistPage(
         private fun fromMusicCarouselShelfRenderer(renderer: MusicCarouselShelfRenderer): ArtistSection? {
             return ArtistSection(
                 title = renderer.header?.musicCarouselShelfBasicHeaderRenderer?.title?.runs?.firstOrNull()?.text ?: return null,
-                items = renderer.contents.mapNotNull {
-                    it.musicTwoRowItemRenderer?.let { renderer ->
-                        fromMusicTwoRowItemRenderer(renderer)
+                items = renderer.contents.mapNotNull { content ->
+                    content.musicTwoRowItemRenderer?.let { twoRowRenderer ->
+                        fromMusicTwoRowItemRenderer(twoRowRenderer)
+                    } ?: content.musicResponsiveListItemRenderer?.let { listItemRenderer ->
+                        fromMusicResponsiveListItemRenderer(listItemRenderer)
                     }
                 }.ifEmpty { null } ?: return null,
                 moreEndpoint = renderer.header.musicCarouselShelfBasicHeaderRenderer.moreContentButton?.buttonRenderer?.navigationEndpoint?.browseEndpoint
@@ -61,47 +67,80 @@ data class ArtistPage(
         }
 
         private fun fromMusicResponsiveListItemRenderer(renderer: MusicResponsiveListItemRenderer): SongItem? {
+            // Split the secondary line by bullet separator to separate artists from other metadata (like views)
+            val secondaryLineRuns = renderer.flexColumns
+                .getOrNull(1)
+                ?.musicResponsiveListItemFlexColumnRenderer
+                ?.text
+                ?.runs
+                ?.splitBySeparator()
+
+            // Extract artists from the first segment after splitting
+            val artists = secondaryLineRuns?.firstOrNull()?.oddElements()?.map {
+                Artist(
+                    name = it.text,
+                    id = it.navigationEndpoint?.browseEndpoint?.browseId
+                )
+            }
+
+            // Extract album from last flexColumn (like SimpMusic)
+            val album = renderer.flexColumns.lastOrNull()
+                ?.musicResponsiveListItemFlexColumnRenderer?.text?.runs
+                ?.firstOrNull()?.let {
+                    if (it.navigationEndpoint?.browseEndpoint?.browseId != null) {
+                        Album(
+                            name = it.text,
+                            id = it.navigationEndpoint.browseEndpoint.browseId
+                        )
+                    } else null
+                }
+
+            // Extract library tokens using the new method that properly handles multiple toggle items
+            val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
+
             return SongItem(
                 id = renderer.playlistItemData?.videoId ?: return null,
                 title = renderer.flexColumns.firstOrNull()
                     ?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()
                     ?.text ?: return null,
-                artists = PageHelper.extractRuns(renderer.flexColumns, "MUSIC_PAGE_TYPE_ARTIST").ifEmpty { renderer.flexColumns.getOrNull(1)?.musicResponsiveListItemFlexColumnRenderer?.text?.runs }?.oddElements()?.map {
-                    Artist(
-                        name = it.text,
-                        id = it.navigationEndpoint?.browseEndpoint?.browseId
-                    )
-                } ?: return null,
-                album = PageHelper.extractRuns(renderer.flexColumns, "MUSIC_PAGE_TYPE_ALBUM").ifEmpty { renderer.flexColumns.getOrNull(3)?.musicResponsiveListItemFlexColumnRenderer?.text?.runs }?.firstOrNull()?.let {
-                    Album(
-                        name = it.text,
-                        id = it.navigationEndpoint?.browseEndpoint?.browseId ?: return@let null
-                    )
-                },
+                artists = artists ?: return null,
+                album = album,
                 duration = null,
+                musicVideoType = renderer.musicVideoType,
                 thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
                 explicit = renderer.badges?.find {
                     it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
                 } != null,
                 endpoint = renderer.overlay?.musicItemThumbnailOverlayRenderer?.content
-                    ?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchEndpoint
+                    ?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchEndpoint,
+                libraryAddToken = libraryTokens.addToken,
+                libraryRemoveToken = libraryTokens.removeToken
             )
         }
 
         private fun fromMusicTwoRowItemRenderer(renderer: MusicTwoRowItemRenderer): YTItem? {
             return when {
                 renderer.isSong -> {
+                    val subtitleRuns = renderer.subtitle?.runs?.oddElements() ?: return null
                     SongItem(
                         id = renderer.navigationEndpoint.watchEndpoint?.videoId ?: return null,
                         title = renderer.title.runs?.firstOrNull()?.text ?: return null,
-                        artists = listOfNotNull(renderer.subtitle?.runs?.firstOrNull()?.let {
+                        artists = subtitleRuns.filter { 
+                            it.navigationEndpoint?.browseEndpoint?.browseId?.startsWith("UC") == true ||
+                            it.navigationEndpoint?.browseEndpoint != null
+                        }.map {
                             Artist(
                                 name = it.text,
                                 id = it.navigationEndpoint?.browseEndpoint?.browseId
                             )
-                        }),
+                        }.ifEmpty {
+                            subtitleRuns.firstOrNull()?.let { 
+                                listOf(Artist(name = it.text, id = null)) 
+                            } ?: emptyList()
+                        },
                         album = null,
                         duration = null,
+                        musicVideoType = renderer.musicVideoType,
                         thumbnail = renderer.thumbnailRenderer.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
                         explicit = renderer.subtitleBadges?.find {
                             it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
@@ -131,7 +170,7 @@ data class ArtistPage(
                         id = renderer.navigationEndpoint.browseEndpoint?.browseId?.removePrefix("VL") ?: return null,
                         title = renderer.title.runs?.firstOrNull()?.text ?: return null,
                         author = Artist(
-                            name = renderer.subtitle?.runs?.lastOrNull()?.text ?: return null,
+                            name = renderer.subtitle?.runs?.firstOrNull()?.text ?: return null,
                             id = null
                         ),
                         songCountText = null,

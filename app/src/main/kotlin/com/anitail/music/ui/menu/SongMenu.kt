@@ -355,6 +355,12 @@ fun SongMenu(
         song = song,
         badges = {},
         trailingContent = {
+            val isFavorite =
+                if (song.song.isEpisode) {
+                    song.song.inLibrary != null
+                } else {
+                    song.song.liked
+                }
             IconButton(
                 onClick = {
                     val s = song.song.toggleLike()
@@ -362,21 +368,23 @@ fun SongMenu(
                         update(s)
                      }
 
-                    syncUtils.likeSong(s)
-                    
-                    // Last.fm integration
-                    if (lastFmUiState.isLoggedIn && lastFmUiState.isLoveTracksEnabled) {
-                        if (s.liked) {
-                            lastFmViewModel.loveTrack(song)
-                        } else {
-                            lastFmViewModel.unloveTrack(song)
+                    if (!s.isEpisode) {
+                        syncUtils.likeSong(s)
+                        
+                        // Last.fm integration
+                        if (lastFmUiState.isLoggedIn && lastFmUiState.isLoveTracksEnabled) {
+                            if (s.liked) {
+                                lastFmViewModel.loveTrack(song)
+                            } else {
+                                lastFmViewModel.unloveTrack(song)
+                            }
                         }
                     }
                 },
             ) {
                 Icon(
-                    painter = painterResource(if (song.song.liked) R.drawable.favorite else R.drawable.favorite_border),
-                    tint = if (song.song.liked) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                    painter = painterResource(if (isFavorite) R.drawable.favorite else R.drawable.favorite_border),
+                    tint = if (isFavorite) MaterialTheme.colorScheme.error else LocalContentColor.current,
                     contentDescription = null,
                 )
             }

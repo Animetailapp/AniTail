@@ -36,12 +36,16 @@ import androidx.navigation.NavController
 import com.anitail.innertube.YouTube.SearchFilter.Companion.FILTER_ALBUM
 import com.anitail.innertube.YouTube.SearchFilter.Companion.FILTER_ARTIST
 import com.anitail.innertube.YouTube.SearchFilter.Companion.FILTER_COMMUNITY_PLAYLIST
+import com.anitail.innertube.YouTube.SearchFilter.Companion.FILTER_EPISODE
 import com.anitail.innertube.YouTube.SearchFilter.Companion.FILTER_FEATURED_PLAYLIST
+import com.anitail.innertube.YouTube.SearchFilter.Companion.FILTER_PODCAST
 import com.anitail.innertube.YouTube.SearchFilter.Companion.FILTER_SONG
 import com.anitail.innertube.YouTube.SearchFilter.Companion.FILTER_VIDEO
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.PodcastItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.innertube.models.YTItem
@@ -133,6 +137,20 @@ fun OnlineSearchResult(
                             coroutineScope = coroutineScope,
                             onDismiss = menuState::dismiss,
                         )
+
+                    is PodcastItem ->
+                        YouTubePlaylistMenu(
+                            playlist = item.asPlaylistItem(),
+                            coroutineScope = coroutineScope,
+                            onDismiss = menuState::dismiss,
+                        )
+
+                    is EpisodeItem ->
+                        YouTubeSongMenu(
+                            song = item.asSongItem(),
+                            navController = navController,
+                            onDismiss = menuState::dismiss,
+                        )
                 }
             }
         }
@@ -141,6 +159,7 @@ fun OnlineSearchResult(
             isActive =
             when (item) {
                 is SongItem -> mediaMetadata?.id == item.id
+                is EpisodeItem -> mediaMetadata?.id == item.id
                 is AlbumItem -> mediaMetadata?.album?.id == item.id
                 else -> false
             },
@@ -173,9 +192,24 @@ fun OnlineSearchResult(
                                 }
                             }
 
+                            is EpisodeItem -> {
+                                val episodeSong = item.asSongItem()
+                                if (episodeSong.id == mediaMetadata?.id) {
+                                    playerConnection.player.togglePlayPause()
+                                } else {
+                                    playerConnection.playQueue(
+                                        YouTubeQueue(
+                                            WatchEndpoint(videoId = episodeSong.id),
+                                            episodeSong.toMediaMetadata()
+                                        )
+                                    )
+                                }
+                            }
+
                             is AlbumItem -> navController.navigate("album/${item.id}")
                             is ArtistItem -> navController.navigate("artist/${item.id}")
                             is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                            is PodcastItem -> navController.navigate("online_podcast/${item.id}")
                         }
                     },
                     onLongClick = longClick,
@@ -258,6 +292,8 @@ fun OnlineSearchResult(
             FILTER_VIDEO to stringResource(R.string.filter_videos),
             FILTER_ALBUM to stringResource(R.string.filter_albums),
             FILTER_ARTIST to stringResource(R.string.filter_artists),
+            FILTER_PODCAST to stringResource(R.string.filter_podcasts),
+            FILTER_EPISODE to stringResource(R.string.filter_episodes),
             FILTER_COMMUNITY_PLAYLIST to stringResource(R.string.filter_community_playlists),
             FILTER_FEATURED_PLAYLIST to stringResource(R.string.filter_featured_playlists),
         ),

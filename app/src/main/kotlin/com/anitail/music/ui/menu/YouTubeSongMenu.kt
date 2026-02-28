@@ -236,6 +236,12 @@ fun YouTubeSongMenu(
             }
         },
         trailingContent = {
+            val isFavorite =
+                if (song.isEpisode) {
+                    librarySong?.song?.inLibrary != null
+                } else {
+                    librarySong?.song?.liked == true
+                }
             IconButton(
                 onClick = {
                     database.transaction {
@@ -243,19 +249,29 @@ fun YouTubeSongMenu(
                             val s: SongEntity
                             if (librarySong == null) {
                                 insert(song.toMediaMetadata(), SongEntity::toggleLike)
-                                s = song.toMediaMetadata().toSongEntity().let(SongEntity::toggleLike)
+                                s = song
+                                    .toMediaMetadata()
+                                    .toSongEntity()
+                                    .copy(
+                                        isEpisode = song.isEpisode,
+                                        liked = true,
+                                        likedDate = LocalDateTime.now(),
+                                        inLibrary = LocalDateTime.now(),
+                                    )
                             } else {
                                 s = librarySong.song.toggleLike()
                                 update(s)
                             }
-                            syncUtils.likeSong(s)
+                            if (!s.isEpisode) {
+                                syncUtils.likeSong(s)
+                            }
                         }
                     }
                 },
             ) {
                 Icon(
-                    painter = painterResource(if (librarySong?.song?.liked == true) R.drawable.favorite else R.drawable.favorite_border),
-                    tint = if (librarySong?.song?.liked == true) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                    painter = painterResource(if (isFavorite) R.drawable.favorite else R.drawable.favorite_border),
+                    tint = if (isFavorite) MaterialTheme.colorScheme.error else LocalContentColor.current,
                     contentDescription = null,
                 )
             }

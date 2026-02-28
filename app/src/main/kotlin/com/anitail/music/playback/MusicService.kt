@@ -864,13 +864,17 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
   private fun updateNotification() {
     val buttons = mutableListOf<CommandButton>()
+    val isFavorite =
+        currentSong.value?.song?.let { song ->
+          if (song.isEpisode) song.inLibrary != null else song.liked
+        } == true
     when (buttonType) {
       NotificationButtonType.LIKE -> {
         buttons.add(
             CommandButton.Builder()
                 .setDisplayName(
                     getString(
-                        if (currentSong.value?.song?.liked == true) {
+                        if (isFavorite) {
                           R.string.action_remove_like
                         } else {
                           R.string.action_like
@@ -878,7 +882,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                     ),
                 )
                 .setIconResId(
-                    if (currentSong.value?.song?.liked == true) R.drawable.favorite
+                    if (isFavorite) R.drawable.favorite
                     else R.drawable.favorite_border)
                 .setSessionCommand(CommandToggleLike)
                 .setEnabled(currentSong.value != null)
@@ -1350,11 +1354,14 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       currentSong.value?.let {
         val song = it.song.toggleLike()
         update(song)
-        syncUtils.likeSong(song)
+        if (!song.isEpisode) {
+          syncUtils.likeSong(song)
+        }
 
         // Check if auto-download on like is enabled and the song is now liked
         if (dataStore.get(AutoDownloadOnLikeKey, false) &&
             song.liked &&
+            !song.isEpisode &&
             !song.isLocal &&
             !song.id.startsWith("LOCAL_")
         ) {

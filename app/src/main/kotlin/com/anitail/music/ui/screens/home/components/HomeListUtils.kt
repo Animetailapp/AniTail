@@ -18,7 +18,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.PodcastItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.YTItem
 import com.anitail.music.db.entities.Album
@@ -41,9 +43,11 @@ internal fun highResThumbnail(
 internal fun ytItemStableKey(item: YTItem): String {
     return when (item) {
         is SongItem -> "song:${item.id}"
+        is EpisodeItem -> "episode:${item.id}"
         is AlbumItem -> "album:${item.id}"
         is ArtistItem -> "artist:${item.id}"
         is PlaylistItem -> "playlist:${item.id}"
+        is PodcastItem -> "podcast:${item.id}"
     }
 }
 

@@ -65,7 +65,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import coil.compose.AsyncImage
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.PodcastItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.innertube.models.YTItem
@@ -353,9 +355,20 @@ fun HomeScreen(
                                 )
                             )
 
+                            is EpisodeItem -> {
+                                val episodeSong = item.asSongItem()
+                                playerConnection.playQueue(
+                                    YouTubeQueue(
+                                        episodeSong.endpoint ?: WatchEndpoint(videoId = episodeSong.id),
+                                        episodeSong.toMediaMetadata()
+                                    )
+                                )
+                            }
+
                             is AlbumItem -> navController.navigate("album/${item.id}")
                             is ArtistItem -> navController.navigate("artist/${item.id}")
                             is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                            is PodcastItem -> navController.navigate("online_podcast/${item.id}")
                         }
                     },
                     onLongClick = {
@@ -382,6 +395,18 @@ fun HomeScreen(
                                 is PlaylistItem -> YouTubePlaylistMenu(
                                     playlist = item,
                                     coroutineScope = scope,
+                                    onDismiss = menuState::dismiss
+                                )
+
+                                is PodcastItem -> YouTubePlaylistMenu(
+                                    playlist = item.asPlaylistItem(),
+                                    coroutineScope = scope,
+                                    onDismiss = menuState::dismiss
+                                )
+
+                                is EpisodeItem -> YouTubeSongMenu(
+                                    song = item.asSongItem(),
+                                    navController = navController,
                                     onDismiss = menuState::dismiss
                                 )
                             }
@@ -552,9 +577,20 @@ fun HomeScreen(
                             ),
                         )
 
+                        is EpisodeItem -> {
+                            val episodeSong = item.asSongItem()
+                            playerConnection.playQueue(
+                                YouTubeQueue(
+                                    episodeSong.endpoint ?: WatchEndpoint(videoId = episodeSong.id),
+                                    episodeSong.toMediaMetadata(),
+                                ),
+                            )
+                        }
+
                         is AlbumItem -> navController.navigate("album/${item.id}")
                         is ArtistItem -> navController.navigate("artist/${item.id}")
                         is PlaylistItem -> navController.navigate("online_playlist/${item.id.removePrefix("VL")}")
+                        is PodcastItem -> navController.navigate("online_podcast/${item.id}")
                     }
                 },
                 onSurpriseClick = {
@@ -568,9 +604,20 @@ fun HomeScreen(
                                 ),
                             )
 
+                            is EpisodeItem -> {
+                                val episodeSong = luckyItem.asSongItem()
+                                playerConnection.playQueue(
+                                    YouTubeQueue(
+                                        episodeSong.endpoint ?: WatchEndpoint(videoId = episodeSong.id),
+                                        episodeSong.toMediaMetadata(),
+                                    ),
+                                )
+                            }
+
                             is AlbumItem -> navController.navigate("album/${luckyItem.id}")
                             is ArtistItem -> navController.navigate("artist/${luckyItem.id}")
                             is PlaylistItem -> navController.navigate("online_playlist/${luckyItem.id.removePrefix("VL")}")
+                            is PodcastItem -> navController.navigate("online_podcast/${luckyItem.id}")
                         }
                     }
                 },
@@ -715,7 +762,13 @@ fun HomeScreen(
                                 when (browseId) {
                                     "FEmusic_moods_and_genres" -> navController.navigate("mood_and_genres")
                                     "FEmusic_charts" -> navController.navigate("charts_screen")
-                                    else -> navController.navigate("browse/$browseId")
+                                    in listOf("FEmusic_library_non_music_audio_channels_list", "FEmusic_new_episodes") ->
+                                        navController.navigate("youtube_browse/$browseId")
+                                    else -> if (browseId.startsWith("MPSP")) {
+                                        navController.navigate("online_podcast/$browseId")
+                                    } else {
+                                        navController.navigate("browse/$browseId")
+                                    }
                                 }
                             }
                         },
@@ -798,11 +851,18 @@ fun HomeScreen(
                     } else {
                         when (val luckyItem = allYtItems.random()) {
                             is SongItem -> playerConnection.playQueue(YouTubeQueue.radio(luckyItem.toMediaMetadata()))
+                            is EpisodeItem -> {
+                                val episodeSong = luckyItem.asSongItem()
+                                playerConnection.playQueue(YouTubeQueue.radio(episodeSong.toMediaMetadata()))
+                            }
                             is AlbumItem -> playerConnection.playQueue(YouTubeAlbumRadio(luckyItem.playlistId))
                             is ArtistItem -> luckyItem.radioEndpoint?.let {
                                 playerConnection.playQueue(YouTubeQueue(it))
                             }
                             is PlaylistItem -> luckyItem.playEndpoint?.let {
+                                playerConnection.playQueue(YouTubeQueue(it))
+                            }
+                            is PodcastItem -> luckyItem.playEndpoint?.let {
                                 playerConnection.playQueue(YouTubeQueue(it))
                             }
                         }
