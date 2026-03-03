@@ -8,7 +8,7 @@ pluginManagement {
     }
     plugins {
         id("org.jetbrains.compose") version "1.11.0-alpha03"
-        id("org.jetbrains.kotlin.plugin.compose") version "2.3.20-RC"
+        id("org.jetbrains.kotlin.plugin.compose") version "2.3.20-RC2"
     }
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
