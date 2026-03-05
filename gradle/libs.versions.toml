@@ -12,7 +12,7 @@ material3 = "1.5.0-alpha15"
 materialKolor = "5.0.0-alpha06"
 media3 = "1.9.1"
 # 22.3.0 triggers R8 "Invalid stack map table" warnings during minify.
-playServicesCast = "22.2.0"
+playServicesCast = "22.3.0"
 playServicesBase = "18.10.0"
 onesignal = "5.6.1"
 room = "2.8.4"
