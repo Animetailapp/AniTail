@@ -14,7 +14,7 @@ media3 = "1.9.1"
 # 22.3.0 triggers R8 "Invalid stack map table" warnings during minify.
 playServicesCast = "22.2.0"
 playServicesBase = "18.10.0"
-onesignal = "5.6.1"
+onesignal = "5.7.0-beta"
 room = "2.8.4"
 hilt = "2.59.2"
 ktor = "3.4.0"
