@@ -28,7 +28,7 @@ workRuntimeKtx = "2.11.2"
 kuromojiIpadic = "0.9.0"
 
 [libraries]
-appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.7.1" }
+appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.8.0-alpha01" }
 commons-codec = { module = "commons-codec:commons-codec", version.ref = "commonsCodec" }
 guava = { group = "com.google.guava", name = "guava", version = "33.5.0-jre" }
 coroutines-guava = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-guava", version = "1.10.2" }
