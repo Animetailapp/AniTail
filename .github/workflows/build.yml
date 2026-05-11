@@ -37,7 +37,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Set Up Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-cleanup: on-success
 
@@ -87,7 +87,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Set Up Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-cleanup: on-success
 
@@ -169,7 +169,7 @@ jobs:
           architecture: ${{ matrix.java_arch }}
 
       - name: Set Up Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-cleanup: on-success
 
