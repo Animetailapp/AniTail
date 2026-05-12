@@ -1,7 +1,6 @@
 plugins {
     kotlin("multiplatform")
     id("com.android.kotlin.multiplatform.library")
-    id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 

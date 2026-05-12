@@ -226,6 +226,7 @@ dependencies {
     implementation(libs.hilt)
     implementation(libs.jsoup)
     ksp(libs.hilt.compiler)
+    ksp(libs.hilt.work.compiler)
 
     implementation(projects.innertube)
     implementation(projects.kugou)

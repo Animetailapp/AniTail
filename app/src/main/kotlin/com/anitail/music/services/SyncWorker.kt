@@ -1,9 +1,7 @@
 package com.anitail.music.services
 
-import android.annotation.SuppressLint
 import android.content.Context
 import androidx.hilt.work.HiltWorker
-import androidx.hilt.work.WorkerAssistedFactory
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -13,7 +11,6 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.anitail.music.utils.SyncUtils
 import dagger.assisted.Assisted
-import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,16 +29,6 @@ class SyncWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val syncUtils: SyncUtils
 ) : CoroutineWorker(context, params) {
-
-    // Factory for creating SyncWorker instances with Hilt
-    @SuppressLint("RestrictedApi")
-    @AssistedFactory
-    interface Factory : WorkerAssistedFactory<SyncWorker> {
-        override fun create(
-            appContext: Context,
-            params: WorkerParameters
-        ): SyncWorker
-    }
 
     companion object {
         private const val SYNC_WORK_NAME = "periodic_cloud_sync"

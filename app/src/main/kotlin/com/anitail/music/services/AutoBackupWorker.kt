@@ -1,7 +1,6 @@
 package com.anitail.music.services
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -15,7 +14,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.hilt.work.HiltWorker
-import androidx.hilt.work.WorkerAssistedFactory
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -34,7 +32,6 @@ import com.anitail.music.utils.dataStore
 import com.anitail.music.utils.get
 import com.anitail.music.viewmodels.BackupRestoreViewModel
 import dagger.assisted.Assisted
-import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -53,16 +50,6 @@ class AutoBackupWorker @AssistedInject constructor(
     private val databaseMerger: com.anitail.music.db.DatabaseMerger,
     private val syncUtils: com.anitail.music.utils.SyncUtils
 ) : CoroutineWorker(context, workerParams) {
-
-    // Factory for creating AutoBackupWorker instances with Hilt
-    @SuppressLint("RestrictedApi")
-    @AssistedFactory
-    interface Factory : WorkerAssistedFactory<AutoBackupWorker> {
-        override fun create(
-            appContext: Context,
-            params: WorkerParameters
-        ): AutoBackupWorker
-    }
 
     companion object {
         const val AUTO_BACKUP_WORK_NAME = "auto_backup_work"

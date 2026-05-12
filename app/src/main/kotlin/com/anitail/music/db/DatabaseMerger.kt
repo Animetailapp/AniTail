@@ -42,76 +42,80 @@ class DatabaseMerger @Inject constructor(
                 Timber.w(detachError, "Failed to pre-clean attached %s", remoteSchema)
             }
 
-            currentDb.beginTransaction()
+            // ATTACH must happen OUTSIDE the transaction.
+            // Android's SQLite reconfigures WAL mode during execSQL, which crashes
+            // with "WAL mode cannot be enabled or disabled while there are transactions
+            // in progress" if a transaction is active.
+            val remotePath = remoteDbFile.absolutePath.replace("'", "''")
+            attachRemoteDatabase(currentDb, remotePath, remoteSchema)
+            Timber.d("Attached remote database for merging as %s", remoteSchema)
+
+            if (!isDatabaseAttached(currentDb, remoteSchema)) {
+                throw IllegalStateException("Failed to attach $remoteSchema before transaction")
+            }
+
             try {
-                // ATTACH must happen on the same connection that runs merge queries.
-                val remotePath = remoteDbFile.absolutePath.replace("'", "''")
-                attachRemoteDatabase(currentDb, remotePath, remoteSchema)
-                Timber.d("Attached remote database for merging as %s", remoteSchema)
-
-                if (!isDatabaseAttached(currentDb, remoteSchema)) {
-                    throw IllegalStateException("Failed to attach $remoteSchema on active transaction connection")
-                }
-
-                // 1. Merge Songs (Favorited status mainly)
-                // If song exists in both but only remote is favorite, update local
-                // If song doesn't exist locally but exists in remote (and is favorite), insert it
-                runMergeStep("favorites") {
-                    mergeFavorites(currentDb, remoteSchema)
-                }
-
-                // 2. Merge Playlists
-                // Insert playlists that don't exist locally
-                runMergeStep("playlists") {
-                    mergePlaylists(currentDb, remoteSchema)
-                }
-
-                // 3. Merge Playlist Items
-                runMergeStep("playlist_items") {
-                    mergePlaylistItems(currentDb, remoteSchema)
-                }
-
-                // 4. Merge Youtube Watch History (Event table)
-                runMergeStep("history") {
-                    mergeHistory(currentDb, remoteSchema)
-                }
-
-                // 5. Merge Artists (bookmarked)
-                runMergeStep("artists") {
-                    mergeArtists(currentDb, remoteSchema)
-                }
-
-                // 6. Merge Albums (bookmarked)
-                runMergeStep("albums") {
-                    mergeAlbums(currentDb, remoteSchema)
-                }
-
-                // 7. Merge Search History
-                runMergeStep("search_history") {
-                    mergeSearchHistory(currentDb, remoteSchema)
-                }
-
-                // 8. Merge Lyrics
-                runMergeStep("lyrics") {
-                    mergeLyrics(currentDb, remoteSchema)
-                }
-
-                // 9. Merge Format (audio quality cache)
-                runMergeStep("formats") {
-                    mergeFormats(currentDb, remoteSchema)
-                }
-
-                currentDb.setTransactionSuccessful()
-                Timber.d("Database merge completed successfully")
-            } finally {
+                currentDb.beginTransaction()
                 try {
-                    currentDb.endTransaction()
-                } finally {
-                    runCatching {
-                        detachDatabaseIfAttached(currentDb, remoteSchema)
-                    }.onFailure { detachError ->
-                        Timber.w(detachError, "Failed to detach %s after endTransaction", remoteSchema)
+                    // 1. Merge Songs (Favorited status mainly)
+                    // If song exists in both but only remote is favorite, update local
+                    // If song doesn't exist locally but exists in remote (and is favorite), insert it
+                    runMergeStep("favorites") {
+                        mergeFavorites(currentDb, remoteSchema)
                     }
+
+                    // 2. Merge Playlists
+                    // Insert playlists that don't exist locally
+                    runMergeStep("playlists") {
+                        mergePlaylists(currentDb, remoteSchema)
+                    }
+
+                    // 3. Merge Playlist Items
+                    runMergeStep("playlist_items") {
+                        mergePlaylistItems(currentDb, remoteSchema)
+                    }
+
+                    // 4. Merge Youtube Watch History (Event table)
+                    runMergeStep("history") {
+                        mergeHistory(currentDb, remoteSchema)
+                    }
+
+                    // 5. Merge Artists (bookmarked)
+                    runMergeStep("artists") {
+                        mergeArtists(currentDb, remoteSchema)
+                    }
+
+                    // 6. Merge Albums (bookmarked)
+                    runMergeStep("albums") {
+                        mergeAlbums(currentDb, remoteSchema)
+                    }
+
+                    // 7. Merge Search History
+                    runMergeStep("search_history") {
+                        mergeSearchHistory(currentDb, remoteSchema)
+                    }
+
+                    // 8. Merge Lyrics
+                    runMergeStep("lyrics") {
+                        mergeLyrics(currentDb, remoteSchema)
+                    }
+
+                    // 9. Merge Format (audio quality cache)
+                    runMergeStep("formats") {
+                        mergeFormats(currentDb, remoteSchema)
+                    }
+
+                    currentDb.setTransactionSuccessful()
+                    Timber.d("Database merge completed successfully")
+                } finally {
+                    currentDb.endTransaction()
+                }
+            } finally {
+                // DETACH must also happen OUTSIDE the transaction.
+                runCatching {
+                    detachDatabaseIfAttached(currentDb, remoteSchema)
+                }.onFailure { detachError ->
+                    Timber.w(detachError, "Failed to detach %s after merge", remoteSchema)
                 }
             }
 
