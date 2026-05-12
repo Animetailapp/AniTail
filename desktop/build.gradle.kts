@@ -54,8 +54,8 @@ dependencies {
     implementation(libs.materialKolor)
     implementation(libs.compose.reorderable)
 
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
     implementation(libs.json)
     implementation(libs.okhttp)
     implementation(libs.lastfm.java)
