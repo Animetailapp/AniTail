@@ -3,7 +3,6 @@ package com.anitail.music.db
 import android.content.Context
 import androidx.sqlite.db.SupportSQLiteDatabase
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.delay
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
@@ -19,109 +18,88 @@ class DatabaseMerger @Inject constructor(
     /**
      * Merges a remote backup database into the current local database.
      * Strategy: "Smart Merge" - Add missing items, ignore duplicates.
+     *
+     * Uses a standalone [SQLiteDatabase] connection instead of Room's
+     * [SupportSQLiteDatabase] to bypass Room's connection pool. Android
+     * classifies ATTACH DATABASE as DDL, triggering pool reconfiguration
+     * which fails if *any* connection in Room's pool has an active
+     * transaction (e.g. InvalidationTracker, DAO queries).
      */
     suspend fun mergeDatabase(remoteDbFile: File) {
-        val currentDb = musicDatabase.openHelper.writableDatabase
+        // Clear column cache for each merge session
+        columnCache.clear()
+
         val remoteSchema = buildRemoteSchemaName()
+        val db = musicDatabase.openHelper.writableDatabase
+        val remotePath = remoteDbFile.absolutePath.replace("'", "''")
 
+        // We MUST start the transaction FIRST.
+        // Starting a transaction pins a single connection from Room's connection pool
+        // to the current thread. This guarantees that ATTACH, PRAGMA, and INSERTs
+        // all happen on the exact same physical SQLite connection.
+        db.beginTransaction()
         try {
-            // Ensure WAL checkpoint is done before merge to avoid conflicts
-            try {
-                currentDb.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
-            } catch (e: Exception) {
-                Timber.w(e, "WAL checkpoint failed, continuing anyway")
-            }
-
-            // Small delay to allow any pending transactions to complete
-            delay(100)
-
-            // Defensive cleanup in case this exact schema name already exists.
-            runCatching {
-                detachDatabaseIfAttached(currentDb, remoteSchema)
-            }.onFailure { detachError ->
-                Timber.w(detachError, "Failed to pre-clean attached %s", remoteSchema)
-            }
-
-            // ATTACH must happen OUTSIDE the transaction.
-            // Android's SQLite reconfigures WAL mode during execSQL, which crashes
-            // with "WAL mode cannot be enabled or disabled while there are transactions
-            // in progress" if a transaction is active.
-            val remotePath = remoteDbFile.absolutePath.replace("'", "''")
-            attachRemoteDatabase(currentDb, remotePath, remoteSchema)
+            // ATTACH the remote database inside the transaction.
+            // (SQLite >= 3.7.11 allows ATTACH inside a transaction).
+            // CRITICAL: We use compileStatement().execute() instead of execSQL().
+            // Android's execSQL() checks for DDL statements (like ATTACH) and triggers
+            // a connection pool reconfiguration. Reconfiguration attempts to disable WAL,
+            // which crashes if ANY transaction is active in Room's pool.
+            // compileStatement() bypasses this DDL check, allowing ATTACH to run safely.
+            db.compileStatement("ATTACH DATABASE '$remotePath' AS $remoteSchema").execute()
             Timber.d("Attached remote database for merging as %s", remoteSchema)
 
-            if (!isDatabaseAttached(currentDb, remoteSchema)) {
-                throw IllegalStateException("Failed to attach $remoteSchema before transaction")
+            if (!isDatabaseAttached(db, remoteSchema)) {
+                throw IllegalStateException("Failed to attach $remoteSchema")
             }
 
             try {
-                currentDb.beginTransaction()
-                try {
-                    // 1. Merge Songs (Favorited status mainly)
-                    // If song exists in both but only remote is favorite, update local
-                    // If song doesn't exist locally but exists in remote (and is favorite), insert it
-                    runMergeStep("favorites") {
-                        mergeFavorites(currentDb, remoteSchema)
-                    }
+                // 1. Merge Songs (Favorited status mainly)
+                runMergeStep("favorites") { mergeFavorites(db, remoteSchema) }
 
-                    // 2. Merge Playlists
-                    // Insert playlists that don't exist locally
-                    runMergeStep("playlists") {
-                        mergePlaylists(currentDb, remoteSchema)
-                    }
+                // 2. Merge Playlists
+                runMergeStep("playlists") { mergePlaylists(db, remoteSchema) }
 
-                    // 3. Merge Playlist Items
-                    runMergeStep("playlist_items") {
-                        mergePlaylistItems(currentDb, remoteSchema)
-                    }
+                // 3. Merge Playlist Items
+                runMergeStep("playlist_items") { mergePlaylistItems(db, remoteSchema) }
 
-                    // 4. Merge Youtube Watch History (Event table)
-                    runMergeStep("history") {
-                        mergeHistory(currentDb, remoteSchema)
-                    }
+                // 4. Merge Youtube Watch History (Event table)
+                runMergeStep("history") { mergeHistory(db, remoteSchema) }
 
-                    // 5. Merge Artists (bookmarked)
-                    runMergeStep("artists") {
-                        mergeArtists(currentDb, remoteSchema)
-                    }
+                // 5. Merge Artists (bookmarked)
+                runMergeStep("artists") { mergeArtists(db, remoteSchema) }
 
-                    // 6. Merge Albums (bookmarked)
-                    runMergeStep("albums") {
-                        mergeAlbums(currentDb, remoteSchema)
-                    }
+                // 6. Merge Albums (bookmarked)
+                runMergeStep("albums") { mergeAlbums(db, remoteSchema) }
 
-                    // 7. Merge Search History
-                    runMergeStep("search_history") {
-                        mergeSearchHistory(currentDb, remoteSchema)
-                    }
+                // 7. Merge Search History
+                runMergeStep("search_history") { mergeSearchHistory(db, remoteSchema) }
 
-                    // 8. Merge Lyrics
-                    runMergeStep("lyrics") {
-                        mergeLyrics(currentDb, remoteSchema)
-                    }
+                // 8. Merge Lyrics
+                runMergeStep("lyrics") { mergeLyrics(db, remoteSchema) }
 
-                    // 9. Merge Format (audio quality cache)
-                    runMergeStep("formats") {
-                        mergeFormats(currentDb, remoteSchema)
-                    }
+                // 9. Merge Format (audio quality cache)
+                runMergeStep("formats") { mergeFormats(db, remoteSchema) }
 
-                    currentDb.setTransactionSuccessful()
-                    Timber.d("Database merge completed successfully")
-                } finally {
-                    currentDb.endTransaction()
-                }
+                db.setTransactionSuccessful()
+                Timber.d("Database merge completed successfully")
             } finally {
-                // DETACH must also happen OUTSIDE the transaction.
+                // DETACH inside the transaction before ending it,
+                // so the connection goes back to the pool clean.
                 runCatching {
-                    detachDatabaseIfAttached(currentDb, remoteSchema)
+                    if (isDatabaseAttached(db, remoteSchema)) {
+                        db.compileStatement("DETACH DATABASE $remoteSchema").execute()
+                        Timber.d("Detached %s", remoteSchema)
+                    }
                 }.onFailure { detachError ->
                     Timber.w(detachError, "Failed to detach %s after merge", remoteSchema)
                 }
             }
-
         } catch (e: Exception) {
             Timber.e(e, "Failed to merge databases")
             throw e
+        } finally {
+            db.endTransaction()
         }
     }
 
@@ -599,11 +577,17 @@ class DatabaseMerger @Inject constructor(
         }
     }
 
+    /** Session-scoped cache for PRAGMA table_info results to avoid repeated queries. */
+    private val columnCache = mutableMapOf<String, List<String>>()
+
     private fun tableColumns(
         db: SupportSQLiteDatabase,
         schema: String,
         table: String,
     ): List<String> {
+        val cacheKey = "$schema.$table"
+        columnCache[cacheKey]?.let { return it }
+
         val columns = mutableListOf<String>()
         db.query("PRAGMA $schema.table_info($table)").use { cursor ->
             val nameIndex = cursor.getColumnIndex("name")
@@ -611,6 +595,7 @@ class DatabaseMerger @Inject constructor(
                 columns += cursor.getString(nameIndex)
             }
         }
+        columnCache[cacheKey] = columns
         return columns
     }
 
@@ -635,88 +620,5 @@ class DatabaseMerger @Inject constructor(
             }
         }
         return false
-    }
-
-    private fun detachDatabaseIfAttached(
-        db: SupportSQLiteDatabase,
-        schemaName: String,
-    ) {
-        if (!isDatabaseAttached(db, schemaName)) return
-        db.execSQL("DETACH DATABASE $schemaName")
-        Timber.d("Detached %s", schemaName)
-    }
-
-    private fun attachRemoteDatabase(
-        db: SupportSQLiteDatabase,
-        escapedRemotePath: String,
-        schemaName: String,
-    ) {
-        val attachSql = "ATTACH DATABASE '$escapedRemotePath' AS $schemaName"
-        runCatching {
-            db.execSQL(attachSql)
-        }.onFailure { attachError ->
-            if (!isAlreadyInUseAttachError(attachError)) {
-                throw attachFailureException(
-                    db = db,
-                    schemaName = schemaName,
-                    phase = "initial",
-                    cause = attachError,
-                )
-            }
-
-            Timber.w(
-                attachError,
-                "Schema %s already in use, retrying ATTACH after DETACH",
-                schemaName
-            )
-
-            runCatching {
-                db.execSQL("DETACH DATABASE $schemaName")
-            }.onFailure { detachError ->
-                Timber.w(detachError, "Retry DETACH failed for %s", schemaName)
-            }
-
-            // Retry ATTACH on the same active connection.
-            runCatching {
-                db.execSQL(attachSql)
-            }.getOrElse { retryError ->
-                throw attachFailureException(
-                    db = db,
-                    schemaName = schemaName,
-                    phase = "retry",
-                    cause = retryError,
-                )
-            }
-        }
-    }
-
-    private fun isAlreadyInUseAttachError(error: Throwable): Boolean {
-        val message = error.message ?: return false
-        return message.contains("already in use", ignoreCase = true)
-    }
-
-    private fun attachFailureException(
-        db: SupportSQLiteDatabase,
-        schemaName: String,
-        phase: String,
-        cause: Throwable,
-    ): IllegalStateException {
-        val attachedSchemas = attachedSchemaNames(db).joinToString(", ")
-        return IllegalStateException(
-            "ATTACH failed ($phase) for schema '$schemaName'. Attached schemas: [$attachedSchemas]",
-            cause,
-        )
-    }
-
-    private fun attachedSchemaNames(db: SupportSQLiteDatabase): List<String> {
-        val result = mutableListOf<String>()
-        db.query("PRAGMA database_list").use { cursor ->
-            val nameIndex = cursor.getColumnIndex("name")
-            if (nameIndex == -1) return emptyList()
-            while (cursor.moveToNext()) {
-                result += cursor.getString(nameIndex)
-            }
-        }
-        return result
     }
 }

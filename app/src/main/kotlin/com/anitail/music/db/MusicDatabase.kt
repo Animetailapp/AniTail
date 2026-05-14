@@ -163,6 +163,12 @@ abstract class InternalDatabase : RoomDatabase() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             super.onOpen(db)
 
+                            // Set busy_timeout so SQLite retries on lock contention
+                            // instead of immediately throwing SQLITE_BUSY.
+                            try {
+                                db.query("PRAGMA busy_timeout = 5000").use { it.moveToFirst() }
+                            } catch (_: Exception) {}
+
                             // Ensure Room's internal invalidation tracking table exists
                             // This is needed when restoring from older backups that might not have it
                             try {

@@ -353,37 +353,40 @@ constructor(
             val tempAccountsFile = java.io.File(context.cacheDir, "temp_accounts.json")
             val tempLastFmOfflineFile = java.io.File(context.cacheDir, "temp_lastfm_offline.xml")
 
+            var mergeProducedChanges = true // assume changes unless proven otherwise
             try {
-                // Extract all files from ZIP
-                java.util.zip.ZipInputStream(java.io.FileInputStream(tempZipFile)).use { zis ->
-                    var entry = zis.nextEntry
-                    while (entry != null) {
-                        when (entry.name) {
-                            com.anitail.music.db.InternalDatabase.DB_NAME -> {
-                                java.io.FileOutputStream(tempDbFile).use { fos ->
-                                    zis.copyTo(fos)
+                // Extract all files from ZIP (buffered for performance)
+                java.io.BufferedInputStream(java.io.FileInputStream(tempZipFile)).use { bis ->
+                    java.util.zip.ZipInputStream(bis).use { zis ->
+                        var entry = zis.nextEntry
+                        while (entry != null) {
+                            when (entry.name) {
+                                com.anitail.music.db.InternalDatabase.DB_NAME -> {
+                                    java.io.BufferedOutputStream(java.io.FileOutputStream(tempDbFile)).use { fos ->
+                                        zis.copyTo(fos, bufferSize = 16384)
+                                    }
                                 }
-                            }
 
-                            "settings.preferences_pb" -> {
-                                java.io.FileOutputStream(tempSettingsFile).use { fos ->
-                                    zis.copyTo(fos)
+                                "settings.preferences_pb" -> {
+                                    java.io.FileOutputStream(tempSettingsFile).use { fos ->
+                                        zis.copyTo(fos)
+                                    }
                                 }
-                            }
 
-                            "accounts.json" -> {
-                                java.io.FileOutputStream(tempAccountsFile).use { fos ->
-                                    zis.copyTo(fos)
+                                "accounts.json" -> {
+                                    java.io.FileOutputStream(tempAccountsFile).use { fos ->
+                                        zis.copyTo(fos)
+                                    }
                                 }
-                            }
 
-                            "lastfm_offline.xml" -> {
-                                java.io.FileOutputStream(tempLastFmOfflineFile).use { fos ->
-                                    zis.copyTo(fos)
+                                "lastfm_offline.xml" -> {
+                                    java.io.FileOutputStream(tempLastFmOfflineFile).use { fos ->
+                                        zis.copyTo(fos)
+                                    }
                                 }
                             }
+                            entry = zis.nextEntry
                         }
-                        entry = zis.nextEntry
                     }
                 }
 
@@ -392,41 +395,21 @@ constructor(
                     return@coroutineScope "Backup corrupto o incompleto"
                 }
 
-                // 3. Merge database (check if still safe) with retry logic
+                // 3. Merge database (check if still safe)
                 if (!database.isSafeToUse()) {
                     Timber.d("syncCloud: Database closed during sync, aborting")
                     return@coroutineScope null
                 }
 
-                // Checkpoint WAL to ensure all data is written to main db file
-                try {
-                    database.checkpoint()
-                } catch (e: Exception) {
-                    Timber.w(e, "Checkpoint before merge failed, continuing anyway")
-                }
+                // Snapshot DB size before merge to detect changes
+                val dbPathForHash = database.openHelper.writableDatabase.path
+                val dbSizeBefore = dbPathForHash?.let { java.io.File(it).length() } ?: -1L
 
-                // Retry merge up to 3 times with delays to allow pending transactions to complete
-                var mergeSuccess = false
-                var lastMergeError: Exception? = null
-                for (attempt in 1..3) {
-                    try {
-                        databaseMerger.mergeDatabase(tempDbFile)
-                        mergeSuccess = true
-                        break
-                    } catch (e: IllegalStateException) {
-                        lastMergeError = e
-                        if (e.message?.contains("transactions in progress") == true && attempt < 3) {
-                            Timber.w("Merge attempt $attempt failed due to pending transactions, retrying...")
-                            kotlinx.coroutines.delay(500L * attempt) // Progressive delay
-                        } else {
-                            throw e
-                        }
-                    }
-                }
+                databaseMerger.mergeDatabase(tempDbFile)
 
-                if (!mergeSuccess && lastMergeError != null) {
-                    throw lastMergeError
-                }
+                // Check if merge actually changed anything
+                val dbSizeAfter = dbPathForHash?.let { java.io.File(it).length() } ?: -2L
+                mergeProducedChanges = dbSizeBefore != dbSizeAfter
 
                 // 4. Restore settings if present
                 if (tempSettingsFile.exists() && tempSettingsFile.length() > 0L) {
@@ -466,6 +449,12 @@ constructor(
             }
 
             // 7. Upload merged database with all files
+            // Skip re-upload if merge produced no changes — the remote already has the latest data.
+            if (!mergeProducedChanges) {
+                Timber.d("syncCloud: Merge produced no changes, skipping re-upload")
+                return@coroutineScope "Sincronización completada"
+            }
+
             val mergedBackupZip = java.io.File(context.cacheDir, "merged_backup.zip")
             try {
                 // Check if database is still available before accessing it
@@ -493,8 +482,9 @@ constructor(
                     java.util.zip.ZipOutputStream(java.io.BufferedOutputStream(fos)).use { zos ->
                         // Add DB
                         zos.putNextEntry(java.util.zip.ZipEntry(com.anitail.music.db.InternalDatabase.DB_NAME))
-                        java.io.FileInputStream(dbPath)
-                            .use { fis -> fis.copyTo(zos) }
+                        java.io.BufferedInputStream(java.io.FileInputStream(dbPath)).use { fis ->
+                            fis.copyTo(zos, bufferSize = 16384)
+                        }
 
                         // Add Settings
                         val settingsFile =
