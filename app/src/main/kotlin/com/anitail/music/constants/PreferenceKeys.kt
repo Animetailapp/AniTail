@@ -434,6 +434,7 @@ val AccountEmailKey = stringPreferencesKey("accountEmail")
 val AccountChannelHandleKey = stringPreferencesKey("accountChannelHandle")
 val AccountImageUrlKey = stringPreferencesKey("accountImageUrl")
 val UseLoginForBrowse = booleanPreferencesKey("useLoginForBrowse")
+val AutoAcceptYouTubeTermsKey = booleanPreferencesKey("autoAcceptYouTubeTerms")
 
 val LanguageCodeToName =
     mapOf(

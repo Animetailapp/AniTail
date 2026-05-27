@@ -110,6 +110,11 @@ object YouTube {
         set(value) {
             innerTube.useLoginForBrowse = value
         }
+    var autoAcceptYouTubeTerms: Boolean
+        get() = innerTube.autoAcceptYouTubeTerms
+        set(value) {
+            innerTube.autoAcceptYouTubeTerms = value
+        }
 
     suspend fun searchSuggestions(query: String): Result<SearchSuggestions> = runCatching {
         val response = innerTube.getSearchSuggestions(WEB_REMIX, query).body<GetSearchSuggestionsResponse>()

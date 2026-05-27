@@ -58,6 +58,7 @@ import com.anitail.music.constants.ListItemHeight
 import com.anitail.music.constants.ListThumbnailSize
 import com.anitail.music.db.entities.Album
 import com.anitail.music.db.entities.Song
+import com.anitail.music.db.entities.SongArtistMap
 import com.anitail.music.playback.DownloadUtil
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.ui.component.AlbumListItem
@@ -175,6 +176,21 @@ fun AlbumMenu(
     AddToPlaylistDialog(
         isVisible = showChoosePlaylistDialog,
         onGetSong = { playlist ->
+            database.transaction {
+                songs.forEach { song ->
+                    insert(song.song)
+                    song.artists.forEachIndexed { index, artist ->
+                        insert(artist)
+                        insert(
+                            SongArtistMap(
+                                songId = song.id,
+                                artistId = artist.id,
+                                position = index
+                            )
+                        )
+                    }
+                }
+            }
             coroutineScope.launch(Dispatchers.IO) {
                 playlist.playlist.browseId?.let { playlistId ->
                     album.album.playlistId?.let { addPlaylistId ->

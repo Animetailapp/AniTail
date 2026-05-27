@@ -43,6 +43,7 @@ import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.R
 import com.anitail.music.constants.ContentCountryKey
 import com.anitail.music.constants.ContentLanguageKey
+import com.anitail.music.constants.AutoAcceptYouTubeTermsKey
 import com.anitail.music.constants.CountryCodeToName
 import com.anitail.music.constants.EnableBetterLyricsKey
 import com.anitail.music.constants.EnableKugouKey
@@ -93,6 +94,10 @@ fun ContentSettings(
     val (contentCountry, onContentCountryChange) = rememberPreference(
         key = ContentCountryKey,
         defaultValue = "system"
+    )
+    val (autoAcceptYouTubeTerms, onAutoAcceptYouTubeTermsChange) = rememberPreference(
+        key = AutoAcceptYouTubeTermsKey,
+        defaultValue = false
     )
     val (selectedLanguage, setSelectedLanguage) = rememberPreference(
         stringPreferencesKey("app_language"),
@@ -308,6 +313,16 @@ fun ContentSettings(
  
                 onContentCountryChange(newValue)
            }
+        )
+        SwitchPreference(
+            title = { Text(stringResource(R.string.auto_accept_youtube_terms)) },
+            description = stringResource(R.string.auto_accept_youtube_terms_desc),
+            icon = { Icon(painterResource(R.drawable.security), null) },
+            checked = autoAcceptYouTubeTerms,
+            onCheckedChange = {
+                YouTube.autoAcceptYouTubeTerms = it
+                onAutoAcceptYouTubeTermsChange(it)
+            }
         )
 
         PreferenceGroupTitle(title = stringResource(R.string.app_language))

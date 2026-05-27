@@ -32,6 +32,7 @@ import com.anitail.music.constants.ProxyUrlKey
 import com.anitail.music.constants.ProxyUsernameKey
 import com.anitail.music.constants.SYSTEM_DEFAULT
 import com.anitail.music.constants.UseLoginForBrowse
+import com.anitail.music.constants.AutoAcceptYouTubeTermsKey
 import com.anitail.music.constants.VisitorDataKey
 import com.anitail.music.extensions.toEnum
 import com.anitail.music.extensions.toInetSocketAddress
@@ -153,6 +154,10 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
 
         if (dataStore[UseLoginForBrowse] != false) {
             YouTube.useLoginForBrowse = true
+        }
+
+        if (dataStore[AutoAcceptYouTubeTermsKey] == true) {
+            YouTube.autoAcceptYouTubeTerms = true
         }
 
         applicationScope.launch {

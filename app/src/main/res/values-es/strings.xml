@@ -254,6 +254,9 @@
     </plurals>
     <string name="error_no_internet">Sin conexión a la red</string>
     <string name="error_unknown">Error desconocido</string>
+    <string name="playback_failed">Falló la reproducción</string>
+    <string name="playback_failed_desc">Es necesario volver a cargar la página.</string>
+    <string name="volver_a_intentar">Volver a intentar</string>
     <string name="seek_backward">5 segundos atrás</string>
     <string name="seek_forward">5 segundos adelante</string>
 

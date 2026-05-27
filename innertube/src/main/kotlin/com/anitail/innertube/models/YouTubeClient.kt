@@ -45,6 +45,7 @@ data class YouTubeClient(
             clientVersion = "2.20250312.04.00",
             clientId = "1",
             userAgent = USER_AGENT_WEB,
+            loginSupported = true,
         )
 
         val WEB_REMIX = YouTubeClient(
@@ -72,7 +73,7 @@ data class YouTubeClient(
             clientId = "85",
             userAgent = "Mozilla/5.0 (PlayStation; PlayStation 4/12.02) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.4 Safari/605.1.15",
             loginSupported = true,
-            loginRequired = true,
+            loginRequired = false,
             useSignatureTimestamp = true,
             isEmbedded = true,
         )
@@ -83,6 +84,7 @@ data class YouTubeClient(
             clientId = "5",
             userAgent = "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)",
             osVersion = "18.3.2.22D82",
+            loginSupported = true,
         )
 
         val MOBILE = YouTubeClient(

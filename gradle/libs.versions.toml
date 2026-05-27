@@ -1,5 +1,5 @@
 [versions]
-androidGradlePlugin = "9.3.0-alpha04"
+androidGradlePlugin = "9.3.0-alpha05"
 hiltWork = "1.4.0-beta01"
 commonsCodec = "1.22.0"
 json = "20250517"
@@ -112,7 +112,7 @@ junit = { group = "junit", name = "junit", version = "4.13.2" }
 timber = { group = "com.jakewharton.timber", name = "timber", version = "5.0.1" }
 
 #newpipe-extractor = { group = "com.github.libre-tube", name = "NewPipeExtractor", version = "f3bb450" }
-newpipe-extractor = { group = "com.github.TeamNewPipe", name = "NewPipeExtractor", version = "dev-SNAPSHOT" }
+newpipe-extractor = { group = "com.github.TeamNewPipe", name = "NewPipeExtractor", version = "v0.26.2" }
 
 kuromoji-ipadic = { group = "com.atilika.kuromoji", name = "kuromoji-ipadic", version.ref = "kuromojiIpadic" }
 work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }

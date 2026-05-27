@@ -1,6 +1,7 @@
 plugins {
     kotlin("multiplatform")
     id("com.android.kotlin.multiplatform.library")
+    id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
@@ -21,10 +22,10 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-                implementation(libs.compose.runtime)
-                implementation(libs.compose.foundation)
-                implementation(libs.material3)
-                implementation(libs.compose.ui)
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.ui)
                 api(libs.ktor.serialization.json)
             }
         }

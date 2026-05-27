@@ -282,6 +282,9 @@
     </plurals>
     <string name="error_no_internet">No network connection</string>
     <string name="error_unknown">Unknown error</string>
+    <string name="playback_failed">Playback failed</string>
+    <string name="playback_failed_desc">It is necessary to reload the page.</string>
+    <string name="volver_a_intentar">Try again</string>
     <string name="seek_backward">5 seconds backward</string>
     <string name="seek_forward">5 seconds forward</string>
 
@@ -416,6 +419,8 @@
     <string name="general">General</string>
     <string name="content_language">Default content language</string>
     <string name="content_country">Default content country</string>
+    <string name="auto_accept_youtube_terms">Auto-accept YouTube Terms</string>
+    <string name="auto_accept_youtube_terms_desc">Automatically accept YouTube terms and cookie consent to prevent playback errors</string>
     <string name="hide_explicit">Hide explicit content</string>
     <string name="hide_explicit_desc">Filter songs with explicit content</string>
     <string name="system_default">System default</string>
