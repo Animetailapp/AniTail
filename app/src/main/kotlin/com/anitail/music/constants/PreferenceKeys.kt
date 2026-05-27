@@ -92,6 +92,9 @@ val EnableKugouKey = booleanPreferencesKey("enableKugou")
 val EnableLrcLibKey = booleanPreferencesKey("enableLrclib")
 val EnableSimpMusicKey = booleanPreferencesKey("enableSimpMusic")
 val EnableBetterLyricsKey = booleanPreferencesKey("enableBetterLyrics")
+val EnablePaxsenixKey = booleanPreferencesKey("enablePaxsenix")
+val EnableLyricsPlus = booleanPreferencesKey("enableLyricsPlus")
+val LyricsProviderOrderKey = stringPreferencesKey("lyricsProviderOrder")
 val HideExplicitKey = booleanPreferencesKey("hideExplicit")
 val ProxyEnabledKey = booleanPreferencesKey("proxyEnabled")
 val ProxyUrlKey = stringPreferencesKey("proxyUrl")
@@ -355,6 +358,8 @@ enum class PreferredLyricsProvider {
     KUGOU,
     BETTER_LYRICS,
     SIMPMUSIC,
+    PAXSENIX,
+    LYRICS_PLUS,
 }
 
 enum class PlayerButtonsStyle {
@@ -392,6 +397,20 @@ val LyricsRomanizeBelarusianKey = booleanPreferencesKey("lyricsRomanizeBelarusia
 val LyricsRomanizeKyrgyzKey = booleanPreferencesKey("lyricsRomanizeKyrgyz")
 val LyricsRomanizeCyrillicByLineKey = booleanPreferencesKey("lyricsRomanizeCyrillicByLine")
 val TranslateLyricsKey = booleanPreferencesKey("translateLyrics")
+val OpenRouterApiKey = stringPreferencesKey("openRouterApiKey")
+val AiProviderKey = stringPreferencesKey("aiProvider")
+val OpenRouterBaseUrlKey = stringPreferencesKey("openRouterBaseUrl")
+val OpenRouterModelKey = stringPreferencesKey("openRouterModel")
+const val OpenRouterDefaultBaseUrl = "https://openrouter.ai/api/v1/chat/completions"
+const val OpenRouterDefaultModel = "google/gemini-2.5-flash-lite"
+val TranslateModeKey = stringPreferencesKey("translateMode")
+val TranslateLanguageKey = stringPreferencesKey("translateLanguage")
+val DeeplApiKey = stringPreferencesKey("deeplApiKey")
+val DeeplFormalityKey = stringPreferencesKey("deeplFormality")
+val MistralApiKey = stringPreferencesKey("mistralApiKey")
+val MistralModelKey = stringPreferencesKey("mistralModel")
+const val DEFAULT_AI_SYSTEM_PROMPT = """You are a precise lyrics translation assistant. Return a JSON array of strings with exactly {lineCount} items."""
+val AiSystemPromptKey = stringPreferencesKey("aiSystemPrompt")
 val LyricsGlowEffectKey = booleanPreferencesKey("lyricsGlowEffect")
 val LyricsAnimationStyleKey = stringPreferencesKey("lyricsAnimationStyle")
 val LyricsFontSizeKey = floatPreferencesKey("lyricsFontSize")

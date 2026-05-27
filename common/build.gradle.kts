@@ -32,12 +32,12 @@ kotlin {
         val commonTest by getting
         val androidMain by getting {
             dependencies {
-                implementation(projects.innertube)
+                implementation(project(":innertube"))
             }
         }
         val desktopMain by getting {
             dependencies {
-                implementation(projects.innertube)
+                implementation(project(":innertube"))
             }
         }
         val desktopTest by getting

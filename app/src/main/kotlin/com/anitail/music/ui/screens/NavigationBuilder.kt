@@ -48,6 +48,8 @@ import com.anitail.music.ui.screens.settings.StorageSettings
 import com.anitail.music.ui.screens.settings.ThemeColorsSettings
 import com.anitail.music.ui.screens.settings.UpdateSettings
 import com.anitail.music.ui.screens.settings.import_from_spotify.ImportFromSpotifyScreen
+import com.anitail.music.ui.screens.equalizer.EqScreen
+import com.anitail.music.ui.screens.equalizer.wizard.WizardScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 fun NavGraphBuilder.navigationBuilder(
@@ -377,6 +379,12 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable("settings/player") {
         PlayerSettings(navController, scrollBehavior)
+    }
+    composable("settings/equalizer") {
+        EqScreen(navController)
+    }
+    composable("eq_wizard") {
+        WizardScreen(onNavigateBack = { navController.popBackStack() })
     }
     composable("settings/storage") {
         StorageSettings(navController, scrollBehavior)

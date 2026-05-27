@@ -52,6 +52,7 @@ include(":kizzy")
 include(":betterlyrics")
 include(":simpmusic")
 include(":shazamkit")
+include(":paxsenix")
 
 if (includeAndroidProject) {
     project(":android").projectDir = file("app")

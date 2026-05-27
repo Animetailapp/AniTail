@@ -86,7 +86,6 @@ import com.anitail.music.constants.SwipeToSongKey
 import com.anitail.music.constants.TranslateLyricsKey
 import com.anitail.music.constants.UseNewMiniPlayerDesignKey
 import com.anitail.music.constants.UseNewPlayerDesignKey
-import com.anitail.music.lyrics.TranslationUtils
 import com.anitail.music.ui.component.DefaultDialog
 import com.anitail.music.ui.component.EnumListPreference
 import com.anitail.music.ui.component.IconButton
@@ -698,15 +697,6 @@ fun AppearanceSettings(
             icon = { Icon(painterResource(R.drawable.language), null) },
             checked = translateLyrics,
             onCheckedChange = onTranslateLyricsChange,
-        )
-
-        PreferenceEntry(
-            title = { Text(stringResource(R.string.clear_translation_models)) },
-            icon = { Icon(painterResource(R.drawable.delete), null) },
-            description = stringResource(R.string.clear),
-            onClick = {
-                scope.launch { TranslationUtils.close() }
-            }
         )
 
         // Lyrics font size preference with dialog

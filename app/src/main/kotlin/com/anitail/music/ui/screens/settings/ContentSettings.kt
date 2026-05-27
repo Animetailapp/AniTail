@@ -47,11 +47,26 @@ import com.anitail.music.constants.AutoAcceptYouTubeTermsKey
 import com.anitail.music.constants.CountryCodeToName
 import com.anitail.music.constants.EnableBetterLyricsKey
 import com.anitail.music.constants.EnableKugouKey
+import com.anitail.music.constants.EnableLyricsPlus
 import com.anitail.music.constants.EnableLrcLibKey
+import com.anitail.music.constants.EnablePaxsenixKey
 import com.anitail.music.constants.EnableSimpMusicKey
 import com.anitail.music.constants.HideExplicitKey
 import com.anitail.music.constants.LanguageCodeToName
 import com.anitail.music.constants.LyricsGlowEffectKey
+import com.anitail.music.constants.AiProviderKey
+import com.anitail.music.constants.DeeplApiKey
+import com.anitail.music.constants.DeeplFormalityKey
+import com.anitail.music.constants.MistralApiKey
+import com.anitail.music.constants.MistralModelKey
+import com.anitail.music.constants.OpenRouterApiKey
+import com.anitail.music.constants.OpenRouterBaseUrlKey
+import com.anitail.music.constants.OpenRouterDefaultBaseUrl
+import com.anitail.music.constants.OpenRouterDefaultModel
+import com.anitail.music.constants.OpenRouterModelKey
+import com.anitail.music.constants.TranslateLanguageKey
+import com.anitail.music.constants.TranslateLyricsKey
+import com.anitail.music.constants.TranslateModeKey
 import com.anitail.music.constants.PreferredLyricsProvider
 import com.anitail.music.constants.PreferredLyricsProviderKey
 import com.anitail.music.constants.ProxyEnabledKey
@@ -125,6 +140,10 @@ fun ContentSettings(
         rememberPreference(key = EnableBetterLyricsKey, defaultValue = true)
     val (enableSimpMusic, onEnableSimpMusicChange) =
         rememberPreference(key = EnableSimpMusicKey, defaultValue = true)
+    val (enablePaxsenix, onEnablePaxsenixChange) =
+        rememberPreference(key = EnablePaxsenixKey, defaultValue = true)
+    val (enableLyricsPlus, onEnableLyricsPlusChange) =
+        rememberPreference(key = EnableLyricsPlus, defaultValue = false)
     val (enableKugou, onEnableKugouChange) = rememberPreference(key = EnableKugouKey, defaultValue = true)
     val (enableLrclib, onEnableLrclibChange) = rememberPreference(key = EnableLrcLibKey, defaultValue = true)
     val (preferredProvider, onPreferredProviderChange) =
@@ -136,6 +155,19 @@ fun ContentSettings(
         key = LyricsGlowEffectKey,
         defaultValue = false
     )
+    val (translateLyrics, onTranslateLyricsChange) = rememberPreference(TranslateLyricsKey, defaultValue = false)
+    val (aiProvider, onAiProviderChange) = rememberPreference(AiProviderKey, defaultValue = "OpenRouter")
+    val (translateMode, onTranslateModeChange) = rememberPreference(TranslateModeKey, defaultValue = "Translated")
+    val (translateLanguage, onTranslateLanguageChange) = rememberPreference(TranslateLanguageKey, defaultValue = "en")
+    val (openRouterApiKey, onOpenRouterApiKeyChange) = rememberPreference(OpenRouterApiKey, defaultValue = "")
+    val (openRouterBaseUrl, onOpenRouterBaseUrlChange) =
+        rememberPreference(OpenRouterBaseUrlKey, defaultValue = OpenRouterDefaultBaseUrl)
+    val (openRouterModel, onOpenRouterModelChange) =
+        rememberPreference(OpenRouterModelKey, defaultValue = OpenRouterDefaultModel)
+    val (deeplApiKey, onDeeplApiKeyChange) = rememberPreference(DeeplApiKey, defaultValue = "")
+    val (deeplFormality, onDeeplFormalityChange) = rememberPreference(DeeplFormalityKey, defaultValue = "default")
+    val (mistralApiKey, onMistralApiKeyChange) = rememberPreference(MistralApiKey, defaultValue = "")
+    val (mistralModel, onMistralModelChange) = rememberPreference(MistralModelKey, defaultValue = "mistral-small-latest")
     val (lengthTop, onLengthTopChange) = rememberPreference(key = TopSize, defaultValue = "50")
     val (quickPicks, onQuickPicksChange) = rememberEnumPreference(key = QuickPicksKey, defaultValue = QuickPicks.QUICK_PICKS)
 
@@ -387,6 +419,18 @@ fun ContentSettings(
             onCheckedChange = onEnableLrclibChange,
         )
         SwitchPreference(
+            title = { Text(stringResource(R.string.enable_paxsenix)) },
+            icon = { Icon(painterResource(R.drawable.lyrics), null) },
+            checked = enablePaxsenix,
+            onCheckedChange = onEnablePaxsenixChange,
+        )
+        SwitchPreference(
+            title = { Text(stringResource(R.string.enable_lyrics_plus)) },
+            icon = { Icon(painterResource(R.drawable.lyrics), null) },
+            checked = enableLyricsPlus,
+            onCheckedChange = onEnableLyricsPlusChange,
+        )
+        SwitchPreference(
             title = { Text(stringResource(R.string.enable_kugou)) },
             icon = { Icon(painterResource(R.drawable.lyrics), null) },
             checked = enableKugou,
@@ -401,6 +445,8 @@ fun ContentSettings(
                 PreferredLyricsProvider.KUGOU,
                 PreferredLyricsProvider.BETTER_LYRICS,
                 PreferredLyricsProvider.SIMPMUSIC,
+                PreferredLyricsProvider.PAXSENIX,
+                PreferredLyricsProvider.LYRICS_PLUS,
             ),
             valueText = {
                 when (it) {
@@ -408,6 +454,8 @@ fun ContentSettings(
                     PreferredLyricsProvider.KUGOU -> "KuGou"
                     PreferredLyricsProvider.BETTER_LYRICS -> stringResource(R.string.lyrics_provider_betterlyrics)
                     PreferredLyricsProvider.SIMPMUSIC -> stringResource(R.string.lyrics_provider_simpmusic)
+                    PreferredLyricsProvider.PAXSENIX -> "Paxsenix"
+                    PreferredLyricsProvider.LYRICS_PLUS -> "LyricsPlus"
                 }
             },
             onValueSelected = onPreferredProviderChange,
@@ -417,6 +465,78 @@ fun ContentSettings(
             icon = { Icon(painterResource(R.drawable.lyrics), null) },
             checked = lyricsGlowEffect,
             onCheckedChange = onLyricsGlowEffectChange,
+        )
+
+        PreferenceGroupTitle(title = stringResource(R.string.lyrics_ai_translation))
+        SwitchPreference(
+            title = { Text(stringResource(R.string.translate_lyrics)) },
+            icon = { Icon(painterResource(R.drawable.language), null) },
+            checked = translateLyrics,
+            onCheckedChange = onTranslateLyricsChange,
+        )
+        ListPreference(
+            title = { Text(stringResource(R.string.ai_provider)) },
+            icon = { Icon(painterResource(R.drawable.tune), null) },
+            selectedValue = aiProvider,
+            values = listOf("OpenRouter", "DeepL", "Mistral"),
+            valueText = { it },
+            onValueSelected = onAiProviderChange,
+        )
+        ListPreference(
+            title = { Text(stringResource(R.string.translate_mode)) },
+            icon = { Icon(painterResource(R.drawable.lyrics), null) },
+            selectedValue = translateMode,
+            values = listOf("Translated", "Romanized", "Transcribed"),
+            valueText = { it },
+            onValueSelected = onTranslateModeChange,
+        )
+        EditTextPreference(
+            title = { Text(stringResource(R.string.translate_language)) },
+            icon = { Icon(painterResource(R.drawable.language), null) },
+            value = translateLanguage,
+            onValueChange = onTranslateLanguageChange,
+        )
+        EditTextPreference(
+            title = { Text(stringResource(R.string.openrouter_api_key)) },
+            icon = { Icon(painterResource(R.drawable.lock), null) },
+            value = openRouterApiKey,
+            onValueChange = onOpenRouterApiKeyChange,
+        )
+        EditTextPreference(
+            title = { Text(stringResource(R.string.openrouter_base_url)) },
+            icon = { Icon(painterResource(R.drawable.links), null) },
+            value = openRouterBaseUrl,
+            onValueChange = onOpenRouterBaseUrlChange,
+        )
+        EditTextPreference(
+            title = { Text(stringResource(R.string.openrouter_model)) },
+            icon = { Icon(painterResource(R.drawable.tune), null) },
+            value = openRouterModel,
+            onValueChange = onOpenRouterModelChange,
+        )
+        EditTextPreference(
+            title = { Text(stringResource(R.string.deepl_api_key)) },
+            icon = { Icon(painterResource(R.drawable.lock), null) },
+            value = deeplApiKey,
+            onValueChange = onDeeplApiKeyChange,
+        )
+        EditTextPreference(
+            title = { Text(stringResource(R.string.deepl_formality)) },
+            icon = { Icon(painterResource(R.drawable.language), null) },
+            value = deeplFormality,
+            onValueChange = onDeeplFormalityChange,
+        )
+        EditTextPreference(
+            title = { Text(stringResource(R.string.mistral_api_key)) },
+            icon = { Icon(painterResource(R.drawable.lock), null) },
+            value = mistralApiKey,
+            onValueChange = onMistralApiKeyChange,
+        )
+        EditTextPreference(
+            title = { Text(stringResource(R.string.mistral_model)) },
+            icon = { Icon(painterResource(R.drawable.tune), null) },
+            value = mistralModel,
+            onValueChange = onMistralModelChange,
         )
 
         PreferenceEntry(

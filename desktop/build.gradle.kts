@@ -43,11 +43,11 @@ val javafxPlatform = when {
 }
 
 dependencies {
-    implementation(projects.common)
-    implementation(projects.innertube)
-    implementation(projects.betterlyrics)
-    implementation(projects.simpmusic)
-    implementation(projects.kizzy)
+    implementation(project(":common"))
+    implementation(project(":innertube"))
+    implementation(project(":betterlyrics"))
+    implementation(project(":simpmusic"))
+    implementation(project(":kizzy"))
 
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
