@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -14,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -23,6 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
+import androidx.compose.material3.carousel.rememberCarouselState
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.YTItem
 import com.anitail.music.R
@@ -150,43 +155,28 @@ internal fun DailyDiscoverSection(
     onItemClick: (DailyDiscoverItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val visibleDiscoverItems = remember(discoverItems) { discoverItems.take(3) }
-    val rowState = rememberLazyListState()
-    val currentPage by remember(rowState, visibleDiscoverItems.size) {
-        derivedStateOf {
-            rowState.firstVisibleItemIndex.coerceAtMost((visibleDiscoverItems.size - 1).coerceAtLeast(0))
-        }
-    }
-    val cardWidth = maxWidth - 110.dp
+    val visibleDiscoverItems = remember(discoverItems) { discoverItems.take(6) }
+    val preferredCardWidth = (maxWidth - 92.dp).coerceAtLeast(220.dp)
+    val carouselState = rememberCarouselState { visibleDiscoverItems.size }
 
-    androidx.compose.foundation.layout.Column(modifier = modifier) {
-        PagerDots(
-            pageCount = visibleDiscoverItems.size,
-            currentPage = currentPage,
+    HorizontalUncontainedCarousel(
+        state = carouselState,
+        itemWidth = preferredCardWidth,
+        itemSpacing = 12.dp,
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+    ) { index ->
+        val discoverItem = visibleDiscoverItems[index]
+        DailyDiscoverCard(
+            item = discoverItem,
+            onClick = { onItemClick(discoverItem) },
+            emphasizeContent = index == carouselState.currentItem,
             modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .padding(bottom = 10.dp),
+                .height(360.dp)
+                .maskClip(RoundedCornerShape(30.dp)),
         )
-
-        LazyRow(
-            state = rowState,
-            flingBehavior = rememberSnapFlingBehavior(rowState),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            items(
-                items = visibleDiscoverItems,
-                key = { it.recommendation.id },
-            ) { discoverItem ->
-                DailyDiscoverCard(
-                    item = discoverItem,
-                    onClick = { onItemClick(discoverItem) },
-                    modifier = Modifier
-                        .width(cardWidth)
-                        .height(360.dp),
-                )
-            }
-        }
     }
 }
 
@@ -246,7 +236,7 @@ internal fun LazyListScope.CommunityPlaylistsBlock(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 internal fun LazyListScope.DailyDiscoverBlock(
     discoverItems: List<DailyDiscoverItem>?,
     maxWidth: Dp,

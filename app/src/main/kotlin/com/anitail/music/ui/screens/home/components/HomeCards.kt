@@ -314,11 +314,11 @@ internal fun CommunityPlaylistCard(
 internal fun DailyDiscoverCard(
     item: DailyDiscoverItem,
     onClick: () -> Unit,
+    emphasizeContent: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Card(
         modifier = modifier
-            .clip(RoundedCornerShape(30.dp))
             .combinedClickable(onClick = onClick),
         shape = RoundedCornerShape(30.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1828)),
@@ -337,43 +337,45 @@ internal fun DailyDiscoverCard(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color.Black.copy(alpha = 0.55f),
+                                Color.Black.copy(alpha = if (emphasizeContent) 0.55f else 0.22f),
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.78f),
+                                Color.Black.copy(alpha = if (emphasizeContent) 0.78f else 0.28f),
                             ),
                         ),
                     ),
             )
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(18.dp),
-            ) {
-                Text(
-                    text = item.recommendation.title,
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = item.recommendation.artists.joinToString(", ") { it.name },
-                    color = Color.White.copy(alpha = 0.84f),
-                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 13.sp),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = stringResource(R.string.daily_discover_based_on, item.seed.title),
-                    color = Color.White.copy(alpha = 0.84f),
-                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 10.sp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            if (emphasizeContent) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(18.dp),
+                ) {
+                    Text(
+                        text = item.recommendation.title,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = item.recommendation.artists.joinToString(", ") { it.name },
+                        color = Color.White.copy(alpha = 0.84f),
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 13.sp),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = stringResource(R.string.daily_discover_based_on, item.seed.title),
+                        color = Color.White.copy(alpha = 0.84f),
+                        style = MaterialTheme.typography.bodyLarge.copy(fontSize = 10.sp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
