@@ -123,7 +123,9 @@ class HomeViewModel @Inject constructor(
 
     val allLocalItems = MutableStateFlow<List<LocalItem>>(emptyList())
     val allYtItems = MutableStateFlow<List<YTItem>>(emptyList())
+    private var deferredLocalContentJob: Job? = null
     private var deferredHomeContentJob: Job? = null
+    private var deferredRemotePagesJob: Job? = null
 
         // Account display info
     val accountName = MutableStateFlow("Guest")
@@ -322,6 +324,24 @@ class HomeViewModel @Inject constructor(
         )
     }
 
+    private suspend fun fetchHomePage(hideExplicit: Boolean): HomePage? {
+        val page = YouTube.home().onFailure {
+            reportException(it)
+        }.getOrNull()
+
+        return page?.copy(
+            sections = page.sections.map { section ->
+                section.copy(items = section.items.filterExplicit(hideExplicit))
+            }
+        )
+    }
+
+    private suspend fun fetchExplorePage(): ExplorePage? {
+        return YouTube.explore().onFailure {
+            reportException(it)
+        }.getOrNull()
+    }
+
     private fun rebuildSpeedDialItems() {
         val localSongs = buildList<YTItem> {
             addAll(quickPicks.value.orEmpty().mapNotNull { it.toSongItemOrNull() })
@@ -498,6 +518,39 @@ class HomeViewModel @Inject constructor(
         return (artistRecommendations + songRecommendations).shuffled()
     }
 
+    private fun startDeferredLocalContentLoad(fromTimeStamp: Long) {
+        deferredLocalContentJob?.cancel()
+        deferredLocalContentJob = viewModelScope.launch(Dispatchers.IO) {
+            supervisorScope {
+                val quickPicksTask = async {
+                    getQuickPicks()
+                }
+                val forgottenFavoritesTask = async {
+                    database.forgottenFavorites().first().shuffled().take(20)
+                }
+                val keepListeningTask = async {
+                    val keepListeningSongs = database.mostPlayedSongs(fromTimeStamp, limit = 15, offset = 5)
+                        .first().shuffled().take(10)
+                    val keepListeningAlbums = database.mostPlayedAlbums(fromTimeStamp, limit = 8, offset = 2)
+                        .first().filter { it.album.thumbnailUrl != null }.shuffled().take(5)
+                    val keepListeningArtists = database.mostPlayedArtists(fromTimeStamp)
+                        .first().filter { it.artist.isYouTubeArtist && it.artist.thumbnailUrl != null }
+                        .shuffled().take(5)
+                    (keepListeningSongs + keepListeningAlbums + keepListeningArtists).shuffled()
+                }
+
+                quickPicksTask.await()
+                forgottenFavorites.value = forgottenFavoritesTask.await()
+                keepListening.value = keepListeningTask.await()
+
+                allLocalItems.value =
+                    (quickPicks.value.orEmpty() + forgottenFavorites.value.orEmpty() + keepListening.value.orEmpty())
+                        .filter { it is Song || it is Album }
+                rebuildSpeedDialItems()
+            }
+        }
+    }
+
     private fun startDeferredHomeContentLoad(
         hideExplicit: Boolean,
         fromTimeStamp: Long,
@@ -530,14 +583,45 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private suspend fun load() {
+    private fun startDeferredRemotePagesLoad(hideExplicit: Boolean) {
+        deferredRemotePagesJob?.cancel()
+        deferredRemotePagesJob = viewModelScope.launch(Dispatchers.IO) {
+            supervisorScope {
+                val homePageTask = async { fetchHomePage(hideExplicit) }
+                val explorePageTask = async { fetchExplorePage() }
+
+                homePageTask.await()?.let { refreshedHomePage ->
+                    homePage.value = refreshedHomePage
+                }
+                explorePageTask.await()?.let { refreshedExplorePage ->
+                    explorePage.value = refreshedExplorePage
+                }
+
+                rebuildAllYtItems()
+                rebuildSpeedDialItems()
+            }
+        }
+    }
+
+    private suspend fun load(
+        showLoadingState: Boolean = true,
+        awaitRemotePages: Boolean = true,
+    ) {
+        deferredLocalContentJob?.cancel()
         deferredHomeContentJob?.cancel()
+        deferredRemotePagesJob?.cancel()
         consumedContinuations.clear()
-        isLoading.value = true
+        if (showLoadingState) {
+            isLoading.value = true
+        }
 
         try {
             val hideExplicit = context.dataStore.get(HideExplicitKey, false)
             val fromTimeStamp = System.currentTimeMillis() - 86400000 * 7 * 2
+
+            if (!awaitRemotePages) {
+                startDeferredRemotePagesLoad(hideExplicit)
+            }
 
             supervisorScope {
                 val quickPicksTask = async {
@@ -556,20 +640,15 @@ class HomeViewModel @Inject constructor(
                         .shuffled().take(5)
                     (keepListeningSongs + keepListeningAlbums + keepListeningArtists).shuffled()
                 }
-                val homePageTask = async {
-                    val page = YouTube.home().onFailure {
-                        reportException(it)
-                    }.getOrNull()
-                    page?.copy(
-                        sections = page.sections.map { section ->
-                            section.copy(items = section.items.filterExplicit(hideExplicit))
-                        }
-                    )
+                val homePageTask = if (awaitRemotePages) {
+                    async { fetchHomePage(hideExplicit) }
+                } else {
+                    null
                 }
-                val explorePageTask = async {
-                    YouTube.explore().onFailure {
-                        reportException(it)
-                    }.getOrNull()
+                val explorePageTask = if (awaitRemotePages) {
+                    async { fetchExplorePage() }
+                } else {
+                    null
                 }
 
                 quickPicksTask.await()
@@ -580,20 +659,28 @@ class HomeViewModel @Inject constructor(
                     (quickPicks.value.orEmpty() + forgottenFavorites.value.orEmpty() + keepListening.value.orEmpty())
                         .filter { it is Song || it is Album }
 
-                isLoading.value = false
+                if (showLoadingState) {
+                    isLoading.value = false
+                }
                 startDeferredHomeContentLoad(
                     hideExplicit = hideExplicit,
                     fromTimeStamp = fromTimeStamp,
                 )
 
-                homePage.value = homePageTask.await()
-                explorePage.value = explorePageTask.await()
+                if (awaitRemotePages) {
+                    homePageTask?.await()?.let { refreshedHomePage ->
+                        homePage.value = refreshedHomePage
+                    }
+                    explorePageTask?.await()?.let { refreshedExplorePage ->
+                        explorePage.value = refreshedExplorePage
+                    }
 
-                rebuildAllYtItems()
-                rebuildSpeedDialItems()
+                    rebuildAllYtItems()
+                    rebuildSpeedDialItems()
+                }
             }
         } finally {
-            if (isLoading.value) isLoading.value = false
+            if (showLoadingState && isLoading.value) isLoading.value = false
         }
     }
 
@@ -686,42 +773,24 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refresh() {
-        if (isRefreshing.value) return
+        if (isRefreshing.value || isLoading.value) return
         viewModelScope.launch(Dispatchers.IO) {
             isRefreshing.value = true
             try {
-                load()
+                val hideExplicit = context.dataStore.get(HideExplicitKey, false)
+                val fromTimeStamp = System.currentTimeMillis() - 86400000 * 7 * 2
+
+                consumedContinuations.clear()
+                startDeferredLocalContentLoad(fromTimeStamp)
+                startDeferredRemotePagesLoad(hideExplicit)
+                startDeferredHomeContentLoad(
+                    hideExplicit = hideExplicit,
+                    fromTimeStamp = fromTimeStamp,
+                )
             } catch (e: Exception) {
                 Timber.e(e, "HomeViewModel: Refresh failed")
             } finally {
                 isRefreshing.value = false
-            }
-
-            // Trigger cloud sync (forced since user manually refreshed)
-            launch {
-                Timber.d("HomeViewModel: Starting manual cloud sync...")
-                try {
-                    syncUtils.isSyncing.value = true
-                    syncUtils.syncStatus.value = context.getString(R.string.syncing)
-                    val result = syncUtils.syncCloud(force = true)
-                    if (result != null) {
-                        Timber.d("HomeViewModel: Cloud sync result: $result")
-                        syncUtils.syncStatus.value = result
-                    } else {
-                        // Sync was skipped (not signed in) — hide icon silently
-                        syncUtils.isSyncing.value = false
-                        syncUtils.syncStatus.value = null
-                        return@launch
-                    }
-                } catch (e: Exception) {
-                    Timber.e(e, "HomeViewModel: Cloud sync failed")
-                    syncUtils.syncStatus.value = context.getString(R.string.sync_error)
-                } finally {
-                    syncUtils.isSyncing.value = false
-                    // Clear status after 3 seconds
-                    kotlinx.coroutines.delay(3000)
-                    syncUtils.syncStatus.value = null
-                }
             }
         }
     }
