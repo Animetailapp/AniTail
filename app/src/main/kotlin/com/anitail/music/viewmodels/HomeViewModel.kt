@@ -804,34 +804,7 @@ class HomeViewModel @Inject constructor(
                 Timber.e(e, "HomeViewModel: Initial load failed")
             }
 
-            // 2. THEN start Cloud sync operation immediately after load() completes
-            launch {
-                Timber.d("HomeViewModel: Starting cloud sync...")
-                try {
-                    syncUtils.isSyncing.value = true
-                    syncUtils.syncStatus.value = context.getString(R.string.syncing)
-                    val result = syncUtils.syncCloud()
-                    if (result != null) {
-                        Timber.d("HomeViewModel: Cloud sync result: $result")
-                        syncUtils.syncStatus.value = result
-                    } else {
-                        // Sync was skipped (not signed in or throttled) — hide icon silently
-                        syncUtils.isSyncing.value = false
-                        syncUtils.syncStatus.value = null
-                        return@launch
-                    }
-                } catch (e: Exception) {
-                    Timber.e(e, "HomeViewModel: Cloud sync failed")
-                    syncUtils.syncStatus.value = context.getString(R.string.sync_error)
-                } finally {
-                    syncUtils.isSyncing.value = false
-                    // Clear status after 3 seconds
-                    kotlinx.coroutines.delay(3000)
-                    syncUtils.syncStatus.value = null
-                }
-            }
-
-            // 3. Start YouTube Music sync operation immediately after load() completes
+            // 2. Start YouTube Music sync operation immediately after load() completes
             launch {
                 val isSyncEnabled = context.dataStore.data
                     .map { it[YtmSyncKey] ?: true }

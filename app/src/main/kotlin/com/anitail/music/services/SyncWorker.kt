@@ -4,15 +4,20 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.anitail.music.constants.LastCloudSyncKey
 import com.anitail.music.utils.SyncUtils
+import com.anitail.music.utils.dataStore
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
@@ -32,6 +37,7 @@ class SyncWorker @AssistedInject constructor(
 
     companion object {
         private const val SYNC_WORK_NAME = "periodic_cloud_sync"
+        private const val STARTUP_SYNC_WORK_NAME = "startup_cloud_sync"
         private const val SYNC_INTERVAL_HOURS = 6L
         private const val WORKER_TIMEOUT_MS = 120_000L // 2 minutes max
 
@@ -61,17 +67,54 @@ class SyncWorker @AssistedInject constructor(
             Timber.d("SyncWorker: Scheduled periodic sync every $SYNC_INTERVAL_HOURS hours")
         }
 
+        suspend fun scheduleImmediate(context: Context) {
+            val lastSync = context.dataStore.data.first()[LastCloudSyncKey] ?: 0L
+            val now = System.currentTimeMillis()
+            if (lastSync != 0L && now - lastSync < SyncUtils.SYNC_THROTTLE_MS) {
+                WorkManager.getInstance(context).cancelUniqueWork(STARTUP_SYNC_WORK_NAME)
+                Timber.d("SyncWorker: Skipping startup sync scheduling - synced recently")
+                return
+            }
+
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .setRequiresBatteryNotLow(true)
+                .build()
+
+            val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
+                .setConstraints(constraints)
+                .setInitialDelay(30, TimeUnit.SECONDS)
+                .addTag(STARTUP_SYNC_WORK_NAME)
+                .build()
+
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                STARTUP_SYNC_WORK_NAME,
+                ExistingWorkPolicy.KEEP,
+                syncRequest
+            )
+
+            Timber.d("SyncWorker: Scheduled startup sync")
+        }
+
         /**
          * Cancel scheduled sync work.
          */
         fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(SYNC_WORK_NAME)
+            WorkManager.getInstance(context).cancelUniqueWork(STARTUP_SYNC_WORK_NAME)
             Timber.d("SyncWorker: Cancelled periodic sync")
         }
     }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         Timber.d("SyncWorker: Starting background sync...")
+
+        val lastSync = applicationContext.dataStore.data.first()[LastCloudSyncKey] ?: 0L
+        val now = System.currentTimeMillis()
+        if (lastSync != 0L && now - lastSync < SyncUtils.SYNC_THROTTLE_MS) {
+            Timber.d("SyncWorker: Skipping background sync - synced recently")
+            return@withContext Result.success()
+        }
 
         return@withContext try {
             val result = withTimeoutOrNull(WORKER_TIMEOUT_MS) {
@@ -80,8 +123,8 @@ class SyncWorker @AssistedInject constructor(
 
             when {
                 result == null -> {
-                    Timber.e("SyncWorker: Sync timed out or database unavailable")
-                    Result.success() // Don't retry if database was closed
+                    Timber.d("SyncWorker: Sync skipped")
+                    Result.success()
                 }
 
                 result.contains("failed", ignoreCase = true) ||

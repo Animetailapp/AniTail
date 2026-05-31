@@ -113,6 +113,13 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
         } catch (e: Exception) {
             Timber.e(e, "Failed to schedule cloud sync")
         }
+        applicationScope.launch(Dispatchers.IO) {
+            runCatching {
+                SyncWorker.scheduleImmediate(this@App)
+            }.onFailure {
+                Timber.e(it, "Failed to schedule startup cloud sync")
+            }
+        }
 
         val locale = Locale.getDefault()
         val languageTag = locale.toLanguageTag().replace("-Hant", "") // replace zh-Hant-* to zh-*

@@ -1064,6 +1064,7 @@
     <string name="sync_failed">Sync failed: %s</string>
     <string name="sync_failed_generic">Sync failed</string>
     <string name="sync_timeout">Sync timed out</string>
+    <string name="sync_failed_download">Failed to download remote backup</string>
     <string name="sync_corrupt_backup">Backup corrupt or incomplete</string>
     <string name="sync_failed_merge">Failed to merge data</string>
     <string name="sync_failed_upload">Failed to upload merged data</string>

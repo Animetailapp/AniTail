@@ -979,6 +979,7 @@
     <string name="sync_failed">Falló: %s</string>
     <string name="sync_failed_generic">Fallo de sincronización</string>
     <string name="sync_timeout">Tiempo de espera de sincronización agotado</string>
+    <string name="sync_failed_download">Fallo al descargar la copia remota</string>
     <string name="sync_corrupt_backup">Copia de seguridad corrupta o incompleta</string>
     <string name="sync_failed_merge">Fallo al mezclar datos</string>
     <string name="sync_failed_upload">Fallo al subir datos fusionados</string>

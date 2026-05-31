@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -56,6 +57,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -167,6 +169,7 @@ fun HomeScreen(
     val isMoodAndGenresLoading = isLoading && explorePage?.moodAndGenres == null
     val isRefreshing = contentUiState.isRefreshing
     val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
     val pullRefreshState = rememberPullToRefreshState()
 
     val quickPicksLazyGridState = rememberLazyGridState()
@@ -190,6 +193,11 @@ fun HomeScreen(
     val latestContinuation by rememberUpdatedState(homePage?.continuation)
     val quickPicksFirstId = quickPicks.firstOrNull()?.id
     val forgottenFavoritesFirstId = forgottenFavorites.firstOrNull()?.id
+    val syncCompletedMessage = stringResource(R.string.sync_completed)
+    val syncInitialUploadMessage = stringResource(R.string.sync_initial_uploaded)
+    val syncSucceeded = syncStatus == syncCompletedMessage || syncStatus == syncInitialUploadMessage
+    val showSyncIndicator =
+        (isSyncing || syncStatus != null) && (allLocalItems.isNotEmpty() || allYtItems.isNotEmpty())
 
     LaunchedEffect(scrollToTop) {
         if (scrollToTop) {
@@ -796,7 +804,7 @@ fun HomeScreen(
 
         // Recognition Floating Action Button (above the shuffle FAB)
         AnimatedVisibility(
-            visible = isSyncing && (allLocalItems.isNotEmpty() || allYtItems.isNotEmpty()) && lazylistState.isScrollingUp(),
+            visible = showSyncIndicator,
             enter = fadeIn() + slideInVertically { it / 2 },
             exit = fadeOut() + slideOutVertically { it / 2 },
             modifier = Modifier
@@ -808,14 +816,37 @@ fun HomeScreen(
                 .padding(end = syncIndicatorEndPadding, bottom = syncIndicatorBottomPadding),
         ) {
             Box(
-                modifier = Modifier.size(syncIndicatorSize),
+                modifier = Modifier
+                    .size(syncIndicatorSize)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
                 contentAlignment = Alignment.Center,
             ) {
-                ContainedLoadingIndicator(
-                    modifier = Modifier.fillMaxSize(),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    indicatorColor = MaterialTheme.colorScheme.primary,
-                )
+                when {
+                    isSyncing -> ContainedLoadingIndicator(
+                        modifier = Modifier.fillMaxSize(),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        indicatorColor = MaterialTheme.colorScheme.primary,
+                    )
+
+                    syncSucceeded -> Icon(
+                        painter = painterResource(R.drawable.check_circle),
+                        contentDescription = null,
+                        tint = Color(0xFF34A853),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(2.dp),
+                    )
+
+                    else -> Icon(
+                        painter = painterResource(R.drawable.error),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(2.dp),
+                    )
+                }
             }
         }
 

@@ -1,5 +1,7 @@
 package com.anitail.music.utils
 
+import android.content.Context
+import android.util.Base64
 import androidx.datastore.preferences.core.edit
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.AlbumItem
@@ -18,9 +20,35 @@ import com.anitail.music.db.entities.PlaylistSongMap
 import com.anitail.music.db.entities.SongEntity
 import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.R
+import com.anitail.music.constants.AccountChannelHandleKey
+import com.anitail.music.constants.AccountEmailKey
+import com.anitail.music.constants.AccountImageUrlKey
+import com.anitail.music.constants.AccountNameKey
+import com.anitail.music.constants.DataSyncIdKey
+import com.anitail.music.constants.DiscordAvatarUrlKey
+import com.anitail.music.constants.DiscordNameKey
+import com.anitail.music.constants.DiscordTokenKey
+import com.anitail.music.constants.DiscordUsernameKey
+import com.anitail.music.constants.InnerTubeCookieKey
+import com.anitail.music.constants.LastFmSessionKey
+import com.anitail.music.constants.LastFmUsernameKey
+import com.anitail.music.constants.ProxyPasswordKey
+import com.anitail.music.constants.ProxyUrlKey
+import com.anitail.music.constants.ProxyUsernameKey
+import com.anitail.music.constants.SpotifyAccessTokenKey
+import com.anitail.music.constants.SpotifyRefreshTokenKey
+import com.anitail.music.constants.VisitorDataKey
+import com.anitail.music.db.DatabaseMerger
+import com.anitail.music.db.InternalDatabase
+import com.anitail.music.db.entities.Event
+import com.anitail.music.models.MediaMetadata
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
@@ -29,9 +57,18 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.time.LocalDateTime
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration.Companion.milliseconds
 
 @Singleton
 class SyncUtils
@@ -40,19 +77,38 @@ constructor(
     private val database: MusicDatabase,
     private val lastFmService: LastFmService,
     private val googleDriveSyncManager: GoogleDriveSyncManager,
-    private val databaseMerger: com.anitail.music.db.DatabaseMerger,
-    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
+    private val databaseMerger: DatabaseMerger,
+    @ApplicationContext private val context: Context
 ) {
     companion object {
         private const val CLOUD_SYNC_REMOTE_BACKUP_NAME = "AniTail_CloudSync_Backup.zip"
-        private const val SYNC_THROTTLE_MS = 30 * 60 * 1000L // 30 minutes
+        const val SYNC_THROTTLE_MS = 30 * 60 * 1000L // 30 minutes
         private const val SYNC_TIMEOUT_MS = 60_000L // 60 seconds
     }
 
     private val syncScope = CoroutineScope(Dispatchers.IO)
-    val isSyncing = kotlinx.coroutines.flow.MutableStateFlow(false)
-    val syncStatus = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    val isSyncing = MutableStateFlow(false)
+    val syncStatus = MutableStateFlow<String?>(null)
     private val cloudSyncMutex = Mutex()
+    private var clearSyncStatusJob: Job? = null
+
+    private fun scheduleSyncStatusClear(status: String) {
+        clearSyncStatusJob?.cancel()
+        clearSyncStatusJob = syncScope.launch {
+            delay(3000.milliseconds)
+            if (!isSyncing.value && syncStatus.value == status) {
+                syncStatus.value = null
+            }
+        }
+    }
+
+    private fun publishSyncStatus(status: String?) {
+        clearSyncStatusJob?.cancel()
+        syncStatus.value = status
+        if (!status.isNullOrBlank()) {
+            scheduleSyncStatusClear(status)
+        }
+    }
 
   fun likeSong(s: SongEntity) {
     syncScope.launch {
@@ -235,7 +291,7 @@ constructor(
 
       if (remoteIds == localIds) return@onSuccess
 
-        val songsToInsert = mutableListOf<com.anitail.music.models.MediaMetadata>()
+        val songsToInsert = mutableListOf<MediaMetadata>()
         withContext(Dispatchers.IO) {
             songs.forEach { song ->
                 if (database.getSongById(song.id) == null) {
@@ -278,7 +334,7 @@ constructor(
                         }
 
                         database.insert(
-                            com.anitail.music.db.entities.Event(
+                            Event(
                                 songId = song.id,
                                 timestamp = LocalDateTime.now()
                                     .minusSeconds((songsToSync.size - index).toLong()),
@@ -291,7 +347,8 @@ constructor(
         }
     }
 
-    suspend fun syncCloud(force: Boolean = false): String? = coroutineScope {
+    suspend fun syncCloud(force: Boolean = false): String? = cloudSyncMutex.withLock {
+        coroutineScope {
         // Skip if database is being restored
         if (!database.isSafeToUse()) {
             Timber.d("syncCloud: Skipping - database is being restored")
@@ -323,24 +380,30 @@ constructor(
         Timber.d("syncCloud: Starting cloud sync...")
 
         // Wrap entire sync in timeout to prevent hangs
-        val result = withTimeoutOrNull(SYNC_TIMEOUT_MS) {
-            syncCloudInternal()
-        }
+        return@coroutineScope try {
+            val result = withTimeoutOrNull(SYNC_TIMEOUT_MS.milliseconds) {
+                syncCloudInternal()
+            } ?: context.getString(R.string.sync_timeout)
 
-        if (result == null) {
-            Timber.e("syncCloud: Timed out after ${SYNC_TIMEOUT_MS / 1000}s")
-            return@coroutineScope context.getString(R.string.sync_timeout)
-        }
+            if (result == context.getString(R.string.sync_timeout)) {
+                Timber.e("syncCloud: Timed out after ${SYNC_TIMEOUT_MS / 1000}s")
+            }
 
-        // Update last sync timestamp on success
-        if (result == context.getString(R.string.sync_completed) || result == context.getString(R.string.sync_initial_uploaded)) {
-            context.dataStore.edit { it[LastCloudSyncKey] = System.currentTimeMillis() }
-        }
+            // Update last sync timestamp on success
+            if (result == context.getString(R.string.sync_completed) || result == context.getString(R.string.sync_initial_uploaded)) {
+                context.dataStore.edit { it[LastCloudSyncKey] = System.currentTimeMillis() }
+            }
 
-        return@coroutineScope result
+            publishSyncStatus(result)
+            result
+        } catch (e: Exception) {
+            publishSyncStatus(context.getString(R.string.sync_error))
+            throw e
+        }
+        }
     }
 
-    private fun fileFingerprint(file: java.io.File): String {
+    private fun fileFingerprint(file: File): String {
         return if (file.exists()) "${file.length()}:${file.lastModified()}" else "missing"
     }
 
@@ -357,11 +420,11 @@ constructor(
             throw e
         } ?: return null
 
-        val dbFile = java.io.File(dbPath)
-        val walFile = java.io.File("$dbPath-wal")
-        val shmFile = java.io.File("$dbPath-shm")
-        val settingsFile = java.io.File(context.filesDir, "datastore/settings.preferences_pb")
-        val lastFmOfflineFile = java.io.File(
+        val dbFile = File(dbPath)
+        val walFile = File("$dbPath-wal")
+        val shmFile = File("$dbPath-shm")
+        val settingsFile = File(context.filesDir, "datastore/settings.preferences_pb")
+        val lastFmOfflineFile = File(
             context.applicationInfo.dataDir,
             "shared_prefs/lastfm_offline.xml"
         )
@@ -414,7 +477,7 @@ constructor(
         }
     }
 
-    private suspend fun createCurrentBackupZip(outputZipFile: java.io.File) {
+    private suspend fun createCurrentBackupZip(outputZipFile: File) {
         if (!database.isSafeToUse()) {
             throw IllegalStateException("Database closed before backup creation")
         }
@@ -430,32 +493,34 @@ constructor(
             throw e
         }
 
-        java.io.FileOutputStream(outputZipFile).use { fos ->
-            java.util.zip.ZipOutputStream(java.io.BufferedOutputStream(fos)).use { zos ->
-                zos.putNextEntry(java.util.zip.ZipEntry(com.anitail.music.db.InternalDatabase.DB_NAME))
-                java.io.FileInputStream(dbPath).use { fis ->
+        withContext(Dispatchers.IO) {
+            FileOutputStream(outputZipFile)
+        }.use { fos ->
+            ZipOutputStream(BufferedOutputStream(fos)).use { zos ->
+                zos.putNextEntry(ZipEntry(InternalDatabase.DB_NAME))
+                FileInputStream(dbPath).use { fis ->
                     fis.copyTo(zos, bufferSize = 16384)
                 }
 
-                val settingsFile = java.io.File(context.filesDir, "datastore/settings.preferences_pb")
+                val settingsFile = File(context.filesDir, "datastore/settings.preferences_pb")
                 if (settingsFile.exists()) {
-                    zos.putNextEntry(java.util.zip.ZipEntry("settings.preferences_pb"))
-                    java.io.FileInputStream(settingsFile).use { fis -> fis.copyTo(zos) }
+                    zos.putNextEntry(ZipEntry("settings.preferences_pb"))
+                    FileInputStream(settingsFile).use { fis -> fis.copyTo(zos) }
                 }
 
                 val accountsJson = createAccountsJson()
                 if (accountsJson.isNotEmpty()) {
-                    zos.putNextEntry(java.util.zip.ZipEntry("accounts.json"))
+                    zos.putNextEntry(ZipEntry("accounts.json"))
                     zos.write(accountsJson.toByteArray())
                 }
 
-                val lastFmOfflineFile = java.io.File(
+                val lastFmOfflineFile = File(
                     context.applicationInfo.dataDir,
                     "shared_prefs/lastfm_offline.xml"
                 )
                 if (lastFmOfflineFile.exists()) {
-                    zos.putNextEntry(java.util.zip.ZipEntry("lastfm_offline.xml"))
-                    java.io.FileInputStream(lastFmOfflineFile).use { fis -> fis.copyTo(zos) }
+                    zos.putNextEntry(ZipEntry("lastfm_offline.xml"))
+                    FileInputStream(lastFmOfflineFile).use { fis -> fis.copyTo(zos) }
                 }
             }
         }
@@ -464,8 +529,8 @@ constructor(
     private suspend fun uploadCurrentStateBackup(
         successMessage: String,
         failureMessage: String,
-    ): String? {
-        val backupZip = java.io.File(context.cacheDir, "cloud_sync_upload.zip")
+    ): String {
+        val backupZip = File(context.cacheDir, "cloud_sync_upload.zip")
         try {
             createCurrentBackupZip(backupZip)
 
@@ -490,8 +555,12 @@ constructor(
         }
     }
 
-    private suspend fun syncCloudInternal(): String? = cloudSyncMutex.withLock {
-        coroutineScope {
+    private suspend fun syncCloudInternal(): String? {
+        clearSyncStatusJob?.cancel()
+        isSyncing.value = true
+        syncStatus.value = context.getString(R.string.syncing)
+        return try {
+            coroutineScope {
             // Check if database is still safe to use
             if (!database.isSafeToUse()) {
                 Timber.d("syncCloudInternal: Database not available, aborting sync")
@@ -505,7 +574,7 @@ constructor(
             val storedLocalFingerprint = prefs[LastCloudSyncLocalFingerprintKey]
             val latestRemoteMetadata = googleDriveSyncManager.getLatestBackupMetadata().getOrElse {
                 Timber.e(it, "syncCloud: Failed to query remote backup metadata")
-                return@coroutineScope context.getString(R.string.sync_failed_upload)
+                return@coroutineScope context.getString(R.string.sync_failed_download)
             }
 
             if (latestRemoteMetadata != null) {
@@ -523,7 +592,7 @@ constructor(
                     return@coroutineScope context.getString(R.string.sync_completed)
                 }
 
-                if (remoteUnchanged && currentLocalFingerprint != null && currentLocalFingerprint != storedLocalFingerprint) {
+                if (remoteUnchanged && currentLocalFingerprint != null) {
                     Timber.d("syncCloud: Remote unchanged, uploading local changes without merge")
                     return@coroutineScope uploadCurrentStateBackup(
                         successMessage = context.getString(R.string.sync_completed),
@@ -532,47 +601,57 @@ constructor(
                 }
             }
 
+            val remoteBackupMetadata = latestRemoteMetadata ?: run {
+                Timber.d("syncCloud: No remote backup found, uploading initial backup...")
+                return@coroutineScope uploadCurrentStateBackup(
+                    successMessage = context.getString(R.string.sync_initial_uploaded),
+                    failureMessage = context.getString(R.string.sync_failed_initial_upload),
+                )
+            }
+
             // 1. Download latest backup (ZIP file)
-            val tempZipFile = java.io.File(context.cacheDir, "temp_sync.zip")
-            val downloadResult = latestRemoteMetadata?.let {
-                googleDriveSyncManager.downloadBackup(it, tempZipFile)
-            } ?: Result.failure(Exception("No backups found"))
+            val tempZipFile = File(context.cacheDir, "temp_sync.zip")
+            val downloadResult = googleDriveSyncManager.downloadBackup(remoteBackupMetadata, tempZipFile)
+            if (!downloadResult.isSuccess) {
+                tempZipFile.delete()
+                Timber.e(downloadResult.exceptionOrNull(), "syncCloud: Failed to download remote backup")
+                return@coroutineScope context.getString(R.string.sync_failed_download)
+            }
 
-        if (downloadResult.isSuccess) {
             // 2. Unzip and extract all files
-            val tempDbFile = java.io.File(context.cacheDir, "temp_sync_extracted.db")
-            val tempSettingsFile = java.io.File(context.cacheDir, "temp_settings.preferences_pb")
-            val tempAccountsFile = java.io.File(context.cacheDir, "temp_accounts.json")
-            val tempLastFmOfflineFile = java.io.File(context.cacheDir, "temp_lastfm_offline.xml")
+            val tempDbFile = File(context.cacheDir, "temp_sync_extracted.db")
+            val tempSettingsFile = File(context.cacheDir, "temp_settings.preferences_pb")
+            val tempAccountsFile = File(context.cacheDir, "temp_accounts.json")
+            val tempLastFmOfflineFile = File(context.cacheDir, "temp_lastfm_offline.xml")
 
-            var mergeProducedChanges = true // assume changes unless proven otherwise
+            var mergeProducedChanges: Boolean  // assume changes unless proven otherwise
             try {
                 // Extract all files from ZIP (buffered for performance)
-                java.io.BufferedInputStream(java.io.FileInputStream(tempZipFile)).use { bis ->
-                    java.util.zip.ZipInputStream(bis).use { zis ->
+                BufferedInputStream(FileInputStream(tempZipFile)).use { bis ->
+                    ZipInputStream(bis).use { zis ->
                         var entry = zis.nextEntry
                         while (entry != null) {
                             when (entry.name) {
-                                com.anitail.music.db.InternalDatabase.DB_NAME -> {
-                                    java.io.BufferedOutputStream(java.io.FileOutputStream(tempDbFile)).use { fos ->
+                                InternalDatabase.DB_NAME -> {
+                                    BufferedOutputStream(FileOutputStream(tempDbFile)).use { fos ->
                                         zis.copyTo(fos, bufferSize = 16384)
                                     }
                                 }
 
                                 "settings.preferences_pb" -> {
-                                    java.io.FileOutputStream(tempSettingsFile).use { fos ->
+                                    FileOutputStream(tempSettingsFile).use { fos ->
                                         zis.copyTo(fos)
                                     }
                                 }
 
                                 "accounts.json" -> {
-                                    java.io.FileOutputStream(tempAccountsFile).use { fos ->
+                                    FileOutputStream(tempAccountsFile).use { fos ->
                                         zis.copyTo(fos)
                                     }
                                 }
 
                                 "lastfm_offline.xml" -> {
-                                    java.io.FileOutputStream(tempLastFmOfflineFile).use { fos ->
+                                    FileOutputStream(tempLastFmOfflineFile).use { fos ->
                                         zis.copyTo(fos)
                                     }
                                 }
@@ -597,10 +676,10 @@ constructor(
 
                 // 4. Restore settings if present
                 if (tempSettingsFile.exists() && tempSettingsFile.length() > 0L) {
-                    val targetSettingsDir = java.io.File(context.filesDir, "datastore")
+                    val targetSettingsDir = File(context.filesDir, "datastore")
                     if (!targetSettingsDir.exists()) targetSettingsDir.mkdirs()
                     val targetSettingsFile =
-                        java.io.File(targetSettingsDir, "settings.preferences_pb")
+                        File(targetSettingsDir, "settings.preferences_pb")
                     tempSettingsFile.copyTo(targetSettingsFile, overwrite = true)
                     Timber.d("Settings restored from backup")
                 }
@@ -613,7 +692,7 @@ constructor(
 
                 // 6. Restore Last.fm offline scrobbles if present
                 if (tempLastFmOfflineFile.exists() && tempLastFmOfflineFile.length() > 0L) {
-                    val targetLastFmFile = java.io.File(
+                    val targetLastFmFile = File(
                         context.applicationInfo.dataDir,
                         "shared_prefs/lastfm_offline.xml"
                     )
@@ -641,7 +720,7 @@ constructor(
             // Skip re-upload if merge produced no changes — the remote already has the latest data.
             if (!mergeProducedChanges) {
                 Timber.d("syncCloud: Merge produced no changes, skipping re-upload")
-                persistCloudSyncSnapshot(latestRemoteMetadata, buildLocalCloudSyncFingerprint())
+                persistCloudSyncSnapshot(remoteBackupMetadata, buildLocalCloudSyncFingerprint())
                 return@coroutineScope context.getString(R.string.sync_completed)
             }
 
@@ -654,17 +733,12 @@ constructor(
                 Timber.e(e, "Failed to create merged backup")
                 return@coroutineScope context.getString(R.string.sync_failed_local_backup)
             }
-        } else {
-            // If no remote backup, upload local as ZIP
-            Timber.d("syncCloud: No remote backup found, uploading initial backup...")
-            return@coroutineScope uploadCurrentStateBackup(
-                successMessage = context.getString(R.string.sync_initial_uploaded),
-                failureMessage = context.getString(R.string.sync_failed_initial_upload),
-            )
-        }
-            return@coroutineScope null
+            }
+        } finally {
+            isSyncing.value = false
         }
     }
+
 
     private suspend fun createAccountsJson(): String {
         val dataStore = context.dataStore
@@ -673,50 +747,50 @@ constructor(
         val accounts = mutableMapOf<String, String>()
 
         // YouTube account
-        prefs[com.anitail.music.constants.InnerTubeCookieKey]?.let {
+        prefs[InnerTubeCookieKey]?.let {
             accounts["innerTubeCookie"] = it
         }
-        prefs[com.anitail.music.constants.VisitorDataKey]?.let { accounts["visitorData"] = it }
-        prefs[com.anitail.music.constants.DataSyncIdKey]?.let { accounts["dataSyncId"] = it }
-        prefs[com.anitail.music.constants.AccountNameKey]?.let { accounts["accountName"] = it }
-        prefs[com.anitail.music.constants.AccountEmailKey]?.let { accounts["accountEmail"] = it }
-        prefs[com.anitail.music.constants.AccountChannelHandleKey]?.let {
+        prefs[VisitorDataKey]?.let { accounts["visitorData"] = it }
+        prefs[DataSyncIdKey]?.let { accounts["dataSyncId"] = it }
+        prefs[AccountNameKey]?.let { accounts["accountName"] = it }
+        prefs[AccountEmailKey]?.let { accounts["accountEmail"] = it }
+        prefs[AccountChannelHandleKey]?.let {
             accounts["accountChannelHandle"] = it
         }
-        prefs[com.anitail.music.constants.AccountImageUrlKey]?.let {
+        prefs[AccountImageUrlKey]?.let {
             accounts["accountImageUrl"] = it
         }
 
         // Last.fm account
-        prefs[com.anitail.music.constants.LastFmSessionKey]?.let {
+        prefs[LastFmSessionKey]?.let {
             accounts["lastFmSessionKey"] = it
         }
-        prefs[com.anitail.music.constants.LastFmUsernameKey]?.let {
+        prefs[LastFmUsernameKey]?.let {
             accounts["lastFmUsername"] = it
         }
 
         // Discord account
-        prefs[com.anitail.music.constants.DiscordTokenKey]?.let { accounts["discordToken"] = it }
-        prefs[com.anitail.music.constants.DiscordUsernameKey]?.let {
+        prefs[DiscordTokenKey]?.let { accounts["discordToken"] = it }
+        prefs[DiscordUsernameKey]?.let {
             accounts["discordUsername"] = it
         }
-        prefs[com.anitail.music.constants.DiscordNameKey]?.let { accounts["discordName"] = it }
-        prefs[com.anitail.music.constants.DiscordAvatarUrlKey]?.let {
+        prefs[DiscordNameKey]?.let { accounts["discordName"] = it }
+        prefs[DiscordAvatarUrlKey]?.let {
             accounts["discordAvatarUrl"] = it
         }
 
         // Spotify account
-        prefs[com.anitail.music.constants.SpotifyAccessTokenKey]?.let {
+        prefs[SpotifyAccessTokenKey]?.let {
             accounts["spotifyAccessToken"] = it
         }
-        prefs[com.anitail.music.constants.SpotifyRefreshTokenKey]?.let {
+        prefs[SpotifyRefreshTokenKey]?.let {
             accounts["spotifyRefreshToken"] = it
         }
 
         // Proxy settings (can contain passwords)
-        prefs[com.anitail.music.constants.ProxyUrlKey]?.let { accounts["proxyUrl"] = it }
-        prefs[com.anitail.music.constants.ProxyUsernameKey]?.let { accounts["proxyUsername"] = it }
-        prefs[com.anitail.music.constants.ProxyPasswordKey]?.let { accounts["proxyPassword"] = it }
+        prefs[ProxyUrlKey]?.let { accounts["proxyUrl"] = it }
+        prefs[ProxyUsernameKey]?.let { accounts["proxyUsername"] = it }
+        prefs[ProxyPasswordKey]?.let { accounts["proxyPassword"] = it }
 
         if (accounts.isEmpty()) return ""
 
@@ -726,9 +800,9 @@ constructor(
             if (index > 0) jsonBuilder.append(",")
             jsonBuilder.append(
                 "\"$key\":\"${
-                    android.util.Base64.encodeToString(
+                    Base64.encodeToString(
                         value.toByteArray(),
-                        android.util.Base64.NO_WRAP
+                        Base64.NO_WRAP
                     )
                 }\""
             )
@@ -737,7 +811,7 @@ constructor(
         return jsonBuilder.toString()
     }
 
-    private suspend fun restoreAccounts(accountsFile: java.io.File) {
+    private suspend fun restoreAccounts(accountsFile: File) {
         try {
             val json = accountsFile.readText()
             if (json.isEmpty() || !json.startsWith("{")) return
@@ -749,62 +823,62 @@ constructor(
 
             dataStore.edit { prefs ->
                 accountsMap["innerTubeCookie"]?.let {
-                    prefs[com.anitail.music.constants.InnerTubeCookieKey] = decodeBase64(it)
+                    prefs[InnerTubeCookieKey] = decodeBase64(it)
                 }
                 accountsMap["visitorData"]?.let {
-                    prefs[com.anitail.music.constants.VisitorDataKey] = decodeBase64(it)
+                    prefs[VisitorDataKey] = decodeBase64(it)
                 }
                 accountsMap["dataSyncId"]?.let {
-                    prefs[com.anitail.music.constants.DataSyncIdKey] = decodeBase64(it)
+                    prefs[DataSyncIdKey] = decodeBase64(it)
                 }
                 accountsMap["accountName"]?.let {
-                    prefs[com.anitail.music.constants.AccountNameKey] = decodeBase64(it)
+                    prefs[AccountNameKey] = decodeBase64(it)
                 }
                 accountsMap["accountEmail"]?.let {
-                    prefs[com.anitail.music.constants.AccountEmailKey] = decodeBase64(it)
+                    prefs[AccountEmailKey] = decodeBase64(it)
                 }
                 accountsMap["accountChannelHandle"]?.let {
-                    prefs[com.anitail.music.constants.AccountChannelHandleKey] = decodeBase64(it)
+                    prefs[AccountChannelHandleKey] = decodeBase64(it)
                 }
                 accountsMap["accountImageUrl"]?.let {
-                    prefs[com.anitail.music.constants.AccountImageUrlKey] = decodeBase64(it)
+                    prefs[AccountImageUrlKey] = decodeBase64(it)
                 }
 
                 accountsMap["lastFmSessionKey"]?.let {
-                    prefs[com.anitail.music.constants.LastFmSessionKey] = decodeBase64(it)
+                    prefs[LastFmSessionKey] = decodeBase64(it)
                 }
                 accountsMap["lastFmUsername"]?.let {
-                    prefs[com.anitail.music.constants.LastFmUsernameKey] = decodeBase64(it)
+                    prefs[LastFmUsernameKey] = decodeBase64(it)
                 }
 
                 accountsMap["discordToken"]?.let {
-                    prefs[com.anitail.music.constants.DiscordTokenKey] = decodeBase64(it)
+                    prefs[DiscordTokenKey] = decodeBase64(it)
                 }
                 accountsMap["discordUsername"]?.let {
-                    prefs[com.anitail.music.constants.DiscordUsernameKey] = decodeBase64(it)
+                    prefs[DiscordUsernameKey] = decodeBase64(it)
                 }
                 accountsMap["discordName"]?.let {
-                    prefs[com.anitail.music.constants.DiscordNameKey] = decodeBase64(it)
+                    prefs[DiscordNameKey] = decodeBase64(it)
                 }
                 accountsMap["discordAvatarUrl"]?.let {
-                    prefs[com.anitail.music.constants.DiscordAvatarUrlKey] = decodeBase64(it)
+                    prefs[DiscordAvatarUrlKey] = decodeBase64(it)
                 }
 
                 accountsMap["spotifyAccessToken"]?.let {
-                    prefs[com.anitail.music.constants.SpotifyAccessTokenKey] = decodeBase64(it)
+                    prefs[SpotifyAccessTokenKey] = decodeBase64(it)
                 }
                 accountsMap["spotifyRefreshToken"]?.let {
-                    prefs[com.anitail.music.constants.SpotifyRefreshTokenKey] = decodeBase64(it)
+                    prefs[SpotifyRefreshTokenKey] = decodeBase64(it)
                 }
 
                 accountsMap["proxyUrl"]?.let {
-                    prefs[com.anitail.music.constants.ProxyUrlKey] = decodeBase64(it)
+                    prefs[ProxyUrlKey] = decodeBase64(it)
                 }
                 accountsMap["proxyUsername"]?.let {
-                    prefs[com.anitail.music.constants.ProxyUsernameKey] = decodeBase64(it)
+                    prefs[ProxyUsernameKey] = decodeBase64(it)
                 }
                 accountsMap["proxyPassword"]?.let {
-                    prefs[com.anitail.music.constants.ProxyPasswordKey] = decodeBase64(it)
+                    prefs[ProxyPasswordKey] = decodeBase64(it)
                 }
             }
         } catch (e: Exception) {
@@ -830,8 +904,8 @@ constructor(
 
     private fun decodeBase64(encoded: String): String {
         return try {
-            String(android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP))
-        } catch (e: Exception) {
+            String(Base64.decode(encoded, Base64.NO_WRAP))
+        } catch (_: Exception) {
             encoded // Return as-is if decoding fails
         }
     }
