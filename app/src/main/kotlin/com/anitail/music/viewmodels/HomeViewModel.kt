@@ -30,6 +30,7 @@ import com.anitail.music.db.entities.Playlist
 import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toEnum
 import com.anitail.music.models.SimilarRecommendation
+import com.anitail.music.R
 import com.anitail.music.utils.SyncUtils
 import com.anitail.music.utils.dataStore
 import com.anitail.music.utils.get
@@ -97,8 +98,8 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
     val isRefreshing = MutableStateFlow(false)
     val isLoading = MutableStateFlow(false)
-    val isSyncing = MutableStateFlow(false)
-    val syncStatus = MutableStateFlow<String?>(null)
+    val isSyncing = syncUtils.isSyncing
+    val syncStatus = syncUtils.syncStatus
 
     private val quickPicksEnum = context.dataStore.data.map {
         it[QuickPicksKey].toEnum(QuickPicks.QUICK_PICKS)
@@ -172,15 +173,18 @@ class HomeViewModel @Inject constructor(
                 } else {
                     combine(
                         baseSongs.map { fallbackSong ->
-                            database.song(fallbackSong.id).map { latestSong ->
-                                latestSong ?: fallbackSong
-                            }
+                            database.song(fallbackSong.id)
+                                .distinctUntilChanged()
+                                .map { latestSong ->
+                                    latestSong ?: fallbackSong
+                                }
                         }
                     ) { songsArray ->
                         songsArray.toList()
                     }
                 }
             }
+            .distinctUntilChanged()
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
@@ -206,7 +210,7 @@ class HomeViewModel @Inject constructor(
                 similarRecommendations = similarRecommendations,
                 accountPlaylists = accountPlaylists,
             )
-        }
+        }.distinctUntilChanged()
 
     private val contentPageSnapshot =
         combine(
@@ -223,7 +227,7 @@ class HomeViewModel @Inject constructor(
                 homePage = homePage,
                 explorePage = explorePage,
             )
-        }
+        }.distinctUntilChanged()
 
     private val contentMetaSnapshot =
         combine(
@@ -240,7 +244,7 @@ class HomeViewModel @Inject constructor(
                 isLoading = isLoading,
                 isRefreshing = isRefreshing,
             )
-        }
+        }.distinctUntilChanged()
 
     private val contentAccountSnapshot =
         combine(accountName, accountImageUrl) { accountName, accountImageUrl ->
@@ -248,7 +252,7 @@ class HomeViewModel @Inject constructor(
                 accountName = accountName,
                 accountImageUrl = accountImageUrl,
             )
-        }
+        }.distinctUntilChanged()
 
     val contentUiState: StateFlow<HomeContentUiState> =
         combine(
@@ -276,7 +280,9 @@ class HomeViewModel @Inject constructor(
                 accountName = account.accountName,
                 accountImageUrl = account.accountImageUrl,
             )
-        }.stateIn(
+        }
+        .distinctUntilChanged()
+        .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = HomeContentUiState(),
@@ -683,55 +689,95 @@ class HomeViewModel @Inject constructor(
         if (isRefreshing.value) return
         viewModelScope.launch(Dispatchers.IO) {
             isRefreshing.value = true
-            load()
-            isRefreshing.value = false
+            try {
+                load()
+            } catch (e: Exception) {
+                Timber.e(e, "HomeViewModel: Refresh failed")
+            } finally {
+                isRefreshing.value = false
+            }
+
+            // Trigger cloud sync (forced since user manually refreshed)
+            launch {
+                Timber.d("HomeViewModel: Starting manual cloud sync...")
+                try {
+                    syncUtils.isSyncing.value = true
+                    syncUtils.syncStatus.value = context.getString(R.string.syncing)
+                    val result = syncUtils.syncCloud(force = true)
+                    if (result != null) {
+                        Timber.d("HomeViewModel: Cloud sync result: $result")
+                        syncUtils.syncStatus.value = result
+                    } else {
+                        // Sync was skipped (not signed in) — hide icon silently
+                        syncUtils.isSyncing.value = false
+                        syncUtils.syncStatus.value = null
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "HomeViewModel: Cloud sync failed")
+                    syncUtils.syncStatus.value = context.getString(R.string.sync_error)
+                } finally {
+                    syncUtils.isSyncing.value = false
+                    // Clear status after 3 seconds
+                    kotlinx.coroutines.delay(3000)
+                    syncUtils.syncStatus.value = null
+                }
+            }
         }
     }
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            load()
-        }
-
-        // Cloud Sync (Smart Merge) - with throttling built into syncCloud()
-        viewModelScope.launch(Dispatchers.IO) {
-            Timber.d("HomeViewModel: Starting cloud sync...")
-            isSyncing.value = true
-            syncStatus.value = "Sincronizando..."
+            // 1. Load UI content FIRST to completion
             try {
-                val result = syncUtils.syncCloud()
-                if (result != null) {
-                    Timber.d("HomeViewModel: Cloud sync result: $result")
-                    syncStatus.value = result
-                } else {
-                    syncStatus.value = null
-                }
+                load()
             } catch (e: Exception) {
-                Timber.e(e, "HomeViewModel: Cloud sync failed")
-                syncStatus.value = "Error de sincronización"
-            } finally {
-                isSyncing.value = false
-                // Clear status after 3 seconds
-                kotlinx.coroutines.delay(3000)
-                syncStatus.value = null
+                Timber.e(e, "HomeViewModel: Initial load failed")
             }
-        }
 
-        // YouTube Music sync
-        viewModelScope.launch(Dispatchers.IO) {
-            val isSyncEnabled = context.dataStore.data
-                .map { it[YtmSyncKey] ?: true }
-                .distinctUntilChanged()
-                .first()
+            // 2. THEN start Cloud sync operation immediately after load() completes
+            launch {
+                Timber.d("HomeViewModel: Starting cloud sync...")
+                try {
+                    syncUtils.isSyncing.value = true
+                    syncUtils.syncStatus.value = context.getString(R.string.syncing)
+                    val result = syncUtils.syncCloud()
+                    if (result != null) {
+                        Timber.d("HomeViewModel: Cloud sync result: $result")
+                        syncUtils.syncStatus.value = result
+                    } else {
+                        // Sync was skipped (not signed in or throttled) — hide icon silently
+                        syncUtils.isSyncing.value = false
+                        syncUtils.syncStatus.value = null
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "HomeViewModel: Cloud sync failed")
+                    syncUtils.syncStatus.value = context.getString(R.string.sync_error)
+                } finally {
+                    syncUtils.isSyncing.value = false
+                    // Clear status after 3 seconds
+                    kotlinx.coroutines.delay(3000)
+                    syncUtils.syncStatus.value = null
+                }
+            }
 
-            if (isSyncEnabled) {
-                supervisorScope {
-                    launch { syncUtils.syncLikedSongs() }
-                    launch { syncUtils.syncLibrarySongs() }
-                    launch { syncUtils.syncSavedPlaylists() }
-                    launch { syncUtils.syncLikedAlbums() }
-                    launch { syncUtils.syncArtistsSubscriptions() }
-                    launch { syncUtils.syncWatchHistory() }
+            // 3. Start YouTube Music sync operation immediately after load() completes
+            launch {
+                val isSyncEnabled = context.dataStore.data
+                    .map { it[YtmSyncKey] ?: true }
+                    .distinctUntilChanged()
+                    .first()
+
+                if (isSyncEnabled) {
+                    supervisorScope {
+                        launch { syncUtils.syncLikedSongs() }
+                        launch { syncUtils.syncLibrarySongs() }
+                        launch { syncUtils.syncSavedPlaylists() }
+                        launch { syncUtils.syncLikedAlbums() }
+                        launch { syncUtils.syncArtistsSubscriptions() }
+                        launch { syncUtils.syncWatchHistory() }
+                    }
                 }
             }
         }

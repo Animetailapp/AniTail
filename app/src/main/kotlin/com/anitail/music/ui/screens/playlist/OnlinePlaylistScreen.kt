@@ -183,8 +183,8 @@ fun OnlinePlaylistScreen(
     }
 
     val wrappedSongs = remember(filteredSongs) {
-        filteredSongs.map { item -> ItemWrapper(item) }
-    }.toMutableStateList()
+        filteredSongs.map { item -> ItemWrapper(item) }.toMutableStateList()
+    }
 
     val showTopBarTitle by remember {
         derivedStateOf {

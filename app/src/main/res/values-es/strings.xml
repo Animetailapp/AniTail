@@ -971,4 +971,18 @@
         <item quantity="one">%d copia de seguridad</item>
         <item quantity="other">%d copias de seguridad</item>
     </plurals>
+    <string name="syncing">Sincronizando…</string>
+    <string name="synced">Sincronizado</string>
+    <string name="sync_error">Error de sincronización</string>
+    <string name="sync_starting">Iniciando…</string>
+    <string name="sync_completed">Sincronización completada</string>
+    <string name="sync_failed">Falló: %s</string>
+    <string name="sync_failed_generic">Fallo de sincronización</string>
+    <string name="sync_timeout">Tiempo de espera de sincronización agotado</string>
+    <string name="sync_corrupt_backup">Copia de seguridad corrupta o incompleta</string>
+    <string name="sync_failed_merge">Fallo al mezclar datos</string>
+    <string name="sync_failed_upload">Fallo al subir datos fusionados</string>
+    <string name="sync_failed_local_backup">Fallo al crear copia de seguridad local</string>
+    <string name="sync_initial_uploaded">Copia inicial subida</string>
+    <string name="sync_failed_initial_upload">Fallo al subir copia inicial</string>
 </resources>

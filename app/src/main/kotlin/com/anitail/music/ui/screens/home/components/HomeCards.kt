@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -215,8 +216,11 @@ internal fun CommunityPlaylistCard(
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val collageThumbnails = remember(item.songs, item.playlist.thumbnail) {
+                    item.songs.take(4).map { it.thumbnail } + item.playlist.thumbnail
+                }
                 PlaylistCollage(
-                    thumbnails = item.songs.take(4).map { it.thumbnail } + item.playlist.thumbnail,
+                    thumbnails = collageThumbnails,
                 )
                 Column(
                     verticalArrangement = Arrangement.Center,

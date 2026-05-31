@@ -29,6 +29,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -881,11 +882,9 @@ class MainActivity : AppCompatActivity() {
                                             }
 
                                             // --- Avatar logic start ---
-                                            // ViewModel and preferences
-                                            val homeViewModel: com.anitail.music.viewmodels.HomeViewModel =
-                                                hiltViewModel()
-                                            val accountImageUrl by homeViewModel.accountImageUrl.collectAsState()
-                                            val discordAvatarUrl by homeViewModel.discordAvatarUrl.collectAsState()
+                                            // Read avatar URLs directly from preferences to avoid instantiating HomeViewModel
+                                            val (accountImageUrl) = rememberPreference(com.anitail.music.constants.AccountImageUrlKey, defaultValue = "")
+                                            val (discordAvatarUrl) = rememberPreference(com.anitail.music.constants.DiscordAvatarUrlKey, defaultValue = "")
                                             val (preferredAvatarSource) = rememberEnumPreference(
                                                 com.anitail.music.constants.PreferredAvatarSourceKey,
                                                 defaultValue = com.anitail.music.constants.AvatarSource.YOUTUBE

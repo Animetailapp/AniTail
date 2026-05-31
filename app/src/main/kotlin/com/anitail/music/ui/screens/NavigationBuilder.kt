@@ -58,7 +58,7 @@ fun NavGraphBuilder.navigationBuilder(
     latestVersionName: String,
 ) {
     composable(Screens.Home.route) {
-        HomeScreen(navController)
+        HomeScreen(navController,)
     }
     composable(
         Screens.Library.route,

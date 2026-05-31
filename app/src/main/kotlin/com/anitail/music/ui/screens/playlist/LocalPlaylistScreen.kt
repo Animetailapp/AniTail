@@ -221,8 +221,8 @@ fun LocalPlaylistScreen(
     }
 
     val wrappedSongs = remember(filteredSongs) {
-        filteredSongs.map { item -> ItemWrapper(item) }
-    }.toMutableStateList()
+        filteredSongs.map { item -> ItemWrapper(item) }.toMutableStateList()
+    }
 
     if (isSearching) {
         BackHandler {

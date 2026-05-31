@@ -14,6 +14,7 @@ import com.anitail.music.db.entities.PlaylistEntity
 import com.anitail.music.db.entities.PlaylistSongMap
 import com.anitail.music.db.entities.SongEntity
 import com.anitail.music.models.toMediaMetadata
+import com.anitail.music.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -46,6 +47,8 @@ constructor(
     }
 
     private val syncScope = CoroutineScope(Dispatchers.IO)
+    val isSyncing = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val syncStatus = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
     private val cloudSyncMutex = Mutex()
 
   fun likeSong(s: SongEntity) {
@@ -323,11 +326,11 @@ constructor(
 
         if (result == null) {
             Timber.e("syncCloud: Timed out after ${SYNC_TIMEOUT_MS / 1000}s")
-            return@coroutineScope "Sync timed out"
+            return@coroutineScope context.getString(R.string.sync_timeout)
         }
 
         // Update last sync timestamp on success
-        if (result.startsWith("Sincronización") || result.startsWith("Copia inicial")) {
+        if (result == context.getString(R.string.sync_completed) || result == context.getString(R.string.sync_initial_uploaded)) {
             context.dataStore.edit { it[LastCloudSyncKey] = System.currentTimeMillis() }
         }
 
@@ -392,7 +395,7 @@ constructor(
 
                 if (!tempDbFile.exists() || tempDbFile.length() == 0L) {
                     Timber.e("Could not find database file in backup zip")
-                    return@coroutineScope "Backup corrupto o incompleto"
+                    return@coroutineScope context.getString(R.string.sync_corrupt_backup)
                 }
 
                 // 3. Merge database (check if still safe)
@@ -439,7 +442,7 @@ constructor(
 
             } catch (e: Exception) {
                 Timber.e(e, "Sync Merge failed")
-                return@coroutineScope "Fallo al mezclar datos"
+                return@coroutineScope context.getString(R.string.sync_failed_merge)
             } finally {
                 tempZipFile.delete()
                 if (tempDbFile.exists()) tempDbFile.delete()
@@ -452,7 +455,7 @@ constructor(
             // Skip re-upload if merge produced no changes — the remote already has the latest data.
             if (!mergeProducedChanges) {
                 Timber.d("syncCloud: Merge produced no changes, skipping re-upload")
-                return@coroutineScope "Sincronización completada"
+                return@coroutineScope context.getString(R.string.sync_completed)
             }
 
             val mergedBackupZip = java.io.File(context.cacheDir, "merged_backup.zip")
@@ -520,14 +523,14 @@ constructor(
                 )
                 if (uploadResult.isSuccess) {
                     Timber.d("syncCloud: Sync completed successfully")
-                    return@coroutineScope "Sincronización completada"
+                    return@coroutineScope context.getString(R.string.sync_completed)
                 } else {
                     Timber.e("syncCloud: Failed to upload merged backup")
-                    return@coroutineScope "Fallo al subir datos fusionados"
+                    return@coroutineScope context.getString(R.string.sync_failed_upload)
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Failed to create merged backup")
-                return@coroutineScope "Fallo al crear backup local"
+                return@coroutineScope context.getString(R.string.sync_failed_local_backup)
             } finally {
                 mergedBackupZip.delete()
             }
@@ -596,13 +599,14 @@ constructor(
                 )
                 if (uploadResult.isSuccess) {
                     Timber.d("syncCloud: Initial backup uploaded successfully")
+                    return@coroutineScope context.getString(R.string.sync_initial_uploaded)
                 } else {
                     Timber.e("syncCloud: Failed to upload initial backup")
+                    return@coroutineScope context.getString(R.string.sync_failed_initial_upload)
                 }
-                return@coroutineScope "Copia inicial subida"
             } catch (e: Exception) {
                 Timber.e(e, "Failed to upload initial backup")
-                return@coroutineScope "Fallo al subir copia inicial"
+                return@coroutineScope context.getString(R.string.sync_failed_initial_upload)
             } finally {
                 localBackupZip.delete()
             }

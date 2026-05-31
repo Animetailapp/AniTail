@@ -1056,4 +1056,18 @@
     <string name="wizard_multiple_variants">Multiple variants available</string>
     <string name="wizard_select_eq_profiles">Select EQ profiles for %s</string>
     <string name="wizard_save_profiles">Save profiles</string>
+    <string name="syncing">Syncing…</string>
+    <string name="synced">Synced</string>
+    <string name="sync_error">Sync error</string>
+    <string name="sync_starting">Starting sync…</string>
+    <string name="sync_completed">Sync completed</string>
+    <string name="sync_failed">Sync failed: %s</string>
+    <string name="sync_failed_generic">Sync failed</string>
+    <string name="sync_timeout">Sync timed out</string>
+    <string name="sync_corrupt_backup">Backup corrupt or incomplete</string>
+    <string name="sync_failed_merge">Failed to merge data</string>
+    <string name="sync_failed_upload">Failed to upload merged data</string>
+    <string name="sync_failed_local_backup">Failed to create local backup</string>
+    <string name="sync_initial_uploaded">Initial backup uploaded</string>
+    <string name="sync_failed_initial_upload">Failed to upload initial backup</string>
 </resources>

@@ -77,6 +77,10 @@ import com.anitail.music.viewmodels.DateAgo
 import com.anitail.music.viewmodels.HistoryViewModel
 import java.time.format.DateTimeFormatter
 
+class WrappedHistoryItem(val item: EventWithSong) {
+    var isSelected by mutableStateOf(false)
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HistoryScreen(
@@ -133,10 +137,6 @@ fun HistoryScreen(
             DateAgo.LastWeek -> context.getString(R.string.last_week)
             is DateAgo.Other -> dateAgo.date.format(DateTimeFormatter.ofPattern("yyyy/MM"))
         }
-    }
-
-    class WrappedHistoryItem(val item: EventWithSong) {
-        var isSelected by mutableStateOf(false)
     }
 
     val filteredEvents = remember(events, query) {
