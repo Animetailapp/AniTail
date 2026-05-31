@@ -8,6 +8,9 @@ import com.anitail.innertube.models.PlaylistItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.utils.completed
 import com.anitail.music.constants.LastCloudSyncKey
+import com.anitail.music.constants.LastCloudSyncLocalFingerprintKey
+import com.anitail.music.constants.LastCloudSyncRemoteMd5Key
+import com.anitail.music.constants.LastCloudSyncRemoteModifiedTimeKey
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.db.entities.ArtistEntity
 import com.anitail.music.db.entities.PlaylistEntity
@@ -337,6 +340,156 @@ constructor(
         return@coroutineScope result
     }
 
+    private fun fileFingerprint(file: java.io.File): String {
+        return if (file.exists()) "${file.length()}:${file.lastModified()}" else "missing"
+    }
+
+    private suspend fun buildLocalCloudSyncFingerprint(): String? {
+        if (!database.isSafeToUse()) return null
+
+        val dbPath = try {
+            database.openHelper.writableDatabase.path
+        } catch (e: IllegalStateException) {
+            if (e.message?.contains("already-closed") == true) {
+                Timber.w("syncCloud: Database was closed while computing local fingerprint")
+                return null
+            }
+            throw e
+        } ?: return null
+
+        val dbFile = java.io.File(dbPath)
+        val walFile = java.io.File("$dbPath-wal")
+        val shmFile = java.io.File("$dbPath-shm")
+        val settingsFile = java.io.File(context.filesDir, "datastore/settings.preferences_pb")
+        val lastFmOfflineFile = java.io.File(
+            context.applicationInfo.dataDir,
+            "shared_prefs/lastfm_offline.xml"
+        )
+        val accountsFingerprint = createAccountsJson().hashCode().toString()
+
+        return listOf(
+            fileFingerprint(dbFile),
+            fileFingerprint(walFile),
+            fileFingerprint(shmFile),
+            fileFingerprint(settingsFile),
+            fileFingerprint(lastFmOfflineFile),
+            accountsFingerprint,
+        ).joinToString("|")
+    }
+
+    private fun matchesRemoteSnapshot(
+        remoteMetadata: DriveBackupMetadata,
+        storedModifiedTime: Long,
+        storedMd5: String?,
+    ): Boolean {
+        if (storedModifiedTime == 0L || remoteMetadata.modifiedTime != storedModifiedTime) {
+            return false
+        }
+
+        return remoteMetadata.md5 == null || storedMd5 == null || remoteMetadata.md5 == storedMd5
+    }
+
+    private suspend fun persistCloudSyncSnapshot(
+        remoteMetadata: DriveBackupMetadata?,
+        localFingerprint: String?,
+    ) {
+        context.dataStore.edit { prefs ->
+            if (remoteMetadata != null) {
+                prefs[LastCloudSyncRemoteModifiedTimeKey] = remoteMetadata.modifiedTime
+                if (!remoteMetadata.md5.isNullOrBlank()) {
+                    prefs[LastCloudSyncRemoteMd5Key] = remoteMetadata.md5
+                } else {
+                    prefs.remove(LastCloudSyncRemoteMd5Key)
+                }
+            } else {
+                prefs.remove(LastCloudSyncRemoteModifiedTimeKey)
+                prefs.remove(LastCloudSyncRemoteMd5Key)
+            }
+
+            if (!localFingerprint.isNullOrBlank()) {
+                prefs[LastCloudSyncLocalFingerprintKey] = localFingerprint
+            } else {
+                prefs.remove(LastCloudSyncLocalFingerprintKey)
+            }
+        }
+    }
+
+    private suspend fun createCurrentBackupZip(outputZipFile: java.io.File) {
+        if (!database.isSafeToUse()) {
+            throw IllegalStateException("Database closed before backup creation")
+        }
+
+        val dbPath = try {
+            database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").moveToFirst()
+            database.openHelper.writableDatabase.path
+                ?: throw IllegalStateException("Database path is null")
+        } catch (e: IllegalStateException) {
+            if (e.message?.contains("already-closed") == true) {
+                throw IllegalStateException("Database closed during backup creation", e)
+            }
+            throw e
+        }
+
+        java.io.FileOutputStream(outputZipFile).use { fos ->
+            java.util.zip.ZipOutputStream(java.io.BufferedOutputStream(fos)).use { zos ->
+                zos.putNextEntry(java.util.zip.ZipEntry(com.anitail.music.db.InternalDatabase.DB_NAME))
+                java.io.FileInputStream(dbPath).use { fis ->
+                    fis.copyTo(zos, bufferSize = 16384)
+                }
+
+                val settingsFile = java.io.File(context.filesDir, "datastore/settings.preferences_pb")
+                if (settingsFile.exists()) {
+                    zos.putNextEntry(java.util.zip.ZipEntry("settings.preferences_pb"))
+                    java.io.FileInputStream(settingsFile).use { fis -> fis.copyTo(zos) }
+                }
+
+                val accountsJson = createAccountsJson()
+                if (accountsJson.isNotEmpty()) {
+                    zos.putNextEntry(java.util.zip.ZipEntry("accounts.json"))
+                    zos.write(accountsJson.toByteArray())
+                }
+
+                val lastFmOfflineFile = java.io.File(
+                    context.applicationInfo.dataDir,
+                    "shared_prefs/lastfm_offline.xml"
+                )
+                if (lastFmOfflineFile.exists()) {
+                    zos.putNextEntry(java.util.zip.ZipEntry("lastfm_offline.xml"))
+                    java.io.FileInputStream(lastFmOfflineFile).use { fis -> fis.copyTo(zos) }
+                }
+            }
+        }
+    }
+
+    private suspend fun uploadCurrentStateBackup(
+        successMessage: String,
+        failureMessage: String,
+    ): String? {
+        val backupZip = java.io.File(context.cacheDir, "cloud_sync_upload.zip")
+        try {
+            createCurrentBackupZip(backupZip)
+
+            val uploadResult = googleDriveSyncManager.uploadBackupReplacingByName(
+                backupZip,
+                CLOUD_SYNC_REMOTE_BACKUP_NAME
+            )
+            if (!uploadResult.isSuccess) {
+                Timber.e("syncCloud: Failed to upload current backup state")
+                return failureMessage
+            }
+
+            val latestRemoteMetadata = googleDriveSyncManager.getLatestBackupMetadata().getOrNull()
+            val latestLocalFingerprint = buildLocalCloudSyncFingerprint()
+            persistCloudSyncSnapshot(latestRemoteMetadata, latestLocalFingerprint)
+            return successMessage
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to upload current backup state")
+            return failureMessage
+        } finally {
+            backupZip.delete()
+        }
+    }
+
     private suspend fun syncCloudInternal(): String? = cloudSyncMutex.withLock {
         coroutineScope {
             // Check if database is still safe to use
@@ -345,9 +498,45 @@ constructor(
                 return@coroutineScope null
             }
 
+            val prefs = context.dataStore.data.first()
+            val currentLocalFingerprint = buildLocalCloudSyncFingerprint()
+            val storedRemoteModifiedTime = prefs[LastCloudSyncRemoteModifiedTimeKey] ?: 0L
+            val storedRemoteMd5 = prefs[LastCloudSyncRemoteMd5Key]
+            val storedLocalFingerprint = prefs[LastCloudSyncLocalFingerprintKey]
+            val latestRemoteMetadata = googleDriveSyncManager.getLatestBackupMetadata().getOrElse {
+                Timber.e(it, "syncCloud: Failed to query remote backup metadata")
+                return@coroutineScope context.getString(R.string.sync_failed_upload)
+            }
+
+            if (latestRemoteMetadata != null) {
+                val remoteUnchanged = matchesRemoteSnapshot(
+                    remoteMetadata = latestRemoteMetadata,
+                    storedModifiedTime = storedRemoteModifiedTime,
+                    storedMd5 = storedRemoteMd5,
+                )
+                val localUnchanged =
+                    currentLocalFingerprint != null && currentLocalFingerprint == storedLocalFingerprint
+
+                if (remoteUnchanged && localUnchanged) {
+                    Timber.d("syncCloud: Remote and local snapshots unchanged, skipping sync")
+                    persistCloudSyncSnapshot(latestRemoteMetadata, currentLocalFingerprint)
+                    return@coroutineScope context.getString(R.string.sync_completed)
+                }
+
+                if (remoteUnchanged && currentLocalFingerprint != null && currentLocalFingerprint != storedLocalFingerprint) {
+                    Timber.d("syncCloud: Remote unchanged, uploading local changes without merge")
+                    return@coroutineScope uploadCurrentStateBackup(
+                        successMessage = context.getString(R.string.sync_completed),
+                        failureMessage = context.getString(R.string.sync_failed_upload),
+                    )
+                }
+            }
+
             // 1. Download latest backup (ZIP file)
             val tempZipFile = java.io.File(context.cacheDir, "temp_sync.zip")
-            val downloadResult = googleDriveSyncManager.downloadLatestBackup(tempZipFile)
+            val downloadResult = latestRemoteMetadata?.let {
+                googleDriveSyncManager.downloadBackup(it, tempZipFile)
+            } ?: Result.failure(Exception("No backups found"))
 
         if (downloadResult.isSuccess) {
             // 2. Unzip and extract all files
@@ -404,15 +593,7 @@ constructor(
                     return@coroutineScope null
                 }
 
-                // Snapshot DB size before merge to detect changes
-                val dbPathForHash = database.openHelper.writableDatabase.path
-                val dbSizeBefore = dbPathForHash?.let { java.io.File(it).length() } ?: -1L
-
                 databaseMerger.mergeDatabase(tempDbFile)
-
-                // Check if merge actually changed anything
-                val dbSizeAfter = dbPathForHash?.let { java.io.File(it).length() } ?: -2L
-                mergeProducedChanges = dbSizeBefore != dbSizeAfter
 
                 // 4. Restore settings if present
                 if (tempSettingsFile.exists() && tempSettingsFile.length() > 0L) {
@@ -440,6 +621,11 @@ constructor(
                     Timber.d("Last.fm offline scrobbles restored from backup")
                 }
 
+                val mergedLocalFingerprint = buildLocalCloudSyncFingerprint()
+                mergeProducedChanges =
+                    currentLocalFingerprint == null || mergedLocalFingerprint == null ||
+                        currentLocalFingerprint != mergedLocalFingerprint
+
             } catch (e: Exception) {
                 Timber.e(e, "Sync Merge failed")
                 return@coroutineScope context.getString(R.string.sync_failed_merge)
@@ -455,161 +641,26 @@ constructor(
             // Skip re-upload if merge produced no changes — the remote already has the latest data.
             if (!mergeProducedChanges) {
                 Timber.d("syncCloud: Merge produced no changes, skipping re-upload")
+                persistCloudSyncSnapshot(latestRemoteMetadata, buildLocalCloudSyncFingerprint())
                 return@coroutineScope context.getString(R.string.sync_completed)
             }
 
-            val mergedBackupZip = java.io.File(context.cacheDir, "merged_backup.zip")
             try {
-                // Check if database is still available before accessing it
-                if (!database.isSafeToUse()) {
-                    Timber.d("syncCloud: Database closed before upload, aborting")
-                    return@coroutineScope null
-                }
-
-                // Get database path before any operations (validate DB is still open)
-                val dbPath: String
-                try {
-                    database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)")
-                        .moveToFirst()
-                    dbPath = database.openHelper.writableDatabase.path
-                        ?: throw IllegalStateException("Database path is null")
-                } catch (e: IllegalStateException) {
-                    if (e.message?.contains("already-closed") == true) {
-                        Timber.w("syncCloud: Database was closed during upload preparation")
-                        return@coroutineScope null
-                    }
-                    throw e
-                }
-                
-                java.io.FileOutputStream(mergedBackupZip).use { fos ->
-                    java.util.zip.ZipOutputStream(java.io.BufferedOutputStream(fos)).use { zos ->
-                        // Add DB
-                        zos.putNextEntry(java.util.zip.ZipEntry(com.anitail.music.db.InternalDatabase.DB_NAME))
-                        java.io.BufferedInputStream(java.io.FileInputStream(dbPath)).use { fis ->
-                            fis.copyTo(zos, bufferSize = 16384)
-                        }
-
-                        // Add Settings
-                        val settingsFile =
-                            java.io.File(context.filesDir, "datastore/settings.preferences_pb")
-                        if (settingsFile.exists()) {
-                            zos.putNextEntry(java.util.zip.ZipEntry("settings.preferences_pb"))
-                            java.io.FileInputStream(settingsFile).use { fis -> fis.copyTo(zos) }
-                        }
-
-                        // Add Accounts (encrypted JSON)
-                        val accountsJson = createAccountsJson()
-                        if (accountsJson.isNotEmpty()) {
-                            zos.putNextEntry(java.util.zip.ZipEntry("accounts.json"))
-                            zos.write(accountsJson.toByteArray())
-                        }
-
-                        // Add Last.fm offline scrobbles
-                        val lastFmOfflineFile = java.io.File(
-                            context.applicationInfo.dataDir,
-                            "shared_prefs/lastfm_offline.xml"
-                        )
-                        if (lastFmOfflineFile.exists()) {
-                            zos.putNextEntry(java.util.zip.ZipEntry("lastfm_offline.xml"))
-                            java.io.FileInputStream(lastFmOfflineFile)
-                                .use { fis -> fis.copyTo(zos) }
-                        }
-                    }
-                }
-
-                val uploadResult = googleDriveSyncManager.uploadBackupReplacingByName(
-                    mergedBackupZip,
-                    CLOUD_SYNC_REMOTE_BACKUP_NAME
+                return@coroutineScope uploadCurrentStateBackup(
+                    successMessage = context.getString(R.string.sync_completed),
+                    failureMessage = context.getString(R.string.sync_failed_upload),
                 )
-                if (uploadResult.isSuccess) {
-                    Timber.d("syncCloud: Sync completed successfully")
-                    return@coroutineScope context.getString(R.string.sync_completed)
-                } else {
-                    Timber.e("syncCloud: Failed to upload merged backup")
-                    return@coroutineScope context.getString(R.string.sync_failed_upload)
-                }
             } catch (e: Exception) {
                 Timber.e(e, "Failed to create merged backup")
                 return@coroutineScope context.getString(R.string.sync_failed_local_backup)
-            } finally {
-                mergedBackupZip.delete()
             }
         } else {
             // If no remote backup, upload local as ZIP
             Timber.d("syncCloud: No remote backup found, uploading initial backup...")
-            val localBackupZip = java.io.File(context.cacheDir, "initial_backup.zip")
-            try {
-                // Check if database is still available before accessing it
-                if (!database.isSafeToUse()) {
-                    Timber.d("syncCloud: Database closed before initial upload, aborting")
-                    return@coroutineScope null
-                }
-
-                // Get database path before any operations (validate DB is still open)
-                val dbPath: String
-                try {
-                    database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)")
-                        .moveToFirst()
-                    dbPath = database.openHelper.writableDatabase.path
-                        ?: throw IllegalStateException("Database path is null")
-                } catch (e: IllegalStateException) {
-                    if (e.message?.contains("already-closed") == true) {
-                        Timber.w("syncCloud: Database was closed during initial upload preparation")
-                        return@coroutineScope null
-                    }
-                    throw e
-                }
-                
-                java.io.FileOutputStream(localBackupZip).use { fos ->
-                    java.util.zip.ZipOutputStream(java.io.BufferedOutputStream(fos)).use { zos ->
-                        zos.putNextEntry(java.util.zip.ZipEntry(com.anitail.music.db.InternalDatabase.DB_NAME))
-                        java.io.FileInputStream(dbPath)
-                            .use { fis -> fis.copyTo(zos) }
-
-                        val settingsFile =
-                            java.io.File(context.filesDir, "datastore/settings.preferences_pb")
-                        if (settingsFile.exists()) {
-                            zos.putNextEntry(java.util.zip.ZipEntry("settings.preferences_pb"))
-                            java.io.FileInputStream(settingsFile).use { fis -> fis.copyTo(zos) }
-                        }
-
-                        // Add Accounts
-                        val accountsJson = createAccountsJson()
-                        if (accountsJson.isNotEmpty()) {
-                            zos.putNextEntry(java.util.zip.ZipEntry("accounts.json"))
-                            zos.write(accountsJson.toByteArray())
-                        }
-
-                        // Add Last.fm offline scrobbles
-                        val lastFmOfflineFile = java.io.File(
-                            context.applicationInfo.dataDir,
-                            "shared_prefs/lastfm_offline.xml"
-                        )
-                        if (lastFmOfflineFile.exists()) {
-                            zos.putNextEntry(java.util.zip.ZipEntry("lastfm_offline.xml"))
-                            java.io.FileInputStream(lastFmOfflineFile)
-                                .use { fis -> fis.copyTo(zos) }
-                        }
-                    }
-                }
-
-                val uploadResult = googleDriveSyncManager.uploadBackupReplacingByName(
-                    localBackupZip,
-                    CLOUD_SYNC_REMOTE_BACKUP_NAME
-                )
-                if (uploadResult.isSuccess) {
-                    Timber.d("syncCloud: Initial backup uploaded successfully")
-                    return@coroutineScope context.getString(R.string.sync_initial_uploaded)
-                } else {
-                    Timber.e("syncCloud: Failed to upload initial backup")
-                    return@coroutineScope context.getString(R.string.sync_failed_initial_upload)
-                }
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to upload initial backup")
-                return@coroutineScope context.getString(R.string.sync_failed_initial_upload)
-            } finally {
-                localBackupZip.delete()
-            }
+            return@coroutineScope uploadCurrentStateBackup(
+                successMessage = context.getString(R.string.sync_initial_uploaded),
+                failureMessage = context.getString(R.string.sync_failed_initial_upload),
+            )
         }
             return@coroutineScope null
         }
