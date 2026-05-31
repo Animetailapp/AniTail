@@ -185,6 +185,9 @@ fun HistoryScreen(
     val allWrappedItems = remember(wrappedItemsMap) {
         wrappedItemsMap.values.flatten()
     }
+    val allHistoryMediaItems = remember(allWrappedItems) {
+        allWrappedItems.mapNotNull { it.item.song?.toMediaItem() }
+    }
 
     val lazyListState = rememberLazyListState()
 
@@ -292,6 +295,7 @@ fun HistoryScreen(
                     }
 
                     val currentDateWrappedItems = wrappedItemsMap[dateAgo] ?: emptyList()
+                    val currentDateMediaItems = currentDateWrappedItems.mapNotNull { it.item.song?.toMediaItem() }
                     
                     itemsIndexed(
                         items = currentDateWrappedItems,
@@ -338,7 +342,7 @@ fun HistoryScreen(
                                                 playerConnection.playQueue(
                                                     ListQueue(
                                                         title = dateAgoToString(dateAgo),
-                                                        items = currentDateWrappedItems.map { it.item.song!!.toMediaItem() },
+                                                        items = currentDateMediaItems,
                                                         startIndex = index
                                                     )
                                                 )
@@ -388,7 +392,7 @@ fun HistoryScreen(
                     playerConnection.playQueue(
                         ListQueue(
                             title = context.getString(R.string.history),
-                            items = allWrappedItems.map { it.item.song!!.toMediaItem() }.shuffled()
+                            items = allHistoryMediaItems.shuffled()
                         )
                     )
                 }
@@ -489,7 +493,7 @@ fun HistoryScreen(
                             SelectionMediaMetadataMenu(
                                 songSelection = allWrappedItems
                                     .filter { it.isSelected }
-                                    .map { it.item.song!!.toMediaItem().metadata!! },
+                                    .mapNotNull { it.item.song?.toMediaItem()?.metadata },
                                 onDismiss = menuState::dismiss,
                                 clearAction = { selection = false },
                                 currentItems = emptyList()

@@ -85,7 +85,9 @@ constructor(
         val download: Download,
     )
 
-    private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
+    private val connectivityManager = requireNotNull(context.getSystemService<ConnectivityManager>()) {
+        "ConnectivityManager unavailable"
+    }
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
     private val customDownloadPathEnabled by booleanPreference(context, CustomDownloadPathEnabledKey, false)
     private val customDownloadPathUri by stringPreference(context, CustomDownloadPathUriKey, "")

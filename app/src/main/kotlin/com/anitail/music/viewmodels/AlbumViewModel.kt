@@ -22,7 +22,9 @@ constructor(
     database: MusicDatabase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    val albumId = savedStateHandle.get<String>("albumId")!!
+    val albumId = requireNotNull(savedStateHandle.get<String>("albumId")) {
+        "Missing albumId navigation argument"
+    }
     val playlistId = MutableStateFlow("")
     val albumWithSongs =
         database

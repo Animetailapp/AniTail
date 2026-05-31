@@ -192,7 +192,9 @@ fun YouTubePlaylistMenu(
                             }
                         } else {
                             database.transaction {
-                                update(dbPlaylist!!.playlist.toggleLike())
+                                dbPlaylist?.playlist?.let { playlistEntity ->
+                                    update(playlistEntity.toggleLike())
+                                }
                             }
                         }
                     }

@@ -1025,8 +1025,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     currentQueue = queue
     queueTitle = null
     player.shuffleModeEnabled = false
-    if (queue.preloadItem != null) {
-      player.setMediaItem(queue.preloadItem!!.toMediaItem())
+    queue.preloadItem?.let { preloadItem ->
+      player.setMediaItem(preloadItem.toMediaItem())
       player.prepare()
       player.playWhenReady = playWhenReady
     }
@@ -2024,7 +2024,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                     codecs = format.mimeType.split("codecs=")[1].removeSurrounding("\""),
                     bitrate = format.bitrate,
                     sampleRate = format.audioSampleRate,
-                    contentLength = format.contentLength!!,
+                    contentLength = format.contentLength ?: 0L,
                     loudnessDb = playbackData.audioConfig?.loudnessDb,
                     playbackUrl = playbackData.playbackTracking?.videostatsPlaybackUrl?.baseUrl
                 )

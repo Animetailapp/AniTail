@@ -202,7 +202,8 @@ class LanJamClient(val host: String, private val port: Int = 5000, private val o
             try {
                 synchronized(this@LanJamClient) {
                     val localWriter = writer
-                    if (localWriter != null && !socket!!.isClosed) {
+                    val localSocket = socket
+                    if (localWriter != null && localSocket?.isClosed == false) {
                         localWriter.println(message)
                         localWriter.flush()
                         

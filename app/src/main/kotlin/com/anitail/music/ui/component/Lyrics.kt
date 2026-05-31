@@ -1323,8 +1323,9 @@ fun Lyrics(
         }
     }
 
-    if (showShareDialog && shareDialogData != null) {
-        val (lyricsText, songTitle, artists) = shareDialogData!! // Renamed 'lyrics' to 'lyricsText' for clarity
+    val currentShareDialogData = shareDialogData
+    if (showShareDialog && currentShareDialogData != null) {
+        val (lyricsText, songTitle, artists) = currentShareDialogData // Renamed 'lyrics' to 'lyricsText' for clarity
         BasicAlertDialog(onDismissRequest = { showShareDialog = false }) {
             Card(
                 shape = MaterialTheme.shapes.medium,
@@ -1444,8 +1445,9 @@ fun Lyrics(
         }
     }
 
-    if (showColorPickerDialog && shareDialogData != null) {
-        val (lyricsText, songTitle, artists) = shareDialogData!!
+    val currentColorPickerData = shareDialogData
+    if (showColorPickerDialog && currentColorPickerData != null) {
+        val (lyricsText, songTitle, artists) = currentColorPickerData
         val coverUrl = mediaMetadata?.thumbnailUrl
         val paletteColors = remember { mutableStateListOf<Color>() }
 

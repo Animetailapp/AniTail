@@ -278,9 +278,9 @@ object YTPlayerUtils {
             if (client.loginRequired && !isLoggedIn && YouTube.cookie == null) continue
             try {
                 val res = YouTube.player(videoId, playlistId, client = client, signatureTimestamp = signatureTimestamp).getOrNull()
-                if (isPlayable(res?.playabilityStatus?.status)) {
+                if (res != null && isPlayable(res.playabilityStatus?.status)) {
                     Timber.tag(logTag).d("Successfully fetched playable player response for metadata using fallback client: ${client.clientName}")
-                    return Result.success(res!!)
+                    return Result.success(res)
                 }
             } catch (e: Exception) {
                 Timber.tag(logTag).d("Fallback client ${client.clientName} failed to fetch player response for metadata: ${e.message}")

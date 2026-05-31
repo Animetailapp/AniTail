@@ -678,33 +678,22 @@ class MainActivity : AppCompatActivity() {
 
                     LaunchedEffect(navBackStackEntry) {
                         if (navBackStackEntry?.destination?.route?.startsWith("search/") == true) {
-                            val searchQuery =
-                                withContext(Dispatchers.IO) {
-                                    if (navBackStackEntry
-                                            ?.arguments
-                                            ?.getString(
-                                                "query",
-                                            )!!
-                                            .contains(
-                                                "%",
-                                            )
-                                    ) {
-                                        navBackStackEntry?.arguments?.getString(
-                                            "query",
-                                        )!!
-                                    } else {
-                                        URLDecoder.decode(
-                                            navBackStackEntry?.arguments?.getString("query")!!,
-                                            "UTF-8"
-                                        )
-                                    }
+                            val queryArg = navBackStackEntry?.arguments?.getString("query")
+                            if (queryArg != null) {
+                                val searchQuery = if (queryArg.contains("%")) {
+                                    queryArg
+                                } else {
+                                    URLDecoder.decode(queryArg, "UTF-8")
                                 }
-                            onQueryChange(
-                                TextFieldValue(
-                                    searchQuery,
-                                    TextRange(searchQuery.length)
+                                onQueryChange(
+                                    TextFieldValue(
+                                        searchQuery,
+                                        TextRange(searchQuery.length)
+                                    )
                                 )
-                            )
+                            } else {
+                                onQueryChange(TextFieldValue())
+                            }
                         } else if (navigationItems.fastAny { it.route == navBackStackEntry?.destination?.route }) {
                             onQueryChange(TextFieldValue())
                         }
@@ -803,8 +792,9 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     LaunchedEffect(Unit) {
-                        if (pendingIntent != null) {
-                            handleDeepLinkIntent(pendingIntent!!, navController)
+                        val launchIntent = pendingIntent
+                        if (launchIntent != null) {
+                            handleDeepLinkIntent(launchIntent, navController)
                             pendingIntent = null
                         } else {
                             handleDeepLinkIntent(intent, navController)

@@ -41,7 +41,7 @@ class EqualizerService @Inject constructor() {
             processor.disable()
             // Don't clear shouldDisable here, as we might add more processors
         } else if (pendingProfile != null) {
-            val profile = pendingProfile!!
+            val profile = pendingProfile ?: return
             applyProfileToProcessor(processor, profile)
             // Don't clear pendingProfile here
         }

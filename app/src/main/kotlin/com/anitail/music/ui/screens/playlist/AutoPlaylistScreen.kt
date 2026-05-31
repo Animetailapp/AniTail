@@ -126,6 +126,7 @@ fun AutoPlaylistScreen(
         if (viewModel.playlist == "liked") stringResource(R.string.liked) else stringResource(R.string.offline)
 
     val songs by viewModel.likedSongs.collectAsState(null)
+    val playlistSongs = songs.orEmpty()
     val mutableSongs =
         remember {
             mutableStateListOf<Song>()
@@ -293,7 +294,7 @@ fun AutoPlaylistScreen(
                 TextButton(
                     onClick = {
                         showRemoveDownloadDialog = false
-                        downloadUtil.removeDownloads(songs!!.map { it.song.id })
+                        downloadUtil.removeDownloads(playlistSongs.map { it.song.id })
                     },
                 ) {
                     Text(text = stringResource(android.R.string.ok))
@@ -321,7 +322,7 @@ fun AutoPlaylistScreen(
             contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues(),
         ) {
             if (songs != null) {
-                if (songs!!.isEmpty()) {
+                if (playlistSongs.isEmpty()) {
                     item {
                         EmptyPlaceholder(
                             icon = R.drawable.music_note,
@@ -347,7 +348,7 @@ fun AutoPlaylistScreen(
                                         .fillMaxWidth(),
                                 ) {
                                     AsyncImage(
-                                        model = songs!![0].song.thumbnailUrl,
+                                        model = playlistSongs[0].song.thumbnailUrl,
                                         contentDescription = null,
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -370,8 +371,8 @@ fun AutoPlaylistScreen(
                                             text =
                                             pluralStringResource(
                                                 R.plurals.n_song,
-                                                songs!!.size,
-                                                songs!!.size,
+                                                playlistSongs.size,
+                                                playlistSongs.size,
                                             ),
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.Normal,
@@ -401,7 +402,7 @@ fun AutoPlaylistScreen(
                                                 Download.STATE_DOWNLOADING -> {
                                                     IconButton(
                                                         onClick = {
-                                                            downloadUtil.removeDownloads(songs!!.map { it.song.id })
+                                                            downloadUtil.removeDownloads(playlistSongs.map { it.song.id })
                                                         },
                                                     ) {
                                                         CircularProgressIndicator(
@@ -414,7 +415,7 @@ fun AutoPlaylistScreen(
                                                 else -> {
                                                     IconButton(
                                                         onClick = {
-                                                            openBatchDownloadDialog(songs!!)
+                                                            openBatchDownloadDialog(playlistSongs)
                                                         },
                                                     ) {
                                                         Icon(
@@ -427,7 +428,7 @@ fun AutoPlaylistScreen(
 
                                             IconButton(
                                                 onClick = {
-                                                    refreshAllSongsMetadata(songs!!)
+                                                    refreshAllSongsMetadata(playlistSongs)
                                                 },
                                                 enabled = !isRefreshingAllSongs,
                                             ) {
@@ -447,7 +448,7 @@ fun AutoPlaylistScreen(
                                             IconButton(
                                                 onClick = {
                                                     playerConnection.addToQueue(
-                                                        items = songs!!.map { it.toMediaItem() },
+                                                        items = playlistSongs.map { it.toMediaItem() },
                                                     )
                                                 },
                                             ) {
@@ -466,7 +467,7 @@ fun AutoPlaylistScreen(
                                             playerConnection.playQueue(
                                                 ListQueue(
                                                     title = "Auto Playlist",
-                                                    items = songs!!.map { it.toMediaItem() },
+                                                    items = playlistSongs.map { it.toMediaItem() },
                                                 ),
                                             )
                                         },
@@ -487,7 +488,7 @@ fun AutoPlaylistScreen(
                                             playerConnection.playQueue(
                                                 ListQueue(
                                                     title = playlist,
-                                                    items = songs!!.shuffled()
+                                                    items = playlistSongs.shuffled()
                                                         .map { it.toMediaItem() },
                                                 ),
                                             )
@@ -572,8 +573,8 @@ fun AutoPlaylistScreen(
                                             playerConnection.playQueue(
                                                 ListQueue(
                                                     title = playlist,
-                                                    items = songs!!.map { it.toMediaItem() },
-                                                    startIndex = songs!!.indexOfFirst { it.id == songWrapper.item.id }
+                                                    items = playlistSongs.map { it.toMediaItem() },
+                                                    startIndex = playlistSongs.indexOfFirst { it.id == songWrapper.item.id }
                                                 ),
                                             )
                                         }

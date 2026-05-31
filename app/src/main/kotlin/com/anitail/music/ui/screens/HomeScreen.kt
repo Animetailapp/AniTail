@@ -522,7 +522,7 @@ fun HomeScreen(
                 similarRecommendations = similarRecommendations,
                 onTitleClick = { localItem ->
                     when (localItem) {
-                        is Song -> navController.navigate("album/${localItem.album!!.id}")
+                        is Song -> localItem.album?.id?.let { navController.navigate("album/$it") }
                         is Album -> navController.navigate("album/${localItem.id}")
                         is Artist -> navController.navigate("artist/${localItem.id}")
                         is Playlist -> {}
