@@ -271,7 +271,11 @@ private fun NewMiniPlayer(
                                 shape = CircleShape
                             )
                             .background(
-                                color = MaterialTheme.colorScheme.primary,
+                                color = if (mediaMetadata?.thumbnailUrl == null) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    Color.Transparent
+                                },
                                 shape = CircleShape
                             )
                             .tvClickable {
@@ -283,6 +287,21 @@ private fun NewMiniPlayer(
                                 }
                             }
                     ) {
+                        mediaMetadata?.thumbnailUrl?.let { thumbnailUrl ->
+                            AsyncImage(
+                                model = thumbnailUrl,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.32f))
+                            )
+                        }
+
                         Icon(
                             painter = painterResource(
                                 if (playbackState == Player.STATE_ENDED) {
@@ -294,7 +313,7 @@ private fun NewMiniPlayer(
                                 },
                             ),
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     }
