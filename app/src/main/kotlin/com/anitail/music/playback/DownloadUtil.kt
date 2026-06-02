@@ -24,6 +24,7 @@ import com.anitail.music.db.entities.FormatEntity
 import com.anitail.music.db.entities.Song
 import com.anitail.music.db.entities.SongEntity
 import com.anitail.music.di.DownloadCache
+import com.anitail.music.ui.utils.resize
 import com.anitail.music.utils.DownloadExportHelper
 import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.utils.booleanPreference
@@ -250,7 +251,7 @@ constructor(
                         id = mediaId,
                         title = playbackData.videoDetails?.title ?: "Unknown",
                         duration = playbackData.videoDetails?.lengthSeconds?.toIntOrNull() ?: 0,
-                        thumbnailUrl = playbackData.videoDetails?.thumbnail?.thumbnails?.lastOrNull()?.url,
+                        thumbnailUrl = playbackData.videoDetails?.thumbnail?.thumbnails?.lastOrNull()?.url?.resize(544, 544),
                         dateDownload = now
                     )
                 }

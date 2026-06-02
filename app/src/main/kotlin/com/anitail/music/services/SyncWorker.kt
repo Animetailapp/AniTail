@@ -11,6 +11,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.anitail.music.R
 import com.anitail.music.constants.LastCloudSyncKey
 import com.anitail.music.utils.SyncUtils
 import com.anitail.music.utils.dataStore
@@ -39,7 +40,7 @@ class SyncWorker @AssistedInject constructor(
         private const val SYNC_WORK_NAME = "periodic_cloud_sync"
         private const val STARTUP_SYNC_WORK_NAME = "startup_cloud_sync"
         private const val SYNC_INTERVAL_HOURS = 6L
-        private const val WORKER_TIMEOUT_MS = 120_000L // 2 minutes max
+        private const val WORKER_TIMEOUT_MS = SyncUtils.SYNC_TIMEOUT_MS + 30_000L
 
         /**
          * Schedule periodic cloud sync.
@@ -120,11 +121,17 @@ class SyncWorker @AssistedInject constructor(
             val result = withTimeoutOrNull(WORKER_TIMEOUT_MS) {
                 syncUtils.syncCloud()
             }
+            val timeoutMessage = applicationContext.getString(R.string.sync_timeout)
 
             when {
                 result == null -> {
                     Timber.d("SyncWorker: Sync skipped")
                     Result.success()
+                }
+
+                result == timeoutMessage -> {
+                    Timber.e("SyncWorker: Sync timed out")
+                    Result.retry()
                 }
 
                 result.contains("failed", ignoreCase = true) ||

@@ -15,7 +15,10 @@ object SearchSuggestionPage {
         return when {
             renderer.isSong -> {
                 SongItem(
-                    id = renderer.playlistItemData?.videoId ?: return null,
+                    id = renderer.playlistItemData?.videoId
+                        ?: renderer.navigationEndpoint?.anyWatchEndpoint?.videoId
+                        ?: renderer.overlay?.musicItemThumbnailOverlayRenderer?.content?.musicPlayButtonRenderer?.playNavigationEndpoint?.anyWatchEndpoint?.videoId
+                        ?: return null,
                     title =
                         renderer.flexColumns
                             .firstOrNull()
@@ -84,7 +87,7 @@ object SearchSuggestionPage {
                                 )
                             },
                     duration = null,
-                    thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
+                    thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
                     explicit =
                         renderer.badges?.find {
                             it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
@@ -103,7 +106,7 @@ object SearchSuggestionPage {
                             ?.firstOrNull()
                             ?.text
                             ?: return null,
-                    thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
+                    thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl(),
                     shuffleEndpoint =
                         renderer.menu
                             ?.menuRenderer
@@ -129,7 +132,7 @@ object SearchSuggestionPage {
                         ?.musicResponsiveListItemFlexColumnRenderer
                         ?.text
                         ?.runs
-                        ?.splitBySeparator() ?: return null
+                        ?.splitBySeparator() ?: emptyList()
                 AlbumItem(
                     browseId = renderer.navigationEndpoint?.browseEndpoint?.browseId ?: return null,
                     playlistId =
@@ -141,7 +144,15 @@ object SearchSuggestionPage {
                             }?.menuNavigationItemRenderer
                             ?.navigationEndpoint
                             ?.watchPlaylistEndpoint
-                            ?.playlistId ?: return null,
+                            ?.playlistId
+                            ?: renderer.overlay
+                            ?.musicItemThumbnailOverlayRenderer
+                            ?.content
+                            ?.musicPlayButtonRenderer
+                            ?.playNavigationEndpoint
+                            ?.anyWatchEndpoint
+                            ?.playlistId
+                            ?: return null,
                     title =
                         renderer.flexColumns
                             .firstOrNull()
@@ -196,7 +207,7 @@ object SearchSuggestionPage {
                             ?.firstOrNull()
                             ?.text
                             ?.toIntOrNull(),
-                    thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
+                    thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
                     explicit =
                         renderer.badges?.find {
                             it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"

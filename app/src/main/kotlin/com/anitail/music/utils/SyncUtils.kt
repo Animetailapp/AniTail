@@ -83,7 +83,7 @@ constructor(
     companion object {
         private const val CLOUD_SYNC_REMOTE_BACKUP_NAME = "AniTail_CloudSync_Backup.zip"
         const val SYNC_THROTTLE_MS = 30 * 60 * 1000L // 30 minutes
-        private const val SYNC_TIMEOUT_MS = 60_000L // 60 seconds
+        const val SYNC_TIMEOUT_MS = 5 * 60 * 1000L // 5 minutes for Drive download/merge/upload
     }
 
     private val syncScope = CoroutineScope(Dispatchers.IO)

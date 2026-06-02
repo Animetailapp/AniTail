@@ -1472,7 +1472,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     }
 
     val mediaId = meta?.id ?: song?.song?.id ?: ""
-    val coverUrl = meta?.thumbnailUrl ?: song?.song?.thumbnailUrl ?: ""
+  val coverUrl = meta?.thumbnailUrl ?: song?.thumbnailUrl ?: ""
     val defaultColor = com.anitail.music.ui.theme.DefaultThemeColor.toArgb()
     val staticCache = widgetStaticCache
     val canReuseStaticCache =

@@ -94,6 +94,7 @@ import com.anitail.music.db.entities.Song
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.models.MediaMetadata
 import com.anitail.music.playback.queues.LocalAlbumRadio
+import com.anitail.music.ui.utils.resize
 import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.joinByBullet
 import com.anitail.music.utils.makeTimeString
@@ -289,7 +290,7 @@ fun SongListItem(
             badges = badges,
             thumbnailContent = {
                 ItemThumbnail(
-                    thumbnailUrl = song.song.thumbnailUrl,
+                    thumbnailUrl = song.thumbnailUrl,
                     albumIndex = albumIndex,
                     isSelected = isSelected,
                     isActive = isActive,
@@ -356,7 +357,7 @@ fun SongGridItem(
     badges = badges,
     thumbnailContent = {
         ItemThumbnail(
-            thumbnailUrl = song.song.thumbnailUrl,
+            thumbnailUrl = song.thumbnailUrl,
             isActive = isActive,
             isPlaying = isPlaying,
             shape = RoundedCornerShape(ThumbnailCornerRadius),
@@ -949,8 +950,9 @@ fun ItemThumbnail(
             .clip(shape)
     ) {
         if (albumIndex == null) {
+            val resolvedThumbnailUrl = remember(thumbnailUrl) { thumbnailUrl?.resize(544, 544) }
             AsyncImage(
-                model = thumbnailUrl,
+                model = resolvedThumbnailUrl,
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1015,6 +1017,8 @@ fun LocalThumbnail(
     playButtonVisible: Boolean = false,
     thumbnailRatio: Float = 1f
 ) {
+    val resolvedThumbnailUrl = remember(thumbnailUrl) { thumbnailUrl?.resize(1200, 1200) }
+
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -1022,7 +1026,7 @@ fun LocalThumbnail(
             .clip(shape)
     ) {
         AsyncImage(
-            model = thumbnailUrl,
+            model = resolvedThumbnailUrl,
             contentDescription = null,
             modifier = Modifier.fillMaxSize()
         )

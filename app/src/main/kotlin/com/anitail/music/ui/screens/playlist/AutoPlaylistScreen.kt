@@ -348,7 +348,7 @@ fun AutoPlaylistScreen(
                                         .fillMaxWidth(),
                                 ) {
                                     AsyncImage(
-                                        model = playlistSongs[0].song.thumbnailUrl,
+                                        model = playlistSongs[0].thumbnailUrl,
                                         contentDescription = null,
                                         modifier = Modifier
                                             .fillMaxWidth()
