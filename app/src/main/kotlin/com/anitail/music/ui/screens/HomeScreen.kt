@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,40 +20,44 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.Indicator
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -121,50 +126,14 @@ import kotlinx.coroutines.withContext
 import kotlin.math.min
 import kotlin.random.Random
 
-@Composable
-private fun SyncStatusSnackbar(
-    viewModel: HomeViewModel,
-    modifier: Modifier = Modifier,
-) {
-    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
-    val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
 
-    if (syncStatus.isNullOrBlank()) return
-
-    Snackbar(
-        modifier = modifier
-            .padding(16.dp)
-            .padding(LocalPlayerAwareWindowInsets.current.asPaddingValues()),
-        containerColor = MaterialTheme.colorScheme.inverseSurface,
-        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (isSyncing) {
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .weight(0.15f)
-                        .padding(end = 12.dp),
-                    color = MaterialTheme.colorScheme.inverseOnSurface,
-                )
-            } else {
-                Icon(
-                    painter = painterResource(R.drawable.check_circle),
-                    contentDescription = null,
-                    modifier = Modifier.padding(end = 12.dp),
-                )
-            }
-            Text(
-                text = syncStatus.orEmpty(),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-    }
-}
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(
+    ExperimentalFoundationApi::class,
+    ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3ExpressiveApi::class,
+)
 @Composable
 fun HomeScreen(
     navController: NavController,
@@ -199,6 +168,8 @@ fun HomeScreen(
     val isLoading = contentUiState.isLoading
     val isMoodAndGenresLoading = isLoading && explorePage?.moodAndGenres == null
     val isRefreshing = contentUiState.isRefreshing
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
     val pullRefreshState = rememberPullToRefreshState()
 
     val quickPicksLazyGridState = rememberLazyGridState()
@@ -222,6 +193,11 @@ fun HomeScreen(
     val latestContinuation by rememberUpdatedState(homePage?.continuation)
     val quickPicksFirstId = quickPicks.firstOrNull()?.id
     val forgottenFavoritesFirstId = forgottenFavorites.firstOrNull()?.id
+    val syncCompletedMessage = stringResource(R.string.sync_completed)
+    val syncInitialUploadMessage = stringResource(R.string.sync_initial_uploaded)
+    val syncSucceeded = syncStatus == syncCompletedMessage || syncStatus == syncInitialUploadMessage
+    val showSyncIndicator =
+        (isSyncing || syncStatus != null) && (allLocalItems.isNotEmpty() || allYtItems.isNotEmpty())
 
     LaunchedEffect(scrollToTop) {
         if (scrollToTop) {
@@ -248,147 +224,155 @@ fun HomeScreen(
         }
     }
 
-    val playOrToggleSong: (Song) -> Unit = { song ->
-        if (song.id == mediaMetadata?.id) {
-            playerConnection.player.togglePlayPause()
-        } else {
-            playerConnection.playQueue(YouTubeQueue.radio(song.toMediaMetadata()))
+    val playOrToggleSong: (Song) -> Unit = remember(mediaMetadata) {
+        { song ->
+            if (song.id == mediaMetadata?.id) {
+                playerConnection.player.togglePlayPause()
+            } else {
+                playerConnection.playQueue(YouTubeQueue.radio(song.toMediaMetadata()))
+            }
         }
     }
 
-    val showSongMenu: (Song, Boolean) -> Unit = { song, withHaptic ->
-        if (withHaptic) {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        }
-        menuState.show {
-            SongMenu(
-                originalSong = song,
-                navController = navController,
-                onDismiss = menuState::dismiss,
-            )
+    val showSongMenu: (Song, Boolean) -> Unit = remember {
+        { song, withHaptic ->
+            if (withHaptic) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
+            menuState.show {
+                SongMenu(
+                    originalSong = song,
+                    navController = navController,
+                    onDismiss = menuState::dismiss,
+                )
+            }
         }
     }
 
-    val localGridItem: @Composable (LocalItem) -> Unit = {
-        when (it) {
-            is Song -> SongGridItem(
-                song = it,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .tvCombinedClickable(
-                        onClick = { playOrToggleSong(it) },
-                        onLongClick = { showSongMenu(it, true) },
-                    ),
-                isActive = it.id == mediaMetadata?.id,
-                isPlaying = isPlaying,
-            )
+    val localGridItem: @Composable (LocalItem) -> Unit = remember(isPlaying, mediaMetadata) {
+        { item ->
+            when (item) {
+                is Song -> SongGridItem(
+                    song = item,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .tvCombinedClickable(
+                            onClick = { playOrToggleSong(item) },
+                            onLongClick = { showSongMenu(item, true) },
+                        ),
+                    isActive = item.id == mediaMetadata?.id,
+                    isPlaying = isPlaying,
+                )
 
-            is Album -> AlbumGridItem(
-                album = it,
-                isActive = it.id == mediaMetadata?.album?.id,
+                is Album -> AlbumGridItem(
+                    album = item,
+                    isActive = item.id == mediaMetadata?.album?.id,
+                    isPlaying = isPlaying,
+                    coroutineScope = scope,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .tvCombinedClickable(
+                            onClick = {
+                                navController.navigate("album/${item.id}")
+                            },
+                            onLongClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                menuState.show {
+                                    AlbumMenu(
+                                        originalAlbum = item,
+                                        navController = navController,
+                                        onDismiss = menuState::dismiss
+                                    )
+                                }
+                            }
+                        )
+                )
+
+                is Artist -> ArtistGridItem(
+                    artist = item,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .tvCombinedClickable(
+                            onClick = {
+                                navController.navigate("artist/${item.id}")
+                            },
+                            onLongClick = {
+                                haptic.performHapticFeedback(
+                                    HapticFeedbackType.LongPress,
+                                )
+                                menuState.show {
+                                    ArtistMenu(
+                                        originalArtist = item,
+                                        coroutineScope = scope,
+                                        onDismiss = menuState::dismiss,
+                                    )
+                                }
+                            },
+                        ),
+                )
+
+                is Playlist -> {}
+            }
+        }
+    }
+
+    val ytGridItem: @Composable (YTItem) -> Unit = remember(isPlaying, mediaMetadata) {
+        { item ->
+            YouTubeGridItem(
+                item = item,
+                isActive = item.id == mediaMetadata?.id || item.id == mediaMetadata?.album?.id,
                 isPlaying = isPlaying,
                 coroutineScope = scope,
+                thumbnailRatio = 1f,
                 modifier = Modifier
-                    .fillMaxWidth()
                     .tvCombinedClickable(
                         onClick = {
-                            navController.navigate("album/${it.id}")
+                            when (item) {
+                                is SongItem -> playerConnection.playQueue(
+                                    YouTubeQueue(
+                                        item.endpoint ?: WatchEndpoint(
+                                            videoId = item.id
+                                        ), item.toMediaMetadata()
+                                    )
+                                )
+
+                                is AlbumItem -> navController.navigate("album/${item.id}")
+                                is ArtistItem -> navController.navigate("artist/${item.id}")
+                                is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                            }
                         },
                         onLongClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             menuState.show {
-                                AlbumMenu(
-                                    originalAlbum = it,
-                                    navController = navController,
-                                    onDismiss = menuState::dismiss
-                                )
+                                when (item) {
+                                    is SongItem -> YouTubeSongMenu(
+                                        song = item,
+                                        navController = navController,
+                                        onDismiss = menuState::dismiss
+                                    )
+
+                                    is AlbumItem -> YouTubeAlbumMenu(
+                                        albumItem = item,
+                                        navController = navController,
+                                        onDismiss = menuState::dismiss
+                                    )
+
+                                    is ArtistItem -> YouTubeArtistMenu(
+                                        artist = item,
+                                        onDismiss = menuState::dismiss
+                                    )
+
+                                    is PlaylistItem -> YouTubePlaylistMenu(
+                                        playlist = item,
+                                        coroutineScope = scope,
+                                        onDismiss = menuState::dismiss
+                                    )
+                                }
                             }
                         }
                     )
             )
-
-            is Artist -> ArtistGridItem(
-                artist = it,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .tvCombinedClickable(
-                        onClick = {
-                            navController.navigate("artist/${it.id}")
-                        },
-                        onLongClick = {
-                            haptic.performHapticFeedback(
-                                HapticFeedbackType.LongPress,
-                            )
-                            menuState.show {
-                                ArtistMenu(
-                                    originalArtist = it,
-                                    coroutineScope = scope,
-                                    onDismiss = menuState::dismiss,
-                                )
-                            }
-                        },
-                    ),
-            )
-
-            is Playlist -> {}
         }
-    }
-
-    val ytGridItem: @Composable (YTItem) -> Unit = { item ->
-        YouTubeGridItem(
-            item = item,
-            isActive = item.id == mediaMetadata?.id || item.id == mediaMetadata?.album?.id,
-            isPlaying = isPlaying,
-            coroutineScope = scope,
-            thumbnailRatio = 1f,
-            modifier = Modifier
-                .tvCombinedClickable(
-                    onClick = {
-                        when (item) {
-                            is SongItem -> playerConnection.playQueue(
-                                YouTubeQueue(
-                                    item.endpoint ?: WatchEndpoint(
-                                        videoId = item.id
-                                    ), item.toMediaMetadata()
-                                )
-                            )
-
-                            is AlbumItem -> navController.navigate("album/${item.id}")
-                            is ArtistItem -> navController.navigate("artist/${item.id}")
-                            is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
-                        }
-                    },
-                    onLongClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        menuState.show {
-                            when (item) {
-                                is SongItem -> YouTubeSongMenu(
-                                    song = item,
-                                    navController = navController,
-                                    onDismiss = menuState::dismiss
-                                )
-
-                                is AlbumItem -> YouTubeAlbumMenu(
-                                    albumItem = item,
-                                    navController = navController,
-                                    onDismiss = menuState::dismiss
-                                )
-
-                                is ArtistItem -> YouTubeArtistMenu(
-                                    artist = item,
-                                    onDismiss = menuState::dismiss
-                                )
-
-                                is PlaylistItem -> YouTubePlaylistMenu(
-                                    playlist = item,
-                                    coroutineScope = scope,
-                                    onDismiss = menuState::dismiss
-                                )
-                            }
-                        }
-                    }
-                )
-        )
     }
 
     LaunchedEffect(quickPicksFirstId) {
@@ -446,6 +430,13 @@ fun HomeScreen(
         val quickPicksFlingBehavior = rememberSnapFlingBehavior(quickPicksSnapLayoutInfoProvider)
         val forgottenFavoritesFlingBehavior =
             rememberSnapFlingBehavior(forgottenFavoritesSnapLayoutInfoProvider)
+        val micFabSize = 56.dp
+        val micFabEndPadding = 16.dp
+        val micFabBottomPadding = 88.dp
+        val syncIndicatorSize = 22.dp
+        val syncIndicatorGap = 4.dp
+        val syncIndicatorEndPadding = micFabEndPadding + (micFabSize - syncIndicatorSize) / 2
+        val syncIndicatorBottomPadding = micFabBottomPadding + micFabSize + syncIndicatorGap
 
         LazyColumn(
             state = lazylistState,
@@ -531,7 +522,7 @@ fun HomeScreen(
                 similarRecommendations = similarRecommendations,
                 onTitleClick = { localItem ->
                     when (localItem) {
-                        is Song -> navController.navigate("album/${localItem.album!!.id}")
+                        is Song -> localItem.album?.id?.let { navController.navigate("album/$it") }
                         is Album -> navController.navigate("album/${localItem.id}")
                         is Artist -> navController.navigate("artist/${localItem.id}")
                         is Playlist -> {}
@@ -813,6 +804,53 @@ fun HomeScreen(
 
         // Recognition Floating Action Button (above the shuffle FAB)
         AnimatedVisibility(
+            visible = showSyncIndicator,
+            enter = fadeIn() + slideInVertically { it / 2 },
+            exit = fadeOut() + slideOutVertically { it / 2 },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .windowInsetsPadding(
+                    LocalPlayerAwareWindowInsets.current
+                        .only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal),
+                )
+                .padding(end = syncIndicatorEndPadding, bottom = syncIndicatorBottomPadding),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(syncIndicatorSize)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                contentAlignment = Alignment.Center,
+            ) {
+                when {
+                    isSyncing -> ContainedLoadingIndicator(
+                        modifier = Modifier.fillMaxSize(),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        indicatorColor = MaterialTheme.colorScheme.primary,
+                    )
+
+                    syncSucceeded -> Icon(
+                        painter = painterResource(R.drawable.check_circle),
+                        contentDescription = null,
+                        tint = Color(0xFF34A853),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(2.dp),
+                    )
+
+                    else -> Icon(
+                        painter = painterResource(R.drawable.error),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(2.dp),
+                    )
+                }
+            }
+        }
+
+        AnimatedVisibility(
             visible = (allLocalItems.isNotEmpty() || allYtItems.isNotEmpty()) && lazylistState.isScrollingUp(),
             enter = slideInVertically { it },
             exit = slideOutVertically { it },
@@ -825,7 +863,7 @@ fun HomeScreen(
                 ),
         ) {
             FloatingActionButton(
-                modifier = Modifier.padding(16.dp).padding(bottom = 72.dp),
+                modifier = Modifier.padding(end = micFabEndPadding, bottom = micFabBottomPadding),
                 onClick = { navController.navigate("recognition") }
             ) {
                 Icon(
@@ -841,11 +879,6 @@ fun HomeScreen(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(LocalPlayerAwareWindowInsets.current.asPaddingValues()),
-        )
-
-        SyncStatusSnackbar(
-            viewModel = viewModel,
-            modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 }

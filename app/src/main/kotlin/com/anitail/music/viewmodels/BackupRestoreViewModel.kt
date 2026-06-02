@@ -69,14 +69,14 @@ class BackupRestoreViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             if (_isSyncing.value) return@launch
             _isSyncing.value = true
-            _syncMessage.value = "Iniciando..."
+            _syncMessage.value = context.getString(R.string.sync_starting)
 
             try {
                 val resultMessage = syncUtils.syncCloud(force = true)
-                _syncMessage.value = resultMessage ?: "Sincronización completada"
+                _syncMessage.value = resultMessage ?: context.getString(R.string.sync_completed)
             } catch (e: Exception) {
                 Timber.e(e, "Sync failed")
-                _syncMessage.value = "Falló: ${e.localizedMessage}"
+                _syncMessage.value = context.getString(R.string.sync_failed, e.localizedMessage ?: "")
             } finally {
                 _isSyncing.value = false
                 // Clear message after delay

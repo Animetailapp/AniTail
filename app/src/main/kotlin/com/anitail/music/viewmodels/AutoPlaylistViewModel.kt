@@ -39,7 +39,9 @@ constructor(
     savedStateHandle: SavedStateHandle,
     private val syncUtils: SyncUtils,
 ) : ViewModel() {
-    val playlist = savedStateHandle.get<String>("playlist")!!
+    val playlist = requireNotNull(savedStateHandle.get<String>("playlist")) {
+        "Missing playlist navigation argument"
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val likedSongs =

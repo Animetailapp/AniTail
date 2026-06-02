@@ -24,6 +24,7 @@ import com.anitail.music.db.entities.FormatEntity
 import com.anitail.music.db.entities.Song
 import com.anitail.music.db.entities.SongEntity
 import com.anitail.music.di.DownloadCache
+import com.anitail.music.ui.utils.resize
 import com.anitail.music.utils.DownloadExportHelper
 import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.utils.booleanPreference
@@ -85,7 +86,9 @@ constructor(
         val download: Download,
     )
 
-    private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
+    private val connectivityManager = requireNotNull(context.getSystemService<ConnectivityManager>()) {
+        "ConnectivityManager unavailable"
+    }
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
     private val customDownloadPathEnabled by booleanPreference(context, CustomDownloadPathEnabledKey, false)
     private val customDownloadPathUri by stringPreference(context, CustomDownloadPathUriKey, "")
@@ -248,7 +251,7 @@ constructor(
                         id = mediaId,
                         title = playbackData.videoDetails?.title ?: "Unknown",
                         duration = playbackData.videoDetails?.lengthSeconds?.toIntOrNull() ?: 0,
-                        thumbnailUrl = playbackData.videoDetails?.thumbnail?.thumbnails?.lastOrNull()?.url,
+                        thumbnailUrl = playbackData.videoDetails?.thumbnail?.thumbnails?.lastOrNull()?.url?.resize(544, 544),
                         dateDownload = now
                     )
                 }

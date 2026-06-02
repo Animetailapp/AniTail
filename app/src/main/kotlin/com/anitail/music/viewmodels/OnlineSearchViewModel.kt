@@ -30,7 +30,10 @@ constructor(
     @ApplicationContext val context: Context,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    val query = URLDecoder.decode(savedStateHandle.get<String>("query")!!, "UTF-8")
+    private val rawQuery = requireNotNull(savedStateHandle.get<String>("query")) {
+        "Missing query navigation argument"
+    }
+    val query = URLDecoder.decode(rawQuery, "UTF-8")
     val filter = MutableStateFlow<YouTube.SearchFilter?>(null)
     var summaryPage by mutableStateOf<SearchSummaryPage?>(null)
     val viewStateMap = mutableStateMapOf<String, ItemsPage?>()

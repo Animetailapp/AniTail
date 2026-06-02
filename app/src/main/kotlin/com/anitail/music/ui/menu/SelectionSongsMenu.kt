@@ -37,6 +37,7 @@ import com.anitail.music.LocalSyncUtils
 import com.anitail.music.R
 import com.anitail.music.db.entities.PlaylistSongMap
 import com.anitail.music.db.entities.Song
+import com.anitail.music.db.entities.SongArtistMap
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.models.MediaMetadata
 import com.anitail.music.models.toMediaMetadata
@@ -126,6 +127,21 @@ fun SelectionSongMenu(
     AddToPlaylistDialog(
         isVisible = showChoosePlaylistDialog,
         onGetSong = { playlist ->
+            database.transaction {
+                songSelection.forEach { song ->
+                    insert(song.song)
+                    song.artists.forEachIndexed { index, artist ->
+                        insert(artist)
+                        insert(
+                            SongArtistMap(
+                                songId = song.id,
+                                artistId = artist.id,
+                                position = index
+                            )
+                        )
+                    }
+                }
+            }
             coroutineScope.launch(Dispatchers.IO) {
                 songSelection.forEach { song ->
                     playlist.playlist.browseId?.let { browseId ->

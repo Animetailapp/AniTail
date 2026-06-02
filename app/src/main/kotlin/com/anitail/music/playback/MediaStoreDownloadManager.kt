@@ -74,7 +74,9 @@ constructor(
 ) {
     private val scope = CoroutineScope(Dispatchers.IO + Job())
     private val mediaStoreHelper = MediaStoreHelper(context)
-    private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
+    private val connectivityManager = requireNotNull(context.getSystemService<ConnectivityManager>()) {
+        "ConnectivityManager unavailable"
+    }
     private val audioQuality by enumPreference(context, AudioQualityKey, AudioQuality.AUTO)
     private val customDownloadPathEnabled by
         booleanPreference(context, CustomDownloadPathEnabledKey, false)

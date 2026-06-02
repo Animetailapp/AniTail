@@ -162,7 +162,9 @@ class LocalArtistViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    private val artistId: String = savedStateHandle.get<String>("artistId")!!
+    private val artistId: String = requireNotNull(savedStateHandle.get<String>("artistId")) {
+        "Missing artistId navigation argument"
+    }
 
     init {
         Timber.d("LocalArtistViewModel: INIT - artistId=$artistId")
@@ -184,7 +186,9 @@ class LocalAlbumViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    private val albumId: String = savedStateHandle.get<String>("albumId")!!
+    private val albumId: String = requireNotNull(savedStateHandle.get<String>("albumId")) {
+        "Missing albumId navigation argument"
+    }
 
     init {
         Timber.d("LocalAlbumViewModel: INIT - albumId=$albumId")

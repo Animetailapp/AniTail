@@ -60,7 +60,7 @@ class LanJamServer(
                 val localIp = getLocalIpAddress()
                 Timber.tag("LanJamServer").d("Servidor iniciado en $localIp:$port (esperando conexiones)")
 
-                while (isRunning.get() && !serverSocket!!.isClosed) {
+                while (isRunning.get() && serverSocket?.isClosed == false) {
                     try {
                         Timber.tag("LanJamServer").d("Esperando conexión de cliente en $localIp:$port ...")
                         val clientSocket = serverSocket?.accept()

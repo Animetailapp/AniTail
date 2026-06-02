@@ -90,8 +90,43 @@ object YTPlayerUtils {
         Timber.tag(logTag).d("Session authentication status: ${if (isLoggedIn) "Logged in" else "Not logged in"}")
 
         Timber.tag(logTag).d("Attempting to get player response using MAIN_CLIENT: ${MAIN_CLIENT.clientName}")
-        val mainPlayerResponse =
-            YouTube.player(videoId, playlistId, MAIN_CLIENT, signatureTimestamp).getOrThrow()
+        var mainPlayerResponse: PlayerResponse? = null
+        var mainPlayerResponseError: Throwable? = null
+        try {
+            val response = YouTube.player(videoId, playlistId, MAIN_CLIENT, signatureTimestamp).getOrThrow()
+            if (isPlayable(response.playabilityStatus.status)) {
+                mainPlayerResponse = response
+            } else {
+                Timber.tag(logTag).d("MAIN_CLIENT playabilityStatus not OK: ${response.playabilityStatus.status}, reason: ${response.playabilityStatus.reason}")
+                mainPlayerResponseError = Exception(response.playabilityStatus.reason ?: "Playability status not OK")
+                mainPlayerResponse = response
+            }
+        } catch (e: Exception) {
+            Timber.tag(logTag).e(e, "Failed to get player response with MAIN_CLIENT")
+            mainPlayerResponseError = e
+        }
+
+        if (mainPlayerResponse == null || !isPlayable(mainPlayerResponse.playabilityStatus.status)) {
+            for (client in STREAM_FALLBACK_CLIENTS) {
+                if (client.loginRequired && !isLoggedIn && YouTube.cookie == null) continue
+                try {
+                    val response = YouTube.player(videoId, playlistId, client, signatureTimestamp).getOrNull()
+                    if (isPlayable(response?.playabilityStatus?.status)) {
+                        Timber.tag(logTag).d("Successfully fetched playable player response using fallback client: ${client.clientName}")
+                        mainPlayerResponse = response
+                        mainPlayerResponseError = null
+                        break
+                    }
+                } catch (e: Exception) {
+                    Timber.tag(logTag).d("Fallback client ${client.clientName} failed to fetch player response: ${e.message}")
+                }
+            }
+        }
+
+        if (mainPlayerResponse == null) {
+            throw (mainPlayerResponseError ?: Exception("Failed to fetch player response"))
+        }
+
         val audioConfig = mainPlayerResponse.playerConfig?.audioConfig
         val videoDetails = mainPlayerResponse.videoDetails
         val playbackTracking = mainPlayerResponse.playbackTracking
@@ -130,12 +165,13 @@ object YTPlayerUtils {
             }
 
             // process current client response
-            if (streamPlayerResponse?.playabilityStatus?.status == "OK") {
+            val response = streamPlayerResponse
+            if (response != null && isPlayable(response.playabilityStatus.status)) {
                 Timber.tag(logTag).d("Player response status OK for client: ${if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
 
                 format =
                     findFormat(
-                        streamPlayerResponse,
+                        response,
                         audioQuality,
                         connectivityManager,
                         targetItag,
@@ -154,7 +190,7 @@ object YTPlayerUtils {
                     continue
                 }
 
-                streamExpiresInSeconds = streamPlayerResponse.streamingData?.expiresInSeconds
+                streamExpiresInSeconds = response.streamingData?.expiresInSeconds
                 if (streamExpiresInSeconds == null) {
                     Timber.tag(logTag).d("Stream expiration time not found")
                     continue
@@ -185,7 +221,7 @@ object YTPlayerUtils {
             throw Exception("Bad stream player response")
         }
 
-        if (streamPlayerResponse.playabilityStatus.status != "OK") {
+        if (!isPlayable(streamPlayerResponse.playabilityStatus.status)) {
             val errorReason = streamPlayerResponse.playabilityStatus.reason
             Timber.tag(logTag).e("Playability status not OK: $errorReason")
             throw PlaybackException(
@@ -229,9 +265,28 @@ object YTPlayerUtils {
         playlistId: String? = null,
     ): Result<PlayerResponse> {
         Timber.tag(logTag).d("Fetching metadata-only player response for videoId: $videoId using MAIN_CLIENT: ${MAIN_CLIENT.clientName}")
-        return YouTube.player(videoId, playlistId, client = MAIN_CLIENT)
-            .onSuccess { Timber.tag(logTag).d("Successfully fetched metadata") }
-            .onFailure { Timber.tag(logTag).e(it, "Failed to fetch metadata") }
+        val result = YouTube.player(videoId, playlistId, client = MAIN_CLIENT)
+        if (result.isSuccess && isPlayable(result.getOrNull()?.playabilityStatus?.status)) {
+            Timber.tag(logTag).d("Successfully fetched metadata")
+            return result
+        }
+
+        Timber.tag(logTag).d("MAIN_CLIENT failed to fetch metadata or playabilityStatus not OK, trying fallback clients")
+        val signatureTimestamp = getSignatureTimestampOrNull(videoId)
+        val isLoggedIn = YouTube.cookie != null
+        for (client in STREAM_FALLBACK_CLIENTS) {
+            if (client.loginRequired && !isLoggedIn && YouTube.cookie == null) continue
+            try {
+                val res = YouTube.player(videoId, playlistId, client = client, signatureTimestamp = signatureTimestamp).getOrNull()
+                if (res != null && isPlayable(res.playabilityStatus?.status)) {
+                    Timber.tag(logTag).d("Successfully fetched playable player response for metadata using fallback client: ${client.clientName}")
+                    return Result.success(res)
+                }
+            } catch (e: Exception) {
+                Timber.tag(logTag).d("Fallback client ${client.clientName} failed to fetch player response for metadata: ${e.message}")
+            }
+        }
+        return result
     }
 
     private fun findFormat(
@@ -305,7 +360,7 @@ object YTPlayerUtils {
                 signatureTimestamp = if (client.useSignatureTimestamp) signatureTimestamp else null,
             ).getOrNull() ?: return@forEach
 
-            if (response.playabilityStatus.status != "OK") return@forEach
+            if (!isPlayable(response.playabilityStatus.status)) return@forEach
 
             response.streamingData?.adaptiveFormats
                 ?.asSequence()
@@ -387,5 +442,9 @@ object YTPlayerUtils {
                 reportException(it)
             }
             .getOrNull()
+    }
+
+    private fun isPlayable(status: String?): Boolean {
+        return status == "OK" || status == "CONTENT_CHECK_REQUIRED"
     }
 }

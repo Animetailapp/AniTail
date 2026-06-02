@@ -104,18 +104,16 @@ fun AddToPlaylistDialog(
                     modifier = Modifier.tvClickable {
                         selectedPlaylist = playlist
                         coroutineScope.launch(Dispatchers.IO) {
-                            if (songIds == null) {
-                                songIds = onGetSong(playlist)
-                            }
-                            duplicates = database.playlistDuplicates(playlist.id, songIds!!)
+                            val resolvedSongIds = songIds ?: onGetSong(playlist).also { songIds = it }
+                            duplicates = database.playlistDuplicates(playlist.id, resolvedSongIds)
                             if (duplicates.isNotEmpty()) {
                                 showDuplicateDialog = true
                             } else {
                                 onDismiss()
-                                database.addSongToPlaylist(playlist, songIds!!)
+                                database.addSongToPlaylist(playlist, resolvedSongIds)
 
                                 playlist.playlist.browseId?.let { plist ->
-                                    songIds?.forEach {
+                                    resolvedSongIds.forEach {
                                         YouTube.addToPlaylist(plist, it)
                                     }
                                 }
@@ -144,13 +142,12 @@ fun AddToPlaylistDialog(
                         onClick = {
                             showDuplicateDialog = false
                             onDismiss()
-                            database.transaction {
-                                addSongToPlaylist(
-                                    selectedPlaylist!!,
-                                    songIds!!.filter {
-                                        !duplicates.contains(it)
-                                    }
-                                )
+                            val playlist = selectedPlaylist
+                            val resolvedSongIds = songIds.orEmpty().filter { !duplicates.contains(it) }
+                            if (playlist != null && resolvedSongIds.isNotEmpty()) {
+                                database.transaction {
+                                    addSongToPlaylist(playlist, resolvedSongIds)
+                                }
                             }
                         }
                     ) {
@@ -161,8 +158,12 @@ fun AddToPlaylistDialog(
                         onClick = {
                             showDuplicateDialog = false
                             onDismiss()
-                            database.transaction {
-                                addSongToPlaylist(selectedPlaylist!!, songIds!!)
+                            val playlist = selectedPlaylist
+                            val resolvedSongIds = songIds.orEmpty()
+                            if (playlist != null && resolvedSongIds.isNotEmpty()) {
+                                database.transaction {
+                                    addSongToPlaylist(playlist, resolvedSongIds)
+                                }
                             }
                         }
                     ) {

@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -73,7 +74,9 @@ fun LibraryDownloadedScreen(
         downloadedTrack.song
     }
 
-    val wrappedSongs = playableSongs.map { item -> ItemWrapper(item) }.toMutableList()
+    val wrappedSongs = remember(playableSongs) {
+        playableSongs.map { item -> ItemWrapper(item) }.toMutableStateList()
+    }
     var selection by remember { mutableStateOf(false) }
 
     val lazyListState = rememberLazyListState()

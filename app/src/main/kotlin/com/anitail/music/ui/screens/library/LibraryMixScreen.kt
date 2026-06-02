@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -167,17 +168,17 @@ fun LibraryMixScreen(
     val (showCached) = rememberPreference(ShowCachedPlaylistKey, true)
     val (showLocal) = rememberPreference(ShowLocalPlaylistKey, true)
 
-    val albums = viewModel.albums.collectAsState()
-    val artist = viewModel.artists.collectAsState()
-    val playlist = viewModel.playlists.collectAsState()
+    val albums by viewModel.albums.collectAsState()
+    val artist by viewModel.artists.collectAsState()
+    val playlist by viewModel.playlists.collectAsState()
 
-    var allItems = albums.value + artist.value + playlist.value
-    val collator = Collator.getInstance(Locale.getDefault())
-    collator.strength = Collator.PRIMARY
-    allItems =
+    val allItems = remember(albums, artist, playlist, sortType, sortDescending) {
+        val list = albums + artist + playlist
+        val collator = Collator.getInstance(Locale.getDefault())
+        collator.strength = Collator.PRIMARY
         when (sortType) {
             MixSortType.CREATE_DATE ->
-                allItems.sortedBy { item ->
+                list.sortedBy { item ->
                     when (item) {
                         is Album -> item.album.bookmarkedAt
                         is Artist -> item.artist.bookmarkedAt
@@ -187,7 +188,7 @@ fun LibraryMixScreen(
                 }
 
             MixSortType.NAME ->
-                allItems.sortedWith(
+                list.sortedWith(
                     compareBy(collator) { item ->
                         when (item) {
                             is Album -> item.album.title
@@ -199,7 +200,7 @@ fun LibraryMixScreen(
                 )
 
             MixSortType.LAST_UPDATED ->
-                allItems.sortedBy { item ->
+                list.sortedBy { item ->
                     when (item) {
                         is Album -> item.album.lastUpdateTime
                         is Artist -> item.artist.lastUpdateTime
@@ -208,6 +209,7 @@ fun LibraryMixScreen(
                     }
                 }
         }.reversed(sortDescending)
+    }
 
     val coroutineScope = rememberCoroutineScope()
 

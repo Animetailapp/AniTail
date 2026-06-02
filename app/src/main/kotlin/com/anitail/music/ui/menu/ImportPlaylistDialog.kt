@@ -30,9 +30,6 @@ fun ImportPlaylistDialog(
     val coroutineScope = rememberCoroutineScope()
 
     val textFieldValue by remember { mutableStateOf(TextFieldValue(text = playlistTitle)) }
-    var songIds by remember {
-        mutableStateOf<List<String>?>(null) // list is not saveable
-    }
 
     if (isVisible) {
         TextFieldDialog(
@@ -51,8 +48,10 @@ fun ImportPlaylistDialog(
                     val playlist = database.playlist(newPlaylist.id).firstOrNull()
 
                     if (playlist != null) {
-                        songIds = onGetSong()
-                        database.addSongToPlaylist(playlist, songIds!!)
+                        val songIds = onGetSong()
+                        if (songIds.isNotEmpty()) {
+                            database.addSongToPlaylist(playlist, songIds)
+                        }
                     }
 
                     onDismiss()

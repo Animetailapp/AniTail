@@ -246,7 +246,7 @@ class DownloadExportHelper @Inject constructor(
 
         return try {
             val allArtists = song.artists.joinToString(", ") { it.name }.ifEmpty { "Unknown Artist" }
-            val artworkData = fetchArtworkData(song.song.thumbnailUrl)
+            val artworkData = fetchArtworkData(song.thumbnailUrl)
 
             var albumName = song.album?.title ?: song.song.albumName
             var year = (song.album?.year ?: song.song.year)?.toString()

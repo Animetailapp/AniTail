@@ -261,6 +261,19 @@ fun SongMenu(
     AddToPlaylistDialog(
         isVisible = showChoosePlaylistDialog,
         onGetSong = { playlist ->
+            database.transaction {
+                insert(song.song)
+                song.artists.forEachIndexed { index, artist ->
+                    insert(artist)
+                    insert(
+                        SongArtistMap(
+                            songId = song.id,
+                            artistId = artist.id,
+                            position = index
+                        )
+                    )
+                }
+            }
             coroutineScope.launch(Dispatchers.IO) {
                 playlist.playlist.browseId?.let { browseId ->
                     YouTube.addToPlaylist(browseId, song.id)

@@ -574,8 +574,8 @@ private fun DailyMinutesChart(
 ) {
     val colors = detailColors()
     val averageLineColor = MaterialTheme.colorScheme.onSurface
-    val dailyMinutes = dailyPlayTimeMs.map { (it / 60_000f) }
-    val maxMinutes = dailyMinutes.maxOrNull()?.coerceAtLeast(1f) ?: 1f
+    val dailyMinutes = remember(dailyPlayTimeMs) { dailyPlayTimeMs.map { (it / 60_000f) } }
+    val maxMinutes = remember(dailyMinutes) { dailyMinutes.maxOrNull()?.coerceAtLeast(1f) ?: 1f }
     val chartMax = maxOf(maxMinutes, averageMinutes.toFloat(), 1f)
 
     DetailSurface(
@@ -675,11 +675,12 @@ private fun PeriodBreakdownCard(
     dominantPeriod: ListeningPeriod,
 ) {
     val colors = detailColors()
-    val periodMinutes =
+    val periodMinutes = remember(state.periodPlayTimeMs) {
         ListeningPeriod.entries.map { period ->
             period to ((state.periodPlayTimeMs[period] ?: 0L) / 60_000L).toInt()
         }
-    val maxMinutes = periodMinutes.maxOfOrNull { (_, value) -> value }?.coerceAtLeast(1) ?: 1
+    }
+    val maxMinutes = remember(periodMinutes) { periodMinutes.maxOfOrNull { (_, value) -> value }?.coerceAtLeast(1) ?: 1 }
 
     DetailSurface(
         accent = colors.primaryAccent,

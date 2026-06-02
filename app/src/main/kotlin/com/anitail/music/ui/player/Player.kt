@@ -656,6 +656,7 @@ fun BottomSheetPlayer(
                         transitionSpec = { fadeIn() togetherWith fadeOut() },
                         label = "",
                     ) { title ->
+                        val albumId = mediaMetadata.album?.id
                         Text(
                             text = title,
                             style = MaterialTheme.typography.titleLarge,
@@ -666,9 +667,11 @@ fun BottomSheetPlayer(
                             modifier =
                                 Modifier
                                     .basicMarquee()
-                                    .tvClickable(enabled = mediaMetadata.album != null) {
-                                        navController.navigate("album/${mediaMetadata.album!!.id}")
-                                        state.collapseSoft()
+                                    .tvClickable(enabled = albumId != null) {
+                                        albumId?.let {
+                                            navController.navigate("album/$it")
+                                            state.collapseSoft()
+                                        }
                                     },
                         )
                     }
@@ -1360,7 +1363,7 @@ fun BottomSheetPlayer(
 
                                 // Show queue name dynamically based on current playing context
                                 val queueTitle = when {
-                                    mediaMetadata?.album != null -> mediaMetadata!!.album!!.title
+                                    mediaMetadata?.album != null -> mediaMetadata?.album?.title.orEmpty()
                                     automix.isNotEmpty() -> "Automix"
                                     currentSong?.song?.title != null -> stringResource(R.string.queue_all_songs)
                                     else -> "Unknown"

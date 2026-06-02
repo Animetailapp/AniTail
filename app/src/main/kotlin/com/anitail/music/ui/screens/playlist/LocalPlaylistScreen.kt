@@ -170,6 +170,8 @@ fun LocalPlaylistScreen(
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
 
     val playlist by viewModel.playlist.collectAsState()
+    val playlistName = playlist?.playlist?.name.orEmpty()
+    val playlistBrowseId = playlist?.playlist?.browseId
     val songs by viewModel.playlistSongs.collectAsState()
     val mutableSongs = remember { mutableStateListOf<PlaylistSong>() }
     val playlistLength =
@@ -221,8 +223,8 @@ fun LocalPlaylistScreen(
     }
 
     val wrappedSongs = remember(filteredSongs) {
-        filteredSongs.map { item -> ItemWrapper(item) }
-    }.toMutableStateList()
+        filteredSongs.map { item -> ItemWrapper(item) }.toMutableStateList()
+    }
 
     if (isSearching) {
         BackHandler {
@@ -290,7 +292,7 @@ fun LocalPlaylistScreen(
                 Text(
                     text = stringResource(
                         R.string.remove_download_playlist_confirm,
-                        playlist?.playlist!!.name
+                        playlistName
                     ),
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(horizontal = 18.dp),
@@ -330,7 +332,7 @@ fun LocalPlaylistScreen(
                 Text(
                     text = stringResource(
                         R.string.delete_playlist_confirm,
-                        playlist?.playlist!!.name
+                        playlistName
                     ),
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(horizontal = 18.dp)
@@ -391,7 +393,7 @@ fun LocalPlaylistScreen(
                 }
 
                 // Sync order with YT Music
-                if (viewModel.playlist.value?.playlist?.browseId != null) {
+                if (playlistBrowseId != null) {
                     viewModel.viewModelScope.launch(Dispatchers.IO) {
                         val playlistSongMap = database.playlistSongMaps(viewModel.playlistId, 0)
                         val successorIndex = if (from > to) to else to + 1
@@ -400,7 +402,7 @@ fun LocalPlaylistScreen(
 
                         playlistSongMap.getOrNull(from)?.setVideoId?.let { setVideoId ->
                             YouTube.moveSongPlaylist(
-                                viewModel.playlist.value?.playlist?.browseId!!,
+                                playlistBrowseId,
                                 setVideoId,
                                 successorSetVideoId
                             )
@@ -665,7 +667,7 @@ fun LocalPlaylistScreen(
                                             } else {
                                                 playerConnection.playQueue(
                                                     ListQueue(
-                                                        title = playlist!!.playlist.name,
+                                                        title = playlistName,
                                                         items = songs.map { it.song.toMediaItem() },
                                                         startIndex = songs.indexOfFirst { it.map.id == song.map.id },
                                                     ),
@@ -805,7 +807,7 @@ fun LocalPlaylistScreen(
                                                 } else {
                                                     playerConnection.playQueue(
                                                         ListQueue(
-                                                            title = playlist!!.playlist.name,
+                                                            title = playlistName,
                                                             items = songs.map { it.song.toMediaItem() },
                                                             startIndex = index,
                                                         ),

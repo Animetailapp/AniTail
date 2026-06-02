@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
+import com.anitail.music.ui.utils.resize
 
 @Immutable
 data class Song
@@ -48,7 +49,7 @@ constructor(
     override val title: String
         get() = song.title
     override val thumbnailUrl: String?
-        get() = song.thumbnailUrl
+        get() = song.thumbnailUrl?.resize(544, 544)
     val romanizeLyrics: Boolean
         get() = song.romanizeLyrics
 }

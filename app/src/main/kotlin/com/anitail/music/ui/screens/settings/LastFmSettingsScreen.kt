@@ -383,7 +383,7 @@ fun LastFmSettingsScreen(
             if (uiState.loginError != null) {
               Spacer(modifier = Modifier.height(8.dp))
               Text(
-                  text = uiState.loginError!!,
+              text = uiState.loginError.orEmpty(),
                   color = MaterialTheme.colorScheme.error,
                   style = MaterialTheme.typography.bodySmall)
             }

@@ -6,6 +6,7 @@ import android.os.Build
 import android.widget.Toast
 import android.widget.Toast.LENGTH_SHORT
 import androidx.annotation.RequiresApi
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.work.Configuration
 import coil.ImageLoader
@@ -32,6 +33,7 @@ import com.anitail.music.constants.ProxyUrlKey
 import com.anitail.music.constants.ProxyUsernameKey
 import com.anitail.music.constants.SYSTEM_DEFAULT
 import com.anitail.music.constants.UseLoginForBrowse
+import com.anitail.music.constants.AutoAcceptYouTubeTermsKey
 import com.anitail.music.constants.VisitorDataKey
 import com.anitail.music.extensions.toEnum
 import com.anitail.music.extensions.toInetSocketAddress
@@ -42,13 +44,12 @@ import com.anitail.music.ui.utils.CrashHandler
 import com.anitail.music.utils.dataStore
 import com.anitail.music.utils.get
 import com.anitail.music.utils.reportException
+import com.anitail.music.utils.warmUp
 import com.onesignal.OneSignal
 import com.onesignal.debug.LogLevel
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -75,7 +76,6 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
 
     @RequiresApi(Build.VERSION_CODES.M)
 
-    @OptIn(DelicateCoroutinesApi::class)
     override fun onCreate() {
         super.onCreate()
         // Install crash handler first
@@ -89,14 +89,16 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
         val oneSignalAppId = "8f09b52f-d61a-469e-9d7d-203ebf6b9e1b"
         try {
             // Enable verbose logging for debugging (remove in production)
-          OneSignal.Debug.logLevel = LogLevel.VERBOSE
-           OneSignal.initWithContext(this, oneSignalAppId)
-            GlobalScope.launch(Dispatchers.IO) {
+            OneSignal.Debug.logLevel = LogLevel.VERBOSE
+            OneSignal.initWithContext(this, oneSignalAppId)
+            applicationScope.launch(Dispatchers.IO) {
                 OneSignal.Notifications.requestPermission(true)
             }
         } catch (e: Exception) {
             Timber.e(e, "OneSignal initialization failed")
-        }        // Initialize automatic update checks
+        }
+
+        // Initialize automatic update checks
         UpdateCheckWorker.schedule(this)
 
         // Initialize automatic backup (only schedule, don't run immediately)
@@ -112,47 +114,26 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
         } catch (e: Exception) {
             Timber.e(e, "Failed to schedule cloud sync")
         }
+        applicationScope.launch(Dispatchers.IO) {
+            runCatching {
+                SyncWorker.scheduleImmediate(this@App)
+            }.onFailure {
+                Timber.e(it, "Failed to schedule startup cloud sync")
+            }
+        }
 
         val locale = Locale.getDefault()
         val languageTag = locale.toLanguageTag().replace("-Hant", "") // replace zh-Hant-* to zh-*
-        YouTube.locale = YouTubeLocale(
-            gl = dataStore[ContentCountryKey]?.takeIf { it != SYSTEM_DEFAULT }
-                ?: locale.country.takeIf { it in CountryCodeToName }
-                ?: "US",
-            hl = dataStore[ContentLanguageKey]?.takeIf { it != SYSTEM_DEFAULT }
-                ?: locale.language.takeIf { it in LanguageCodeToName }
-                ?: languageTag.takeIf { it in LanguageCodeToName }
-                ?: "en"
-        )
+        YouTube.locale = defaultYouTubeLocale(locale, languageTag)
         if (languageTag == "zh-TW") {
             KuGou.useTraditionalChinese = true
         }
-
-        if (dataStore[ProxyEnabledKey] == true) {
-            val username = dataStore[ProxyUsernameKey].orEmpty()
-            val password = dataStore[ProxyPasswordKey].orEmpty()
-            val type = dataStore[ProxyTypeKey].toEnum(defaultValue = Proxy.Type.HTTP)
-
-            if (username.isNotEmpty() || password.isNotEmpty()) {
-                if (type == Proxy.Type.HTTP) {
-                    YouTube.proxyAuth = Credentials.basic(username, password)
-                } else {
-                    Authenticator.setDefault(object : Authenticator() {
-                        override fun getPasswordAuthentication() =
-                            PasswordAuthentication(username, password.toCharArray())
-                    })
-                }
-            }
-            try {
-                YouTube.proxy = Proxy(type, dataStore[ProxyUrlKey]!!.toInetSocketAddress())
-            } catch (e: Exception) {
-                Toast.makeText(this, "Failed to parse proxy url.", LENGTH_SHORT).show()
-                reportException(e)
-            }
-        }
-
-        if (dataStore[UseLoginForBrowse] != false) {
-            YouTube.useLoginForBrowse = true
+        applicationScope.launch(Dispatchers.IO) {
+            applyStartupSettings(
+                settings = dataStore.warmUp(),
+                locale = locale,
+                languageTag = languageTag,
+            )
         }
 
         applicationScope.launch {
@@ -210,6 +191,67 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
                 }
         }
     }
+
+    private fun defaultYouTubeLocale(locale: Locale, languageTag: String): YouTubeLocale =
+        YouTubeLocale(
+            gl = locale.country.takeIf { it in CountryCodeToName } ?: "US",
+            hl = locale.language.takeIf { it in LanguageCodeToName }
+                ?: languageTag.takeIf { it in LanguageCodeToName }
+                ?: "en",
+        )
+
+    private suspend fun applyStartupSettings(
+        settings: Preferences,
+        locale: Locale,
+        languageTag: String,
+    ) {
+        YouTube.locale = YouTubeLocale(
+            gl = settings[ContentCountryKey]?.takeIf { it != SYSTEM_DEFAULT }
+                ?: locale.country.takeIf { it in CountryCodeToName }
+                ?: "US",
+            hl = settings[ContentLanguageKey]?.takeIf { it != SYSTEM_DEFAULT }
+                ?: locale.language.takeIf { it in LanguageCodeToName }
+                ?: languageTag.takeIf { it in LanguageCodeToName }
+                ?: "en",
+        )
+
+        if (settings[ProxyEnabledKey] == true) {
+            val username = settings[ProxyUsernameKey].orEmpty()
+            val password = settings[ProxyPasswordKey].orEmpty()
+            val type = settings[ProxyTypeKey].toEnum(defaultValue = Proxy.Type.HTTP)
+            val proxyUrl = settings[ProxyUrlKey]
+
+            if (proxyUrl.isNullOrBlank()) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@App, "Failed to parse proxy url.", LENGTH_SHORT).show()
+                }
+                Timber.w("Proxy is enabled but no proxy URL is configured")
+            } else {
+                if (username.isNotEmpty() || password.isNotEmpty()) {
+                    if (type == Proxy.Type.HTTP) {
+                        YouTube.proxyAuth = Credentials.basic(username, password)
+                    } else {
+                        Authenticator.setDefault(object : Authenticator() {
+                            override fun getPasswordAuthentication() =
+                                PasswordAuthentication(username, password.toCharArray())
+                        })
+                    }
+                }
+                try {
+                    YouTube.proxy = Proxy(type, proxyUrl.toInetSocketAddress())
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@App, "Failed to parse proxy url.", LENGTH_SHORT).show()
+                    }
+                    reportException(e)
+                }
+            }
+        }
+
+        YouTube.useLoginForBrowse = settings[UseLoginForBrowse] != false
+        YouTube.autoAcceptYouTubeTerms = settings[AutoAcceptYouTubeTermsKey] == true
+    }
+
     override fun newImageLoader(): ImageLoader {
         val cacheSize = dataStore[MaxImageCacheSizeKey]
 
@@ -249,7 +291,8 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
             private set
 
         fun forgetAccount(context: Context) {
-            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            val app = context.applicationContext as? App ?: return
+            app.applicationScope.launch(Dispatchers.IO) {
                 context.dataStore.edit { settings ->
                     settings.remove(InnerTubeCookieKey)
                     settings.remove(VisitorDataKey)

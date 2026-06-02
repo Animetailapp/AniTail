@@ -101,6 +101,8 @@ import com.anitail.music.db.entities.RelatedSongMap
 import com.anitail.music.db.entities.Song
 import com.anitail.music.di.DownloadCache
 import com.anitail.music.di.PlayerCache
+import com.anitail.music.eq.EqualizerService
+import com.anitail.music.eq.audio.CustomEqualizerAudioProcessor
 import com.anitail.music.extensions.SilentHandler
 import com.anitail.music.extensions.collect
 import com.anitail.music.extensions.collectLatest
@@ -183,6 +185,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
   @Inject lateinit var lyricsHelper: LyricsHelper
   @Inject lateinit var syncUtils: SyncUtils
+  @Inject lateinit var equalizerService: EqualizerService
     @Inject
     lateinit var downloadUtil: DownloadUtil
 
@@ -1022,8 +1025,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     currentQueue = queue
     queueTitle = null
     player.shuffleModeEnabled = false
-    if (queue.preloadItem != null) {
-      player.setMediaItem(queue.preloadItem!!.toMediaItem())
+    queue.preloadItem?.let { preloadItem ->
+      player.setMediaItem(preloadItem.toMediaItem())
       player.prepare()
       player.playWhenReady = playWhenReady
     }
@@ -1469,7 +1472,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     }
 
     val mediaId = meta?.id ?: song?.song?.id ?: ""
-    val coverUrl = meta?.thumbnailUrl ?: song?.song?.thumbnailUrl ?: ""
+  val coverUrl = meta?.thumbnailUrl ?: song?.thumbnailUrl ?: ""
     val defaultColor = com.anitail.music.ui.theme.DefaultThemeColor.toArgb()
     val staticCache = widgetStaticCache
     val canReuseStaticCache =
@@ -2021,7 +2024,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                     codecs = format.mimeType.split("codecs=")[1].removeSurrounding("\""),
                     bitrate = format.bitrate,
                     sampleRate = format.audioSampleRate,
-                    contentLength = format.contentLength!!,
+                    contentLength = format.contentLength ?: 0L,
                     loudnessDb = playbackData.audioConfig?.loudnessDb,
                     playbackUrl = playbackData.playbackTracking?.videostatsPlaybackUrl?.baseUrl
                 )
@@ -2069,6 +2072,10 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
   private fun createRenderersFactory() =
       object : DefaultRenderersFactory(this) {
+        private val equalizerProcessor = CustomEqualizerAudioProcessor().also {
+            equalizerService.addAudioProcessor(it)
+        }
+
         override fun buildAudioSink(
             context: Context,
             enableFloatOutput: Boolean,
@@ -2079,7 +2086,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                 .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                 .setAudioProcessorChain(
                     DefaultAudioSink.DefaultAudioProcessorChain(
-                        emptyArray(),
+                        arrayOf(equalizerProcessor),
                         SilenceSkippingAudioProcessor(2_000_000, 20_000, 256),
                         SonicAudioProcessor(),
                     ),
