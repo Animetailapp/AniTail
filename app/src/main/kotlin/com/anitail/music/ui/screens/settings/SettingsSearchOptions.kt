@@ -130,12 +130,6 @@ object SettingsSearchOptions {
         ),
         option(
             context,
-            "clear_translation_models",
-            R.string.clear_translation_models,
-            sectionRes = R.string.lyrics
-        ),
-        option(
-            context,
             "lyrics_font_size",
             R.string.lyrics_font_size,
             sectionRes = R.string.lyrics

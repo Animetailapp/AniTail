@@ -131,6 +131,11 @@ object YouTube {
         set(value) {
             innerTube.useLoginForBrowse = value
         }
+    var autoAcceptYouTubeTerms: Boolean
+        get() = innerTube.autoAcceptYouTubeTerms
+        set(value) {
+            innerTube.autoAcceptYouTubeTerms = value
+        }
 
     suspend fun searchSuggestions(query: String): Result<SearchSuggestions> = runCatching {
         val response = innerTube.getSearchSuggestions(WEB_REMIX, query).body<GetSearchSuggestionsResponse>()
@@ -1455,6 +1460,73 @@ object YouTube {
             result.onFailure { e -> logE(e, "[PODCAST_API] newEpisodes FAILED") }
             result.onSuccess { logD("[PODCAST_API] newEpisodes SUCCESS: ${it.size} items") }
         }
+    }
+
+    /**
+     * Fetch the RDPN "New Episodes" playlist info (title + thumbnail).
+     * Uses the same VLRDPN browse call as [newEpisodes] but parses the header instead.
+     */
+    suspend fun newEpisodesPlaylistInfo(): Result<PlaylistItem> = runCatching {
+        val response = innerTube.browse(
+            client = WEB_REMIX,
+            browseId = "VLRDPN",
+            setLogin = true
+        ).body<BrowseResponse>()
+
+        val thumbnail = response.header
+            ?.musicImmersiveHeaderRenderer
+            ?.thumbnail
+            ?.musicThumbnailRenderer
+            ?.getThumbnailUrl()
+            ?: response.header
+                ?.musicVisualHeaderRenderer
+                ?.thumbnail
+                ?.musicThumbnailRenderer
+                ?.getThumbnailUrl()
+            ?: response.header
+                ?.musicDetailHeaderRenderer
+                ?.thumbnail
+                ?.croppedSquareThumbnailRenderer
+                ?.thumbnail
+                ?.thumbnails
+                ?.lastOrNull()
+                ?.url
+            ?: response.contents
+                ?.twoColumnBrowseResultsRenderer
+                ?.secondaryContents
+                ?.sectionListRenderer
+                ?.contents
+                ?.firstOrNull()
+                ?.musicShelfRenderer
+                ?.contents
+                ?.firstOrNull()
+                ?.musicMultiRowListItemRenderer
+                ?.thumbnail
+                ?.musicThumbnailRenderer
+                ?.getThumbnailUrl()
+
+        val title = response.header
+            ?.musicImmersiveHeaderRenderer
+            ?.title
+            ?.runs
+            ?.joinToString("") { it.text }
+            ?: response.header
+                ?.musicVisualHeaderRenderer
+                ?.title
+                ?.runs
+                ?.joinToString("") { it.text }
+            ?: "New Episodes"
+
+        PlaylistItem(
+            id = "RDPN",
+            title = title,
+            author = null,
+            songCountText = null,
+            thumbnail = thumbnail,
+            playEndpoint = null,
+            shuffleEndpoint = null,
+            radioEndpoint = null,
+        )
     }
 
     /**

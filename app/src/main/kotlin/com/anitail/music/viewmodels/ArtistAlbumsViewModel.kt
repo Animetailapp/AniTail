@@ -14,7 +14,9 @@ class ArtistAlbumsViewModel @Inject constructor(
     database: MusicDatabase,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
-    private val artistId = savedStateHandle.get<String>("artistId")!!
+    private val artistId = requireNotNull(savedStateHandle.get<String>("artistId")) {
+        "Missing artistId navigation argument"
+    }
     val artist = database.artist(artistId)
         .stateIn(viewModelScope, SharingStarted.Companion.Lazily, null)
 

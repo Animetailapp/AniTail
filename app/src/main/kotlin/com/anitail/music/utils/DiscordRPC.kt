@@ -26,7 +26,7 @@ class DiscordRPC(
             }
         }
         val fallbackAsset = FALLBACK_DISCORD_ASSET
-        val largeAsset = song.song.thumbnailUrl?.let { RpcImage.ExternalImage(it, fallbackAsset) }
+        val largeAsset = song.thumbnailUrl?.let { RpcImage.ExternalImage(it, fallbackAsset) }
             ?: RpcImage.DiscordImage(fallbackAsset)
         val smallAsset =
             song.artists.firstOrNull()?.thumbnailUrl?.let {

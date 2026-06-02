@@ -15,12 +15,14 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.anitail.music.extensions.toEnum
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.properties.ReadOnlyProperty
 
@@ -32,12 +34,22 @@ private val dataStoreStateFlows =
 
 private fun DataStore<Preferences>.cachedPreferences(): StateFlow<Preferences> =
     dataStoreStateFlows.getOrPut(this) {
+        val initialPreferences = runCatching {
+            runBlocking {
+                data.first()
+            }
+        }.getOrElse {
+            emptyPreferences()
+        }
+
         data.stateIn(
             dataStoreScope,
             SharingStarted.Eagerly,
-            emptyPreferences(),
+            initialPreferences,
         )
     }
+
+fun DataStore<Preferences>.warmUp(): Preferences = cachedPreferences().value
 
 operator fun <T> DataStore<Preferences>.get(key: Preferences.Key<T>): T? =
     cachedPreferences().value[key]

@@ -17,6 +17,11 @@
         <item quantity="other">%d selected</item>
     </plurals>
 
+    <plurals name="band_count">
+        <item quantity="one">%d band</item>
+        <item quantity="other">%d bands</item>
+    </plurals>
+
     <!-- Home -->
     <string name="history">History</string>
     <string name="stats">Stats</string>
@@ -294,6 +299,9 @@
     <string name="error_unknown">Unknown error</string>
     <string name="error_podcast_subscribe">Could not subscribe to podcast</string>
     <string name="error_podcast_unsubscribe">Could not remove podcast subscription</string>
+    <string name="playback_failed">Playback failed</string>
+    <string name="playback_failed_desc">It is necessary to reload the page.</string>
+    <string name="volver_a_intentar">Try again</string>
     <string name="seek_backward">5 seconds backward</string>
     <string name="seek_forward">5 seconds forward</string>
 
@@ -428,6 +436,8 @@
     <string name="general">General</string>
     <string name="content_language">Default content language</string>
     <string name="content_country">Default content country</string>
+    <string name="auto_accept_youtube_terms">Auto-accept YouTube Terms</string>
+    <string name="auto_accept_youtube_terms_desc">Automatically accept YouTube terms and cookie consent to prevent playback errors</string>
     <string name="hide_explicit">Hide explicit content</string>
     <string name="hide_explicit_desc">Filter songs with explicit content</string>
     <string name="system_default">System default</string>
@@ -1018,4 +1028,59 @@
     <string name="syncing_local_music">Scanning local music library…</string>
     <string name="file_path">File path</string>
     <string name="year">Year</string>
+
+    <!-- Lyrics providers, AI translation, and equalizer -->
+    <string name="enable_paxsenix">Enable Paxsenix</string>
+    <string name="enable_lyrics_plus">Enable LyricsPlus</string>
+    <string name="lyrics_ai_translation">Lyrics AI translation</string>
+    <string name="translate_lyrics">Translate lyrics</string>
+    <string name="ai_provider">AI provider</string>
+    <string name="translate_mode">Translation mode</string>
+    <string name="translate_language">Target language</string>
+    <string name="openrouter_api_key">OpenRouter API key</string>
+    <string name="openrouter_base_url">OpenRouter base URL</string>
+    <string name="openrouter_model">OpenRouter model</string>
+    <string name="deepl_api_key">DeepL API key</string>
+    <string name="deepl_formality">DeepL formality</string>
+    <string name="mistral_api_key">Mistral API key</string>
+    <string name="mistral_model">Mistral model</string>
+    <string name="equalizer_header">Equalizer</string>
+    <string name="no_profiles">No equalizer profiles</string>
+    <string name="import_profile">Import profile</string>
+    <string name="eq_disabled">Disabled</string>
+    <string name="eq_wizard">AutoEQ Wizard</string>
+    <string name="eq_download_db">Download AutoEQ database (17 MB)</string>
+    <string name="eq_downloading">Downloading…</string>
+    <string name="import_from_file">Import from file</string>
+    <string name="delete_profile_desc">Delete profile</string>
+    <string name="delete_profile_confirmation">Are you sure you want to delete %1$s? This action cannot be undone.</string>
+    <string name="error_file_read">Could not read file</string>
+    <string name="error_file_open">Failed to open file: %1$s</string>
+    <string name="import_error_title">Import error</string>
+    <string name="error_title">Error</string>
+    <string name="error_eq_apply_failed">Failed to apply equalizer profile: %1$s</string>
+    <string name="wizard_select_model">Select model</string>
+    <string name="wizard_select_profiles">Select profiles</string>
+    <string name="wizard_search_model_hint">Search for your headphone or earphone model</string>
+    <string name="wizard_model_name">Model name</string>
+    <string name="wizard_model_placeholder">e.g., Sony WH-1000XM4, Bose QuietComfort 45</string>
+    <string name="wizard_no_models">No models found</string>
+    <string name="wizard_multiple_variants">Multiple variants available</string>
+    <string name="wizard_select_eq_profiles">Select EQ profiles for %s</string>
+    <string name="wizard_save_profiles">Save profiles</string>
+    <string name="syncing">Syncing…</string>
+    <string name="synced">Synced</string>
+    <string name="sync_error">Sync error</string>
+    <string name="sync_starting">Starting sync…</string>
+    <string name="sync_completed">Sync completed</string>
+    <string name="sync_failed">Sync failed: %s</string>
+    <string name="sync_failed_generic">Sync failed</string>
+    <string name="sync_timeout">Sync timed out</string>
+    <string name="sync_failed_download">Failed to download remote backup</string>
+    <string name="sync_corrupt_backup">Backup corrupt or incomplete</string>
+    <string name="sync_failed_merge">Failed to merge data</string>
+    <string name="sync_failed_upload">Failed to upload merged data</string>
+    <string name="sync_failed_local_backup">Failed to create local backup</string>
+    <string name="sync_initial_uploaded">Initial backup uploaded</string>
+    <string name="sync_failed_initial_upload">Failed to upload initial backup</string>
 </resources>

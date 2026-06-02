@@ -48,7 +48,22 @@ class NewPipeDownloaderImpl(
                 .url(url)
                 .addHeader("User-Agent", YouTubeClient.USER_AGENT_WEB)
 
+        val originalCookie = headers.entries.find { it.key.equals("cookie", ignoreCase = true) }?.value?.firstOrNull()
+        var requestCookie = originalCookie ?: YouTube.cookie
+        if (YouTube.autoAcceptYouTubeTerms) {
+            if (requestCookie == null) {
+                requestCookie = "SOCS=CAESEwgDEgk0ODE3Nzk3NTQaAmVuIAEaBgiA_K-fBg"
+            } else if ("SOCS=" !in requestCookie) {
+                requestCookie = "$requestCookie; SOCS=CAESEwgDEgk0ODE3Nzk3NTQaAmVuIAEaBgiA_K-fBg"
+            }
+        }
+
+        requestCookie?.let {
+            requestBuilder.header("Cookie", it)
+        }
+
         headers.forEach { (headerName, headerValueList) ->
+            if (headerName.equals("cookie", ignoreCase = true)) return@forEach
             if (headerValueList.size > 1) {
                 requestBuilder.removeHeader(headerName)
                 headerValueList.forEach { headerValue ->

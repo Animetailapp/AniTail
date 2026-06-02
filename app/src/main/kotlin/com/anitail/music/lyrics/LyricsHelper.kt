@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.LruCache
 import com.anitail.music.constants.PreferredLyricsProvider
 import com.anitail.music.constants.PreferredLyricsProviderKey
+import com.anitail.music.constants.LyricsProviderOrderKey
 import com.anitail.music.db.entities.LyricsEntity.Companion.LYRICS_NOT_FOUND
 import com.anitail.music.extensions.toEnum
 import com.anitail.music.models.MediaMetadata
@@ -17,6 +18,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -27,14 +29,7 @@ constructor(
     @ApplicationContext private val context: Context,
 ) {
     private val defaultLyricsProviders =
-        listOf(
-            BetterLyricsProvider,
-            SimpMusicLyricsProvider,
-            LrcLibLyricsProvider,
-            KuGouLyricsProvider,
-            YouTubeSubtitleLyricsProvider,
-            YouTubeLyricsProvider
-        )
+        LyricsProviderRegistry.getOrderedProviders("")
 
     private var lyricsProviders =
         defaultLyricsProviders
@@ -42,17 +37,21 @@ constructor(
     val preferred =
         context.dataStore.data
             .map {
-                it[PreferredLyricsProviderKey].toEnum(PreferredLyricsProvider.BETTER_LYRICS)
+                val providerOrder = it[LyricsProviderOrderKey].orEmpty()
+                if (providerOrder.isNotBlank()) {
+                    lyricsProviders = LyricsProviderRegistry.getOrderedProviders(providerOrder)
+                    return@map
+                }
+                val preferredProvider = it[PreferredLyricsProviderKey].toEnum(PreferredLyricsProvider.BETTER_LYRICS)
+                lyricsProviders = orderedProviders(preferredProvider)
             }.distinctUntilChanged()
-            .map {
-                lyricsProviders = orderedProviders(it)
-            }
 
     private val cache = LruCache<String, List<LyricsResult>>(MAX_CACHE_SIZE)
     private var currentLyricsJob: Job? = null
 
     suspend fun getLyrics(mediaMetadata: MediaMetadata): LyricsWithProvider {
         currentLyricsJob?.cancel()
+        refreshProviderOrder()
 
         val cached = cache.get(mediaMetadata.id)?.firstOrNull()
         if (cached != null) {
@@ -119,6 +118,7 @@ constructor(
         callback: (LyricsResult) -> Unit,
     ) {
         currentLyricsJob?.cancel()
+        refreshProviderOrder()
 
         val cacheKey = "$songArtists-$songTitle".replace(" ", "")
         cache.get(cacheKey)?.let { results ->
@@ -162,8 +162,20 @@ constructor(
                 PreferredLyricsProvider.KUGOU -> KuGouLyricsProvider
                 PreferredLyricsProvider.BETTER_LYRICS -> BetterLyricsProvider
                 PreferredLyricsProvider.SIMPMUSIC -> SimpMusicLyricsProvider
+                PreferredLyricsProvider.PAXSENIX -> PaxsenixLyricsProvider
+                PreferredLyricsProvider.LYRICS_PLUS -> LyricsPlusProvider
             }
         return listOf(selected) + defaultLyricsProviders.filterNot { it == selected }
+    }
+
+    private suspend fun refreshProviderOrder() {
+        val preferences = context.dataStore.data.first()
+        val providerOrder = preferences[LyricsProviderOrderKey].orEmpty()
+        lyricsProviders = if (providerOrder.isNotBlank()) {
+            LyricsProviderRegistry.getOrderedProviders(providerOrder)
+        } else {
+            orderedProviders(preferences[PreferredLyricsProviderKey].toEnum(PreferredLyricsProvider.BETTER_LYRICS))
+        }
     }
 
     companion object {

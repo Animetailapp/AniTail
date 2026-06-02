@@ -60,6 +60,7 @@ class InnerTube {
     var proxyAuth: String? = null
 
     var useLoginForBrowse: Boolean = false
+    var autoAcceptYouTubeTerms: Boolean = false
 
     @OptIn(ExperimentalSerializationApi::class)
     private fun createClient() = HttpClient(OkHttp) {
@@ -150,13 +151,27 @@ class InnerTube {
             append("X-Origin", YouTubeClient.ORIGIN_YOUTUBE_MUSIC)
             append("Referer", YouTubeClient.REFERER_YOUTUBE_MUSIC)
             visitorData?.let { append("X-Goog-Visitor-Id", it) }
+
+            var requestCookie = if (setLogin && client.loginSupported) cookie else null
+            if (autoAcceptYouTubeTerms) {
+                if (requestCookie == null) {
+                    requestCookie = "SOCS=CAESEwgDEgk0ODE3Nzk3NTQaAmVuIAEaBgiA_K-fBg"
+                } else if ("SOCS=" !in requestCookie) {
+                    requestCookie = "$requestCookie; SOCS=CAESEwgDEgk0ODE3Nzk3NTQaAmVuIAEaBgiA_K-fBg"
+                }
+            }
+
+            requestCookie?.let { cookieVal ->
+                append("cookie", cookieVal)
+            }
+
             if (setLogin && client.loginSupported) {
                 cookie?.let { cookie ->
-                    append("cookie", cookie)
-                    if ("SAPISID" !in cookieMap) return@let
-                    val currentTime = System.currentTimeMillis() / 1000
-                    val sapisidHash = sha1("$currentTime ${cookieMap["SAPISID"]} ${YouTubeClient.ORIGIN_YOUTUBE_MUSIC}")
-                    append("Authorization", "SAPISIDHASH ${currentTime}_${sapisidHash}")
+                    if ("SAPISID" in cookieMap) {
+                        val currentTime = System.currentTimeMillis() / 1000
+                        val sapisidHash = sha1("$currentTime ${cookieMap["SAPISID"]} ${YouTubeClient.ORIGIN_YOUTUBE_MUSIC}")
+                        append("Authorization", "SAPISIDHASH ${currentTime}_${sapisidHash}")
+                    }
                 }
             }
         }

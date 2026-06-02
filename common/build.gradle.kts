@@ -25,23 +25,23 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-                implementation("org.jetbrains.compose.runtime:runtime:$composeVersion")
-                implementation("org.jetbrains.compose.foundation:foundation:$composeVersion")
-                implementation("org.jetbrains.compose.material3:material3:$composeVersion")
-                implementation("org.jetbrains.compose.ui:ui:$composeVersion")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.ui)
                 api(libs.ktor.serialization.json)
             }
         }
         val commonTest by getting
         val androidMain by getting {
             dependencies {
-                implementation(projects.innertube)
+                implementation(project(":innertube"))
             }
         }
         val desktopMain by getting {
             dependencies {
-                implementation(projects.innertube)
+                implementation(project(":innertube"))
             }
         }
         val desktopTest by getting

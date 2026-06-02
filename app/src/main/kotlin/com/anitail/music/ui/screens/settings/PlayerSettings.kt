@@ -47,6 +47,7 @@ import com.anitail.music.constants.WidgetActionSearchEnabledKey
 import com.anitail.music.ui.component.DurationSliderPreference
 import com.anitail.music.ui.component.EnumListPreference
 import com.anitail.music.ui.component.IconButton
+import com.anitail.music.ui.component.PreferenceEntry
 import com.anitail.music.ui.component.PreferenceGroupTitle
 import com.anitail.music.ui.component.SliderPreference
 import com.anitail.music.ui.component.SwitchPreference
@@ -251,6 +252,12 @@ fun PlayerSettings(
             valueRange = 0f..12f,
             steps = 11,
             defaultValue = 0f
+        )
+
+        PreferenceEntry(
+            title = { Text(stringResource(R.string.equalizer_header)) },
+            icon = { Icon(painterResource(R.drawable.equalizer), null) },
+            onClick = { navController.navigate("settings/equalizer") },
         )
 
         PreferenceGroupTitle(

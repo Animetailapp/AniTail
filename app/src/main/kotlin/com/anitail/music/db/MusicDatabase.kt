@@ -166,6 +166,12 @@ abstract class InternalDatabase : RoomDatabase() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             super.onOpen(db)
 
+                            // Set busy_timeout so SQLite retries on lock contention
+                            // instead of immediately throwing SQLITE_BUSY.
+                            try {
+                                db.query("PRAGMA busy_timeout = 5000").use { it.moveToFirst() }
+                            } catch (_: Exception) {}
+
                             // Ensure Room's internal invalidation tracking table exists
                             // This is needed when restoring from older backups that might not have it
                             try {
@@ -250,29 +256,31 @@ val MIGRATION_1_2 =
             val playlistSongMaps = mutableListOf<PlaylistSongMap>()
             database.query("SELECT * FROM playlist_song".toSQLiteQuery()).use { cursor ->
                 while (cursor.moveToNext()) {
+                    val playlistId = playlistMap[cursor.getInt(1)] ?: continue
                     playlistSongMaps.add(
                         PlaylistSongMap(
-                            playlistId = playlistMap[cursor.getInt(1)]!!,
+                            playlistId = playlistId,
                             songId = cursor.getString(2),
                             position = cursor.getInt(3),
                         ),
                     )
                 }
             }
-            // ensure we have continuous playlist song position
-            playlistSongMaps.sortBy { it.position }
-            val playlistSongCount = mutableMapOf<String, Int>()
-            playlistSongMaps.map { map ->
-                if (map.playlistId !in playlistSongCount) playlistSongCount[map.playlistId] = 0
-                map.copy(position = playlistSongCount[map.playlistId]!!).also {
-                    playlistSongCount[map.playlistId] = playlistSongCount[map.playlistId]!! + 1
+            val normalizedPlaylistSongMaps = playlistSongMaps
+                .sortedWith(compareBy<PlaylistSongMap> { it.playlistId }.thenBy { it.position })
+                .groupBy { it.playlistId }
+                .values
+                .flatMap { playlistMaps ->
+                    playlistMaps.mapIndexed { index, map ->
+                        map.copy(position = index)
+                    }
                 }
-            }
             val songs = mutableListOf<OldSongEntity>()
             val songArtistMaps = mutableListOf<SongArtistMap>()
             database.query("SELECT * FROM song".toSQLiteQuery()).use { cursor ->
                 while (cursor.moveToNext()) {
                     val songId = cursor.getString(0)
+                    val artistId = artistMap[cursor.getInt(2)]
                     songs.add(
                         OldSongEntity(
                             id = songId,
@@ -285,13 +293,15 @@ val MIGRATION_1_2 =
                                 .atZone(ZoneOffset.UTC).toLocalDateTime(),
                         ),
                     )
-                    songArtistMaps.add(
-                        SongArtistMap(
-                            songId = songId,
-                            artistId = artistMap[cursor.getInt(2)]!!,
-                            position = 0,
-                        ),
-                    )
+                    if (artistId != null) {
+                        songArtistMaps.add(
+                            SongArtistMap(
+                                songId = songId,
+                                artistId = artistId,
+                                position = 0,
+                            ),
+                        )
+                    }
                 }
             }
             database.execSQL("DROP TABLE IF EXISTS song")
@@ -391,7 +401,7 @@ val MIGRATION_1_2 =
                     ),
                 )
             }
-            playlistSongMaps.forEach { playlistSongMap ->
+            normalizedPlaylistSongMaps.forEach { playlistSongMap ->
                 database.insert(
                     "playlist_song_map",
                     SQLiteDatabase.CONFLICT_ABORT,

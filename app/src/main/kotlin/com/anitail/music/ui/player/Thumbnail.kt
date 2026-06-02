@@ -55,6 +55,7 @@ import com.anitail.music.constants.SwipeSensitivityKey
 import com.anitail.music.constants.SwipeThumbnailKey
 import com.anitail.music.constants.ThumbnailCornerRadius
 import com.anitail.music.ui.component.Lyrics
+import com.anitail.music.ui.utils.resize
 import com.anitail.music.utils.rememberPreference
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -101,6 +102,9 @@ fun Thumbnail(
 
     var displayedThumbnailUrl by remember { mutableStateOf(mediaMetadata?.thumbnailUrl) }
     var nextThumbnailUrl by remember { mutableStateOf<String?>(null) }
+    val resolvedDisplayedThumbnailUrl = remember(displayedThumbnailUrl) { displayedThumbnailUrl?.resize(1200, 1200) }
+    val resolvedNextThumbnailUrl = remember(nextThumbnailUrl) { nextThumbnailUrl?.resize(1200, 1200) }
+    val resolvedPreviewImage = remember(previewImage) { previewImage?.resize(1200, 1200) }
     var isAnimatingTransition by remember { mutableStateOf(false) }
     var lastMediaId by remember { mutableStateOf(mediaMetadata?.id) }
     var lastQueueIndex by remember { mutableIntStateOf(playerConnection.player.currentMediaItemIndex) }
@@ -381,7 +385,7 @@ fun Thumbnail(
                 ) {
 
                     AsyncImage(
-                        model = displayedThumbnailUrl,
+                        model = resolvedDisplayedThumbnailUrl,
                         contentDescription = null,
                         contentScale = ContentScale.FillBounds,
                         modifier = Modifier
@@ -396,7 +400,7 @@ fun Thumbnail(
                     )
 
                     AsyncImage(
-                        model = displayedThumbnailUrl,
+                        model = resolvedDisplayedThumbnailUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
@@ -451,7 +455,7 @@ fun Thumbnail(
                     ) {
 
                         AsyncImage(
-                            model = nextUrl,
+                            model = resolvedNextThumbnailUrl,
                             contentDescription = null,
                             contentScale = ContentScale.FillBounds,
                             modifier = Modifier
@@ -466,7 +470,7 @@ fun Thumbnail(
                         )
 
                         AsyncImage(
-                            model = nextUrl,
+                            model = resolvedNextThumbnailUrl,
                             contentDescription = null,
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxSize()
@@ -515,7 +519,7 @@ fun Thumbnail(
                     ) {
 
                     AsyncImage(
-                            model = it,
+                            model = resolvedPreviewImage,
                             contentDescription = null,
                             contentScale = ContentScale.FillBounds,
                             modifier = Modifier
@@ -530,7 +534,7 @@ fun Thumbnail(
                         )
 
                         AsyncImage(
-                            model = it,
+                            model = resolvedPreviewImage,
                             contentDescription = null,
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxSize()

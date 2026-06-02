@@ -182,7 +182,7 @@ dependencies {
     implementation(libs.navigation)
     implementation(libs.hilt.navigation)
     implementation(libs.datastore)
-    implementation("androidx.documentfile:documentfile:1.1.0")
+    implementation(libs.documentfile)
 
     implementation(libs.compose.runtime)
     implementation(libs.compose.foundation)
@@ -226,17 +226,20 @@ dependencies {
     implementation(libs.hilt)
     implementation(libs.jsoup)
     ksp(libs.hilt.compiler)
+    ksp(libs.hilt.work.compiler)
 
-    implementation(projects.innertube)
-    implementation(projects.kugou)
-    implementation(projects.lrclib)
-    implementation(projects.kizzy)
-    implementation(projects.betterlyrics)
-    implementation(projects.simpmusic)
+    implementation(project(":innertube"))
+    implementation(project(":kugou"))
+    implementation(project(":lrclib"))
+    implementation(project(":kizzy"))
+    implementation(project(":betterlyrics"))
+    implementation(project(":simpmusic"))
+    implementation(project(":paxsenix"))
     implementation(project(":shazamkit"))
-    implementation(projects.common)
+    implementation(project(":common"))
 
     implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.android)
     implementation(libs.ktor.serialization.json)
 
     coreLibraryDesugaring(libs.desugaring)
@@ -245,7 +248,7 @@ dependencies {
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
     // Ensure Android dispatcher is available at runtime to avoid coroutine runtime mismatches
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation(libs.compose.icons.extended)
     implementation(libs.work.runtime.ktx)
     implementation(libs.hilt.work)    // OneSignal Push Notifications
@@ -256,9 +259,6 @@ dependencies {
     // Last.fm integration
     implementation(libs.lastfm.java)
     implementation(libs.commons.codec)
-
-    // On-device translation for lyrics (ML Kit)
-    implementation(libs.translate)
 
     // Google Drive Sync
     implementation(libs.play.services.auth)

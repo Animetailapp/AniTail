@@ -26,7 +26,6 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
-import java.io.OutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -43,6 +42,10 @@ class GoogleDriveSyncManager @Inject constructor(
     val signedInAccount: StateFlow<GoogleSignInAccount?> = _signedInAccount.asStateFlow()
 
     private var driveService: Drive? = null
+
+    /** Cached folder ID to avoid repeated Drive API lookups within a session. */
+    @Volatile
+    private var cachedFolderId: String? = null
 
     private val googleSignInClient: GoogleSignInClient by lazy {
         val signInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -102,6 +105,7 @@ class GoogleDriveSyncManager @Inject constructor(
                 googleSignInClient.signOut().await()
                 _signedInAccount.value = null
                 driveService = null
+                cachedFolderId = null
             } catch (e: Exception) {
                 Timber.e(e, "Sign out failed")
             }
@@ -255,7 +259,7 @@ class GoogleDriveSyncManager @Inject constructor(
             }
         }
 
-    suspend fun downloadLatestBackup(destinationFile: File): Result<File> =
+    suspend fun getLatestBackupMetadata(): Result<DriveBackupMetadata?> =
         withContext(Dispatchers.IO) {
             val service =
                 driveService ?: return@withContext Result.failure(Exception("Not signed in"))
@@ -263,7 +267,6 @@ class GoogleDriveSyncManager @Inject constructor(
             try {
                 val folderId = getOrCreateBackupFolder()
 
-                // Find latest backup file
                 val result = service.files().list()
                     .setQ(
                         "'$folderId' in parents and (" +
@@ -274,27 +277,68 @@ class GoogleDriveSyncManager @Inject constructor(
                     )
                     .setOrderBy("modifiedTime desc")
                     .setPageSize(1)
-                    .setFields("files(id, name, modifiedTime, createdTime)")
+                    .setFields("files(id, name, modifiedTime, createdTime, md5Checksum)")
                     .execute()
 
-                val files = result.files
-                if (files.isNullOrEmpty()) {
-                    return@withContext Result.failure(Exception("No backups found"))
-                }
+                val latestFile = result.files?.firstOrNull()
+                    ?: return@withContext Result.success(null)
 
-                val latestFile = files.first()
-
-                // Download file
-                val outputStream: OutputStream = FileOutputStream(destinationFile)
-                service.files().get(latestFile.id).executeMediaAndDownloadTo(outputStream)
-                outputStream.close()
-
-                Timber.d("Downloaded backup: ${latestFile.name}")
-                Result.success(destinationFile)
+                Result.success(
+                    DriveBackupMetadata(
+                        id = latestFile.id,
+                        name = latestFile.name,
+                        modifiedTime = latestFile.modifiedTime?.value ?: latestFile.createdTime?.value ?: 0L,
+                        md5 = latestFile.md5Checksum,
+                    )
+                )
             } catch (e: Exception) {
-                Timber.e(e, "Failed to download backup")
+                Timber.e(e, "Failed to get latest backup metadata")
                 Result.failure(e)
             }
+        }
+
+    suspend fun downloadBackup(
+        backupMetadata: DriveBackupMetadata,
+        destinationFile: File,
+    ): Result<DownloadResult> = withContext(Dispatchers.IO) {
+        val service = driveService ?: return@withContext Result.failure(Exception("Not signed in"))
+
+        try {
+            FileOutputStream(destinationFile).use { outputStream ->
+                service.files().get(backupMetadata.id).executeMediaAndDownloadTo(outputStream)
+            }
+
+            Timber.d("Downloaded backup: ${backupMetadata.name}")
+            Result.success(
+                DownloadResult(
+                    file = destinationFile,
+                    remoteModifiedTime = backupMetadata.modifiedTime,
+                    remoteFileId = backupMetadata.id,
+                    remoteMd5 = backupMetadata.md5,
+                )
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to download backup")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Downloads the latest backup from Google Drive.
+     * Returns a [DownloadResult] containing the file, its remote modification time,
+     * and the cached folder ID for efficient re-upload.
+     */
+    suspend fun downloadLatestBackup(destinationFile: File): Result<DownloadResult> =
+        withContext(Dispatchers.IO) {
+            val metadata = getLatestBackupMetadata().getOrElse {
+                return@withContext Result.failure(it)
+            }
+
+            if (metadata == null) {
+                return@withContext Result.failure(Exception("No backups found"))
+            }
+
+            downloadBackup(metadata, destinationFile)
         }
 
     suspend fun listBackups(): Result<List<DriveBackupInfo>> = withContext(Dispatchers.IO) {
@@ -333,6 +377,9 @@ class GoogleDriveSyncManager @Inject constructor(
     }
 
     private suspend fun getOrCreateBackupFolder(): String = withContext(Dispatchers.IO) {
+        // Return cached folder ID if available
+        cachedFolderId?.let { return@withContext it }
+
         val service = driveService ?: throw Exception("Not signed in")
         val folderName = "AniTail Backups"
 
@@ -344,7 +391,9 @@ class GoogleDriveSyncManager @Inject constructor(
             .execute()
 
         if (result.files.isNotEmpty()) {
-            return@withContext result.files.first().id
+            val id = result.files.first().id
+            cachedFolderId = id
+            return@withContext id
         }
 
         // Create folder if not exists
@@ -358,6 +407,7 @@ class GoogleDriveSyncManager @Inject constructor(
             .execute()
 
         Timber.d("Created backup folder: ${folder.id}")
+        cachedFolderId = folder.id
         folder.id
     }
 
@@ -384,4 +434,22 @@ data class DriveBackupInfo(
     val name: String,
     val createdTime: Long,
     val size: Long
+)
+
+data class DriveBackupMetadata(
+    val id: String,
+    val name: String,
+    val modifiedTime: Long,
+    val md5: String?,
+)
+
+/**
+ * Result of downloading a backup, containing the file and metadata
+ * needed to decide whether re-upload is necessary.
+ */
+data class DownloadResult(
+    val file: File,
+    val remoteModifiedTime: Long,
+    val remoteFileId: String?,
+    val remoteMd5: String?,
 )

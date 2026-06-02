@@ -381,6 +381,32 @@ private data class DetailNavigation(
 )
 
 fun main(args: Array<String>) {
+    try {
+        realMain(args)
+    } catch (t: Throwable) {
+        t.printStackTrace()
+        try {
+            val logFile = java.io.File(System.getProperty("user.home"), "anitail-crash.log")
+            val writer = java.io.PrintWriter(logFile)
+            t.printStackTrace(writer)
+            writer.close()
+        } catch (e: Exception) {
+            // ignore
+        }
+        try {
+            javax.swing.JOptionPane.showMessageDialog(
+                null,
+                "Error starting AniTail:\n${t.stackTraceToString()}",
+                "AniTail Error",
+                javax.swing.JOptionPane.ERROR_MESSAGE
+            )
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+}
+
+private fun realMain(args: Array<String>) {
     if (args.any { it == "--check-updates-once" }) {
         runBlocking {
             val preferences = DesktopPreferences.getInstance()

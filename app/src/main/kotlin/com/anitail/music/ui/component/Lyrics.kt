@@ -132,11 +132,26 @@ import com.anitail.music.constants.LyricsRomanizeUkrainianKey
 import com.anitail.music.constants.LyricsScrollKey
 import com.anitail.music.constants.LyricsSmoothScrollKey
 import com.anitail.music.constants.LyricsTextPositionKey
+import com.anitail.music.constants.AiProviderKey
+import com.anitail.music.constants.AiSystemPromptKey
+import com.anitail.music.constants.DEFAULT_AI_SYSTEM_PROMPT
+import com.anitail.music.constants.DeeplApiKey
+import com.anitail.music.constants.DeeplFormalityKey
+import com.anitail.music.constants.MistralApiKey
+import com.anitail.music.constants.MistralModelKey
+import com.anitail.music.constants.OpenRouterApiKey
+import com.anitail.music.constants.OpenRouterBaseUrlKey
+import com.anitail.music.constants.OpenRouterDefaultBaseUrl
+import com.anitail.music.constants.OpenRouterDefaultModel
+import com.anitail.music.constants.OpenRouterModelKey
 import com.anitail.music.constants.PlayerBackgroundStyle
 import com.anitail.music.constants.PlayerBackgroundStyleKey
+import com.anitail.music.constants.TranslateLanguageKey
 import com.anitail.music.constants.TranslateLyricsKey
+import com.anitail.music.constants.TranslateModeKey
 import com.anitail.music.db.entities.LyricsEntity.Companion.LYRICS_NOT_FOUND
 import com.anitail.music.lyrics.LyricsEntry
+import com.anitail.music.lyrics.LyricsAiTranslator
 import com.anitail.music.lyrics.LyricsUtils.findCurrentLineIndex
 import com.anitail.music.lyrics.LyricsUtils.isBelarusian
 import com.anitail.music.lyrics.LyricsUtils.isBulgarian
@@ -152,7 +167,6 @@ import com.anitail.music.lyrics.LyricsUtils.parseLyrics
 import com.anitail.music.lyrics.LyricsUtils.romanizeCyrillic
 import com.anitail.music.lyrics.LyricsUtils.romanizeJapanese
 import com.anitail.music.lyrics.LyricsUtils.romanizeKorean
-import com.anitail.music.lyrics.TranslationUtils
 import com.anitail.music.ui.component.shimmer.ShimmerHost
 import com.anitail.music.ui.component.shimmer.TextPlaceholder
 import com.anitail.music.ui.menu.LyricsMenu
@@ -210,6 +224,17 @@ fun Lyrics(
         defaultValue = LyricsAnimationStyle.APPLE
     )
     val translateLyrics by rememberPreference(TranslateLyricsKey, false)
+    val aiProvider by rememberPreference(AiProviderKey, "OpenRouter")
+    val translateMode by rememberPreference(TranslateModeKey, "Translated")
+    val translateLanguage by rememberPreference(TranslateLanguageKey, "en")
+    val openRouterApiKey by rememberPreference(OpenRouterApiKey, "")
+    val openRouterBaseUrl by rememberPreference(OpenRouterBaseUrlKey, OpenRouterDefaultBaseUrl)
+    val openRouterModel by rememberPreference(OpenRouterModelKey, OpenRouterDefaultModel)
+    val deeplApiKey by rememberPreference(DeeplApiKey, "")
+    val deeplFormality by rememberPreference(DeeplFormalityKey, "default")
+    val mistralApiKey by rememberPreference(MistralApiKey, "")
+    val mistralModel by rememberPreference(MistralModelKey, "mistral-small-latest")
+    val aiSystemPrompt by rememberPreference(AiSystemPromptKey, DEFAULT_AI_SYSTEM_PROMPT)
     val scope = rememberCoroutineScope()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
     val lyricsEntity by playerConnection.currentLyrics.collectAsState(initial = null)
@@ -584,37 +609,60 @@ fun Lyrics(
         previousLineIndex = currentLineIndex
     }
 
-    // Inline translation: translate lines when enabled. We use app locale as target.
+    // Inline translation uses the configured AI provider only.
     val appLocale = remember(context) {
         context.resources.configuration.locales.get(0)?.toLanguageTag() ?: "en"
     }
-    LaunchedEffect(translateLyrics, lines, appLocale) {
+    LaunchedEffect(
+        translateLyrics,
+        lines,
+        appLocale,
+        aiProvider,
+        translateMode,
+        translateLanguage,
+        openRouterApiKey,
+        openRouterBaseUrl,
+        openRouterModel,
+        deeplApiKey,
+        deeplFormality,
+        mistralApiKey,
+        mistralModel,
+        aiSystemPrompt,
+    ) {
         if (!translateLyrics) {
             // Clear previous translations
             lines.forEach { it.translatedTextFlow.value = null }
             return@LaunchedEffect
         }
-        val target = TranslationUtils.languageTagToMlKit(appLocale) ?: return@LaunchedEffect
         val start = SystemClock.elapsedRealtime()
         withContext(Dispatchers.IO) {
-            // Try to infer probable source (best-effort). If text contains Japanese/Korean/Chinese, set accordingly; else let ML Kit detect? (not available directly), we fallback to English->target for Latin scripts.
-            lines.forEach { entry ->
-                if (!isActive || entry.text.isBlank()) return@forEach
-                // Skip if already translated
-                if (entry.translatedTextFlow.value != null) return@forEach
-                val source = when {
-                    isJapanese(entry.text) -> com.google.mlkit.nl.translate.TranslateLanguage.JAPANESE
-                    isKorean(entry.text) -> com.google.mlkit.nl.translate.TranslateLanguage.KOREAN
-                    isChinese(entry.text) -> com.google.mlkit.nl.translate.TranslateLanguage.CHINESE
-                    else -> com.google.mlkit.nl.translate.TranslateLanguage.ENGLISH
-                }
-                runCatching {
-                    // Download model lazily if needed
-                    TranslationUtils.ensureModelDownloaded(source, target)
-                    val translated = TranslationUtils.translateOrNull(entry.text, source, target)
-                    if (!translated.isNullOrBlank()) {
-                        entry.translatedTextFlow.value = translated
+            val nonEmptyLines = lines.filter { it.text.isNotBlank() }
+            val hasAiCredentials = when (aiProvider) {
+                "DeepL" -> deeplApiKey.isNotBlank()
+                "Mistral" -> mistralApiKey.isNotBlank()
+                else -> openRouterApiKey.isNotBlank()
+            }
+            if (hasAiCredentials && nonEmptyLines.isNotEmpty()) {
+                LyricsAiTranslator.translate(
+                    lines = nonEmptyLines.map { it.text },
+                    targetLanguage = translateLanguage.ifBlank { appLocale },
+                    provider = aiProvider,
+                    mode = translateMode,
+                    openRouterApiKey = openRouterApiKey,
+                    openRouterBaseUrl = openRouterBaseUrl,
+                    openRouterModel = openRouterModel,
+                    deeplApiKey = deeplApiKey,
+                    deeplFormality = deeplFormality,
+                    mistralApiKey = mistralApiKey,
+                    mistralModel = mistralModel,
+                    systemPrompt = aiSystemPrompt,
+                ).onSuccess { translatedLines ->
+                    nonEmptyLines.zip(translatedLines).forEach { (entry, translated) ->
+                        if (translated.isNotBlank()) {
+                            entry.translatedTextFlow.value = translated
+                        }
                     }
+                    return@withContext
                 }
             }
         }
@@ -1275,8 +1323,9 @@ fun Lyrics(
         }
     }
 
-    if (showShareDialog && shareDialogData != null) {
-        val (lyricsText, songTitle, artists) = shareDialogData!! // Renamed 'lyrics' to 'lyricsText' for clarity
+    val currentShareDialogData = shareDialogData
+    if (showShareDialog && currentShareDialogData != null) {
+        val (lyricsText, songTitle, artists) = currentShareDialogData // Renamed 'lyrics' to 'lyricsText' for clarity
         BasicAlertDialog(onDismissRequest = { showShareDialog = false }) {
             Card(
                 shape = MaterialTheme.shapes.medium,
@@ -1396,8 +1445,9 @@ fun Lyrics(
         }
     }
 
-    if (showColorPickerDialog && shareDialogData != null) {
-        val (lyricsText, songTitle, artists) = shareDialogData!!
+    val currentColorPickerData = shareDialogData
+    if (showColorPickerDialog && currentColorPickerData != null) {
+        val (lyricsText, songTitle, artists) = currentColorPickerData
         val coverUrl = mediaMetadata?.thumbnailUrl
         val paletteColors = remember { mutableStateListOf<Color>() }
 
