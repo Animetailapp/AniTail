@@ -55,10 +55,10 @@ fun Song.toMediaMetadata() =
         id = song.id,
         title = song.title,
         artists =
-        artists.map {
+        (artists ?: emptyList()).map {
             MediaMetadata.Artist(
                 id = it.id,
-                name = it.name,
+                name = it.name ?: "Unknown",
             )
         },
         artistName = song.artistName,
@@ -68,7 +68,7 @@ fun Song.toMediaMetadata() =
         album?.let {
             MediaMetadata.Album(
                 id = it.id,
-                title = it.title,
+                title = it.title ?: "Unknown",
             )
         } ?: song.albumId?.let { albumId ->
             MediaMetadata.Album(
@@ -81,23 +81,23 @@ fun Song.toMediaMetadata() =
 
 fun SongItem.toMediaMetadata() =
     MediaMetadata(
-        id = id,
-        title = title,
+        id = id ?: "",
+        title = title ?: "Unknown",
         artists =
-        artists.map {
+        (artists ?: emptyList()).map {
             MediaMetadata.Artist(
                 id = it.id,
-                name = it.name,
+                name = it.name ?: "Unknown",
             )
         },
         artistName = null,
         duration = duration ?: -1,
-        thumbnailUrl = thumbnail.resize(544, 544),
+        thumbnailUrl = thumbnail?.resize(544, 544),
         album =
         album?.let {
             MediaMetadata.Album(
                 id = it.id,
-                title = it.name,
+                title = it.name ?: "Unknown",
             )
         },
         explicit = explicit,

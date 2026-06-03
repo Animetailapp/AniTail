@@ -140,8 +140,8 @@ data class LibraryPage(
                             it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
                         } == true,
                         endpoint = renderer.thumbnailOverlay
-                            .musicItemThumbnailOverlayRenderer.content
-                            .musicPlayButtonRenderer?.playNavigationEndpoint
+                            ?.musicItemThumbnailOverlayRenderer?.content
+                            ?.musicPlayButtonRenderer?.playNavigationEndpoint
                             ?.watchEndpoint,
                         libraryAddToken = libraryTokens.addToken,
                         libraryRemoveToken = libraryTokens.removeToken,
@@ -159,7 +159,7 @@ data class LibraryPage(
 
             return when {
                 renderer.isSong -> {
-                    val videoId = renderer.playlistItemData?.videoId
+                    val videoId = renderer.videoId
                     if (videoId == null) {
                         println("[UPLOAD_DEBUG] LibraryPage.parse FAILED: videoId is null")
                         return null
@@ -293,7 +293,7 @@ data class LibraryPage(
                     if (run.navigationEndpoint != null) {
                         artists.add(
                             Artist(
-                                id = run.navigationEndpoint.browseEndpoint?.browseId!!,
+                                id = run.navigationEndpoint.browseEndpoint?.browseId ?: "",
                                 name = run.text
                             )
                         )

@@ -79,6 +79,22 @@ data class MusicResponsiveListItemRenderer(
                 ?.musicVideoType
                 ?: navigationEndpoint?.musicVideoType
 
+    val videoId: String?
+        get() = playlistItemData?.videoId
+            ?: flexColumns.firstOrNull()
+                ?.musicResponsiveListItemFlexColumnRenderer
+                ?.text?.runs?.firstOrNull()
+                ?.navigationEndpoint?.watchEndpoint?.videoId
+            ?: overlay?.musicItemThumbnailOverlayRenderer
+                ?.content?.musicPlayButtonRenderer
+                ?.playNavigationEndpoint?.watchEndpoint?.videoId
+
+    val playlistSetVideoId: String?
+        get() = playlistItemData?.playlistSetVideoId
+            ?: overlay?.musicItemThumbnailOverlayRenderer
+                ?.content?.musicPlayButtonRenderer
+                ?.playNavigationEndpoint?.watchEndpoint?.playlistSetVideoId
+
     @Serializable
     data class FlexColumn(
         @JsonNames("musicResponsiveListItemFixedColumnRenderer")

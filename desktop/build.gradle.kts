@@ -36,7 +36,6 @@ tasks.named<ProcessResources>("processResources") {
 }
 
 val javafxVersion = "21.0.2"
-val composeMultiplatformVersion = "1.11.0-alpha03"
 val javafxPlatform = when {
     OperatingSystem.current().isWindows -> "win"
     OperatingSystem.current().isMacOsX -> "mac"

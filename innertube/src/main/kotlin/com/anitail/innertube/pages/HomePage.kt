@@ -97,14 +97,14 @@ data class HomePage(
 
                 return Section(
                     title = title,
-                    label = renderer.header.musicCarouselShelfBasicHeaderRenderer.strapline?.runs?.firstOrNull()?.text,
-                    thumbnail = renderer.header.musicCarouselShelfBasicHeaderRenderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl(),
-                    endpoint = renderer.header.musicCarouselShelfBasicHeaderRenderer.moreContentButton?.buttonRenderer?.navigationEndpoint?.browseEndpoint,
+                    label = renderer.header?.musicCarouselShelfBasicHeaderRenderer?.strapline?.runs?.firstOrNull()?.text,
+                    thumbnail = renderer.header?.musicCarouselShelfBasicHeaderRenderer?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl(),
+                    endpoint = renderer.header?.musicCarouselShelfBasicHeaderRenderer?.moreContentButton?.buttonRenderer?.navigationEndpoint?.browseEndpoint,
                     items = items
                 )
             }
 
-            private fun fromMusicMultiRowListItemRenderer(renderer: MusicMultiRowListItemRenderer): EpisodeItem? {
+            fun fromMusicMultiRowListItemRenderer(renderer: MusicMultiRowListItemRenderer): EpisodeItem? {
                 val subtitleRuns = renderer.subtitle?.runs?.splitBySeparator()
                 val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
 
@@ -351,8 +351,8 @@ data class HomePage(
                                 it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
                             } == true,
                             endpoint = renderer.thumbnailOverlay
-                                .musicItemThumbnailOverlayRenderer.content
-                                .musicPlayButtonRenderer?.playNavigationEndpoint
+                                ?.musicItemThumbnailOverlayRenderer?.content
+                                ?.musicPlayButtonRenderer?.playNavigationEndpoint
                                 ?.watchEndpoint,
                             libraryAddToken = libraryTokens.addToken,
                             libraryRemoveToken = libraryTokens.removeToken,

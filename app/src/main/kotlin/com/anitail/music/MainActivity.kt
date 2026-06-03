@@ -370,7 +370,7 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             // JAM: Observe JamViewModel and update MusicService JAM settings
-            val jamViewModel: com.anitail.music.ui.screens.settings.JamViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+            val jamViewModel: com.anitail.music.ui.screens.settings.JamViewModel = hiltViewModel()
             val isJamEnabled by jamViewModel.isJamEnabled.collectAsState()
             val isJamHost by jamViewModel.isJamHost.collectAsState()
             val hostIp by jamViewModel.hostIp.collectAsState()

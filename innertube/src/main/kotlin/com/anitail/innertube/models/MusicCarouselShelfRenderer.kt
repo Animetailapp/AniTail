@@ -11,7 +11,7 @@ data class MusicCarouselShelfRenderer(
 ) {
     @Serializable
     data class Header(
-        val musicCarouselShelfBasicHeaderRenderer: MusicCarouselShelfBasicHeaderRenderer,
+        val musicCarouselShelfBasicHeaderRenderer: MusicCarouselShelfBasicHeaderRenderer? = null,
     ) {
         @Serializable
         data class MusicCarouselShelfBasicHeaderRenderer(

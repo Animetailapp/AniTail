@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -257,52 +258,63 @@ fun LibraryPodcastsScreen(
                     key = "new_episodes_row",
                     contentType = CONTENT_TYPE_HEADER,
                 ) {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        items(
-                            items = newEpisodes,
-                            key = { it.id }
-                        ) { episode ->
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier
-                                    .width(140.dp)
-                                    .clickable {
-                                        playerConnection.playQueue(
-                                            ListQueue(
-                                                title = episode.title,
-                                                items = listOf(episode.toMediaItem()),
-                                            ),
-                                        )
-                                    }
-                                    .padding(4.dp)
-                            ) {
-                                AsyncImage(
-                                    model = episode.thumbnail,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
+                    if (isLoadingNewEpisodes && newEpisodes.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(140.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    } else {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            items(
+                                items = newEpisodes,
+                                key = { it.id }
+                            ) { episode ->
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier
-                                        .size(120.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                )
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    text = episode.title,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center,
-                                )
-                                Text(
-                                    text = episode.artists.joinToString { it.name },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center,
-                                    color = MaterialTheme.colorScheme.secondary,
-                                )
+                                        .width(140.dp)
+                                        .clickable {
+                                            playerConnection.playQueue(
+                                                ListQueue(
+                                                    title = episode.title,
+                                                    items = listOf(episode.toMediaItem()),
+                                                ),
+                                            )
+                                        }
+                                        .padding(4.dp)
+                                ) {
+                                    AsyncImage(
+                                        model = episode.thumbnail,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(120.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        text = episode.title,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                    Text(
+                                        text = episode.artists.joinToString { it.name },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                    )
+                                }
                             }
                         }
                     }

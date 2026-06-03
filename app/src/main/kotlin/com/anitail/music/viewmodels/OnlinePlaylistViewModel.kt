@@ -35,14 +35,67 @@ class OnlinePlaylistViewModel @Inject constructor(
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            YouTube.playlist(playlistId)
-                .onSuccess { playlistPage ->
-                    playlist.value = playlistPage.playlist
-                    playlistSongs.value = playlistPage.songs.distinctBy { it.id }
-                    continuation = playlistPage.songsContinuation
-                }.onFailure {
-                    reportException(it)
+            when (playlistId) {
+                "RDPN" -> {
+                    YouTube.newEpisodesPlaylistInfo()
+                        .onSuccess { playlistInfo ->
+                            playlist.value = playlistInfo
+                        }.onFailure {
+                            playlist.value = PlaylistItem(
+                                id = "RDPN",
+                                title = "New Episodes",
+                                author = null,
+                                songCountText = null,
+                                thumbnail = null,
+                                playEndpoint = null,
+                                shuffleEndpoint = null,
+                                radioEndpoint = null,
+                            )
+                        }
+
+                    YouTube.newEpisodes()
+                        .onSuccess { songs ->
+                            playlistSongs.value = songs.distinctBy { it.id }
+                            if (playlist.value?.thumbnail == null && songs.isNotEmpty()) {
+                                playlist.value = playlist.value?.copy(thumbnail = songs.first().thumbnail)
+                            }
+                        }.onFailure {
+                            reportException(it)
+                        }
                 }
+                "SE" -> {
+                    playlist.value = PlaylistItem(
+                        id = "SE",
+                        title = "Episodes for Later",
+                        author = null,
+                        songCountText = null,
+                        thumbnail = null,
+                        playEndpoint = null,
+                        shuffleEndpoint = null,
+                        radioEndpoint = null,
+                    )
+
+                    YouTube.episodesForLater()
+                        .onSuccess { songs ->
+                            playlistSongs.value = songs.distinctBy { it.id }
+                            if (songs.isNotEmpty()) {
+                                playlist.value = playlist.value?.copy(thumbnail = songs.first().thumbnail)
+                            }
+                        }.onFailure {
+                            reportException(it)
+                        }
+                }
+                else -> {
+                    YouTube.playlist(playlistId)
+                        .onSuccess { playlistPage ->
+                            playlist.value = playlistPage.playlist
+                            playlistSongs.value = playlistPage.songs.distinctBy { it.id }
+                            continuation = playlistPage.songsContinuation
+                        }.onFailure {
+                            reportException(it)
+                        }
+                }
+            }
         }
     }
 

@@ -39,13 +39,13 @@ data class SectionListRenderer(
     @Serializable
     data class Content(
         @JsonNames("musicImmersiveCarouselShelfRenderer")
-        val musicCarouselShelfRenderer: MusicCarouselShelfRenderer?,
-        val musicShelfRenderer: MusicShelfRenderer?,
-        val musicCardShelfRenderer: MusicCardShelfRenderer?,
-        val musicPlaylistShelfRenderer: MusicPlaylistShelfRenderer?,
-        val musicDescriptionShelfRenderer: MusicDescriptionShelfRenderer?,
-        val musicResponsiveHeaderRenderer: MusicResponsiveHeaderRenderer?,
-        val musicEditablePlaylistDetailHeaderRenderer: MusicEditablePlaylistDetailHeaderRenderer?,
-        val gridRenderer: GridRenderer?,
+        val musicCarouselShelfRenderer: MusicCarouselShelfRenderer? = null,
+        val musicShelfRenderer: MusicShelfRenderer? = null,
+        val musicCardShelfRenderer: MusicCardShelfRenderer? = null,
+        val musicPlaylistShelfRenderer: MusicPlaylistShelfRenderer? = null,
+        val musicDescriptionShelfRenderer: MusicDescriptionShelfRenderer? = null,
+        val musicResponsiveHeaderRenderer: MusicResponsiveHeaderRenderer? = null,
+        val musicEditablePlaylistDetailHeaderRenderer: MusicEditablePlaylistDetailHeaderRenderer? = null,
+        val gridRenderer: GridRenderer? = null,
     )
 }

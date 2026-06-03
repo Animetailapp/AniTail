@@ -1,11 +1,9 @@
 plugins {
     kotlin("multiplatform")
     id("com.android.kotlin.multiplatform.library")
+    id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
 }
-
-// Must match org.jetbrains.compose plugin version from settings.gradle.kts
-val composeVersion = "1.11.0-alpha03"
 
 kotlin {
     compilerOptions {
@@ -13,13 +11,11 @@ kotlin {
     }
 
     applyDefaultHierarchyTemplate()
-
     android {
         namespace = "com.anitail.shared"
         compileSdk = 36
         minSdk = 23
     }
-
     jvm("desktop")
 
     sourceSets {
