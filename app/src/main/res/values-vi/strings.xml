@@ -342,7 +342,7 @@
     <string name="restore_failed">Khôi phục thất bại</string>
 
     <string name="discord_integration">Tích hợp vào Discord</string>
-    <string name="discord_information">AniTail sử dụng thư viện KizzyRPC để thiết lập trạng thái hoạt động trên Discord. Điều này liên quan đến việc sử dụng kết nối đến cổng giao tiếp của Discord, có thể bị coi là vi phạm chính sách của Discord. Tuy nhiên, chưa có trường hợp nào bị đình chỉ tài khoản vì lý do này. Hãy dùng cẩn thận.\n\nAnitail sẽ chỉ trích xuất mã Token của bạn, mọi thứ khác sẽ được lưu trữ cục bộ.</string>
+    <string name="discord_information">AniTail sử dụng Discord Social SDK để đặt trạng thái tài khoản Discord của bạn. Sử dụng xác thực OAuth2 + PKCE để kết nối an toàn với Discord. Hãy tận hưởng việc hiển thị hoạt động nghe nhạc của bạn một cách an toàn và tự nhiên!</string>
     <string name="dismiss">Bỏ lỡ</string>
     <string name="options">Lựa chọn</string>
     <string name="preview">Xem trước</string>

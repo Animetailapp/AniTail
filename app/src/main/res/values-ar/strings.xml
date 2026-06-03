@@ -419,9 +419,7 @@
     <string name="not_logged_in_youtube">لم يتم تسجيل الدخول إلى يوتيوب</string>
 
     <string name="discord_integration">دمج ديسكورد</string>
-    <string name="discord_information">متروليست تستخدم مكتبة KizzyRPC لتعيين حالة حسابك على ديسكورد. يتضمن ذلك استخدام اتصال Discord Gateway، والذي قد يعتبر انتهاكًا لشروط الخدمة الخاصة بديسكورد. ومع ذلك، لا توجد حالات معروفة تم فيها تعليق حسابات المستخدمين لهذا السبب. استخدم هذه الخدمة على مسؤوليتك الخاصة.
-
-    متروليست ستستخرج فقط رمز التوكن الخاص بك، وكل شيء آخر يتم تخزينه محليًا.</string>
+    <string name="discord_information">يستخدم AniTail حزمة Discord Social SDK لتعيين حالة حساب Discord الخاص بك. يستخدم هذا ترخيص OAuth2 + PKCE للاتصال بـ Discord بشكل آمن. استمتع بعرض نشاط الاستماع الخاص بك بأمان وبشكل أصلي!</string>
     <string name="dismiss">إغلاق</string>
     <string name="options">الخيارات</string>
     <string name="preview">معاينة</string>

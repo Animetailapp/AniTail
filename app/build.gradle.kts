@@ -23,6 +23,10 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+        
         // Last.fm API credentials from local.properties or environment variables
         val localProperties = Properties()
         val localPropertiesFile = rootProject.file("local.properties")
@@ -39,6 +43,8 @@ android {
             
         buildConfigField("String", "LASTFM_API_KEY", "\"$lastfmApiKey\"")
         buildConfigField("String", "LASTFM_API_SECRET", "\"$lastfmApiSecret\"")
+        buildConfigField("Long", "DISCORD_APP_ID", "1359660031183818955L")
+        manifestPlaceholders["discordAppId"] = "1359660031183818955"
 
     }
     val enableVibrafp = (project.findProperty("enableVibrafp") as? String)?.toBoolean() ?: false
@@ -148,6 +154,12 @@ android {
         generateLocaleConfig = true
     }
 
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -231,7 +243,9 @@ dependencies {
     implementation(project(":innertube"))
     implementation(project(":kugou"))
     implementation(project(":lrclib"))
-    implementation(project(":kizzy"))
+    implementation(libs.browser)
+    implementation(libs.security.crypto)
+    implementation(files("libs/discord_partner_sdk.aar"))
     implementation(project(":betterlyrics"))
     implementation(project(":simpmusic"))
     implementation(project(":paxsenix"))

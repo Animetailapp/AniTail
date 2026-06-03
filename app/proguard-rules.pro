@@ -245,3 +245,13 @@
 }
 -keep class com.anitail.music.utils.CoverArtEmbedder { *; }
 -keep class com.anitail.music.utils.DownloadExportHelper { *; }
+
+## Discord Social SDK JNI and callbacks
+-keep class com.anitail.music.discord.** { *; }
+-keepclassmembers class com.anitail.music.discord.** {
+    native <methods>;
+    *** onNativeStatusChanged(...);
+}
+-keep class com.discord.socialsdk.** { *; }
+-dontwarn com.discord.socialsdk.**
+

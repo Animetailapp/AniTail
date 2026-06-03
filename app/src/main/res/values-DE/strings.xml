@@ -315,7 +315,7 @@
 
 
     <string name="discord_integration">Discord-Integration</string>
-    <string name="discord_information">AniTail verwendet die KizzyRPC-Bibliothek, um den Status deines Discord-Accounts festzulegen. Dazu wird die Discord Gateway-Verbindung genutzt, was möglicherweise als Verstoß gegen die Discord-Nutzungsbedingungen angesehen wird. Es sind jedoch keine Fälle bekannt, in denen Benutzerkonten aus diesem Grund gesperrt wurden. Nutzung auf eigenes Risiko.\n\nAnitail extrahiert nur deinen Token, alle anderen Daten werden lokal gespeichert.</string>
+    <string name="discord_information">AniTail verwendet das Discord Social SDK, um den Status deines Discord-Kontos festzulegen. Dies nutzt OAuth2 + PKCE-Autorisierung für eine sichere Verbindung zu Discord. Genieße die Anzeige deiner Höraktivität sicher und nativ!</string>
     <string name="dismiss">Schließen</string>
     <string name="options">Optionen</string>
     <string name="preview">Vorschau</string>

@@ -348,7 +348,7 @@
     <string name="backup_create_failed">Yedekleme oluşturulamadı</string>
     <string name="restore_failed">Yedekleme geri yüklenemedi</string>
     <string name="discord_integration">Discord Entegrasyonu</string>
-    <string name="discord_information">AniTail, Discord hesabınızın durumunu ayarlamak için KizzyRPC kütüphanesini kullanır. Bu, Discord Gateway bağlantısını kullanmayı içerir ve bu, Discord\'un Hizmet Şartları\'nın ihlali olarak kabul edilebilir. Ancak, bu nedenle kullanıcı hesaplarının askıya alındığına dair bilinen bir vaka yoktur. Kendi sorumluluğunuzda kullanın.\n\nAnitail yalnızca token\'inizi çıkaracak ve diğer her şey yerel olarak saklanacaktır.</string>
+    <string name="discord_information">AniTail, Discord hesabınızın durumunu ayarlamak için Discord Social SDK\'yı kullanır. Bu, Discord\'a güvenli bir şekilde bağlanmak için OAuth2 + PKCE yetkilendirmesi kullanır. Dinleme etkinliğinizi güvenle ve yerel olarak görüntülemenin keyfini çıkarın!</string>
     <string name="dismiss">Kapat</string>
     <string name="options">Seçenekler</string>
     <string name="preview">Önizleme</string>

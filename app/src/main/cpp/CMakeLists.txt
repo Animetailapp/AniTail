@@ -1,21 +1,23 @@
-cmake_minimum_required(VERSION 3.18)
-project(anitail-native)
+cmake_minimum_required(VERSION 3.22)
+project("anitail_discord")
 
-option(ENABLE_VIBRAFP "Build vibra_fp native library" OFF)
+add_library(anitail_discord SHARED
+    discord_bridge.cpp
+)
 
-add_subdirectory(coverart)
+target_include_directories(anitail_discord PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
-if(ANDROID)
-    # Bento4 defaults to fseeko/ftello, unavailable on Android API 23.
-    # Force portable stdio seeks so x86/minSdk23 builds succeed.
-    if(TARGET ap4)
-        target_compile_definitions(ap4 PRIVATE AP4_fseek=fseek AP4_ftell=ftell)
-    endif()
-    if(TARGET coverart)
-        target_compile_definitions(coverart PRIVATE AP4_fseek=fseek AP4_ftell=ftell)
-    endif()
-endif()
+add_library(discord_partner_sdk SHARED IMPORTED)
+set_target_properties(discord_partner_sdk PROPERTIES
+    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libdiscord_partner_sdk.so
+)
 
-if(ENABLE_VIBRAFP)
-    add_subdirectory(vibrafp/lib)
-endif()
+target_link_libraries(anitail_discord
+    discord_partner_sdk
+    jnigraphics
+    log
+)
+
+target_compile_features(anitail_discord PUBLIC cxx_std_17)
