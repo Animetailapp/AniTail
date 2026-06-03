@@ -188,7 +188,7 @@ fun SettingsScreen(
                 previewItem = playerState?.currentItem,
                 previewPositionMs = playerState?.position ?: 0L,
                 isPreviewPlaying = playerState?.isPlaying == true,
-                onBack = { currentDestination = SettingsDestination.ACCOUNT },
+                onBack = { currentDestination = SettingsDestination.MAIN },
             )
 
             SettingsDestination.SPOTIFY_IMPORT -> SpotifyImportSettingsScreen(

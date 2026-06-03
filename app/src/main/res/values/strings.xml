@@ -566,6 +566,11 @@
     <string name="discord_status_online">Online</string>
     <string name="discord_information_warning">Warning: Discord integration uses the Discord Social SDK to set your status. Usage is at your own risk.</string>
     <string name="discord_connect_description">Connect your Discord account to display your current song as your status.</string>
+    <string name="discord_ipc_info">AniTail connects to your local Discord client via IPC (named pipe / Unix socket). No token or login required — just open Discord on your PC and enable RPC below.</string>
+    <string name="discord_ipc_subtitle">Requires Discord to be running on this PC</string>
+    <string name="discord_ipc_hint">Press the button below to test whether Discord is open and reachable.</string>
+    <string name="discord_ipc_not_found">Discord not found. Make sure Discord is open on this PC.</string>
+    <string name="discord_test_connection">Test connection to Discord</string>
     <string name="discord_presence">Presence Customization</string>
     <string name="discord_activity_type">Activity Type</string>
     <string name="discord_activity_name">Activity Name</string>
