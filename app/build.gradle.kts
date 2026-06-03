@@ -26,7 +26,7 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
         }
-        
+
         // Last.fm API credentials from local.properties or environment variables
         val localProperties = Properties()
         val localPropertiesFile = rootProject.file("local.properties")
@@ -143,6 +143,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        prefab = true
     }
 
     dependenciesInfo {
