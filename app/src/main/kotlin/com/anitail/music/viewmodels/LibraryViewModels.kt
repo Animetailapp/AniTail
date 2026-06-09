@@ -10,8 +10,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.offline.Download
 import com.anitail.innertube.YouTube
+import com.anitail.innertube.models.ArtistItem
 import com.anitail.innertube.models.PodcastItem
 import com.anitail.innertube.models.SongItem
+import com.anitail.innertube.utils.completed
 import com.anitail.music.constants.AlbumFilter
 import com.anitail.music.constants.AlbumFilterKey
 import com.anitail.music.constants.AlbumSortDescendingKey
@@ -48,6 +50,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -65,6 +68,7 @@ import java.time.Duration
 import java.time.LocalDateTime
 import java.util.Locale
 import javax.inject.Inject
+import timber.log.Timber
 
 @HiltViewModel
 class LibrarySongsViewModel
@@ -384,48 +388,111 @@ class LibraryPodcastsViewModel
 constructor(
     @ApplicationContext context: Context,
     private val database: MusicDatabase,
+    private val syncUtils: SyncUtils,
 ) : ViewModel() {
     val subscribedChannels = database.subscribedPodcasts()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    private val _newEpisodes = MutableStateFlow<List<SongItem>>(emptyList())
-    val newEpisodes: StateFlow<List<SongItem>> = _newEpisodes.asStateFlow()
+    private val _sePlaylist = MutableStateFlow<com.anitail.innertube.models.PlaylistItem?>(null)
+    val sePlaylist = _sePlaylist.asStateFlow()
 
-    private val _isLoadingNewEpisodes = MutableStateFlow(false)
-    val isLoadingNewEpisodes: StateFlow<Boolean> = _isLoadingNewEpisodes.asStateFlow()
+    private val _rdpnPlaylist = MutableStateFlow<com.anitail.innertube.models.PlaylistItem?>(null)
+    val rdpnPlaylist = _rdpnPlaylist.asStateFlow()
 
-    val allPodcasts =
+    private val _apiPodcastChannels = MutableStateFlow<List<ArtistItem>>(emptyList())
+
+    val podcastChannels = kotlinx.coroutines.flow.combine(
+        _apiPodcastChannels,
+        database.bookmarkedPodcastChannels()
+    ) { apiChannels, localPodcastChannels ->
+        val localAsArtistItems = localPodcastChannels.map { artist ->
+            ArtistItem(
+                id = artist.id,
+                title = artist.artist.name,
+                thumbnail = artist.artist.thumbnailUrl,
+                shuffleEndpoint = null,
+                radioEndpoint = null,
+            )
+        }
+        val apiIds = apiChannels.map { it.id }.toSet()
+        val uniqueLocalChannels = localAsArtistItems.filter { it.id !in apiIds }
+        apiChannels + uniqueLocalChannels
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val downloadedEpisodes =
         context.dataStore.data
             .map {
-                it[SongSortTypeKey].toEnum(SongSortType.CREATE_DATE) to (it[SongSortDescendingKey] ?: true)
+                Pair(
+                    it[SongSortTypeKey].toEnum(SongSortType.CREATE_DATE) to (it[SongSortDescendingKey] ?: true),
+                    it[com.anitail.music.constants.HideExplicitKey] ?: false
+                )
             }.distinctUntilChanged()
-            .flatMapLatest { (sortType, descending) ->
-                database.podcastEpisodes(sortType, descending)
+            .flatMapLatest { (sortDesc, hideExplicit) ->
+                val (sortType, descending) = sortDesc
+                database.downloadedPodcastEpisodes(sortType, descending).map { it.filterExplicit(hideExplicit) }
+            }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val savedEpisodes =
+        context.dataStore.data
+            .map {
+                Pair(
+                    it[SongSortTypeKey].toEnum(SongSortType.CREATE_DATE) to (it[SongSortDescendingKey] ?: true),
+                    it[com.anitail.music.constants.HideExplicitKey] ?: false
+                )
+            }.distinctUntilChanged()
+            .flatMapLatest { (sortDesc, hideExplicit) ->
+                val (sortType, descending) = sortDesc
+                database.savedPodcastEpisodes(sortType, descending).map { it.filterExplicit(hideExplicit) }
             }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            syncPodcastSubscriptionsInternal()
-            syncEpisodesForLaterInternal()
-            fetchNewEpisodesInternal()
+            fetchSePlaylist()
         }
-    }
-
-    fun fetchNewEpisodes() {
         viewModelScope.launch(Dispatchers.IO) {
-            fetchNewEpisodesInternal()
+            fetchPodcastChannels()
         }
-    }
-
-    fun syncPodcastSubscriptions() {
+        viewModelScope.launch(Dispatchers.IO) {
+            fetchRdpnPlaylist()
+        }
         viewModelScope.launch(Dispatchers.IO) {
             syncPodcastSubscriptionsInternal()
+            syncEpisodesForLaterInternal()
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            com.anitail.music.utils.PodcastRefreshTrigger.refreshFlow.collect {
+                delay(1500)
+                fetchPodcastChannels()
+            }
         }
     }
 
-    fun syncEpisodesForLater() {
-        viewModelScope.launch(Dispatchers.IO) {
-            syncEpisodesForLaterInternal()
+    private suspend fun fetchSePlaylist() {
+        YouTube.library("FEmusic_liked_playlists").completed().onSuccess {
+            _sePlaylist.value = it.items
+                .filterIsInstance<com.anitail.innertube.models.PlaylistItem>()
+                .find { it.id == "SE" }
+        }.onFailure {
+            Timber.e(it, "[PODCAST] Failed to fetch SE playlist")
+        }
+    }
+
+    private suspend fun fetchPodcastChannels() {
+        YouTube.libraryPodcastChannels().onSuccess { page ->
+            val channels = page.items.filterIsInstance<ArtistItem>()
+            _apiPodcastChannels.value = channels
+            Timber.d("[PODCAST] Fetched ${channels.size} podcast channels from YT Music")
+        }.onFailure {
+            Timber.e(it, "[PODCAST] Failed to fetch podcast channels")
+        }
+    }
+
+    private suspend fun fetchRdpnPlaylist() {
+        YouTube.newEpisodesPlaylistInfo().onSuccess { item ->
+            _rdpnPlaylist.value = item
+            Timber.d("[PODCAST] RDPN playlist: ${item.title}, thumbnail: ${item.thumbnail}")
+        }.onFailure {
+            Timber.e(it, "[PODCAST] Failed to fetch RDPN playlist info")
         }
     }
 
@@ -439,7 +506,7 @@ constructor(
                     )
                 )
             }
-            allPodcasts.first().forEach { episode ->
+            savedEpisodes.first().forEach { episode ->
                 database.update(
                     episode.song.copy(
                         liked = false,
@@ -452,19 +519,17 @@ constructor(
     }
 
     suspend fun refreshAll() {
+        fetchSePlaylist()
+        fetchPodcastChannels()
+        fetchRdpnPlaylist()
         syncPodcastSubscriptionsInternal()
         syncEpisodesForLaterInternal()
-        fetchNewEpisodesInternal()
     }
 
-    private suspend fun fetchNewEpisodesInternal() {
-        _isLoadingNewEpisodes.value = true
-        YouTube.newEpisodes().onSuccess { episodes ->
-            _newEpisodes.value = episodes
-        }.onFailure {
-            reportException(it)
+    fun refreshChannels() {
+        viewModelScope.launch(Dispatchers.IO) {
+            fetchPodcastChannels()
         }
-        _isLoadingNewEpisodes.value = false
     }
 
     private suspend fun syncPodcastSubscriptionsInternal() {
@@ -527,7 +592,7 @@ constructor(
 
                 episodes.forEach { episode ->
                     insert(episode.toMediaMetadata())
-                    val existing = getSongByIdBlocking(episode.id) ?: return@forEach
+                    val existing = database.getSongByIdBlocking(episode.id) ?: return@forEach
                     update(
                         existing.song.copy(
                             isEpisode = true,
@@ -543,6 +608,9 @@ constructor(
         }
     }
 }
+
+fun List<com.anitail.music.db.entities.Song>.filterExplicit(enabled: Boolean = true) =
+    if (enabled) filterNot { it.song.explicit } else this
 
 @HiltViewModel
 class LibraryViewModel

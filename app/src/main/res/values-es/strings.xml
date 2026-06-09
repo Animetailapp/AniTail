@@ -129,6 +129,17 @@
     <string name="import_playlist">Importar lista</string>
     <string name="add_to_playlist">Añadir a lista</string>
     <string name="view_artist">Ver artista</string>
+    <string name="view_channel">Ver canal</string>
+    <string name="downloaded_episodes">Episodios descargados</string>
+    <string name="close_chip">Cerrar etiqueta</string>
+    <string name="filter_channels">Canales</string>
+    <string name="no_subscribed_channels">No hay canales suscritos</string>
+    <string name="no_downloaded_episodes">No hay episodios descargados</string>
+    <string name="auto_playlist">Lista automática</string>
+    <plurals name="n_channel">
+        <item quantity="one">%d canal</item>
+        <item quantity="other">%d canales</item>
+    </plurals>
     <string name="view_album">Ver álbum</string>
     <string name="refetch">Actualizar</string>
     <string name="share">Compartir</string>

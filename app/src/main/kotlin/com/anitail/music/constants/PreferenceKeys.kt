@@ -192,6 +192,7 @@ val MixSortDescendingKey = booleanPreferencesKey("albumSortDescending")
 val SongFilterKey = stringPreferencesKey("songFilter")
 val ArtistFilterKey = stringPreferencesKey("artistFilter")
 val AlbumFilterKey = stringPreferencesKey("albumFilter")
+val PodcastFilterKey = stringPreferencesKey("podcastFilter")
 
 val LastLikeSongSyncKey = longPreferencesKey("last_like_song_sync")
 val LastLibSongSyncKey = longPreferencesKey("last_library_song_sync")
@@ -244,6 +245,12 @@ enum class ArtistFilter {
 enum class AlbumFilter {
     LIBRARY,
     LIKED
+}
+
+enum class PodcastFilter {
+    EPISODES,
+    CHANNELS,
+    DOWNLOADED
 }
 
 enum class SongSortType {

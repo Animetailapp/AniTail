@@ -168,6 +168,17 @@
     <string name="import_playlist">Import playlist</string>
     <string name="add_to_playlist">Add to playlist</string>
     <string name="view_artist">View artist</string>
+    <string name="view_channel">View channel</string>
+    <string name="downloaded_episodes">Downloaded episodes</string>
+    <string name="close_chip">Close chip</string>
+    <string name="filter_channels">Channels</string>
+    <string name="no_subscribed_channels">No subscribed channels</string>
+    <string name="no_downloaded_episodes">No downloaded episodes</string>
+    <string name="auto_playlist">Auto playlist</string>
+    <plurals name="n_channel">
+        <item quantity="one">%d channel</item>
+        <item quantity="other">%d channels</item>
+    </plurals>
     <string name="view_album">View album</string>
     <string name="refetch">Refetch</string>
     <string name="share">Share</string>

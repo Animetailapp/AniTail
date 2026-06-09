@@ -909,4 +909,18 @@ constructor(
             encoded // Return as-is if decoding fails
         }
     }
+
+    fun savePodcast(podcastId: String, save: Boolean) {
+        syncScope.launch {
+            if (YouTube.cookie == null) {
+                Timber.d("[PODCAST_TOGGLE] Skipping savePodcast - user not logged in")
+                return@launch
+            }
+            YouTube.savePodcast(podcastId, save).onSuccess {
+                Timber.d("[PODCAST_TOGGLE] Successfully saved/unsaved podcast: $podcastId")
+            }.onFailure { e ->
+                Timber.e(e, "[PODCAST_TOGGLE] Failed to save/unsave podcast: $podcastId")
+            }
+        }
+    }
 }

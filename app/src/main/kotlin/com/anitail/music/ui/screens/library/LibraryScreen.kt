@@ -65,7 +65,7 @@ fun LibraryScreen(navController: NavController) {
 
             LibraryFilter.PODCASTS -> LibraryPodcastsScreen(
                 navController,
-                filterContent)
+                { filterType = LibraryFilter.LIBRARY })
 
             LibraryFilter.LOCAL -> {
                 // Local entry lives in LibraryMixScreen as a dedicated card.
