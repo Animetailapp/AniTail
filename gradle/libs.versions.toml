@@ -6,6 +6,8 @@ commonsCodec = "1.22.0"
 json = "20250517"
 jsoup = "1.22.2"
 kotlin = "2.3.20-RC"
+browser = "1.8.0"
+securityCrypto = "1.1.0-alpha07"
 compose = "1.11.0-alpha06"
 lastfmJava = "0.1.2"
 lifecycle = "2.11.0-beta01"
@@ -25,10 +27,11 @@ ksp = "2.3.8"
 okhttp = "5.3.2"
 newpipe = "v0.26.0"
 workRuntimeKtx = "2.11.2"
-kuromojiIpadic = "0.9.0"
 
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.8.0-alpha01" }
+browser = { module = "androidx.browser:browser", version.ref = "browser" }
+security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 commons-codec = { module = "commons-codec:commons-codec", version.ref = "commonsCodec" }
 documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
 guava = { group = "com.google.guava", name = "guava", version = "33.6.0-jre" }
@@ -113,8 +116,6 @@ timber = { group = "com.jakewharton.timber", name = "timber", version = "5.0.1" 
 
 #newpipe-extractor = { group = "com.github.libre-tube", name = "NewPipeExtractor", version = "f3bb450" }
 newpipe-extractor = { group = "com.github.TeamNewPipe", name = "NewPipeExtractor", version = "v0.26.2" }
-
-kuromoji-ipadic = { group = "com.atilika.kuromoji", name = "kuromoji-ipadic", version.ref = "kuromojiIpadic" }
 work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version = "21.5.1" }
 google-api-client-android = { module = "com.google.api-client:google-api-client-android", version = "2.9.0" }

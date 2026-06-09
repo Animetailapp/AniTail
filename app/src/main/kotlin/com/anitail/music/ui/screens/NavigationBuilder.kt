@@ -35,7 +35,6 @@ import com.anitail.music.ui.screens.settings.AppearanceSettings
 import com.anitail.music.ui.screens.settings.AutoBackupSettings
 import com.anitail.music.ui.screens.settings.BackupAndRestore
 import com.anitail.music.ui.screens.settings.ContentSettings
-import com.anitail.music.ui.screens.settings.DiscordLoginScreen
 import com.anitail.music.ui.screens.settings.DiscordSettings
 import com.anitail.music.ui.screens.settings.JamSettingsScreen
 import com.anitail.music.ui.screens.settings.LastFmSettingsScreen
@@ -403,9 +402,6 @@ fun NavGraphBuilder.navigationBuilder(
     }
     composable("settings/discord") {
         DiscordSettings(navController, scrollBehavior)
-    }
-    composable("settings/discord/login") {
-        DiscordLoginScreen(navController)
     }
     composable("settings/updates") {
         UpdateSettings(navController, scrollBehavior, latestVersionName)

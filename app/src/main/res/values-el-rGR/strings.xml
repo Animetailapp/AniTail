@@ -279,6 +279,7 @@
     <string name="default_lib_chips">Αλλαγή προεπιλεγμένου τσιπ βιβλιοθήκης</string>
     <string name="set_quick_picks">Ορισμός γρήγορων επιλογών</string>
     <string name="last_song_listened">Με βάση στο τελευταίο τραγούδι που ακούστηκε</string>
+    <string name="discord_information">Το AniTail χρησιμοποιεί το Discord Social SDK για να ορίσει την κατάσταση του λογαριασμού σας στο Discord. Χρησιμοποιεί εξουσιοδότηση OAuth2 + PKCE για ασφαλή σύνδεση στο Discord. Απολαύστε την εμφάνιση της δραστηριότητας ακρόασής σας με ασφάλεια!</string>
     <string name="app_language">Γλώσσα εφαρμογής</string>
     <string name="enable_kugou">Ενεργοποίηση παρόχου στίχων KuGou</string>
     <string name="enable_lrclib">Ενεργοποίηση παρόχου στίχων LrcLib</string>
@@ -328,7 +329,6 @@
     <string name="backup_create_failed">Αδυναμία δημιουργίας εφεδρικού αντιγράφου ασφαλείας</string>
     <string name="restore_failed">Αποτυχία επαναφοράς αντιγράφου ασφαλείας</string>
     <string name="discord_integration">Ενσωμάτωση Discord</string>
-    <string name="discord_information">Η AniTail χρησιμοποιεί τη βιβλιοθήκη KizzyRPC για να ρυθμίσει την κατάσταση του λογαριασμού σας στο Discord. Αυτό συνεπάγεται τη χρήση της σύνδεσης Discord Gateway, η οποία μπορεί να θεωρηθεί παραβίαση των TOS του Discord. Ωστόσο, δεν υπάρχουν γνωστές περιπτώσεις διακοπής λογαριασμών χρηστών για αυτόν τον λόγο. Η χρήση γίνεται με δική σας ευθύνη.\n\nΗ Anitail θα εξάγει μόνο το διακριτικό σας και όλα τα υπόλοιπα αποθηκεύονται τοπικά.</string>
     <string name="dismiss">Απόρριψη</string>
     <string name="options">Επιλογές</string>
     <string name="preview">Προεπισκόπηση</string>

@@ -1,7 +1,7 @@
 package com.anitail.desktop.ui.screen
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,19 +11,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,18 +32,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.anitail.desktop.auth.DesktopDiscordService
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.util.DiscordIpcClient
 import com.anitail.shared.model.LibraryItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -60,274 +59,148 @@ internal fun DiscordSettingsScreen(
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val discordToken by preferences.discordToken.collectAsState()
-    val discordName by preferences.discordName.collectAsState()
-    val discordUsername by preferences.discordUsername.collectAsState()
-    val discordAvatarUrl by preferences.discordAvatarUrl.collectAsState()
-    val infoDismissed by preferences.discordInfoDismissed.collectAsState()
     val discordRpcEnabled by preferences.enableDiscordRPC.collectAsState()
-    val lastSyncEpochMillis by preferences.discordLastSyncEpochMillis.collectAsState()
-    val lastErrorMessage by preferences.discordLastErrorMessage.collectAsState()
 
-    var showDiscordEditor by remember { mutableStateOf(false) }
-    var isRefreshing by remember { mutableStateOf(false) }
+    var isTesting by remember { mutableStateOf(false) }
+    var testResult by remember { mutableStateOf<Boolean?>(null) }
 
-    val isLoggedIn = discordToken.isNotBlank()
-    val statusLabel = when {
-        !discordRpcEnabled -> stringResource("discord_status_disabled")
-        isRefreshing -> stringResource("discord_status_connecting")
-        lastErrorMessage.isNotBlank() -> stringResource("discord_status_error")
-        isLoggedIn -> stringResource("discord_status_connected")
-        else -> stringResource("discord_status_idle")
-    }
-
-    val lastSyncLabel = if (lastSyncEpochMillis <= 0L) {
-        stringResource("discord_last_sync_never")
-    } else {
-        relativeTimeLabel(lastSyncEpochMillis)
-    }
-
-    val refreshLabel = if (isRefreshing) {
-        stringResource("discord_manual_refreshing")
-    } else {
-        stringResource("discord_manual_refresh")
-    }
-    val discordStatusErrorText = stringResource("discord_status_error")
-
-    fun refreshProfile(token: String) {
-        val sanitizedToken = token.trim()
-        if (sanitizedToken.isBlank()) {
-            preferences.setDiscordName("")
-            preferences.setDiscordUsername("")
-            preferences.setDiscordAvatarUrl("")
-            preferences.setDiscordLastErrorMessage("")
-            return
-        }
-
+    fun testConnection() {
         scope.launch {
-            isRefreshing = true
-            val profile = withContext(Dispatchers.IO) {
-                DesktopDiscordService.fetchProfile(sanitizedToken)
+            isTesting = true
+            testResult = null
+            val result = withContext(Dispatchers.IO) {
+                val client = DiscordIpcClient("1271273225120125040")
+                val connected = client.connect()
+                if (connected) client.close()
+                connected
             }
-            if (profile != null) {
-                preferences.setDiscordName(profile.name)
-                preferences.setDiscordUsername(profile.username)
-                preferences.setDiscordAvatarUrl(profile.avatarUrl.orEmpty())
-                preferences.setDiscordLastErrorMessage("")
-                preferences.setDiscordLastSyncEpochMillis(System.currentTimeMillis())
-            } else {
-                preferences.setDiscordLastErrorMessage(discordStatusErrorText)
-            }
-            isRefreshing = false
+            testResult = result
+            isTesting = false
         }
-    }
-
-    if (showDiscordEditor) {
-        var discordTokenInput by remember(discordToken, showDiscordEditor) { mutableStateOf(discordToken) }
-        AlertDialog(
-            onDismissRequest = { showDiscordEditor = false },
-            title = { Text(stringResource("discord_integration")) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = discordTokenInput,
-                        onValueChange = { discordTokenInput = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                        maxLines = 3,
-                        textStyle = MaterialTheme.typography.bodySmall,
-                        placeholder = { Text("Discord token") },
-                    )
-                    Text(
-                        text = stringResource("discord_information"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    TextButton(
-                        onClick = {
-                            runCatching {
-                                java.awt.Desktop.getDesktop().browse(java.net.URI("https://discord.com/channels/@me"))
-                            }
-                        }
-                    ) {
-                        Text(stringResource("open_in_browser"))
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = !isRefreshing,
-                    onClick = {
-                        val token = discordTokenInput.trim()
-                        preferences.setDiscordToken(token)
-                        if (token.isBlank()) {
-                            preferences.setDiscordName("")
-                            preferences.setDiscordUsername("")
-                            preferences.setDiscordAvatarUrl("")
-                            preferences.setDiscordLastErrorMessage("")
-                            preferences.setDiscordLastSyncEpochMillis(0L)
-                        } else {
-                            refreshProfile(token)
-                        }
-                        showDiscordEditor = false
-                    },
-                ) { Text(stringResource("save")) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDiscordEditor = false }) { Text(stringResource("cancel")) }
-            },
-        )
     }
 
     SettingsSubScreen(
         title = stringResource("discord_integration"),
         onBack = onBack,
     ) {
-        if (!infoDismissed) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(4.dp),
+        // Info card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.Top,
             ) {
                 Icon(
                     imageVector = IconAssets.info(),
                     contentDescription = null,
-                    modifier = Modifier.padding(16.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp).padding(top = 2.dp),
                 )
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = stringResource("discord_information"),
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    text = stringResource("discord_ipc_info"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
-                TextButton(
-                    onClick = { preferences.setDiscordInfoDismissed(true) },
-                    modifier = Modifier
-                        .align(Alignment.End)
-                        .padding(16.dp),
-                ) {
-                    Text(stringResource("dismiss"))
-                }
-            }
-        }
-
-        AndroidPreferenceGroupTitle(title = stringResource("account"))
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (discordAvatarUrl.isNotBlank()) {
-                    RemoteImage(
-                        url = discordAvatarUrl,
-                        contentDescription = null,
-                        modifier = Modifier.size(30.dp),
-                        shape = CircleShape,
-                    )
-                } else {
-                    Icon(
-                        imageVector = IconAssets.discord(),
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isLoggedIn) 1f else 0.5f),
-                    )
-                }
-
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 12.dp),
-                ) {
-                    Text(
-                        text = if (isLoggedIn) {
-                            discordName.ifBlank { discordUsername.ifBlank { stringResource("discord") } }
-                        } else {
-                            stringResource("not_logged_in")
-                        },
-                        modifier = Modifier.alpha(if (isLoggedIn) 1f else 0.5f),
-                    )
-                    if (discordUsername.isNotBlank()) {
-                        Text(
-                            text = "@$discordUsername",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        if (isLoggedIn) {
-                            preferences.setDiscordToken("")
-                            preferences.setDiscordName("")
-                            preferences.setDiscordUsername("")
-                            preferences.setDiscordAvatarUrl("")
-                            preferences.setDiscordLastErrorMessage("")
-                            preferences.setDiscordLastSyncEpochMillis(0L)
-                        } else {
-                            showDiscordEditor = true
-                        }
-                    },
-                ) {
-                    Text(stringResource(if (isLoggedIn) "logout" else "login"))
-                }
             }
         }
 
         AndroidPreferenceGroupTitle(title = stringResource("options"))
+
+        // Enable toggle
         SettingsSwitch(
             title = stringResource("enable_discord_rpc"),
-            subtitle = "",
+            subtitle = stringResource("discord_ipc_subtitle"),
             checked = discordRpcEnabled,
             onCheckedChange = { preferences.setEnableDiscordRPC(it) },
-            enabled = isLoggedIn,
         )
 
-        if (isLoggedIn) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Test connection card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 8.dp),
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                Text(
+                    text = stringResource("discord_connection_state"),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+
+                if (isTesting) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Text(
+                        text = stringResource("discord_status_connecting"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    when (testResult) {
+                        true -> {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF4CAF50)),
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource("discord_status_connected"),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color(0xFF4CAF50),
+                                )
+                            }
+                        }
+                        false -> {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.error),
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource("discord_ipc_not_found"),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
+                        null -> {
+                            Text(
+                                text = stringResource("discord_ipc_hint"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = { testConnection() },
+                    enabled = !isTesting,
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    if (isRefreshing) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                    }
-
-                    SettingsInfoItem(
-                        title = stringResource("discord_connection_state"),
-                        value = statusLabel,
+                    Icon(
+                        imageVector = IconAssets.discord(),
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
                     )
-                    SettingsInfoItem(
-                        title = stringResource("discord_last_sync"),
-                        value = lastSyncLabel,
-                    )
-
-                    if (lastErrorMessage.isNotBlank()) {
-                        Text(
-                            text = stringResource("discord_error_format", lastErrorMessage),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-
-                    OutlinedButton(
-                        onClick = { refreshProfile(discordToken) },
-                        enabled = !isRefreshing && discordRpcEnabled,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(refreshLabel)
-                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource("discord_test_connection"))
                 }
             }
         }
@@ -359,7 +232,7 @@ private fun DiscordPreviewCard(
         shape = MaterialTheme.shapes.medium,
         shadowElevation = 6.dp,
         modifier = Modifier
-            .padding(16.dp)
+            .padding(vertical = 8.dp)
             .fillMaxWidth(),
     ) {
         Column(
@@ -424,7 +297,7 @@ private fun DiscordPreviewCard(
             Spacer(modifier = Modifier.height(16.dp))
 
             LinearProgressIndicator(
-                progress = progress,
+                progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(4.dp),
@@ -464,31 +337,7 @@ private fun DiscordPreviewCard(
             ) {
                 Text("Listen on YouTube Music")
             }
-
-            OutlinedButton(
-                onClick = {
-                    runCatching {
-                        java.awt.Desktop.getDesktop().browse(java.net.URI("https://discord.gg/H8x3yNbc67"))
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Join our discord")
-            }
         }
-    }
-}
-
-private fun relativeTimeLabel(timestamp: Long): String {
-    val diff = (System.currentTimeMillis() - timestamp).coerceAtLeast(0L)
-    val minute = 60_000L
-    val hour = 60 * minute
-    val day = 24 * hour
-    return when {
-        diff < minute -> "just now"
-        diff < hour -> "${diff / minute}m ago"
-        diff < day -> "${diff / hour}h ago"
-        else -> "${diff / day}d ago"
     }
 }
 

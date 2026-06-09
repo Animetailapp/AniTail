@@ -127,6 +127,7 @@ fun SettingsScreen(
     val homeViewModel: HomeViewModel = hiltViewModel()
     val accountName by homeViewModel.accountName.collectAsState()
     val discordUsername by homeViewModel.discordUsername.collectAsState()
+    val discordName by homeViewModel.discordName.collectAsState()
     val (preferredAvatarSource) = rememberEnumPreference(PreferredAvatarSourceKey, defaultValue = AvatarSource.YOUTUBE)
 
     val greetingText = remember(currentHour) {
@@ -389,7 +390,7 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(4.dp))
                             val displayName = when (preferredAvatarSource) {
                                 AvatarSource.YOUTUBE -> accountName.takeUnless { it.isBlank() || it == "Guest" }
-                                AvatarSource.DISCORD -> discordUsername
+                                AvatarSource.DISCORD -> discordUsername?.let { "@$it" }
                             } ?: Build.MODEL
                             Text(
                                 text = displayName,

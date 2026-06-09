@@ -324,7 +324,7 @@
     <string name="restore_failed">Falha ao restaurar backup</string>
 
     <string name="discord_integration">Integração com Discord</string>
-    <string name="discord_information">O AniTail usa a biblioteca KizzyRPC para definir o status da sua conta no Discord. Isso envolve usar a conexão do Discord Gateway, o que pode ser considerado uma violação dos TOS do Discord. No entanto, não há casos conhecidos de contas de usuários sendo suspensas por essa razão. Use por sua conta e risco.\n\nO Anitail irá extrair apenas o seu token, e tudo o mais é armazenado localmente.</string>
+    <string name="discord_information">O AniTail usa o Discord Social SDK para definir o status da sua conta Discord. Isso usa autorização OAuth2 + PKCE para conectar-se com segurança ao Discord. Aproveite para exibir sua atividade de audição com segurança e nativamente!</string>
     <string name="dismiss">Fechar</string>
     <string name="options">Opções</string>
     <string name="preview">Pré-visualização</string>

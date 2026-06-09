@@ -195,7 +195,12 @@ fun HomeScreen(
     val forgottenFavoritesFirstId = forgottenFavorites.firstOrNull()?.id
     val syncCompletedMessage = stringResource(R.string.sync_completed)
     val syncInitialUploadMessage = stringResource(R.string.sync_initial_uploaded)
-    val syncSucceeded = syncStatus == syncCompletedMessage || syncStatus == syncInitialUploadMessage
+    var syncSucceeded by remember { mutableStateOf(false) }
+    LaunchedEffect(syncStatus) {
+        if (syncStatus != null) {
+            syncSucceeded = syncStatus == syncCompletedMessage || syncStatus == syncInitialUploadMessage
+        }
+    }
     val showSyncIndicator =
         (isSyncing || syncStatus != null) && (allLocalItems.isNotEmpty() || allYtItems.isNotEmpty())
 

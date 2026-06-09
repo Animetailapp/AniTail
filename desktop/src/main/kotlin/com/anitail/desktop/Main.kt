@@ -681,12 +681,12 @@ private fun FrameWindowScope.AniTailDesktopApp(
         }
     }
 
-    LaunchedEffect(enableDiscordRPC, discordToken, playerState.isPlaying, playerState.currentItem == null) {
-        val shouldBeRunning = enableDiscordRPC && discordToken.isNotBlank() &&
+    LaunchedEffect(enableDiscordRPC, playerState.isPlaying, playerState.currentItem == null) {
+        val shouldBeRunning = enableDiscordRPC &&
             playerState.isPlaying && playerState.currentItem != null
         if (shouldBeRunning) {
             if (discordRPC == null) {
-                discordRPC = DesktopDiscordRPC(discordToken)
+                discordRPC = DesktopDiscordRPC()
                 discordRpcController = com.anitail.desktop.rpc.DesktopPlayerRpcController(discordRPC!!)
             }
         } else {
@@ -1265,8 +1265,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
             val discordAccountName = discordUsername.takeUnless { it.isBlank() }
             val discordAccountAvatar = discordAvatarUrl.takeUnless { it.isBlank() }
             val topBarAccountName = when (preferredAvatarSource) {
-                AvatarSourcePreference.YOUTUBE -> youtubeAccountName ?: discordAccountName
-                AvatarSourcePreference.DISCORD -> discordAccountName ?: youtubeAccountName
+                AvatarSourcePreference.YOUTUBE -> youtubeAccountName ?: discordAccountName?.let { "@$it" }
+                AvatarSourcePreference.DISCORD -> discordAccountName?.let { "@$it" } ?: youtubeAccountName
             }
             val topBarAccountAvatar = when (preferredAvatarSource) {
                 AvatarSourcePreference.YOUTUBE -> youtubeAccountAvatar ?: discordAccountAvatar
@@ -1520,6 +1520,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                 AvatarSourcePreference.YOUTUBE -> accountInfo?.name ?: authCredentials?.accountName
                                 AvatarSourcePreference.DISCORD -> discordUsername
                                     .takeUnless { it.isBlank() }
+                                    ?.let { "@$it" }
                                     ?: accountInfo?.name
                                     ?: authCredentials?.accountName
                             },

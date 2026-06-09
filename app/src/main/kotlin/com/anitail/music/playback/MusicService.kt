@@ -17,7 +17,6 @@ import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Binder
 import android.os.Build
-import android.os.Looper
 import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.NotificationCompat
@@ -75,8 +74,28 @@ import com.anitail.music.constants.AutoDownloadOnLikeKey
 import com.anitail.music.constants.AutoLoadMoreKey
 import com.anitail.music.constants.AutoSkipNextOnErrorKey
 import com.anitail.music.constants.CrossfadeDurationKey
-import com.anitail.music.constants.DiscordTokenKey
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import android.os.Handler
+import android.os.Looper
+import com.anitail.music.constants.DiscordButton1EnabledKey
+import com.anitail.music.constants.DiscordButton1LabelKey
+import com.anitail.music.constants.DiscordButton1UrlKey
+import com.anitail.music.constants.DiscordButton2EnabledKey
+import com.anitail.music.constants.DiscordButton2LabelKey
+import com.anitail.music.constants.DiscordButton2UrlKey
+import com.anitail.music.constants.DiscordDetailsTemplateKey
+import com.anitail.music.constants.DiscordStateTemplateKey
+import com.anitail.music.constants.DiscordUserStatusKey
+import com.anitail.music.constants.DiscordActivityNameKey
+import com.anitail.music.constants.DiscordActivityTypeKey
+import com.anitail.music.constants.DiscordAdvancedModeKey
 import com.anitail.music.constants.EnableDiscordRPCKey
+import com.anitail.music.discord.DiscordActivity
+import com.anitail.music.discord.DiscordDefaults
+import com.anitail.music.discord.DiscordRpcManager
+import com.anitail.music.discord.DiscordActivityBuilder
+import com.anitail.music.discord.DiscordTemplateRenderer
 import com.anitail.music.constants.HideExplicitKey
 import com.anitail.music.constants.HistoryDuration
 import com.anitail.music.constants.JamConnectionHistoryKey
@@ -125,7 +144,6 @@ import com.anitail.music.ui.component.MusicWidgetProvider.Companion.ACTION_NEXT
 import com.anitail.music.ui.component.MusicWidgetProvider.Companion.ACTION_PLAY_PAUSE
 import com.anitail.music.ui.component.MusicWidgetProvider.Companion.ACTION_PREV
 import com.anitail.music.utils.CoilBitmapLoader
-import com.anitail.music.utils.DiscordRPC
 import com.anitail.music.utils.LanJamClient
 import com.anitail.music.utils.LanJamCommands
 import com.anitail.music.utils.LanJamQueueSync
@@ -140,7 +158,6 @@ import com.anitail.music.utils.get
 import com.anitail.music.utils.isInternetAvailable
 import com.anitail.music.utils.reportException
 import com.google.common.util.concurrent.MoreExecutors
-import com.my.kizzy.gateway.GatewayConnectionState
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -281,11 +298,44 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
   private var isAudioEffectSessionOpened = false
 
-  private var discordRpc: DiscordRPC? = null
-    private var discordRpcToken: String? = null
-    private var discordGatewayJob: Job? = null
-    private val discordPresenceState = MutableStateFlow(DiscordPresenceState())
-    val discordPresence = discordPresenceState.asStateFlow()
+    @Volatile private var discordRpcEnabled = false
+    private val screenOffHandler = Handler(Looper.getMainLooper())
+    private val screenOffTimeout = Runnable {
+        Timber.tag("DiscordSvc").i("screenOffTimeout: isPlaying=%s, isReady=%s",
+            player.isPlaying, DiscordRpcManager.isReady())
+        if (!player.isPlaying && DiscordRpcManager.isReady()) {
+            Timber.tag("DiscordSvc").i("screenOffTimeout: disconnecting")
+            DiscordRpcManager.disconnect()
+        }
+    }
+
+    private val screenStateReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context,
+                intent: Intent,
+            ) {
+                when (intent.action) {
+                    Intent.ACTION_SCREEN_OFF -> {
+                        Timber.tag("DiscordSvc").i("SCREEN_OFF: delaying disconnect 60s")
+                        screenOffHandler.postDelayed(screenOffTimeout, 60_000)
+                    }
+
+                    Intent.ACTION_SCREEN_ON -> {
+                        Timber.tag("DiscordSvc").i("SCREEN_ON: removing disconnect delay")
+                        screenOffHandler.removeCallbacks(screenOffTimeout)
+                        if (player.isPlaying && DiscordRpcManager.isReady()) {
+                            currentSong.value?.let { song ->
+                                Timber.tag("DiscordSvc").i("SCREEN_ON: updating RPC")
+                                scope.launch {
+                                    updateDiscordRPC(song)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
   val automixItems = MutableStateFlow<List<MediaItem>>(emptyList())
   private var consecutivePlaybackErr = 0
@@ -411,11 +461,13 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     currentSong.debounce(1000).collect(scope) { song ->
       updateNotification()
       if (song != null) {
-        updateDiscordPresence(song)
+        scope.launch {
+          updateDiscordRPC(song)
+        }
       } else {
-          discordPresenceState.update {
-              it.copy(status = DiscordGatewayStatus.IDLE)
-          }
+        if (DiscordRpcManager.isReady()) {
+          DiscordRpcManager.clear()
+        }
       }
     }
     combine(
@@ -517,27 +569,101 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
               }
         }
 
-    dataStore.data
-        .map { it[DiscordTokenKey] to (it[EnableDiscordRPCKey] ?: true) }
-        .debounce(300)
-        .distinctUntilChanged()
-        .collect(scope) { (token, enabled) ->
-            if (!enabled || token.isNullOrBlank()) {
-                tearDownDiscordRpc()
-                return@collect
+        val screenStateFilter =
+            IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_SCREEN_OFF)
+            }
+        registerReceiver(screenStateReceiver, screenStateFilter)
+
+        dataStore.data
+            .map { it[EnableDiscordRPCKey] ?: true }
+            .debounce(300)
+            .distinctUntilChanged()
+            .collect(scope) { enabled ->
+                Timber.tag("DiscordSvc").i("RPC toggle: enabled=%s, isReady=%s, hasToken=%s",
+                    enabled, DiscordRpcManager.isReady(), DiscordRpcManager.getAccessToken() != null)
+                discordRpcEnabled = enabled
+                if (enabled) {
+                    if (DiscordRpcManager.isReady()) {
+                        Timber.tag("DiscordSvc").i("RPC toggle: already ready, updating RPC")
+                        scope.launch {
+                            currentSong.value?.let { updateDiscordRPC(it) }
+                        }
+                    } else {
+                        // Always ensure init is called first so the native lib loads
+                        // and the stored token is populated into accessTokenFlow
+                        scope.launch(Dispatchers.IO) {
+                            if (!DiscordRpcManager.isInitialized()) {
+                                Timber.tag("DiscordSvc").i("RPC toggle: initializing DiscordRpcManager")
+                                DiscordRpcManager.init(this@MusicService)
+                            }
+                            val token = DiscordRpcManager.getAccessToken()
+                            if (token != null) {
+                                Timber.tag("DiscordSvc").i("RPC toggle: has stored token, reconnecting")
+                                DiscordRpcManager.reconnectWithToken(token)
+                            } else {
+                                Timber.tag("DiscordSvc").w("RPC toggle: enabled but no token stored")
+                            }
+                        }
+                    }
+                } else if (DiscordRpcManager.isReady()) {
+                    Timber.tag("DiscordSvc").i("RPC toggle: disabled, disconnecting")
+                    scope.launch(Dispatchers.IO) {
+                        DiscordRpcManager.disconnect()
+                    }
+                }
             }
 
-            if (discordRpc == null || discordRpcToken != token) {
-                tearDownDiscordRpc(setDisabledState = false)
-                discordPresenceState.value =
-                    DiscordPresenceState(status = DiscordGatewayStatus.CONNECTING)
-                val rpc = DiscordRPC(this, token)
-                discordRpc = rpc
-                discordRpcToken = token
-                discordGatewayJob = launchDiscordGatewayObserver(rpc)
-                scope.launch { rpc.connect() }
-                currentSong.value?.let { updateDiscordPresence(it) }
-          }
+        DiscordRpcManager.accessTokenFlow.collectLatest(scope) { token ->
+                Timber.tag("DiscordSvc").i("Token change: hasToken=%s, initialized=%s, authorized=%s, enabled=%s",
+                    token != null, DiscordRpcManager.isInitialized(), DiscordRpcManager.isAuthorized(), discordRpcEnabled)
+                if (token == null) {
+                    if (DiscordRpcManager.isReady()) {
+                        Timber.tag("DiscordSvc").i("Token change: empty token, disconnecting")
+                        DiscordRpcManager.disconnect()
+                    }
+                    return@collectLatest
+                }
+                if (!discordRpcEnabled) {
+                    Timber.tag("DiscordSvc").i("Token change: RPC disabled, skipping reconnect")
+                    return@collectLatest
+                }
+                if (!DiscordRpcManager.isInitialized()) {
+                    Timber.tag("DiscordSvc").i("Token change: initializing")
+                    DiscordRpcManager.init(this@MusicService)
+                }
+                if (!DiscordRpcManager.isAuthorized()) {
+                    Timber.tag("DiscordSvc").i("Token change: reconnecting with token")
+                    DiscordRpcManager.reconnectWithToken(token)
+                } else {
+                    Timber.tag("DiscordSvc").i("Token change: already authorized, skipping reconnect")
+                }
+            }
+
+        scope.launch {
+            DiscordRpcManager.connectionStatus.collect { status ->
+                val isPlayerPlaying = withContext(Dispatchers.Main) { player.isPlaying }
+                Timber.tag("DiscordSvc").i("Status change: %s (discordRpcEnabled=%s, playing=%s)",
+                    status, discordRpcEnabled, isPlayerPlaying)
+                if (status == DiscordRpcManager.Status.Connected && discordRpcEnabled && isPlayerPlaying) {
+                    currentSong.value?.let { song ->
+                        Timber.tag("DiscordSvc").i("Status change: connected, updating RPC for song=%s", song.song.title)
+                        updateDiscordRPC(song)
+                    }
+                }
+            }
+        }
+
+        scope.launch {
+            DiscordRpcManager.settingsChanged.collect {
+                if (discordRpcEnabled && DiscordRpcManager.isReady()) {
+                    Timber.tag("DiscordSvc").i("Settings changed, re-updating RPC")
+                    currentSong.value?.let { song ->
+                        updateDiscordRPC(song)
+                    }
+                }
+            }
         }
 
     if (dataStore.get(PersistentQueueKey, true)) {
@@ -2186,14 +2312,17 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     if (dataStore.get(PersistentQueueKey, true)) {
       saveQueueToDisk()
     }
-      tearDownDiscordRpc()
+      DiscordRpcManager.disconnect()
     mediaSession.release()
     player.removeListener(this)
     player.removeListener(sleepTimer)
     player.release()
     instance = null
 
-    super.onDestroy()
+       try {
+           unregisterReceiver(screenStateReceiver)
+       } catch (_: IllegalArgumentException) {}
+       super.onDestroy()
   }
 
   override fun onBind(intent: Intent?) = super.onBind(intent) ?: binder
@@ -2269,7 +2398,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     currentQueue = EmptyQueue
     queueTitle = null
     currentMediaMetadata.value = null
-      tearDownDiscordRpc()
+      DiscordRpcManager.disconnect()
 
     if (isAudioEffectSessionOpened) {
       closeAudioEffectSession()
@@ -2611,111 +2740,75 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     }
   }
 
-  private suspend fun updateDiscordPresence(song: Song) {
-      val rpc = discordRpc ?: return
-      rpc
-          .updateSong(
-            song = song,
-            timeStart =
-                if (player.isPlaying) System.currentTimeMillis() - player.currentPosition else 0L,
-            timeEnd =
-                if (player.isPlaying)
-                    (System.currentTimeMillis() - player.currentPosition) + player.duration
-                else 0L)
-          .onSuccess {
-              discordPresenceState.update {
-                  it.copy(
-                      lastSyncedAtEpochMillis = System.currentTimeMillis(),
-                      lastErrorMessage = null,
-                  )
-              }
+  private suspend fun updateDiscordRPC(song: Song) {
+      if (!discordRpcEnabled || !DiscordRpcManager.isReady()) return
+
+      try {
+          // Snapshot player state on the main thread (ExoPlayer requirement)
+          val (isPlaying, duration, currentPosition) = withContext(Dispatchers.Main) {
+              Triple(player.isPlaying, player.duration, player.currentPosition)
           }
-          .onFailure { throwable ->
-              discordPresenceState.update {
-                  it.copy(lastErrorMessage = throwable.message ?: throwable::class.simpleName)
-              }
-              scope.launch {
-                  delay(3000)
-                  if (rpc.connectionState.value !is GatewayConnectionState.Connected) {
-                      runCatching { rpc.restartGateway() }
-                  }
-              }
+
+          val advancedMode = dataStore.get(DiscordAdvancedModeKey, false)
+          val activityTypeStr = dataStore.get(DiscordActivityTypeKey, DiscordDefaults.ACTIVITY_TYPE)
+          val activityType = activityTypeStr.toIntOrNull() ?: DiscordDefaults.ACTIVITY_TYPE_LISTENING.toInt()
+          val activityName = dataStore.get(DiscordActivityNameKey, DiscordDefaults.ACTIVITY_NAME)
+          val stateTemplate = dataStore.get(DiscordStateTemplateKey, DiscordDefaults.STATE_TEMPLATE)
+          val detailsTemplate = dataStore.get(DiscordDetailsTemplateKey, DiscordDefaults.DETAILS_TEMPLATE)
+          val btn1Enabled = dataStore.get(DiscordButton1EnabledKey, true)
+          val btn1Label = dataStore.get(DiscordButton1LabelKey, DiscordDefaults.BUTTON1_LABEL)
+          val btn1Url = dataStore.get(DiscordButton1UrlKey, DiscordDefaults.BUTTON1_URL_TEMPLATE)
+          val btn2Enabled = dataStore.get(DiscordButton2EnabledKey, true)
+          val btn2Label = dataStore.get(DiscordButton2LabelKey, DiscordDefaults.BUTTON2_LABEL)
+          val btn2Url = dataStore.get(DiscordButton2UrlKey, DiscordDefaults.BUTTON2_URL)
+          val userStatus = dataStore.get(DiscordUserStatusKey, DiscordDefaults.USER_STATUS)
+
+          val primaryArtist = song.artists.firstOrNull()?.name ?: song.song.artistName ?: ""
+          val albumTitle = song.album?.title
+          val artistThumbnail = song.artists.firstOrNull()?.thumbnailUrl
+
+          val startTimestamp = if (isPlaying) System.currentTimeMillis() / 1000L else 0L
+          val endTimestamp = if (isPlaying && duration > 0) {
+              (System.currentTimeMillis() + (duration - currentPosition)) / 1000L
+          } else {
+              0L
           }
+
+          val activity = DiscordActivityBuilder.build(
+              song = song,
+              artistName = primaryArtist,
+              albumName = albumTitle,
+              artistThumbnail = artistThumbnail,
+              songTitle = song.song.title,
+              startTimestamp = startTimestamp,
+              endTimestamp = if (endTimestamp > 0) endTimestamp else null,
+              advancedMode = advancedMode,
+              activityType = activityType,
+              activityName = activityName,
+              stateTemplate = stateTemplate,
+              detailsTemplate = detailsTemplate,
+              btn1Enabled = btn1Enabled,
+              btn1Label = btn1Label,
+              btn1Url = btn1Url,
+              btn2Enabled = btn2Enabled,
+              btn2Label = btn2Label,
+              btn2Url = btn2Url
+          )
+
+          DiscordRpcManager.setActivity(activity)
+
+          val statusType = when (userStatus) {
+              "idle" -> DiscordRpcManager.StatusType.Idle
+              "dnd" -> DiscordRpcManager.StatusType.Dnd
+              else -> DiscordRpcManager.StatusType.Online
+          }
+          DiscordRpcManager.setOnlineStatus(statusType)
+      } catch (e: Exception) {
+          Timber.tag("DiscordSvc").e(e, "Error updating Discord RPC")
+      }
   }
 
-    private fun tearDownDiscordRpc(setDisabledState: Boolean = true) {
-        discordGatewayJob?.cancel()
-        discordGatewayJob = null
-        discordRpc?.closeRPC()
-        discordRpc = null
-        discordRpcToken = null
-        if (setDisabledState) {
-            discordPresenceState.value =
-                DiscordPresenceState(status = DiscordGatewayStatus.DISABLED)
-        } else {
-            discordPresenceState.update { it.copy(manualRefreshInFlight = false) }
-        }
-    }
 
-    fun requestDiscordPresenceRefresh() {
-        val rpc = discordRpc ?: return
-        if (discordPresenceState.value.manualRefreshInFlight) return
-        scope.launch {
-            discordPresenceState.update {
-                it.copy(manualRefreshInFlight = true, lastErrorMessage = null)
-            }
-            val result = runCatching { rpc.restartGateway() }
-            result.exceptionOrNull()?.let { error ->
-                discordPresenceState.update {
-                    it.copy(lastErrorMessage = error.message ?: error::class.simpleName)
-                }
-            } ?: currentSong.value?.let { updateDiscordPresence(it) }
-            discordPresenceState.update { it.copy(manualRefreshInFlight = false) }
-        }
-    }
-
-    private fun launchDiscordGatewayObserver(rpc: DiscordRPC): Job {
-        return scope.launch {
-            combine(
-                rpc.connectionState,
-                rpc.lastActivityAt,
-                rpc.lastError
-            ) { state, lastActivity, error ->
-                Triple(state, lastActivity, error)
-            }
-                .collect { (state, lastActivity, error) ->
-                    discordPresenceState.update { previous ->
-                        previous.copy(
-                            status = mapGatewayStatus(state),
-                            lastSyncedAtEpochMillis =
-                                lastActivity ?: previous.lastSyncedAtEpochMillis,
-                            lastErrorMessage =
-                                if (state is GatewayConnectionState.Error) {
-                                    (error ?: state.throwable).message
-                                        ?: state.throwable::class.simpleName
-                                } else {
-                                    null
-                                },
-                            manualRefreshInFlight = previous.manualRefreshInFlight,
-                        )
-                    }
-                }
-        }
-    }
-
-    private fun mapGatewayStatus(state: GatewayConnectionState): DiscordGatewayStatus {
-        return when (state) {
-            GatewayConnectionState.Idle ->
-                if (discordRpcToken == null) DiscordGatewayStatus.DISABLED else DiscordGatewayStatus.IDLE
-
-            GatewayConnectionState.Connecting -> DiscordGatewayStatus.CONNECTING
-            GatewayConnectionState.Connected -> DiscordGatewayStatus.CONNECTED
-            GatewayConnectionState.Reconnecting -> DiscordGatewayStatus.RECONNECTING
-            is GatewayConnectionState.Disconnected -> DiscordGatewayStatus.RECONNECTING
-            is GatewayConnectionState.Error -> DiscordGatewayStatus.ERROR
-            GatewayConnectionState.Closing -> DiscordGatewayStatus.DISABLED
-    }
-  }
 
     private suspend fun getNextQueueItems(count: Int): List<MediaItem> =
         withContext(Dispatchers.Main) {

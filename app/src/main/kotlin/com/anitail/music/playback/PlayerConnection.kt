@@ -78,7 +78,7 @@ class PlayerConnection(
 
     val error = MutableStateFlow<PlaybackException?>(null)
     val waitingForNetworkConnection = service.waitingForNetworkConnection
-    val discordPresence = service.discordPresence
+
 
     init {
         attachPlayer(attachedPlayer)

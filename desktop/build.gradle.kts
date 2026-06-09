@@ -47,7 +47,7 @@ dependencies {
     implementation(project(":innertube"))
     implementation(project(":betterlyrics"))
     implementation(project(":simpmusic"))
-    implementation(project(":kizzy"))
+
 
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
@@ -62,7 +62,6 @@ dependencies {
     implementation(libs.commons.codec)
     implementation(libs.jna)
     implementation(libs.jna.platform)
-    implementation(libs.kuromoji.ipadic)
     implementation("org.xerial:sqlite-jdbc:3.53.1.0")
     implementation("com.google.api-client:google-api-client:2.9.0")
     implementation("com.google.oauth-client:google-oauth-client-jetty:1.39.0")

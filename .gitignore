@@ -1,6 +1,7 @@
 # Built application files
 *.apk
 *.aar
+!app/libs/discord_partner_sdk.aar
 *.ap_
 *.aab
 

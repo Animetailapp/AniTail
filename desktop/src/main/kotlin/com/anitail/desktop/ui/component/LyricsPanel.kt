@@ -96,7 +96,10 @@ import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.storage.LyricsAnimationStylePreference
 import com.anitail.desktop.storage.LyricsPositionPreference
 import com.anitail.desktop.ui.IconAssets
-import com.atilika.kuromoji.ipadic.Tokenizer
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
+import org.json.JSONArray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -568,7 +571,25 @@ fun LyricsPanel(
                 lyrics = fullLyricsText,
                 options = romanizationOptions,
             )
-            lines.mapIndexedNotNull { index, lyricLine ->
+            val resultMap = mutableMapOf<Int, String>()
+            if (romanizationOptions.japanese) {
+                val jaLineIndices = lines.mapIndexedNotNull { index, lyricLine ->
+                    if (isJapaneseText(lyricLine.text) && !isChineseText(lyricLine.text)) {
+                        index
+                    } else null
+                }
+                if (jaLineIndices.isNotEmpty()) {
+                    val jaTexts = jaLineIndices.map { lines[it].text }
+                    val romanizedJa = batchRomanizeJapanese(jaTexts)
+                    jaLineIndices.zip(romanizedJa).forEach { (index, rom) ->
+                        if (rom.isNotBlank() && !rom.equals(lines[index].text, ignoreCase = false)) {
+                            resultMap[index] = rom
+                        }
+                    }
+                }
+            }
+            lines.forEachIndexed { index, lyricLine ->
+                if (resultMap.containsKey(index)) return@forEachIndexed
                 val romanized = romanizeLyricLine(
                     line = lyricLine.text,
                     options = romanizationOptions,
@@ -576,8 +597,9 @@ fun LyricsPanel(
                 )
                 romanized
                     ?.takeIf { it.isNotBlank() && !it.equals(lyricLine.text, ignoreCase = false) }
-                    ?.let { index to it }
-            }.toMap()
+                    ?.let { resultMap[index] = it }
+            }
+            resultMap
         }
     }
     LaunchedEffect(currentLineIndex, lyricsScroll, lyricsSmoothScroll, lyricsAnimationStyle, lyricsResult, isSelectionModeActive, isAutoScrollEnabled) {
@@ -2222,7 +2244,7 @@ private fun romanizeLyricLine(
 ): String? {
     if (line.isBlank()) return null
     if (options.japanese && isJapaneseText(line) && !isChineseText(line)) {
-        return romanizeJapaneseText(line)
+        return null
     }
     if (options.korean && isKoreanText(line)) {
         return romanizeKoreanText(line)
@@ -2285,25 +2307,42 @@ private fun isChineseText(text: String): Boolean {
     return cjkCharCount > 0 && (hiraganaKatakanaCount.toDouble() / text.length.toDouble()) < 0.1
 }
 
-private fun romanizeJapaneseText(text: String): String? {
-    val tokens = runCatching { JapaneseTokenizer.tokenize(text) }.getOrElse { return null }
-    if (tokens.isEmpty()) return null
+private suspend fun batchRomanizeJapanese(texts: List<String>): List<String> = withContext(Dispatchers.IO) {
+    if (texts.isEmpty()) return@withContext emptyList()
+    try {
+        val combinedText = texts.joinToString("\n")
+        val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=ja&tl=en&dt=rm&q=${java.net.URLEncoder.encode(combinedText, "UTF-8")}"
+        val response = httpClient.get(url)
+        val body = response.bodyAsText()
 
-    val romanized = tokens.mapIndexed { index, token ->
-        val currentReading = token.reading
-            ?.takeIf { it.isNotBlank() && it != "*" }
-            ?: token.surface
-        val nextReading = if (index + 1 < tokens.size) {
-            tokens[index + 1].reading
-                ?.takeIf { it.isNotBlank() && it != "*" }
-                ?: tokens[index + 1].surface
-        } else {
-            null
+        val jsonArray = JSONArray(body)
+        val innerArray = jsonArray.optJSONArray(0)
+        if (innerArray != null) {
+            val resultBuilder = StringBuilder()
+            for (i in 0 until innerArray.length()) {
+                val part = innerArray.optJSONArray(i)
+                val translit = part?.optString(2)
+                if (!translit.isNullOrEmpty()) {
+                    resultBuilder.append(translit)
+                }
+            }
+            val result = resultBuilder.toString().trim()
+            if (result.isNotEmpty()) {
+                val romanizedLines = result.split("\n").map { it.trim() }
+                if (romanizedLines.size == texts.size) {
+                    return@withContext romanizedLines
+                } else if (romanizedLines.size > texts.size) {
+                    return@withContext romanizedLines.take(texts.size)
+                } else {
+                    return@withContext texts.mapIndexed { index, fallback ->
+                        romanizedLines.getOrNull(index) ?: katakanaToRomaji(fallback)
+                    }
+                }
+            }
         }
-        katakanaToRomaji(currentReading, nextReading)
-    }.joinToString(" ").trim()
-
-    return romanized.ifBlank { null }
+    } catch (_: Exception) {
+    }
+    return@withContext texts.map { katakanaToRomaji(it) }
 }
 
 private fun katakanaToRomaji(
@@ -2731,7 +2770,7 @@ private val SerbianSpecificCyrillicLetters = setOf("Ђ", "ђ", "Ј", "ј", "Љ",
 private val BelarusianSpecificCyrillicLetters = setOf("Ў", "ў", "І", "і")
 private val KyrgyzSpecificCyrillicLetters = setOf("Ң", "ң", "Ө", "ө", "Ү", "ү")
 
-private val JapaneseTokenizer by lazy { Tokenizer() }
+private val httpClient by lazy { HttpClient() }
 
 private val HangulRomajaMap: Map<String, Map<String, String>> = mapOf(
     "cho" to mapOf(

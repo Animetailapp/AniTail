@@ -2,9 +2,12 @@ package com.anitail.music.lyrics
 
 import android.text.format.DateUtils
 import com.anitail.music.ui.component.ANIMATE_SCROLL_DURATION
-import com.atilika.kuromoji.ipadic.Tokenizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
+import org.json.JSONArray
 
 @Suppress("RegExpRedundantEscape")
 object LyricsUtils {
@@ -246,10 +249,7 @@ object LyricsUtils {
         "Ң", "ң", "Ө", "ө", "Ү", "ү"
     )
 
-    // Lazy initialized Tokenizer
-    private val kuromojiTokenizer: Tokenizer by lazy {
-        Tokenizer()
-    }
+    private val httpClient by lazy { HttpClient() }
 
     fun parseLyrics(lyrics: String): List<LyricsEntry> {
         // Unescape JSON string if needed
@@ -544,23 +544,46 @@ object LyricsUtils {
         return romajiBuilder.toString().lowercase()
     }
 
-    suspend fun romanizeJapanese(text: String): String = withContext(Dispatchers.Default) {
-        val tokens = kuromojiTokenizer.tokenize(text)
-        val romanizedTokens = tokens.mapIndexed { index, token ->
-            val currentReading = if (token.reading.isNullOrEmpty() || token.reading == "*") {
-                token.surface
-            } else {
-                token.reading
+    suspend fun batchRomanizeJapanese(texts: List<String>): List<String> = withContext(Dispatchers.IO) {
+        if (texts.isEmpty()) return@withContext emptyList()
+        try {
+            val combinedText = texts.joinToString("\n")
+            val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=ja&tl=en&dt=rm&q=${java.net.URLEncoder.encode(combinedText, "UTF-8")}"
+            val response = httpClient.get(url)
+            val body = response.bodyAsText()
+
+            val jsonArray = JSONArray(body)
+            val innerArray = jsonArray.optJSONArray(0)
+            if (innerArray != null) {
+                val resultBuilder = StringBuilder()
+                for (i in 0 until innerArray.length()) {
+                    val part = innerArray.optJSONArray(i)
+                    val translit = part?.optString(2)
+                    if (!translit.isNullOrEmpty()) {
+                        resultBuilder.append(translit)
+                    }
+                }
+                val result = resultBuilder.toString().trim()
+                if (result.isNotEmpty()) {
+                    val romanizedLines = result.split("\n").map { it.trim() }
+                    if (romanizedLines.size == texts.size) {
+                        return@withContext romanizedLines
+                    } else if (romanizedLines.size > texts.size) {
+                        return@withContext romanizedLines.take(texts.size)
+                    } else {
+                        return@withContext texts.mapIndexed { index, fallback ->
+                            romanizedLines.getOrNull(index) ?: katakanaToRomaji(fallback)
+                        }
+                    }
+                }
             }
-            val nextTokenReading = if (index + 1 < tokens.size) {
-                tokens[index + 1].reading?.takeIf { it.isNotEmpty() && it != "*" }
-                    ?: tokens[index + 1].surface
-            } else {
-                null
-            }
-            katakanaToRomaji(currentReading, nextTokenReading)
+        } catch (_: Exception) {
         }
-        romanizedTokens.joinToString(" ")
+        return@withContext texts.map { katakanaToRomaji(it) }
+    }
+
+    suspend fun romanizeJapanese(text: String): String = withContext(Dispatchers.IO) {
+        batchRomanizeJapanese(listOf(text)).firstOrNull() ?: katakanaToRomaji(text)
     }
 
     fun katakanaToRomaji(katakana: String?, nextKatakana: String? = null): String {

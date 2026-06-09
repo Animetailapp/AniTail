@@ -101,7 +101,7 @@ internal fun SettingsMainScreen(
                 if (googleAvatarUrl.isNullOrBlank()) "" else googleAccountName?.trim().orEmpty()
             }
             AvatarSourcePreference.DISCORD -> {
-                if (discordAvatarUrl.isNullOrBlank()) "" else discordUsername?.trim().orEmpty()
+                if (discordAvatarUrl.isNullOrBlank()) "" else discordUsername?.trim()?.let { "@$it" }.orEmpty()
             }
         }
         preferredName.ifBlank { deviceName }
@@ -115,6 +115,7 @@ internal fun SettingsMainScreen(
     val appearanceText = stringResource("appearance")
     val accountText = stringResource("account")
     val lastFmText = stringResource("lastfm_settings")
+    val discordText = stringResource("discord_integration")
     val contentText = stringResource("content")
     val privacyText = stringResource("privacy")
     val playerText = stringResource("player_and_audio")
@@ -166,6 +167,14 @@ internal fun SettingsMainScreen(
                 icon = IconAssets.musicNote(),
                 iconColor = Color(0xFFEF5350),
                 destination = SettingsDestination.LASTFM,
+            ),
+            DesktopSettingItem(
+                id = "discord",
+                title = discordText,
+                section = sectionInterface,
+                icon = IconAssets.discord(),
+                iconColor = Color(0xFF5865F2),
+                destination = SettingsDestination.DISCORD,
             ),
             DesktopSettingItem(
                 id = "content",

@@ -365,7 +365,7 @@
     <string name="restore_failed">Impossibile eseguire il ripristino dal backup</string>
 
     <string name="discord_integration">Integrazione con Discord</string>
-    <string name="discord_information">Anitail usa la libreria KizzyRPC per impostare il tuo stato di Discord. Questo implica usare la connessione a Discord Gateway, che può essere considerata una violazione dei termini di servizio di Discord. Tuttavia non risultano casi noti di account sospesi per questa ragione. Usa questa funzione a tuo rischio.\n\nAnitail estrarrà solamente il tuo token e tutto il resto sarà salvato localmente.</string>
+    <string name="discord_information">AniTail utilizza il Discord Social SDK per impostare lo stato del tuo account Discord. Utilizza l\'autorizzazione OAuth2 + PKCE per connettersi in modo sicuro a Discord. Goditi la visualizzazione della tua attività di ascolto in modo sicuro e nativo!</string>
     <string name="dismiss">Togli</string>
     <string name="options">Opzioni</string>
     <string name="preview">Anteprima</string>

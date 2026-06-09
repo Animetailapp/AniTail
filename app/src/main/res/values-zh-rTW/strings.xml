@@ -347,7 +347,7 @@
     <string name="restore_failed">無法還原備份</string>
 
     <string name="discord_integration">Discord 整合</string>
-    <string name="discord_information">AniTail使用KizzyRPC函式庫來設定您的Discord狀態。這會用到Discord Gateway連線，可能會違反Discord服務條款，但是目前沒有使用者為此被停用帳號。使用此功能需自行承擔此風險。\n\nAnitail只會提取你的token，所有東西都存在本機。</string>
+    <string name="discord_information">AniTail 使用 Discord Social SDK 來設定您的 Discord 帳號狀態。透過 OAuth2 + PKCE 授權安全連接至 Discord。享受安全且原生地展示您的聆聽活動！</string>
     <string name="dismiss">忽略</string>
     <string name="options">選項</string>
     <string name="preview">預覽</string>

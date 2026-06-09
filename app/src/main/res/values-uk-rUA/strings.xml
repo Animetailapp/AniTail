@@ -362,7 +362,7 @@
     <string name="restore_failed">Не вдалося відновити з резервної копії</string>
 
   <string name="discord_integration">Інтеграція Discord</string>
-    <string name="discord_information">AniTail використовує бібліотеку KizzyRPC для встановлення статусу вашого облікового запису Discord. Це передбачає використання з\'єднання через шлюз Discord, що може вважатися порушенням Умов використання Discord. Однак, не відомо жодного випадку призупинення дії облікових записів користувачів з цієї причини. Використовуйте на власний ризик.\n\nAnitail лише витягує ваш токен, а все інше зберігається локально.</string>
+    <string name="discord_information">AniTail використовує Discord Social SDK для встановлення статусу вашого облікового запису Discord. Для безпечного підключення до Discord використовується авторизація OAuth2 + PKCE. Насолоджуйтесь безпечним та нативним відображенням вашої активності прослуховування!</string>
     <string name="dismiss">Відхилити</string>
     <string name="options">Параметри</string>
     <string name="preview">Попередній перегляд</string>

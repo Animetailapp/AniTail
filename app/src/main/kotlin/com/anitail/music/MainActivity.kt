@@ -307,6 +307,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        try {
+            com.discord.socialsdk.DiscordSocialSdkInit.setEngineActivity(null)
+        } catch (_: Exception) {}
         super.onDestroy()
         if (dataStore.get(
                 StopMusicOnTaskClearKey,
@@ -339,6 +342,9 @@ class MainActivity : AppCompatActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        try {
+            com.discord.socialsdk.DiscordSocialSdkInit.setEngineActivity(this)
+        } catch (_: Exception) {}
         pendingExternalAction = intent.action
         window.decorView.layoutDirection = View.LAYOUT_DIRECTION_LTR
         WindowCompat.setDecorFitsSystemWindows(window, false)

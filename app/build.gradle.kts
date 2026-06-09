@@ -23,6 +23,10 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+        }
+
         // Last.fm API credentials from local.properties or environment variables
         val localProperties = Properties()
         val localPropertiesFile = rootProject.file("local.properties")
@@ -39,6 +43,8 @@ android {
             
         buildConfigField("String", "LASTFM_API_KEY", "\"$lastfmApiKey\"")
         buildConfigField("String", "LASTFM_API_SECRET", "\"$lastfmApiSecret\"")
+        buildConfigField("Long", "DISCORD_APP_ID", "1359660031183818955L")
+        manifestPlaceholders["discordAppId"] = "1359660031183818955"
 
     }
     val enableVibrafp = (project.findProperty("enableVibrafp") as? String)?.toBoolean() ?: false
@@ -46,18 +52,24 @@ android {
     productFlavors {
         create("universal") {
             dimension = "abi"
+             ndk {
+                abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            }
             buildConfigField("String", "ARCHITECTURE", "\"universal\"")
         }
         create("arm64") {
             dimension = "abi"
+             ndk { abiFilters += "arm64-v8a" }
             buildConfigField("String", "ARCHITECTURE", "\"arm64\"")
         }
         create("armeabi") {
             dimension = "abi"
+              ndk { abiFilters += "armeabi-v7a" }
             buildConfigField("String", "ARCHITECTURE", "\"armeabi\"")
         }
         create("x86") {
             dimension = "abi"
+             ndk { abiFilters += "x86" }
             buildConfigField("String", "ARCHITECTURE", "\"x86\"")
         }
         create("x86_64") {
@@ -131,6 +143,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        prefab = true
     }
 
     dependenciesInfo {
@@ -146,6 +159,12 @@ android {
 
     androidResources {
         generateLocaleConfig = true
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
     }
 
     packaging {
@@ -217,7 +236,6 @@ dependencies {
     implementation(libs.squigglyslider)
 
     implementation(libs.room.runtime)
-    implementation(libs.kuromoji.ipadic)
     ksp(libs.room.compiler)
     implementation(libs.room.ktx)
 
@@ -231,7 +249,9 @@ dependencies {
     implementation(project(":innertube"))
     implementation(project(":kugou"))
     implementation(project(":lrclib"))
-    implementation(project(":kizzy"))
+    implementation(libs.browser)
+    implementation(libs.security.crypto)
+    implementation(files("libs/discord_partner_sdk.aar"))
     implementation(project(":betterlyrics"))
     implementation(project(":simpmusic"))
     implementation(project(":paxsenix"))
