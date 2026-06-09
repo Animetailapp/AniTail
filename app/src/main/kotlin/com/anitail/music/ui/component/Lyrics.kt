@@ -166,6 +166,7 @@ import com.anitail.music.lyrics.LyricsUtils.decodeHtmlEntities
 import com.anitail.music.lyrics.LyricsUtils.parseLyrics
 import com.anitail.music.lyrics.LyricsUtils.romanizeCyrillic
 import com.anitail.music.lyrics.LyricsUtils.romanizeJapanese
+import com.anitail.music.lyrics.LyricsUtils.batchRomanizeJapanese
 import com.anitail.music.lyrics.LyricsUtils.romanizeKorean
 import com.anitail.music.ui.component.shimmer.ShimmerHost
 import com.anitail.music.ui.component.shimmer.TextPlaceholder
@@ -381,10 +382,19 @@ fun Lyrics(
             return@LaunchedEffect
         }
         withContext(Dispatchers.Default) {
+            if (romanizeJapaneseLyrics) {
+                val jaLines = lines.filter { isJapanese(it.text) && !isChinese(it.text) }
+                if (jaLines.isNotEmpty()) {
+                    val romanized = batchRomanizeJapanese(jaLines.map { it.text })
+                    jaLines.zip(romanized).forEach { (entry, rom) ->
+                        entry.romanizedTextFlow.value = rom
+                    }
+                }
+            }
             lines.forEach { entry ->
                 if (!isActive || entry.text.isBlank()) return@forEach
                 if (romanizeJapaneseLyrics && isJapanese(entry.text) && !isChinese(entry.text)) {
-                    entry.romanizedTextFlow.value = romanizeJapanese(entry.text)
+                    // Already processed in batch
                     return@forEach
                 }
                 if (romanizeKoreanLyrics && isKorean(entry.text)) {

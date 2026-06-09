@@ -27,7 +27,6 @@ ksp = "2.3.8"
 okhttp = "5.3.2"
 newpipe = "v0.26.0"
 workRuntimeKtx = "2.11.2"
-kuromojiIpadic = "0.9.0"
 
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.8.0-alpha01" }
@@ -117,8 +116,6 @@ timber = { group = "com.jakewharton.timber", name = "timber", version = "5.0.1" 
 
 #newpipe-extractor = { group = "com.github.libre-tube", name = "NewPipeExtractor", version = "f3bb450" }
 newpipe-extractor = { group = "com.github.TeamNewPipe", name = "NewPipeExtractor", version = "v0.26.2" }
-
-kuromoji-ipadic = { group = "com.atilika.kuromoji", name = "kuromoji-ipadic", version.ref = "kuromojiIpadic" }
 work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version = "21.5.1" }
 google-api-client-android = { module = "com.google.api-client:google-api-client-android", version = "2.9.0" }

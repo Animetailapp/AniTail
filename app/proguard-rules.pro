@@ -90,8 +90,7 @@
 -dontwarn java.beans.Introspector
 -dontwarn java.beans.PropertyDescriptor
 
-# Keep all classes within the kuromoji package
--keep class com.atilika.kuromoji.** { *; }
+
 
 ## Queue Persistence Rules
 # Keep queue-related classes to prevent serialization issues in release builds
@@ -110,28 +109,7 @@
 -keep class androidx.mediarouter.** { *; }
 
 
-## Media3 Protection Rules
-# Protect Guava from conflicts with system versions
--keep class com.google.common.** { *; }
--keep class com.google.common.util.concurrent.** { *; }
--keep class com.google.common.collect.** { *; }
--dontwarn com.google.common.**
-
-# Protect Media3 from obfuscation
--keep class androidx.media3.** { *; }
--keep interface androidx.media3.** { *; }
--dontwarn androidx.media3.**
-
-# Suppress warnings for com.google.re2j reported by R8
--dontwarn com.google.re2j.Matcher
--dontwarn com.google.re2j.Pattern
-
 ## Google API Client Libraries (Drive API, OAuth)
-# Keep all Google API client model classes for JSON parsing
--keep class com.google.api.client.** { *; }
--keep class com.google.api.services.** { *; }
--keep class com.google.auth.** { *; }
-
 # Keep GenericJson implementations used by Drive API
 -keepclassmembers class * extends com.google.api.client.json.GenericJson {
     *;
@@ -146,50 +124,16 @@
     @com.google.api.client.util.Key <fields>;
 }
 
-# Google HTTP Client
+# Suppress warnings for com.google.re2j reported by R8
+-dontwarn com.google.re2j.Matcher
+-dontwarn com.google.re2j.Pattern
+
+# Suppress warnings for Google Client library dependency classes not used at runtime
 -dontwarn com.google.api.client.http.**
--keep class com.google.api.client.http.** { *; }
--keep class com.google.api.client.json.** { *; }
--keep class com.google.api.client.util.** { *; }
-
-# Google OAuth2
--keep class com.google.api.client.googleapis.** { *; }
 -dontwarn com.google.api.client.googleapis.**
-
-# Please add these rules to your existing keep rules in order to suppress warnings.
-# This is generated automatically by the Android Gradle plugin.
--dontwarn javax.naming.InvalidNameException
--dontwarn javax.naming.NamingException
--dontwarn javax.naming.directory.Attribute
--dontwarn javax.naming.directory.Attributes
--dontwarn javax.naming.ldap.LdapName
--dontwarn javax.naming.ldap.Rdn
--dontwarn org.ietf.jgss.GSSContext
--dontwarn org.ietf.jgss.GSSCredential
--dontwarn org.ietf.jgss.GSSException
--dontwarn org.ietf.jgss.GSSManager
--dontwarn org.ietf.jgss.GSSName
--dontwarn org.ietf.jgss.Oid
-# ============================================
-# Kotlin Core
-# ============================================
--keep class kotlin.** { *; }
--keep interface kotlin.** { *; }
--keep class kotlin.coroutines.** { *; }
--keep interface kotlin.coroutines.** { *; }
--dontwarn kotlin.**
-
-# ============================================
-# Kotlin Coroutines
-# ============================================
--keep class kotlinx.coroutines.** { *; }
--keep interface kotlinx.coroutines.** { *; }
--keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
--keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
--keepclassmembers class kotlinx.coroutines.** {
-    volatile <fields>;
-}
--dontwarn kotlinx.coroutines.**
+-dontwarn com.google.common.**
+-dontwarn javax.naming.**
+-dontwarn org.ietf.jgss.**
 
 # ============================================
 # Evitar que R8 convierta interfaces en clases
@@ -206,31 +150,6 @@
 -keepattributes RuntimeVisibleAnnotations
 -keepattributes AnnotationDefault
 
-# ============================================
-# Kotlin Serialization
-# ============================================
--keepattributes *Annotation*, InnerClasses
--keep,includedescriptorclasses class com.anitail.music.**$$serializer { *; }
--keepclassmembers class com.anitail.music.** {
-    *** Companion;
-}
--keepclasseswithmembers class com.anitail.music.** {
-    kotlinx.serialization.KSerializer serializer(...);
-}
-
-# ============================================
-# Media3 / ExoPlayer
-# ============================================
--keep class androidx.media3.** { *; }
--keep interface androidx.media3.** { *; }
--dontwarn androidx.media3.**
-
-# ============================================
-# Ktor
-# ============================================
--keep class io.ktor.** { *; }
--keep interface io.ktor.** { *; }
--dontwarn io.ktor.**
 
 # Vibra fingerprint library
 -keep class com.anitail.music.recognition.VibraSignature { *; }
