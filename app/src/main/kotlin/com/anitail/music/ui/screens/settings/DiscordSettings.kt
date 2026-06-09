@@ -92,7 +92,6 @@ import com.anitail.music.constants.DiscordDetailsTemplateKey
 import com.anitail.music.constants.DiscordInfoDismissedKey
 import com.anitail.music.constants.DiscordNameKey
 import com.anitail.music.constants.DiscordStateTemplateKey
-import com.anitail.music.constants.DiscordTokenKey
 import com.anitail.music.constants.DiscordUserStatusKey
 import com.anitail.music.constants.DiscordUsernameKey
 import com.anitail.music.constants.EnableDiscordRPCKey
@@ -143,7 +142,6 @@ fun DiscordSettings(
     var discordName by rememberPreference(DiscordNameKey, "")
     var discordAvatar by rememberPreference(DiscordAvatarKey, "")
     var discordAvatarUrl by rememberPreference(DiscordAvatarUrlKey, "")
-    var discordToken by rememberPreference(DiscordTokenKey, "")
     var discordAccessToken by remember { mutableStateOf<String?>(null) }
     var infoDismissed by rememberPreference(DiscordInfoDismissedKey, false)
 
@@ -373,7 +371,6 @@ fun DiscordSettings(
                         discordUsername = ""
                         discordAvatar = ""
                         discordAvatarUrl = ""
-                        discordToken = ""
                         discordAccessToken = null
                         coroutineScope.launch(Dispatchers.IO) {
                             try {
@@ -410,7 +407,6 @@ fun DiscordSettings(
                                                 if (user != null) {
                                                     withContext(Dispatchers.Main) {
                                                         discordAccessToken = token
-                                                        discordToken = token
                                                         discordUsername = user.username
                                                         discordName = user.name
                                                         discordAvatar = user.avatar ?: ""

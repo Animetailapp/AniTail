@@ -2319,7 +2319,10 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     player.release()
     instance = null
 
-    super.onDestroy()
+       try {
+           unregisterReceiver(screenStateReceiver)
+       } catch (_: IllegalArgumentException) {}
+       super.onDestroy()
   }
 
   override fun onBind(intent: Intent?) = super.onBind(intent) ?: binder

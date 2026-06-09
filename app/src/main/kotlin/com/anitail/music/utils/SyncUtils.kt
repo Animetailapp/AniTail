@@ -26,8 +26,10 @@ import com.anitail.music.constants.AccountImageUrlKey
 import com.anitail.music.constants.AccountNameKey
 import com.anitail.music.constants.DataSyncIdKey
 import com.anitail.music.constants.DiscordAvatarUrlKey
+import com.anitail.music.constants.DiscordStateTemplateKey
+import com.anitail.music.constants.DiscordUserStatusKey
 import com.anitail.music.constants.DiscordNameKey
-import com.anitail.music.constants.DiscordTokenKey
+import com.anitail.music.discord.DiscordTokenStore
 import com.anitail.music.constants.DiscordUsernameKey
 import com.anitail.music.constants.InnerTubeCookieKey
 import com.anitail.music.constants.LastFmSessionKey
@@ -770,7 +772,8 @@ constructor(
         }
 
         // Discord account
-        prefs[DiscordTokenKey]?.let { accounts["discordToken"] = it }
+        DiscordTokenStore.init(context)
+        DiscordTokenStore.retrieve()?.let { accounts["discordToken"] = it }
         prefs[DiscordUsernameKey]?.let {
             accounts["discordUsername"] = it
         }
@@ -852,7 +855,8 @@ constructor(
                 }
 
                 accountsMap["discordToken"]?.let {
-                    prefs[DiscordTokenKey] = decodeBase64(it)
+                    DiscordTokenStore.init(context)
+                    DiscordTokenStore.store(decodeBase64(it))
                 }
                 accountsMap["discordUsername"]?.let {
                     prefs[DiscordUsernameKey] = decodeBase64(it)

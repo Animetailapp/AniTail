@@ -74,7 +74,7 @@ object DiscordRpcManager {
             _authorized = authorized
             _connectionStatus.value = when {
                 ready && authorized -> Status.Connected
-                statusCode == 3 || (!ready && !authorized) -> Status.Disconnected
+                statusCode == 0 || (!ready && !authorized) -> Status.Disconnected
                 else -> Status.Authorizing
             }
         }

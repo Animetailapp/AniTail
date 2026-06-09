@@ -17,7 +17,6 @@ import com.anitail.innertube.utils.completed
 import com.anitail.music.constants.AccountImageUrlKey
 import com.anitail.music.constants.AccountNameKey
 import com.anitail.music.constants.DiscordAvatarUrlKey
-import com.anitail.music.constants.DiscordTokenKey
 import com.anitail.music.constants.DiscordNameKey
 import com.anitail.music.constants.DiscordUsernameKey
 import com.anitail.music.constants.HideExplicitKey
@@ -831,8 +830,9 @@ class HomeViewModel @Inject constructor(
 
         // Listen for Discord token changes and fetch Discord avatar
         viewModelScope.launch(Dispatchers.IO) {
-            context.dataStore.data.map { it[DiscordTokenKey] ?: "" }.distinctUntilChanged().collect { token ->
-                if (token.isNotEmpty()) {
+            DiscordRpcManager.init(context)
+            DiscordRpcManager.accessTokenFlow.collect { token ->
+                if (!token.isNullOrEmpty()) {
                     runCatching {
                             DiscordRpcManager.fetchCurrentUser(token)
                         }.onSuccess { user ->

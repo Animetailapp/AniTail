@@ -43,7 +43,7 @@ import com.anitail.music.constants.AccountEmailKey
 import com.anitail.music.constants.AccountNameKey
 import com.anitail.music.constants.AvatarSource
 import com.anitail.music.constants.DataSyncIdKey
-import com.anitail.music.constants.DiscordTokenKey
+import com.anitail.music.constants.DiscordNameKey
 import com.anitail.music.constants.InnerTubeCookieKey
 import com.anitail.music.constants.PreferredAvatarSourceKey
 import com.anitail.music.constants.UseLoginForBrowse
@@ -81,7 +81,7 @@ fun AccountSettings(
     }
     val (useLoginForBrowse, onUseLoginForBrowseChange) = rememberPreference(UseLoginForBrowse, true)
     val (ytmSync, onYtmSyncChange) = rememberPreference(YtmSyncKey, true)
-    val (discordToken, _) = rememberPreference(DiscordTokenKey, "")
+    val (discordName, _) = rememberPreference(DiscordNameKey, "")
 
     val viewModel: HomeViewModel = hiltViewModel()
     val accountName by viewModel.accountName.collectAsState()
@@ -290,7 +290,7 @@ fun AccountSettings(
                         AvatarSource.DISCORD -> stringResource(R.string.avatar_source_discord)
                     }
                 },
-                isEnabled = isLoggedIn || discordToken.isNotEmpty()
+                isEnabled = isLoggedIn || discordName.isNotEmpty()
             )
         }
     }
