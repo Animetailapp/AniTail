@@ -41,8 +41,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.db.DesktopDatabase
@@ -68,6 +66,8 @@ import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.component.SortHeader
 import com.anitail.desktop.ui.component.pluralizeSongs
 import kotlinx.coroutines.launch
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -81,7 +81,9 @@ fun LibraryArtistsScreen(
     onArtistClick: (String, String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val clipboard = LocalClipboardManager.current
+    fun copyToClipboard(text: String) {
+        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null)
+    }
 
     val filter by preferences.artistFilter.collectAsState()
     val sortType by preferences.artistSortType.collectAsState()
@@ -208,7 +210,7 @@ fun LibraryArtistsScreen(
                                         },
                                         onShare = {
                                             val url = "https://music.youtube.com/channel/${artist.id}"
-                                            clipboard.setText(AnnotatedString(url))
+                                            copyToClipboard(url)
                                         },
                                         onDismiss = { menuExpanded.value = false },
                                     )
@@ -314,7 +316,7 @@ fun LibraryArtistsScreen(
                                         },
                                         onShare = {
                                             val url = "https://music.youtube.com/channel/${artist.id}"
-                                            clipboard.setText(AnnotatedString(url))
+                                            copyToClipboard(url)
                                         },
                                         onDismiss = { menuExpanded.value = false },
                                     )

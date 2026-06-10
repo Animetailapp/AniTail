@@ -1,8 +1,8 @@
 package com.anitail.desktop.player
 
+import com.anitail.innertube.NewPipeExtractor
 import com.anitail.innertube.models.YouTubeClient
 import com.anitail.innertube.models.response.PlayerResponse
-import com.anitail.innertube.pages.NewPipeUtils
 
 internal fun interface StreamUrlResolver {
     fun resolve(
@@ -30,6 +30,9 @@ internal object NewPipeStreamUrlResolver : StreamUrlResolver {
         videoId: String,
         userAgentOverride: String?
     ): Result<String> {
-        return NewPipeUtils.getStreamUrl(format, videoId)
+        return runCatching {
+            NewPipeExtractor.getStreamUrl(format, videoId)
+                ?: error("Could not resolve stream URL")
+        }
     }
 }

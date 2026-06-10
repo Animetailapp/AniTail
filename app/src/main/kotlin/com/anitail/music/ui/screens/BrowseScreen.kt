@@ -21,11 +21,17 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.PodcastItem
+import com.anitail.innertube.models.SongItem
+import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.constants.GridThumbnailHeight
+import com.anitail.music.models.toMediaMetadata
+import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.ui.component.IconButton
 import com.anitail.music.ui.component.LocalMenuState
 import com.anitail.music.ui.component.YouTubeGridItem
@@ -34,6 +40,7 @@ import com.anitail.music.ui.component.shimmer.ShimmerHost
 import com.anitail.music.ui.menu.YouTubeAlbumMenu
 import com.anitail.music.ui.menu.YouTubeArtistMenu
 import com.anitail.music.ui.menu.YouTubePlaylistMenu
+import com.anitail.music.ui.menu.YouTubeSongMenu
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.ui.utils.tvCombinedClickable
 import com.anitail.music.viewmodels.BrowseViewModel
@@ -75,17 +82,48 @@ import com.anitail.music.viewmodels.BrowseViewModel
                          .tvCombinedClickable(
                              onClick = {
                                  when (item) {
+                                     is SongItem -> {
+                                         playerConnection.playQueue(
+                                             YouTubeQueue(
+                                                 item.endpoint ?: WatchEndpoint(videoId = item.id),
+                                                 item.toMediaMetadata()
+                                             )
+                                         )
+                                     }
+
+                                     is EpisodeItem -> {
+                                         val songItem = item.asSongItem()
+                                         playerConnection.playQueue(
+                                             YouTubeQueue(
+                                                 songItem.endpoint ?: WatchEndpoint(videoId = songItem.id),
+                                                 songItem.toMediaMetadata()
+                                             )
+                                         )
+                                     }
+
                                      is AlbumItem -> navController.navigate("album/${item.id}")
                                      is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                                     is PodcastItem -> navController.navigate("online_podcast/${item.id}")
                                      is ArtistItem -> navController.navigate("artist/${item.id}")
-                                     else -> {
-                                         // Do nothing
-                                     }
                                  }
                              },
                              onLongClick = {
                                  menuState.show {
                                      when (item) {
+                                         is SongItem ->
+                                             YouTubeSongMenu(
+                                                 song = item,
+                                                 navController = navController,
+                                                 onDismiss = menuState::dismiss
+                                             )
+
+                                         is EpisodeItem ->
+                                             YouTubeSongMenu(
+                                                 song = item.asSongItem(),
+                                                 navController = navController,
+                                                 onDismiss = menuState::dismiss
+                                             )
+
                                          is AlbumItem ->
                                              YouTubeAlbumMenu(
                                                  albumItem = item,
@@ -100,16 +138,20 @@ import com.anitail.music.viewmodels.BrowseViewModel
                                                  onDismiss = menuState::dismiss
                                              )
                                          }
- 
+
+                                         is PodcastItem -> {
+                                             YouTubePlaylistMenu(
+                                                 playlist = item.asPlaylistItem(),
+                                                 coroutineScope = coroutineScope,
+                                                 onDismiss = menuState::dismiss
+                                             )
+                                         }
+
                                          is ArtistItem -> {
                                              YouTubeArtistMenu(
                                                  artist = item,
                                                  onDismiss = menuState::dismiss
                                              )
-                                         }
- 
-                                         else -> {
-                                             // Do nothing
                                          }
                                      }
                                  }

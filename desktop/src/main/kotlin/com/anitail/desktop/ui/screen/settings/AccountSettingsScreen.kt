@@ -230,7 +230,7 @@ internal fun AccountSettingsScreen(
                     Text(
                         text = if (isLoggedIn) {
                             accountInfo?.name
-                                ?: authCredentials?.accountName
+                                ?: authCredentials.accountName
                                 ?: stringResource("account")
                         } else {
                             stringResource("login")
@@ -239,8 +239,8 @@ internal fun AccountSettingsScreen(
                     )
                     val subtitle = if (isLoggedIn) {
                         accountInfo?.email
-                            ?: authCredentials?.accountEmail
-                            ?: authCredentials?.channelHandle
+                            ?: authCredentials.accountEmail
+                            ?: authCredentials.channelHandle
                     } else if (!loginEnabled) {
                         if (hasDataSyncId && !hasCookie) {
                             stringResource("login_requires_cookie")

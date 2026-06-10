@@ -1,8 +1,8 @@
 package com.anitail.desktop.player
 
 import com.anitail.desktop.YouTube
+import com.anitail.innertube.NewPipeExtractor
 import com.anitail.innertube.models.YouTubeClient
-import com.anitail.innertube.pages.NewPipeUtils
 import com.anitail.desktop.storage.AudioQuality
 import com.anitail.desktop.storage.DesktopPreferences
 import kotlinx.coroutines.Dispatchers
@@ -131,7 +131,7 @@ class NativeAudioPlayer {
 
         println("NativeAudioPlayer: Intentando reproducir videoId: $videoId con VLC")
 
-        val signatureTimestamp = NewPipeUtils.getSignatureTimestamp(videoId).getOrNull()
+        val signatureTimestamp = NewPipeExtractor.getSignatureTimestamp(videoId).getOrNull()
         val isLoggedIn = YouTube.cookie != null
         var lastError: String? = null
         val clientsToTry = StreamClientOrder.build()

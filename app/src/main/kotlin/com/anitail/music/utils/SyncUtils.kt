@@ -284,7 +284,30 @@ constructor(
   }
 
   private suspend fun syncPlaylist(browseId: String, playlistId: String) = coroutineScope {
-    YouTube.playlist(browseId).completed().onSuccess { page ->
+    val isRdpn = browseId == "RDPN" || browseId == "VLRDPN" || browseId == "FEmusic_new_episodes"
+    val result = if (isRdpn) {
+        YouTube.newEpisodes().map { songs ->
+            com.anitail.innertube.pages.PlaylistPage(
+                playlist = com.anitail.innertube.models.PlaylistItem(
+                    id = "RDPN",
+                    title = "New Episodes",
+                    author = null,
+                    songCountText = "${songs.size} episodes",
+                    thumbnail = songs.firstOrNull()?.thumbnail,
+                    playEndpoint = null,
+                    shuffleEndpoint = null,
+                    radioEndpoint = null,
+                ),
+                songs = songs,
+                songsContinuation = null,
+                continuation = null
+            )
+        }
+    } else {
+        YouTube.playlist(browseId)
+    }
+
+    result.completed().onSuccess { page ->
       val songs = page.songs.map(SongItem::toMediaMetadata)
 
       val remoteIds = songs.map { it.id }
@@ -911,6 +934,20 @@ constructor(
             String(Base64.decode(encoded, Base64.NO_WRAP))
         } catch (_: Exception) {
             encoded // Return as-is if decoding fails
+        }
+    }
+
+    fun savePodcast(podcastId: String, save: Boolean) {
+        syncScope.launch {
+            if (YouTube.cookie == null) {
+                Timber.d("[PODCAST_TOGGLE] Skipping savePodcast - user not logged in")
+                return@launch
+            }
+            YouTube.savePodcast(podcastId, save).onSuccess {
+                Timber.d("[PODCAST_TOGGLE] Successfully saved/unsaved podcast: $podcastId")
+            }.onFailure { e ->
+                Timber.e(e, "[PODCAST_TOGGLE] Failed to save/unsave podcast: $podcastId")
+            }
         }
     }
 }

@@ -2,8 +2,9 @@ package com.anitail.innertube.models
 
 import com.anitail.innertube.models.BrowseEndpoint.BrowseEndpointContextSupportedConfigs.BrowseEndpointContextMusicConfig.Companion.MUSIC_PAGE_TYPE_ALBUM
 import com.anitail.innertube.models.BrowseEndpoint.BrowseEndpointContextSupportedConfigs.BrowseEndpointContextMusicConfig.Companion.MUSIC_PAGE_TYPE_ARTIST
-import com.anitail.innertube.models.BrowseEndpoint.BrowseEndpointContextSupportedConfigs.BrowseEndpointContextMusicConfig.Companion.MUSIC_PAGE_TYPE_AUDIOBOOK
 import com.anitail.innertube.models.BrowseEndpoint.BrowseEndpointContextSupportedConfigs.BrowseEndpointContextMusicConfig.Companion.MUSIC_PAGE_TYPE_PLAYLIST
+import com.anitail.innertube.models.BrowseEndpoint.BrowseEndpointContextSupportedConfigs.BrowseEndpointContextMusicConfig.Companion.MUSIC_PAGE_TYPE_AUDIOBOOK
+import com.anitail.innertube.models.BrowseEndpoint.BrowseEndpointContextSupportedConfigs.BrowseEndpointContextMusicConfig.Companion.MUSIC_PAGE_TYPE_PODCAST_SHOW_DETAIL_PAGE
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -49,6 +50,8 @@ data class BrowseEndpoint(
                 browseEndpointContextSupportedConfigs?.browseEndpointContextMusicConfig?.pageType == MUSIC_PAGE_TYPE_AUDIOBOOK
     val isPlaylistEndpoint: Boolean
         get() = browseEndpointContextSupportedConfigs?.browseEndpointContextMusicConfig?.pageType == MUSIC_PAGE_TYPE_PLAYLIST
+    val isPodcastEndpoint: Boolean
+        get() = browseEndpointContextSupportedConfigs?.browseEndpointContextMusicConfig?.pageType == MUSIC_PAGE_TYPE_PODCAST_SHOW_DETAIL_PAGE
 
     @Serializable
     data class BrowseEndpointContextSupportedConfigs(
@@ -67,6 +70,8 @@ data class BrowseEndpoint(
                 const val MUSIC_PAGE_TYPE_USER_CHANNEL = "MUSIC_PAGE_TYPE_USER_CHANNEL"
                 const val MUSIC_PAGE_TYPE_TRACK_LYRICS = "MUSIC_PAGE_TYPE_TRACK_LYRICS"
                 const val MUSIC_PAGE_TYPE_TRACK_RELATED = "MUSIC_PAGE_TYPE_TRACK_RELATED"
+                const val MUSIC_PAGE_TYPE_PODCAST_SHOW_DETAIL_PAGE = "MUSIC_PAGE_TYPE_PODCAST_SHOW_DETAIL_PAGE"
+                const val MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE = "MUSIC_PAGE_TYPE_NON_MUSIC_AUDIO_TRACK_PAGE"
             }
         }
     }
@@ -76,6 +81,11 @@ data class BrowseEndpoint(
 data class SearchEndpoint(
     val params: String?,
     val query: String,
+) : Endpoint()
+
+@Serializable
+data class FeedbackEndpoint(
+    val feedbackToken: String
 ) : Endpoint()
 
 @Serializable
@@ -97,7 +107,8 @@ data class ShareEntityEndpoint(
 
 @Serializable
 data class DefaultServiceEndpoint(
-    var subscribeEndpoint: SubscribeEndpoint?
+    var subscribeEndpoint: SubscribeEndpoint?,
+    var feedbackEndpoint: FeedbackEndpoint?
 ) : Endpoint() {
     @Serializable
     data class SubscribeEndpoint(
@@ -105,3 +116,8 @@ data class DefaultServiceEndpoint(
         val params: String? = null,
     ) : Endpoint()
 }
+
+@Serializable
+data class ToggledServiceEndpoint(
+    var feedbackEndpoint: FeedbackEndpoint?
+) : Endpoint()

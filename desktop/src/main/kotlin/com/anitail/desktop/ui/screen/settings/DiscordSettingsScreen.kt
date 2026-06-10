@@ -253,7 +253,7 @@ private fun DiscordPreviewCard(
                 Box(modifier = Modifier.size(108.dp)) {
                     if (!item?.artworkUrl.isNullOrBlank()) {
                         RemoteImage(
-                            url = item?.artworkUrl,
+                            url = item.artworkUrl,
                             contentDescription = null,
                             modifier = Modifier
                                 .size(96.dp)

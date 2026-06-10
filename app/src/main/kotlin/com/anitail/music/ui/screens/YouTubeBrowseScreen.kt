@@ -42,7 +42,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.PodcastItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.music.LocalPlayerAwareWindowInsets
 import com.anitail.music.LocalPlayerConnection
@@ -211,6 +213,13 @@ fun YouTubeBrowseScreen(
                                                         is AlbumItem -> navController.navigate("album/${item.id}")
                                                         is ArtistItem -> navController.navigate("artist/${item.id}")
                                                         is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                                                        is PodcastItem -> navController.navigate("online_podcast/${item.id}")
+                                                        is EpisodeItem -> {
+                                                            val episodeSong = item.asSongItem()
+                                                            playerConnection.playQueue(
+                                                                YouTubeQueue.radio(episodeSong.toMediaMetadata())
+                                                            )
+                                                        }
                                                         else -> item
                                                     }
                                                 },
@@ -242,6 +251,20 @@ fun YouTubeBrowseScreen(
                                                                 YouTubePlaylistMenu(
                                                                     playlist = item,
                                                                     coroutineScope = coroutineScope,
+                                                                    onDismiss = menuState::dismiss,
+                                                                )
+
+                                                            is PodcastItem ->
+                                                                YouTubePlaylistMenu(
+                                                                    playlist = item.asPlaylistItem(),
+                                                                    coroutineScope = coroutineScope,
+                                                                    onDismiss = menuState::dismiss,
+                                                                )
+
+                                                            is EpisodeItem ->
+                                                                YouTubeSongMenu(
+                                                                    song = item.asSongItem(),
+                                                                    navController = navController,
                                                                     onDismiss = menuState::dismiss,
                                                                 )
                                                         }

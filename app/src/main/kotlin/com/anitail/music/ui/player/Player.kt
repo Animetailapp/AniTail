@@ -746,7 +746,13 @@ fun BottomSheetPlayer(
                         ) {
                             Image(
                                 painter = painterResource(
-                                    if (currentSong?.song?.liked == true)
+                                    if (
+                                        if (currentSong?.song?.isEpisode == true) {
+                                            currentSong?.song?.inLibrary != null
+                                        } else {
+                                            currentSong?.song?.liked == true
+                                        }
+                                    )
                                         R.drawable.favorite
                                     else R.drawable.favorite_border
                                 ),
@@ -1228,8 +1234,20 @@ fun BottomSheetPlayer(
 
                     Box(modifier = Modifier.weight(1f)) {
                         ResizableIconButton(
-                            icon = if (currentSong?.song?.liked == true) R.drawable.favorite else R.drawable.favorite_border,
-                            color = if (currentSong?.song?.liked == true) MaterialTheme.colorScheme.error else TextBackgroundColor,
+                            icon = if (
+                                if (currentSong?.song?.isEpisode == true) {
+                                    currentSong?.song?.inLibrary != null
+                                } else {
+                                    currentSong?.song?.liked == true
+                                }
+                            ) R.drawable.favorite else R.drawable.favorite_border,
+                            color = if (
+                                if (currentSong?.song?.isEpisode == true) {
+                                    currentSong?.song?.inLibrary != null
+                                } else {
+                                    currentSong?.song?.liked == true
+                                }
+                            ) MaterialTheme.colorScheme.error else TextBackgroundColor,
                             modifier =
                                 Modifier
                                     .size(32.dp)

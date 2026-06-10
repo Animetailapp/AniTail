@@ -72,7 +72,9 @@ import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.Artist
 import com.anitail.innertube.models.ArtistItem
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.PodcastItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.YTItem
 import com.anitail.innertube.pages.ArtistPage
@@ -413,9 +415,11 @@ fun ArtistDetailScreen(
                                                 onClick = {
                                                     when (item) {
                                                         is SongItem -> onSongClick(songItemToLibraryItem(item))
+                                                        is EpisodeItem -> onSongClick(songItemToLibraryItem(item.asSongItem()))
                                                         is AlbumItem -> onAlbumClick(item.browseId, item.title)
                                                         is ArtistItem -> onArtistClick(item.id, item.title)
                                                         is PlaylistItem -> onPlaylistClick(item.id, item.title)
+                                                        is PodcastItem -> onPlaylistClick(item.id, item.title)
                                                     }
                                                 }
                                             )

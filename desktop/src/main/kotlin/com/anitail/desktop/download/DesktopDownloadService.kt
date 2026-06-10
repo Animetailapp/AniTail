@@ -1,8 +1,8 @@
 package com.anitail.desktop.download
 
 import com.anitail.desktop.YouTube
+import com.anitail.innertube.NewPipeExtractor
 import com.anitail.innertube.models.YouTubeClient
-import com.anitail.innertube.pages.NewPipeUtils
 import com.anitail.desktop.player.StreamClientOrder
 import com.anitail.desktop.storage.AudioQuality
 import com.anitail.desktop.storage.DesktopPreferences
@@ -432,7 +432,7 @@ class DesktopDownloadService {
     )
 
     private suspend fun resolveStreamForDownload(videoId: String): ResolvedStream? {
-        val signatureTimestamp = NewPipeUtils.getSignatureTimestamp(videoId).getOrNull()
+        val signatureTimestamp = NewPipeExtractor.getSignatureTimestamp(videoId).getOrNull()
         val isLoggedIn = YouTube.cookie != null
         val clientsToTry = StreamClientOrder.build()
         val audioQuality = preferences.audioQuality.value
@@ -449,7 +449,7 @@ class DesktopDownloadService {
             if (formats.isEmpty()) continue
 
             for (format in formats) {
-                val url = NewPipeUtils.getStreamUrl(format, videoId).getOrNull()
+                val url = NewPipeExtractor.getStreamUrl(format, videoId)
                 if (url != null) {
                     return ResolvedStream(url = url, format = format, client = client)
                 }

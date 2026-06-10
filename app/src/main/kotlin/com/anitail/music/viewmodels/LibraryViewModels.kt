@@ -10,6 +10,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.offline.Download
 import com.anitail.innertube.YouTube
+import com.anitail.innertube.models.ArtistItem
+import com.anitail.innertube.models.PodcastItem
+import com.anitail.innertube.models.SongItem
+import com.anitail.innertube.utils.completed
 import com.anitail.music.constants.AlbumFilter
 import com.anitail.music.constants.AlbumFilterKey
 import com.anitail.music.constants.AlbumSortDescendingKey
@@ -34,8 +38,10 @@ import com.anitail.music.constants.SongSortType
 import com.anitail.music.constants.SongSortTypeKey
 import com.anitail.music.constants.TopSize
 import com.anitail.music.db.MusicDatabase
+import com.anitail.music.db.entities.PodcastEntity
 import com.anitail.music.extensions.reversed
 import com.anitail.music.extensions.toEnum
+import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.DownloadUtil
 import com.anitail.music.utils.SyncUtils
 import com.anitail.music.utils.dataStore
@@ -44,10 +50,16 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -56,6 +68,7 @@ import java.time.Duration
 import java.time.LocalDateTime
 import java.util.Locale
 import javax.inject.Inject
+import timber.log.Timber
 
 @HiltViewModel
 class LibrarySongsViewModel
@@ -368,6 +381,236 @@ constructor(
         }
     }
 }
+
+@HiltViewModel
+class LibraryPodcastsViewModel
+@Inject
+constructor(
+    @ApplicationContext context: Context,
+    private val database: MusicDatabase,
+    private val syncUtils: SyncUtils,
+) : ViewModel() {
+    val subscribedChannels = database.subscribedPodcasts()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    private val _sePlaylist = MutableStateFlow<com.anitail.innertube.models.PlaylistItem?>(null)
+    val sePlaylist = _sePlaylist.asStateFlow()
+
+    private val _rdpnPlaylist = MutableStateFlow<com.anitail.innertube.models.PlaylistItem?>(null)
+    val rdpnPlaylist = _rdpnPlaylist.asStateFlow()
+
+    private val _apiPodcastChannels = MutableStateFlow<List<ArtistItem>>(emptyList())
+
+    val podcastChannels = kotlinx.coroutines.flow.combine(
+        _apiPodcastChannels,
+        database.bookmarkedPodcastChannels()
+    ) { apiChannels, localPodcastChannels ->
+        val localAsArtistItems = localPodcastChannels.map { artist ->
+            ArtistItem(
+                id = artist.id,
+                title = artist.artist.name,
+                thumbnail = artist.artist.thumbnailUrl,
+                shuffleEndpoint = null,
+                radioEndpoint = null,
+            )
+        }
+        val apiIds = apiChannels.map { it.id }.toSet()
+        val uniqueLocalChannels = localAsArtistItems.filter { it.id !in apiIds }
+        apiChannels + uniqueLocalChannels
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val downloadedEpisodes =
+        context.dataStore.data
+            .map {
+                Pair(
+                    it[SongSortTypeKey].toEnum(SongSortType.CREATE_DATE) to (it[SongSortDescendingKey] ?: true),
+                    it[com.anitail.music.constants.HideExplicitKey] ?: false
+                )
+            }.distinctUntilChanged()
+            .flatMapLatest { (sortDesc, hideExplicit) ->
+                val (sortType, descending) = sortDesc
+                database.downloadedPodcastEpisodes(sortType, descending).map { it.filterExplicit(hideExplicit) }
+            }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val savedEpisodes =
+        context.dataStore.data
+            .map {
+                Pair(
+                    it[SongSortTypeKey].toEnum(SongSortType.CREATE_DATE) to (it[SongSortDescendingKey] ?: true),
+                    it[com.anitail.music.constants.HideExplicitKey] ?: false
+                )
+            }.distinctUntilChanged()
+            .flatMapLatest { (sortDesc, hideExplicit) ->
+                val (sortType, descending) = sortDesc
+                database.savedPodcastEpisodes(sortType, descending).map { it.filterExplicit(hideExplicit) }
+            }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            fetchSePlaylist()
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            fetchPodcastChannels()
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            fetchRdpnPlaylist()
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            syncPodcastSubscriptionsInternal()
+            syncEpisodesForLaterInternal()
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            com.anitail.music.utils.PodcastRefreshTrigger.refreshFlow.collect {
+                delay(1500)
+                fetchPodcastChannels()
+                syncPodcastSubscriptionsInternal()
+            }
+        }
+    }
+
+    private suspend fun fetchSePlaylist() {
+        YouTube.library("FEmusic_liked_playlists").completed().onSuccess {
+            _sePlaylist.value = it.items
+                .filterIsInstance<com.anitail.innertube.models.PlaylistItem>()
+                .find { it.id == "SE" }
+        }.onFailure {
+            Timber.e(it, "[PODCAST] Failed to fetch SE playlist")
+        }
+    }
+
+    private suspend fun fetchPodcastChannels() {
+        YouTube.libraryPodcastChannels().onSuccess { page ->
+            val channels = page.items.filterIsInstance<ArtistItem>()
+            _apiPodcastChannels.value = channels
+            Timber.d("[PODCAST] Fetched ${channels.size} podcast channels from YT Music")
+        }.onFailure {
+            Timber.e(it, "[PODCAST] Failed to fetch podcast channels")
+        }
+    }
+
+    private suspend fun fetchRdpnPlaylist() {
+        YouTube.newEpisodesPlaylistInfo().onSuccess { item ->
+            _rdpnPlaylist.value = item
+            Timber.d("[PODCAST] RDPN playlist: ${item.title}, thumbnail: ${item.thumbnail}")
+        }.onFailure {
+            Timber.e(it, "[PODCAST] Failed to fetch RDPN playlist info")
+        }
+    }
+
+    fun clearPodcastData() {
+        viewModelScope.launch(Dispatchers.IO) {
+            subscribedChannels.first().forEach {
+                database.update(
+                    it.copy(
+                        bookmarkedAt = null,
+                        lastUpdateTime = LocalDateTime.now(),
+                    )
+                )
+            }
+            savedEpisodes.first().forEach { episode ->
+                database.update(
+                    episode.song.copy(
+                        liked = false,
+                        likedDate = null,
+                        inLibrary = null,
+                    )
+                )
+            }
+        }
+    }
+
+    suspend fun refreshAll() {
+        fetchSePlaylist()
+        fetchPodcastChannels()
+        fetchRdpnPlaylist()
+        syncPodcastSubscriptionsInternal()
+        syncEpisodesForLaterInternal()
+    }
+
+    fun refreshChannels() {
+        viewModelScope.launch(Dispatchers.IO) {
+            fetchPodcastChannels()
+        }
+    }
+
+    private suspend fun syncPodcastSubscriptionsInternal() {
+        YouTube.savedPodcastShows().onSuccess { remotePodcasts ->
+            val remoteById = remotePodcasts.associateBy { it.id }
+            val localPodcasts = database.subscribedPodcasts().first()
+
+            database.transaction {
+                localPodcasts
+                    .filter { it.id !in remoteById.keys }
+                    .forEach { local ->
+                        update(
+                            local.copy(
+                                bookmarkedAt = null,
+                                lastUpdateTime = LocalDateTime.now(),
+                            )
+                        )
+                    }
+
+                remotePodcasts.forEach { podcast ->
+                    val existing = localPodcasts.firstOrNull { it.id == podcast.id }
+                    val entity =
+                        PodcastEntity(
+                            id = podcast.id,
+                            title = podcast.title,
+                            author = podcast.author?.name,
+                            thumbnailUrl = podcast.thumbnail,
+                            channelId = podcast.channelId,
+                            bookmarkedAt = existing?.bookmarkedAt ?: LocalDateTime.now(),
+                            lastUpdateTime = LocalDateTime.now(),
+                            libraryAddToken = podcast.libraryAddToken,
+                            libraryRemoveToken = podcast.libraryRemoveToken,
+                        )
+                    upsert(entity)
+                }
+            }
+        }.onFailure {
+            reportException(it)
+        }
+    }
+
+    private suspend fun syncEpisodesForLaterInternal() {
+        YouTube.episodesForLater().onSuccess { episodes ->
+            val remoteIds = episodes.map { it.id }.toSet()
+            val localEpisodes = database.podcastEpisodes(SongSortType.CREATE_DATE, true).first()
+
+            database.transaction {
+                localEpisodes
+                    .filter { it.song.inLibrary != null && it.id !in remoteIds }
+                    .forEach { local ->
+                        update(
+                            local.song.copy(
+                                liked = false,
+                                likedDate = null,
+                                inLibrary = null,
+                            )
+                        )
+                    }
+
+                episodes.forEach { episode ->
+                    insert(episode.toMediaMetadata())
+                    val existing = database.getSongByIdBlocking(episode.id) ?: return@forEach
+                    update(
+                        existing.song.copy(
+                            isEpisode = true,
+                            liked = true,
+                            likedDate = existing.song.likedDate ?: LocalDateTime.now(),
+                            inLibrary = existing.song.inLibrary ?: LocalDateTime.now(),
+                        )
+                    )
+                }
+            }
+        }.onFailure {
+            reportException(it)
+        }
+    }
+}
+
+fun List<com.anitail.music.db.entities.Song>.filterExplicit(enabled: Boolean = true) =
+    if (enabled) filterNot { it.song.explicit } else this
 
 @HiltViewModel
 class LibraryViewModel

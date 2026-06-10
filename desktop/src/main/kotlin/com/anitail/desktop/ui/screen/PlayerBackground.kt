@@ -25,7 +25,7 @@ import com.anitail.desktop.ui.component.RemoteImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
-import java.net.URL
+import java.net.URI
 import kotlin.math.max
 
 @Composable
@@ -111,7 +111,7 @@ private suspend fun loadArtworkBitmap(url: String, fallbackUrls: List<String> = 
     for (candidate in candidates) {
         ImageCache.get(candidate)?.let { return it }
         val bytes = withContext(Dispatchers.IO) {
-            runCatching { URL(candidate).readBytes() }.getOrNull()
+            runCatching { URI(candidate).toURL().readBytes() }.getOrNull()
         } ?: continue
         val bitmap = runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
         if (bitmap != null) {

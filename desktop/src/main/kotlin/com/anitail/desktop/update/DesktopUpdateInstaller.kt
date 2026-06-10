@@ -8,7 +8,6 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
-import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
@@ -49,7 +48,7 @@ object DesktopUpdateInstaller {
     }
 
     private fun downloadFile(downloadUrl: String, destination: Path) {
-        val connection = (URL(downloadUrl).openConnection() as HttpURLConnection).apply {
+        val connection = (URI(downloadUrl).toURL().openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             instanceFollowRedirects = true
             connectTimeout = 15_000

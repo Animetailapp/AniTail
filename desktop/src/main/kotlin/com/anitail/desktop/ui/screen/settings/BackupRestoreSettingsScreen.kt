@@ -50,7 +50,9 @@ import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.io.File
 import java.net.HttpURLConnection
-import java.net.URL
+import java.net.URI
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
@@ -631,7 +633,8 @@ private fun uploadBackupToFilebin(
 
     val binId = UUID.randomUUID().toString().substring(0, 8)
     val fileName = backupPath.fileName.toString()
-    val endpoint = URL("https://filebin.net/$binId/$fileName")
+    val encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8)
+    val endpoint = URI("https://filebin.net/$binId/$encodedFileName").toURL()
 
     val connection = (endpoint.openConnection() as HttpURLConnection).apply {
         requestMethod = "PUT"

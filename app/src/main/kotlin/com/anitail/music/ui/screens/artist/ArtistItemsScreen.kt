@@ -31,7 +31,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.PodcastItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.music.LocalPlayerAwareWindowInsets
@@ -119,6 +121,7 @@ fun ArtistItemsScreen(
                     isActive =
                     when (item) {
                         is SongItem -> mediaMetadata?.id == item.id
+                        is EpisodeItem -> mediaMetadata?.id == item.id
                         is AlbumItem -> mediaMetadata?.album?.id == item.id
                         else -> false
                     },
@@ -131,6 +134,13 @@ fun ArtistItemsScreen(
                                         is SongItem ->
                                             YouTubeSongMenu(
                                                 song = item,
+                                                navController = navController,
+                                                onDismiss = menuState::dismiss,
+                                            )
+
+                                        is EpisodeItem ->
+                                            YouTubeSongMenu(
+                                                song = item.asSongItem(),
                                                 navController = navController,
                                                 onDismiss = menuState::dismiss,
                                             )
@@ -151,6 +161,13 @@ fun ArtistItemsScreen(
                                         is PlaylistItem ->
                                             YouTubePlaylistMenu(
                                                 playlist = item,
+                                                coroutineScope = coroutineScope,
+                                                onDismiss = menuState::dismiss,
+                                            )
+
+                                        is PodcastItem ->
+                                            YouTubePlaylistMenu(
+                                                playlist = item.asPlaylistItem(),
                                                 coroutineScope = coroutineScope,
                                                 onDismiss = menuState::dismiss,
                                             )
@@ -181,9 +198,24 @@ fun ArtistItemsScreen(
                                     }
                                 }
 
+                                is EpisodeItem -> {
+                                    val songItem = item.asSongItem()
+                                    if (songItem.id == mediaMetadata?.id) {
+                                        playerConnection.player.togglePlayPause()
+                                    } else {
+                                        playerConnection.playQueue(
+                                            YouTubeQueue(
+                                                songItem.endpoint ?: WatchEndpoint(videoId = songItem.id),
+                                                songItem.toMediaMetadata()
+                                            ),
+                                        )
+                                    }
+                                }
+
                                 is AlbumItem -> navController.navigate("album/${item.id}")
                                 is ArtistItem -> navController.navigate("artist/${item.id}")
                                 is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                                is PodcastItem -> navController.navigate("online_podcast/${item.id}")
                             }
                         },
                 )
@@ -213,6 +245,7 @@ fun ArtistItemsScreen(
                     item = item,
                     isActive = when (item) {
                         is SongItem -> mediaMetadata?.id == item.id
+                        is EpisodeItem -> mediaMetadata?.id == item.id
                         is AlbumItem -> mediaMetadata?.album?.id == item.id
                         else -> false
                     },
@@ -230,9 +263,20 @@ fun ArtistItemsScreen(
                                         )
                                     )
 
+                                    is EpisodeItem -> {
+                                        val songItem = item.asSongItem()
+                                        playerConnection.playQueue(
+                                            YouTubeQueue(
+                                                songItem.endpoint ?: WatchEndpoint(videoId = songItem.id),
+                                                songItem.toMediaMetadata()
+                                            )
+                                        )
+                                    }
+
                                     is AlbumItem -> navController.navigate("album/${item.id}")
                                     is ArtistItem -> navController.navigate("artist/${item.id}")
                                     is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                                    is PodcastItem -> navController.navigate("online_podcast/${item.id}")
                                 }
                             },
                             onLongClick = {
@@ -241,6 +285,12 @@ fun ArtistItemsScreen(
                                     when (item) {
                                         is SongItem -> YouTubeSongMenu(
                                             song = item,
+                                            navController = navController,
+                                            onDismiss = menuState::dismiss
+                                        )
+
+                                        is EpisodeItem -> YouTubeSongMenu(
+                                            song = item.asSongItem(),
                                             navController = navController,
                                             onDismiss = menuState::dismiss
                                         )
@@ -258,6 +308,12 @@ fun ArtistItemsScreen(
 
                                         is PlaylistItem -> YouTubePlaylistMenu(
                                             playlist = item,
+                                            coroutineScope = coroutineScope,
+                                            onDismiss = menuState::dismiss
+                                        )
+
+                                        is PodcastItem -> YouTubePlaylistMenu(
+                                            playlist = item.asPlaylistItem(),
                                             coroutineScope = coroutineScope,
                                             onDismiss = menuState::dismiss
                                         )

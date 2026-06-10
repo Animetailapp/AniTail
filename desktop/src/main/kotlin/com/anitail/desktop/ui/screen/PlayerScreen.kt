@@ -37,11 +37,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,6 +75,8 @@ import com.anitail.innertube.pages.NextResult
 import com.anitail.shared.model.LibraryItem
 import kotlinx.coroutines.launch
 import java.awt.Desktop
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.net.URI
 import kotlin.math.abs
 import kotlin.math.exp
@@ -107,7 +107,6 @@ fun PlayerScreen(
     val playerButtonsStyle by preferences.playerButtonsStyle.collectAsState()
     val sliderStyle by preferences.sliderStyle.collectAsState()
 
-    val clipboard = LocalClipboardManager.current
     val layoutDirection = LocalLayoutDirection.current
     val coroutineScope = rememberCoroutineScope()
     val songs by database.songs.collectAsState(initial = emptyList())
@@ -199,7 +198,7 @@ fun PlayerScreen(
 
     fun copyLink(url: String) {
         if (url.isNotBlank()) {
-            clipboard.setText(AnnotatedString(url))
+            Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(url), null)
         }
     }
 

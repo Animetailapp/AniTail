@@ -1,6 +1,7 @@
 package com.anitail.music.models
 
 import androidx.compose.runtime.Immutable
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.music.db.entities.Song
 import com.anitail.music.db.entities.SongEntity
@@ -21,6 +22,7 @@ data class MediaMetadata(
     val setVideoId: String? = null,
     val explicit: Boolean = false,
     val liked: Boolean = false,
+    val isEpisode: Boolean = false,
 ) {
     @Serializable
     data class Artist(
@@ -44,6 +46,7 @@ data class MediaMetadata(
             albumName = album?.title,
             artistName = artistName,
             explicit = explicit,
+            isEpisode = isEpisode,
         )
 }
 
@@ -52,10 +55,10 @@ fun Song.toMediaMetadata() =
         id = song.id,
         title = song.title,
         artists =
-        artists.map {
+        (artists ?: emptyList()).map {
             MediaMetadata.Artist(
                 id = it.id,
-                name = it.name,
+                name = it.name ?: "Unknown",
             )
         },
         artistName = song.artistName,
@@ -65,7 +68,7 @@ fun Song.toMediaMetadata() =
         album?.let {
             MediaMetadata.Album(
                 id = it.id,
-                title = it.title,
+                title = it.title ?: "Unknown",
             )
         } ?: song.albumId?.let { albumId ->
             MediaMetadata.Album(
@@ -73,29 +76,33 @@ fun Song.toMediaMetadata() =
                 title = song.albumName.orEmpty(),
             )
         },
+        isEpisode = song.isEpisode,
     )
 
 fun SongItem.toMediaMetadata() =
     MediaMetadata(
-        id = id,
-        title = title,
+        id = id ?: "",
+        title = title ?: "Unknown",
         artists =
-        artists.map {
+        (artists ?: emptyList()).map {
             MediaMetadata.Artist(
                 id = it.id,
-                name = it.name,
+                name = it.name ?: "Unknown",
             )
         },
         artistName = null,
         duration = duration ?: -1,
-        thumbnailUrl = thumbnail.resize(544, 544),
+        thumbnailUrl = thumbnail?.resize(544, 544),
         album =
         album?.let {
             MediaMetadata.Album(
                 id = it.id,
-                title = it.name,
+                title = it.name ?: "Unknown",
             )
         },
         explicit = explicit,
-        setVideoId = setVideoId
+        setVideoId = setVideoId,
+        isEpisode = isEpisode
     )
+
+fun EpisodeItem.toMediaMetadata() = asSongItem().toMediaMetadata()

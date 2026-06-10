@@ -48,7 +48,9 @@ data class SongEntity(
     @ColumnInfo(name = "localPath", defaultValue = "NULL")
     val localPath: String? = null,
     @ColumnInfo(name = "downloadUri", defaultValue = "NULL")
-    val downloadUri: String? = null
+    val downloadUri: String? = null,
+    @ColumnInfo(name = "isEpisode", defaultValue = "0")
+    val isEpisode: Boolean = false
 ) {
     fun localToggleLike() = copy(
         liked = !liked,
@@ -57,6 +59,27 @@ data class SongEntity(
 
     fun toggleLike() = if (isLocal || id.startsWith("LOCAL_")) {
         localToggleLike()
+    } else if (isEpisode) {
+        copy(
+            liked = !liked,
+            likedDate = if (!liked) LocalDateTime.now() else null,
+            inLibrary = if (!liked) inLibrary ?: LocalDateTime.now() else null
+        ).also {
+            CoroutineScope(Dispatchers.IO).launch {
+                if (!liked) {
+                    YouTube.addEpisodeToSavedEpisodes(id)
+                } else {
+                    val setVideoId = YouTube.episodesForLater()
+                        .getOrNull()
+                        ?.firstOrNull { it.id == id }
+                        ?.setVideoId
+                    if (setVideoId != null) {
+                        YouTube.removeEpisodeFromSavedEpisodes(id, setVideoId)
+                    }
+                }
+                this.cancel()
+            }
+        }
     } else {
         copy(
             liked = !liked,

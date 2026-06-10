@@ -64,11 +64,14 @@ import com.anitail.desktop.ui.component.ShimmerListItem
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.PodcastItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.YTItem
 import com.anitail.innertube.pages.SearchSummaryPage
 import com.anitail.shared.model.LibraryItem
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 
@@ -76,6 +79,7 @@ import kotlinx.coroutines.launch
  * Pantalla de búsqueda para Desktop - Idéntica a Android.
  * Incluye: barra de búsqueda, sugerencias, historial, resultados con filtros.
  */
+@OptIn(FlowPreview::class)
 @Composable
 fun SearchScreen(
     database: DesktopDatabase,
@@ -270,9 +274,11 @@ fun SearchScreen(
                             onClick = {
                                 when (item) {
                                     is SongItem -> onSongClick(songItemToLibraryItem(item))
+                                    is EpisodeItem -> onSongClick(songItemToLibraryItem(item.asSongItem()))
                                     is AlbumItem -> onAlbumClick(item.browseId, item.title)
                                     is ArtistItem -> onArtistClick(item.id, item.title)
                                     is PlaylistItem -> onPlaylistClick(item.id, item.title)
+                                    is PodcastItem -> onPlaylistClick(item.id, item.title)
                                 }
                             },
                         )
@@ -306,9 +312,11 @@ fun SearchScreen(
                                 onClick = {
                                     when (item) {
                                         is SongItem -> onSongClick(songItemToLibraryItem(item))
+                                        is EpisodeItem -> onSongClick(songItemToLibraryItem(item.asSongItem()))
                                         is AlbumItem -> onAlbumClick(item.browseId, item.title)
                                         is ArtistItem -> onArtistClick(item.id, item.title)
                                         is PlaylistItem -> onPlaylistClick(item.id, item.title)
+                                        is PodcastItem -> onPlaylistClick(item.id, item.title)
                                     }
                                 },
                             )
@@ -333,9 +341,11 @@ fun SearchScreen(
                                 onClick = {
                                     when (item) {
                                         is SongItem -> onSongClick(songItemToLibraryItem(item))
+                                        is EpisodeItem -> onSongClick(songItemToLibraryItem(item.asSongItem()))
                                         is AlbumItem -> onAlbumClick(item.browseId, item.title)
                                         is ArtistItem -> onArtistClick(item.id, item.title)
                                         is PlaylistItem -> onPlaylistClick(item.id, item.title)
+                                        is PodcastItem -> onPlaylistClick(item.id, item.title)
                                     }
                                 },
                             )

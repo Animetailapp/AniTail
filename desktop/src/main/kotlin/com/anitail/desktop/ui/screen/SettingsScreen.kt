@@ -36,10 +36,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -604,7 +604,7 @@ internal fun LegacyAccountSettingsScreen(
                     Text(
                         text = if (isLoggedIn) {
                             accountInfo?.name
-                                ?: authCredentials?.accountName
+                                ?: authCredentials.accountName
                                 ?: stringResource("account")
                         } else {
                             stringResource("login")
@@ -613,8 +613,8 @@ internal fun LegacyAccountSettingsScreen(
                     )
                     val subtitle = if (isLoggedIn) {
                         accountInfo?.email
-                            ?: authCredentials?.accountEmail
-                            ?: authCredentials?.channelHandle
+                            ?: authCredentials.accountEmail
+                            ?: authCredentials.channelHandle
                     } else if (!loginEnabled) {
                         if (hasDataSyncId && !hasCookie) {
                             stringResource("login_requires_cookie")
@@ -879,7 +879,7 @@ internal fun LegacyAppearanceSettingsScreen(
             },
         )
 
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
         val backgroundStyleOptions = mutableListOf<String>()
         for (style in PlayerBackgroundStyle.entries) {
@@ -1236,7 +1236,7 @@ internal fun LegacyPlayerSettingsScreen(
             onCheckedChange = { preferences.setAutoStartRadio(it) },
         )
 
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
         // Show Lyrics
         SettingsSwitch(
@@ -1426,7 +1426,7 @@ internal fun LegacyPrivacySettingsScreen(
             onCheckedChange = { preferences.setPauseSearchHistory(it) },
         )
 
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
         // Clear buttons
         var showClearHistoryDialog by remember { mutableStateOf(false) }
@@ -1528,7 +1528,7 @@ internal fun LegacyStorageSettingsScreen(
             onValueChange = { preferences.setMaxSongCacheSizeMB(it.toInt()) },
         )
 
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
         var showClearCacheDialog by remember { mutableStateOf(false) }
 

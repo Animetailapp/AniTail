@@ -15,14 +15,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.storage.DesktopPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image
-import java.net.URL
+import java.net.URI
 
 /**
  * RemoteImage - Carga y muestra imágenes remotas con caché en memoria
@@ -53,14 +53,14 @@ fun RemoteImage(
     LaunchedEffect(activeUrl, candidateIndex, candidates) {
         if (image != null || activeUrl.isNullOrBlank()) return@LaunchedEffect
         val bytes = withContext(Dispatchers.IO) {
-            runCatching { URL(activeUrl).readBytes() }.getOrNull()
+            runCatching { URI(activeUrl).toURL().readBytes() }.getOrNull()
         } ?: run {
             if (candidateIndex < candidates.lastIndex) {
                 candidateIndex += 1
             }
             return@LaunchedEffect
         }
-        val bitmap = runCatching { Image.makeFromEncoded(bytes).asImageBitmap() }.getOrNull()
+        val bitmap = runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
         if (bitmap != null) {
             ImageCache.put(activeUrl, bitmap)
             image = bitmap
