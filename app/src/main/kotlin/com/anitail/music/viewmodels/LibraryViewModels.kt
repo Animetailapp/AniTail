@@ -463,6 +463,7 @@ constructor(
             com.anitail.music.utils.PodcastRefreshTrigger.refreshFlow.collect {
                 delay(1500)
                 fetchPodcastChannels()
+                syncPodcastSubscriptionsInternal()
             }
         }
     }
@@ -533,8 +534,7 @@ constructor(
     }
 
     private suspend fun syncPodcastSubscriptionsInternal() {
-        YouTube.libraryPodcastChannels().onSuccess { page ->
-            val remotePodcasts = page.items.filterIsInstance<PodcastItem>()
+        YouTube.savedPodcastShows().onSuccess { remotePodcasts ->
             val remoteById = remotePodcasts.associateBy { it.id }
             val localPodcasts = database.subscribedPodcasts().first()
 

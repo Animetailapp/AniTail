@@ -525,8 +525,13 @@ private fun AutoPlaylistCard(
                             .clip(RoundedCornerShape(ThumbnailCornerRadius)),
                 )
             } else {
+                val painter = when (title) {
+                    stringResource(R.string.new_episodes) -> R.drawable.update
+                    stringResource(R.string.episodes_for_later) -> R.drawable.bookmark
+                    else -> R.drawable.queue_music
+                }
                 Icon(
-                    painter = painterResource(R.drawable.queue_music),
+                    painter = painterResource(painter),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(28.dp),

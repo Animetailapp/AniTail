@@ -282,7 +282,30 @@ constructor(
   }
 
   private suspend fun syncPlaylist(browseId: String, playlistId: String) = coroutineScope {
-    YouTube.playlist(browseId).completed().onSuccess { page ->
+    val isRdpn = browseId == "RDPN" || browseId == "VLRDPN" || browseId == "FEmusic_new_episodes"
+    val result = if (isRdpn) {
+        YouTube.newEpisodes().map { songs ->
+            com.anitail.innertube.pages.PlaylistPage(
+                playlist = com.anitail.innertube.models.PlaylistItem(
+                    id = "RDPN",
+                    title = "New Episodes",
+                    author = null,
+                    songCountText = "${songs.size} episodes",
+                    thumbnail = songs.firstOrNull()?.thumbnail,
+                    playEndpoint = null,
+                    shuffleEndpoint = null,
+                    radioEndpoint = null,
+                ),
+                songs = songs,
+                songsContinuation = null,
+                continuation = null
+            )
+        }
+    } else {
+        YouTube.playlist(browseId)
+    }
+
+    result.completed().onSuccess { page ->
       val songs = page.songs.map(SongItem::toMediaMetadata)
 
       val remoteIds = songs.map { it.id }
