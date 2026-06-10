@@ -113,10 +113,6 @@ class NativeAudioPlayer {
                      onTimeChanged?.invoke(newTime, player?.status()?.length() ?: 0L)
                  }
             }
-            
-            override fun positionChanged(player: MediaPlayer?, newPosition: Float) {
-                // Alternativa a timeChanged
-            }
         })
     }
 
