@@ -9,7 +9,7 @@ pluginManagement {
     }
     plugins {
         id("org.jetbrains.compose") version "1.12.0-SNAPSHOT+v-mazunin-enable-lifecycle-and-nav3-for-1-12-0-alpha02"
-        id("org.jetbrains.kotlin.plugin.compose") version "2.3.20-RC"
+        id("org.jetbrains.kotlin.plugin.compose") version "2.4.0"
     }
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
