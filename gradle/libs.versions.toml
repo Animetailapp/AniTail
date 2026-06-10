@@ -1,7 +1,7 @@
 [versions]
 androidGradlePlugin = "9.2.1"
 documentfile = "1.1.0"
-hiltWork = "1.4.0-beta01"
+hiltWork = "1.4.0-rc01"
 commonsCodec = "1.22.0"
 json = "20250517"
 jsoup = "1.22.2"
