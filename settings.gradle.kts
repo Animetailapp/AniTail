@@ -21,7 +21,12 @@ dependencyResolutionManagement {
         mavenCentral()
         maven { setUrl("https://maven.pkg.jetbrains.space/public/p/compose/dev") }
         maven { setUrl("https://jitpack.io") }
-        maven { setUrl("https://jogamp.org/deployment/maven/") }
+        maven {
+            setUrl("https://jogamp.org/deployment/maven/")
+            content {
+                includeGroupAndSubgroups("org.jogamp")
+            }
+        }
     }
 }
 
