@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.anitail.paxsenix"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 23

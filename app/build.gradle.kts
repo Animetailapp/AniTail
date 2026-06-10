@@ -13,11 +13,11 @@ plugins {
 
 android {
     namespace = "com.anitail.music"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         applicationId = "com.anitail.music"
         minSdk = 23
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 17
         versionName = "1.15.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

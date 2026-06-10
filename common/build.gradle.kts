@@ -15,7 +15,7 @@ kotlin {
     applyDefaultHierarchyTemplate()
     android {
         namespace = "com.anitail.shared"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 23
     }
     jvm("desktop")
