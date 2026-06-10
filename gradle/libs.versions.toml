@@ -117,7 +117,7 @@ timber = { group = "com.jakewharton.timber", name = "timber", version = "5.0.1" 
 #newpipe-extractor = { group = "com.github.libre-tube", name = "NewPipeExtractor", version = "f3bb450" }
 newpipe-extractor = { group = "com.github.TeamNewPipe", name = "NewPipeExtractor", version = "0.26.3" }
 work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
-play-services-auth = { module = "com.google.android.gms:play-services-auth", version = "21.5.1" }
+play-services-auth = { module = "com.google.android.gms:play-services-auth", version = "21.6.0" }
 google-api-client-android = { module = "com.google.api-client:google-api-client-android", version = "2.9.0" }
 google-api-services-drive = { module = "com.google.apis:google-api-services-drive", version = "v3-rev20260428-2.0.0" }
 google-auth-library-oauth2-http = { module = "com.google.auth:google-auth-library-oauth2-http", version = "1.47.0" }
