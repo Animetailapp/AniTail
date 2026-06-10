@@ -30,19 +30,19 @@ kotlin {
         getByName("androidMain") {
             dependencies {
                 implementation(project(":innertube"))
-                implementation(libs.compose.runtime)
-                implementation(libs.compose.foundation)
-                implementation(libs.material3)
-                implementation(libs.compose.ui)
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.ui)
             }
         }
         getByName("desktopMain") {
             dependencies {
                 implementation(project(":innertube"))
-                implementation(libs.compose.runtime)
-                implementation(libs.compose.foundation)
-                implementation(libs.material3)
-                implementation(libs.compose.ui)
+                implementation(compose.runtime)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.ui)
             }
         }
     }
