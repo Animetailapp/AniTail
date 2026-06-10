@@ -21,31 +21,29 @@ kotlin {
     jvm("desktop")
 
     sourceSets {
-        val commonMain by getting {
+        getByName("commonMain") {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 api(libs.ktor.serialization.json)
             }
         }
-        val commonTest by getting
-        val androidMain by getting {
+        getByName("androidMain") {
             dependencies {
                 implementation(project(":innertube"))
-                implementation(compose.runtime)
-                implementation(compose.foundation)
-                implementation(compose.material3)
-                implementation(compose.ui)
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.foundation)
+                implementation(libs.material3)
+                implementation(libs.compose.ui)
             }
         }
-        val desktopMain by getting {
+        getByName("desktopMain") {
             dependencies {
                 implementation(project(":innertube"))
-                implementation(compose.runtime)
-                implementation(compose.foundation)
-                implementation(compose.material3)
-                implementation(compose.ui)
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.foundation)
+                implementation(libs.material3)
+                implementation(libs.compose.ui)
             }
         }
-        val desktopTest by getting
     }
 }
