@@ -91,6 +91,11 @@ dependencies {
 compose.desktop {
     application {
         mainClass = "com.anitail.desktop.MainKt"
+        val toolchains = project.extensions.getByType<JavaToolchainService>()
+        val launcher = toolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        }
+        javaHome = launcher.get().metadata.installationPath.asFile.absolutePath
         nativeDistributions {
             includeAllModules = true
             val os = OperatingSystem.current()
@@ -137,3 +142,6 @@ tasks.register("runDesktop") {
     description = "Run the AniTail Desktop app."
     dependsOn("run")
 }
+
+
+
