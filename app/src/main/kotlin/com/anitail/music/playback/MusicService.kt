@@ -381,6 +381,9 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             ): Boolean =
                 (baseNotificationProvider as MediaNotification.Provider)
                     .handleCustomCommand(session, action, extras)
+
+            override fun getNotificationChannelInfo(): MediaNotification.Provider.NotificationChannelInfo =
+                (baseNotificationProvider as MediaNotification.Provider).getNotificationChannelInfo()
         }
         setMediaNotificationProvider(suppressingProvider)
 
