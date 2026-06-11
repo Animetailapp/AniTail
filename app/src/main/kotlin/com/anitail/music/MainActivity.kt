@@ -1486,11 +1486,30 @@ class MainActivity : AppCompatActivity() {
         val coroutineScope = lifecycleScope
 
         if (uri.scheme.equals("anitail", ignoreCase = true)) {
-            val deepLinkQuery = uri.getQueryParameter("q")
-                ?.takeIf { it.isNotBlank() }
-                ?: uri.getQueryParameter("query")?.takeIf { it.isNotBlank() }
-            if (uri.host.equals("search", ignoreCase = true) && !deepLinkQuery.isNullOrBlank()) {
-                navController.navigate("search/${URLEncoder.encode(deepLinkQuery, "UTF-8")}")
+            if (uri.host.equals("play", ignoreCase = true)) {
+                uri.getQueryParameter("v")?.let { videoId ->
+                    coroutineScope.launch {
+                        withContext(Dispatchers.IO) {
+                            YouTube.queue(listOf(videoId), null)
+                        }.onSuccess {
+                            playerConnection?.playQueue(
+                                YouTubeQueue(
+                                    WatchEndpoint(videoId = videoId),
+                                    it.firstOrNull()?.toMediaMetadata()
+                                )
+                            )
+                        }.onFailure {
+                            reportException(it)
+                        }
+                    }
+                }
+            } else {
+                val deepLinkQuery = uri.getQueryParameter("q")
+                    ?.takeIf { it.isNotBlank() }
+                    ?: uri.getQueryParameter("query")?.takeIf { it.isNotBlank() }
+                if (uri.host.equals("search", ignoreCase = true) && !deepLinkQuery.isNullOrBlank()) {
+                    navController.navigate("search/${URLEncoder.encode(deepLinkQuery, "UTF-8")}")
+                }
             }
             return
         }
