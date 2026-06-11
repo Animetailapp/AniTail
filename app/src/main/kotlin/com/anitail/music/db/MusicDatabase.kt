@@ -655,6 +655,9 @@ val MIGRATION_28_30 =
                 )
                 """.trimIndent()
             )
+
+            // Create the missing view introduced in version 29
+            database.execSQL("CREATE VIEW IF NOT EXISTS `sorted_song_album_map` AS SELECT * FROM song_album_map ORDER BY `index`")
         }
     }
 
