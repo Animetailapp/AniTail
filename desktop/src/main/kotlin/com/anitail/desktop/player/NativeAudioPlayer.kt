@@ -13,6 +13,10 @@ import uk.co.caprica.vlcj.factory.MediaPlayerFactory
 import uk.co.caprica.vlcj.factory.discovery.NativeDiscovery
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
+import com.sun.jna.Platform
+import com.sun.jna.platform.win32.Advapi32Util
+import com.sun.jna.platform.win32.WinReg
+import java.io.File
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.pow
@@ -25,6 +29,45 @@ import javax.swing.SwingUtilities
  * y mejorar la compatibilidad con streams de YouTube.
  */
 class NativeAudioPlayer {
+
+    companion object {
+        init {
+            if (Platform.isWindows()) {
+                try {
+                    val pathsToTry = listOf(
+                        Pair(WinReg.HKEY_LOCAL_MACHINE, "SOFTWARE\\VideoLAN\\VLC"),
+                        Pair(WinReg.HKEY_CURRENT_USER, "SOFTWARE\\VideoLAN\\VLC"),
+                        Pair(WinReg.HKEY_LOCAL_MACHINE, "SOFTWARE\\WOW6432Node\\VideoLAN\\VLC")
+                    )
+                    var vlcPath: String? = null
+                    for ((hkey, subkey) in pathsToTry) {
+                        try {
+                            if (Advapi32Util.registryKeyExists(hkey, subkey)) {
+                                val installDir = Advapi32Util.registryGetStringValue(hkey, subkey, "InstallDir")
+                                if (!installDir.isNullOrBlank() && File(installDir, "libvlc.dll").exists()) {
+                                    vlcPath = installDir
+                                    break
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Ignorar y probar con el siguiente
+                        }
+                    }
+                    if (vlcPath != null) {
+                        val currentJnaPath = System.getProperty("jna.library.path") ?: ""
+                        if (!currentJnaPath.contains(vlcPath)) {
+                            val newPath = if (currentJnaPath.isEmpty()) vlcPath else "$vlcPath;$currentJnaPath"
+                            System.setProperty("jna.library.path", newPath)
+                            println("NativeAudioPlayer: Registrado VLC desde el registro: $vlcPath")
+                        }
+                    }
+                } catch (t: Throwable) {
+                    println("NativeAudioPlayer: Error al buscar VLC en el registro de Windows: ${t.message}")
+                }
+            }
+        }
+    }
+
 
     private val httpClient = OkHttpClient.Builder()
         .proxy(YouTube.proxy)
