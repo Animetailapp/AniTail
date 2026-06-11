@@ -14,6 +14,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -67,6 +68,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -534,6 +540,41 @@ fun BottomSheetPlayer(
             Modifier
                 .focusGroup()
                 .focusProperties { onExit = { cancelFocusChange() } }
+                .onKeyEvent { keyEvent ->
+                    if (keyEvent.type == KeyEventType.KeyDown) {
+                        when (keyEvent.key) {
+                            Key.DirectionCenter, Key.Spacebar, Key.MediaPlayPause -> {
+                                playerConnection.player.togglePlayPause()
+                                true
+                            }
+                            Key.MediaPlay -> {
+                                if (!playerConnection.player.isPlaying) {
+                                    playerConnection.player.play()
+                                }
+                                true
+                            }
+                            Key.MediaPause -> {
+                                if (playerConnection.player.isPlaying) {
+                                    playerConnection.player.pause()
+                                }
+                                true
+                            }
+                            Key.MediaNext -> {
+                                if (playerConnection.player.hasNextMediaItem()) {
+                                    playerConnection.player.seekToNext()
+                                }
+                                true
+                            }
+                            Key.MediaPrevious -> {
+                                if (playerConnection.player.hasPreviousMediaItem()) {
+                                    playerConnection.player.seekToPrevious()
+                                }
+                                true
+                            }
+                            else -> false
+                        }
+                    } else false
+                }
         } else {
             Modifier
         }
@@ -855,6 +896,32 @@ fun BottomSheetPlayer(
 
             Spacer(Modifier.height(12.dp))
 
+            val sliderTvModifier = if (isTelevision) {
+                Modifier
+                    .tvFocusable(shape = RoundedCornerShape(8.dp))
+                    .onKeyEvent { keyEvent ->
+                        if (keyEvent.type == KeyEventType.KeyDown) {
+                            when (keyEvent.key) {
+                                Key.DirectionLeft -> {
+                                    val newPos = ((sliderPosition ?: position) - 10000).coerceAtLeast(0)
+                                    playerConnection.player.seekTo(newPos)
+                                    position = newPos
+                                    true
+                                }
+                                Key.DirectionRight -> {
+                                    val newPos = ((sliderPosition ?: position) + 10000).coerceAtMost(duration)
+                                    playerConnection.player.seekTo(newPos)
+                                    position = newPos
+                                    true
+                                }
+                                else -> false
+                            }
+                        } else false
+                    }
+            } else {
+                Modifier
+            }
+
             when (sliderStyle) {
                 SliderStyle.DEFAULT -> {
                     Slider(
@@ -883,7 +950,9 @@ fun BottomSheetPlayer(
                             activeTickColor = textButtonColor,
                             thumbColor = textButtonColor
                         ),
-                        modifier = Modifier.padding(horizontal = PlayerHorizontalPadding),
+                        modifier = Modifier
+                            .padding(horizontal = PlayerHorizontalPadding)
+                            .then(sliderTvModifier),
                     )
                 }
 
@@ -914,7 +983,9 @@ fun BottomSheetPlayer(
                             activeTickColor = textButtonColor,
                             thumbColor = textButtonColor
                         ),
-                        modifier = Modifier.padding(horizontal = PlayerHorizontalPadding),
+                        modifier = Modifier
+                            .padding(horizontal = PlayerHorizontalPadding)
+                            .then(sliderTvModifier),
                         squigglesSpec =
                             SquigglySlider.SquigglesSpec(
                                 amplitude = if (isPlaying) (2.dp).coerceAtLeast(2.dp) else 0.dp,
@@ -944,7 +1015,9 @@ fun BottomSheetPlayer(
                                 colors = PlayerSliderColors.slimSliderColors(textButtonColor)
                             )
                         },
-                        modifier = Modifier.padding(horizontal = PlayerHorizontalPadding)
+                        modifier = Modifier
+                            .padding(horizontal = PlayerHorizontalPadding)
+                            .then(sliderTvModifier),
                     )
                 }
             }
@@ -993,125 +1066,257 @@ fun BottomSheetPlayer(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-
-                        IconButton(
-                            onClick = { playerConnection.player.toggleRepeatMode() },
-                            modifier = Modifier
-                                .size(48.dp)
-                                .tvFocusable(shape = CircleShape)
-                        ) {
-                            Icon(
-                                painter = painterResource(
-                                    when (repeatMode) {
-                                        Player.REPEAT_MODE_OFF, Player.REPEAT_MODE_ALL -> R.drawable.repeat
-                                        Player.REPEAT_MODE_ONE -> R.drawable.repeat_one
-                                        else -> R.drawable.repeat
-                                    }
-                                ),
-                                contentDescription = "Repeat",
-                                tint = if (repeatMode == Player.REPEAT_MODE_OFF) textBackgroundColor.copy(
-                                    alpha = 0.4f
+                        if (isTelevision) {
+                            // 1. Repeat Button
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .tvClickable(
+                                        shape = CircleShape,
+                                        onClick = { playerConnection.player.toggleRepeatMode() }
+                                    )
+                            ) {
+                                Icon(
+                                    painter = painterResource(
+                                        when (repeatMode) {
+                                            Player.REPEAT_MODE_OFF, Player.REPEAT_MODE_ALL -> R.drawable.repeat
+                                            Player.REPEAT_MODE_ONE -> R.drawable.repeat_one
+                                            else -> R.drawable.repeat
+                                        }
+                                    ),
+                                    contentDescription = "Repeat",
+                                    tint = if (repeatMode == Player.REPEAT_MODE_OFF) textBackgroundColor.copy(alpha = 0.4f) else textBackgroundColor,
+                                    modifier = Modifier.size(24.dp)
                                 )
-                                else textBackgroundColor,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                            }
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
 
-                        FilledTonalIconButton(
-                            onClick = playerConnection::seekToPrevious,
-                            enabled = canSkipPrevious,
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = textButtonColor,
-                                contentColor = iconButtonColor
-                            ),
-                            modifier = Modifier
-                                .size(width = sideButtonWidth, height = sideButtonHeight)
-                                .clip(RoundedCornerShape(32.dp))
-                                .tvFocusable(shape = RoundedCornerShape(32.dp))
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.skip_previous),
-                                contentDescription = null,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
+                            // 2. Previous Button
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(width = sideButtonWidth, height = sideButtonHeight)
+                                    .clip(RoundedCornerShape(32.dp))
+                                    .background(if (canSkipPrevious) textButtonColor else textButtonColor.copy(alpha = 0.5f))
+                                    .tvClickable(
+                                        enabled = canSkipPrevious,
+                                        shape = RoundedCornerShape(32.dp),
+                                        onClick = playerConnection::seekToPrevious
+                                    )
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.skip_previous),
+                                    contentDescription = null,
+                                    tint = iconButtonColor,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
 
-                        FilledIconButton(
-                            onClick = {
-                                if (playbackState == STATE_ENDED) {
-                                    playerConnection.player.seekTo(0, 0)
-                                    playerConnection.player.playWhenReady = true
-                                } else {
-                                    playerConnection.player.togglePlayPause()
-                                }
-                            },
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = textButtonColor,
-                                contentColor = iconButtonColor
-                            ),
-                            modifier = Modifier
-                                .size(width = playButtonWidth, height = playButtonHeight)
-                                .clip(RoundedCornerShape(32.dp))
-                                .focusRequester(playerFocusRequester)
-                                .tvFocusable(shape = RoundedCornerShape(32.dp))
-                        ) {
-                            Icon(
-                                painter = painterResource(
-                                    when {
-                                        playbackState == STATE_ENDED -> R.drawable.replay
-                                        isPlaying -> R.drawable.pause
-                                        else -> R.drawable.play
+                            // 3. Play/Pause Button
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(width = playButtonWidth, height = playButtonHeight)
+                                    .clip(RoundedCornerShape(32.dp))
+                                    .background(textButtonColor)
+                                    .focusRequester(playerFocusRequester)
+                                    .tvClickable(
+                                        shape = RoundedCornerShape(32.dp),
+                                        onClick = {
+                                            if (playbackState == STATE_ENDED) {
+                                                playerConnection.player.seekTo(0, 0)
+                                                playerConnection.player.playWhenReady = true
+                                            } else {
+                                                playerConnection.player.togglePlayPause()
+                                            }
+                                        }
+                                    )
+                            ) {
+                                Icon(
+                                    painter = painterResource(
+                                        when {
+                                            playbackState == STATE_ENDED -> R.drawable.replay
+                                            isPlaying -> R.drawable.pause
+                                            else -> R.drawable.play
+                                        }
+                                    ),
+                                    contentDescription = null,
+                                    tint = iconButtonColor,
+                                    modifier = Modifier.size(42.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            // 4. Next Button
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(width = sideButtonWidth, height = sideButtonHeight)
+                                    .clip(RoundedCornerShape(32.dp))
+                                    .background(if (canSkipNext) textButtonColor else textButtonColor.copy(alpha = 0.5f))
+                                    .tvClickable(
+                                        enabled = canSkipNext,
+                                        shape = RoundedCornerShape(32.dp),
+                                        onClick = playerConnection::seekToNext
+                                    )
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.skip_next),
+                                    contentDescription = null,
+                                    tint = iconButtonColor,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            // 5. Shuffle Button
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .tvClickable(
+                                        shape = CircleShape,
+                                        onClick = {
+                                            playerConnection.player.shuffleModeEnabled =
+                                                !playerConnection.player.shuffleModeEnabled
+                                        }
+                                    )
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.shuffle),
+                                    contentDescription = "shuffle",
+                                    tint = if (shuffleModeEnabled) textBackgroundColor else textBackgroundColor.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        } else {
+                            IconButton(
+                                onClick = { playerConnection.player.toggleRepeatMode() },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .tvFocusable(shape = CircleShape)
+                            ) {
+                                Icon(
+                                    painter = painterResource(
+                                        when (repeatMode) {
+                                            Player.REPEAT_MODE_OFF, Player.REPEAT_MODE_ALL -> R.drawable.repeat
+                                            Player.REPEAT_MODE_ONE -> R.drawable.repeat_one
+                                            else -> R.drawable.repeat
+                                        }
+                                    ),
+                                    contentDescription = "Repeat",
+                                    tint = if (repeatMode == Player.REPEAT_MODE_OFF) textBackgroundColor.copy(
+                                        alpha = 0.4f
+                                    )
+                                    else textBackgroundColor,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            FilledTonalIconButton(
+                                onClick = playerConnection::seekToPrevious,
+                                enabled = canSkipPrevious,
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = textButtonColor,
+                                    contentColor = iconButtonColor
+                                ),
+                                modifier = Modifier
+                                    .size(width = sideButtonWidth, height = sideButtonHeight)
+                                    .clip(RoundedCornerShape(32.dp))
+                                    .tvFocusable(shape = RoundedCornerShape(32.dp))
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.skip_previous),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            FilledIconButton(
+                                onClick = {
+                                    if (playbackState == STATE_ENDED) {
+                                        playerConnection.player.seekTo(0, 0)
+                                        playerConnection.player.playWhenReady = true
+                                    } else {
+                                        playerConnection.player.togglePlayPause()
                                     }
+                                },
+                                colors = IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = textButtonColor,
+                                    contentColor = iconButtonColor
                                 ),
-                                contentDescription = null,
-                                modifier = Modifier.size(42.dp)
-                            )
-                        }
+                                modifier = Modifier
+                                    .size(width = playButtonWidth, height = playButtonHeight)
+                                    .clip(RoundedCornerShape(32.dp))
+                                    .focusRequester(playerFocusRequester)
+                                    .tvFocusable(shape = RoundedCornerShape(32.dp))
+                            ) {
+                                Icon(
+                                    painter = painterResource(
+                                        when {
+                                            playbackState == STATE_ENDED -> R.drawable.replay
+                                            isPlaying -> R.drawable.pause
+                                            else -> R.drawable.play
+                                        }
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(42.dp)
+                                )
+                            }
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
 
-                        FilledTonalIconButton(
-                            onClick = playerConnection::seekToNext,
-                            enabled = canSkipNext,
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = textButtonColor,
-                                contentColor = iconButtonColor
-                            ),
-                            modifier = Modifier
-                                .size(width = sideButtonWidth, height = sideButtonHeight)
-                                .clip(RoundedCornerShape(32.dp))
-                                .tvFocusable(shape = RoundedCornerShape(32.dp))
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.skip_next),
-                                contentDescription = null,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(16.dp))
-
-                        IconButton(
-                            onClick = {
-                                playerConnection.player.shuffleModeEnabled =
-                                    !playerConnection.player.shuffleModeEnabled
-                            },
-                            modifier = Modifier
-                                .size(48.dp)
-                                .tvFocusable(shape = CircleShape)
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.shuffle),
-                                contentDescription = "shuffle",
-                                tint = if (shuffleModeEnabled) textBackgroundColor else textBackgroundColor.copy(
-                                    alpha = 0.4f
+                            FilledTonalIconButton(
+                                onClick = playerConnection::seekToNext,
+                                enabled = canSkipNext,
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = textButtonColor,
+                                    contentColor = iconButtonColor
                                 ),
-                                modifier = Modifier.size(24.dp),
-                            )
+                                modifier = Modifier
+                                    .size(width = sideButtonWidth, height = sideButtonHeight)
+                                    .clip(RoundedCornerShape(32.dp))
+                                    .tvFocusable(shape = RoundedCornerShape(32.dp))
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.skip_next),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            IconButton(
+                                onClick = {
+                                    playerConnection.player.shuffleModeEnabled =
+                                        !playerConnection.player.shuffleModeEnabled
+                                },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .tvFocusable(shape = CircleShape)
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.shuffle),
+                                    contentDescription = "shuffle",
+                                    tint = if (shuffleModeEnabled) textBackgroundColor else textBackgroundColor.copy(
+                                        alpha = 0.4f
+                                    ),
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
                         }
                     }
                 }

@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -64,6 +65,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Surface
@@ -620,7 +623,7 @@ class MainActivity : AppCompatActivity() {
                         }
 
                     fun getNavPadding(): Dp {
-                        return if (shouldShowNavigationBar) {
+                        return if (shouldShowNavigationBar && !isTelevision) {
                             if (slimNav) SlimNavBarHeight else NavigationBarHeight
                         } else {
                             0.dp
@@ -628,7 +631,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     val navigationBarHeight by animateDpAsState(
-                        targetValue = if (shouldShowNavigationBar) NavigationBarHeight else 0.dp,
+                        targetValue = if (shouldShowNavigationBar && !isTelevision) NavigationBarHeight else 0.dp,
                         animationSpec = NavigationBarAnimationSpec,
                         label = "",
                     )
@@ -1098,39 +1101,156 @@ class MainActivity : AppCompatActivity() {
                                 }
                             },
                             bottomBar = {
-                                Box {
+                                if (isTelevision) {
                                     BottomSheetPlayer(
                                         state = playerBottomSheetState,
                                         navController = navController,
                                         pureBlack = pureBlack
                                     )
-                                    NavigationBar(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomCenter)
-                                            .height(bottomInset + getNavPadding())
-                                            .offset {
-                                                if (navigationBarHeight == 0.dp) {
-                                                    IntOffset(
-                                                        x = 0,
-                                                        y = (bottomInset + NavigationBarHeight).roundToPx(),
-                                                    )
-                                                } else {
-                                                    val slideOffset =
-                                                        (bottomInset + NavigationBarHeight) *
-                                                                playerBottomSheetState.progress.coerceIn(
-                                                                    0f,
-                                                                    1f,
+                                } else {
+                                    Box {
+                                        BottomSheetPlayer(
+                                            state = playerBottomSheetState,
+                                            navController = navController,
+                                            pureBlack = pureBlack
+                                        )
+                                        NavigationBar(
+                                            modifier = Modifier
+                                                .align(Alignment.BottomCenter)
+                                                .height(bottomInset + getNavPadding())
+                                                .offset {
+                                                    if (navigationBarHeight == 0.dp) {
+                                                        IntOffset(
+                                                            x = 0,
+                                                            y = (bottomInset + NavigationBarHeight).roundToPx(),
+                                                        )
+                                                    } else {
+                                                        val slideOffset =
+                                                            (bottomInset + NavigationBarHeight) *
+                                                                    playerBottomSheetState.progress.coerceIn(
+                                                                        0f,
+                                                                        1f,
+                                                                    )
+                                                        val hideOffset =
+                                                            (bottomInset + NavigationBarHeight) * (1 - navigationBarHeight / NavigationBarHeight)
+                                                        IntOffset(
+                                                            x = 0,
+                                                            y = (slideOffset + hideOffset).roundToPx(),
+                                                        )
+                                                    }
+                                                },
+                                            containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
+                                            contentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                        ) {
+                                            var lastTapTime by remember { mutableLongStateOf(0L) }
+                                            var lastTappedIcon by remember { mutableStateOf<Int?>(null) }
+                                            var navigateToExplore by remember { mutableStateOf(false) }
+                                            navigationItems.fastForEach { screen ->
+                                                val isSelected =
+                                                    navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true
+
+                                                NavigationBarItem(
+                                                    modifier = Modifier.tvFocusable(
+                                                        shape = RoundedCornerShape(12.dp),
+                                                    ),
+                                                    selected = isSelected,
+                                                    icon = {
+                                                        Icon(
+                                                            painter = painterResource(
+                                                                id = if (isSelected) screen.iconIdActive else screen.iconIdInactive
+                                                            ),
+                                                            contentDescription = null,
+                                                        )
+                                                    },
+                                                    label = {
+                                                        if (!slimNav) {
+                                                            Text(
+                                                                text = stringResource(screen.titleId),
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis
+                                                            )
+                                                        }
+                                                    },
+                                                    onClick = {
+                                                        val currentTapTime = System.currentTimeMillis()
+                                                        val timeSinceLastTap =
+                                                            currentTapTime - lastTapTime
+                                                        val isDoubleTap =
+                                                            screen.titleId == R.string.explore &&
+                                                                    lastTappedIcon == R.string.explore &&
+                                                                    timeSinceLastTap < 300
+
+                                                        lastTapTime = currentTapTime
+                                                        lastTappedIcon = screen.titleId
+
+                                                        if (screen.titleId == R.string.explore) {
+                                                            if (isDoubleTap) {
+                                                                onActiveChange(true)
+                                                                navigateToExplore = false
+                                                            } else {
+                                                                navigateToExplore = true
+                                                                coroutineScope.launch {
+                                                                    delay(100)
+                                                                    if (navigateToExplore) {
+                                                                        if (isSelected) {
+                                                                            navController.currentBackStackEntry?.savedStateHandle?.set(
+                                                                                "scrollToTop",
+                                                                                true
+                                                                            )
+                                                                        } else {
+                                                                            navigateToScreen(navController, screen)
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        } else {
+                                                            if (isSelected) {
+                                                                navController.currentBackStackEntry?.savedStateHandle?.set(
+                                                                    "scrollToTop",
+                                                                    true
                                                                 )
-                                                    val hideOffset =
-                                                        (bottomInset + NavigationBarHeight) * (1 - navigationBarHeight / NavigationBarHeight)
-                                                    IntOffset(
-                                                        x = 0,
-                                                        y = (slideOffset + hideOffset).roundToPx(),
-                                                    )
-                                                }
-                                            },
+                                                                coroutineScope.launch {
+                                                                    searchBarScrollBehavior.state.resetHeightOffset()
+                                                                }
+                                                            } else {
+                                                                navigateToScreen(navController, screen)
+                                                            }
+                                                        }
+                                                    },
+                                                )
+                                            }
+                                        }
+                                        val baseBg = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
+                                        val insetBg = if (playerBottomSheetState.progress > 0f) Color.Transparent else baseBg
+
+                                        Box(
+                                            modifier = Modifier
+                                                .background(insetBg)
+                                                .fillMaxWidth()
+                                                .align(Alignment.BottomCenter)
+                                                .height(bottomInsetDp)
+                                        )
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .nestedScroll(searchBarScrollBehavior.nestedScrollConnection)
+                        ) { paddingValues ->
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                if (isTelevision && shouldShowNavigationBar) {
+                                    NavigationRail(
                                         containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
-                                        contentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                        contentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        header = {
+                                            Image(
+                                                painter = painterResource(R.drawable.ic_anitail),
+                                                contentDescription = "App Logo",
+                                                modifier = Modifier
+                                                    .padding(top = 16.dp, bottom = 32.dp)
+                                                    .size(32.dp)
+                                            )
+                                        }
                                     ) {
                                         var lastTapTime by remember { mutableLongStateOf(0L) }
                                         var lastTappedIcon by remember { mutableStateOf<Int?>(null) }
@@ -1139,7 +1259,7 @@ class MainActivity : AppCompatActivity() {
                                             val isSelected =
                                                 navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true
 
-                                            NavigationBarItem(
+                                            NavigationRailItem(
                                                 modifier = Modifier.tvFocusable(
                                                     shape = RoundedCornerShape(12.dp),
                                                 ),
@@ -1153,13 +1273,11 @@ class MainActivity : AppCompatActivity() {
                                                     )
                                                 },
                                                 label = {
-                                                    if (!slimNav) {
-                                                        Text(
-                                                            text = stringResource(screen.titleId),
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis
-                                                        )
-                                                    }
+                                                    Text(
+                                                        text = stringResource(screen.titleId),
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
                                                 },
                                                 onClick = {
                                                     val currentTapTime = System.currentTimeMillis()
@@ -1182,18 +1300,18 @@ class MainActivity : AppCompatActivity() {
                                                             coroutineScope.launch {
                                                                 delay(100)
                                                                 if (navigateToExplore) {
-                                                                        if (isSelected) {
-                                                                            navController.currentBackStackEntry?.savedStateHandle?.set(
-                                                                                "scrollToTop",
-                                                                                true
-                                                                            )
-                                                                        } else {
-                                                                            navigateToScreen(navController, screen)
-                                                                        }
+                                                                    if (isSelected) {
+                                                                        navController.currentBackStackEntry?.savedStateHandle?.set(
+                                                                            "scrollToTop",
+                                                                            true
+                                                                        )
+                                                                    } else {
+                                                                        navigateToScreen(navController, screen)
                                                                     }
                                                                 }
                                                             }
-                                                        } else {
+                                                        }
+                                                    } else {
                                                         if (isSelected) {
                                                             navController.currentBackStackEntry?.savedStateHandle?.set(
                                                                 "scrollToTop",
@@ -1206,26 +1324,17 @@ class MainActivity : AppCompatActivity() {
                                                             navigateToScreen(navController, screen)
                                                         }
                                                     }
-                                                },
+                                                }
                                             )
                                         }
                                     }
-                                    val baseBg = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
-                                    val insetBg = if (playerBottomSheetState.progress > 0f) Color.Transparent else baseBg
-
-                                    Box(
-                                        modifier = Modifier
-                                            .background(insetBg)
-                                            .fillMaxWidth()
-                                            .align(Alignment.BottomCenter)
-                                            .height(bottomInsetDp)
-                                    )
                                 }
-                            },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .nestedScroll(searchBarScrollBehavior.nestedScrollConnection)
-                        ) {
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                ) {
                             var transitionDirection =
                                 AnimatedContentTransitionScope.SlideDirection.Left
 
@@ -1300,6 +1409,8 @@ class MainActivity : AppCompatActivity() {
                                     topAppBarScrollBehavior,
                                     latestVersionName
                                 )
+                            }
+                                }
                             }
                         }
 

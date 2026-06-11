@@ -393,6 +393,10 @@ object DiscordRpcManager {
     }
 
     fun destroy() = synchronized(this) {
+        if (!initialized.get()) {
+            Timber.i("destroy: skipping — not initialized")
+            return
+        }
         Timber.i("destroy: entering (_ready=%s, _authorized=%s, initialized=%s)", _ready, _authorized, initialized)
         _ready = false
         _authorized = false
@@ -405,6 +409,10 @@ object DiscordRpcManager {
 
     fun disconnect() {
         synchronized(this) {
+            if (!initialized.get()) {
+                Timber.i("disconnect: skipping — not initialized")
+                return
+            }
             Timber.i("disconnect: entering (_ready=%s, _authorized=%s)", _ready, _authorized)
             _connectionStatus.value = Status.Disconnected
             _ready = false
