@@ -32,6 +32,15 @@ tasks.register("packageDistributionForCurrentOS") {
 }
 
 subprojects {
+    configurations.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlin" && requested.name == "kotlin-metadata-jvm") {
+                useVersion(rootProject.libs.versions.kotlin.get())
+                because("Fixes Hilt compatibility issues with newer Kotlin metadata versions")
+            }
+        }
+    }
+
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         compilerOptions {
             freeCompilerArgs.add("-Xannotation-default-target=param-property")
