@@ -1125,4 +1125,5 @@
     <string name="sync_failed_local_backup">Failed to create local backup</string>
     <string name="sync_initial_uploaded">Initial backup uploaded</string>
     <string name="sync_failed_initial_upload">Failed to upload initial backup</string>
+    <string name="discord_paused">Paused</string>
 </resources>

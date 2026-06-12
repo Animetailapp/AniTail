@@ -13,6 +13,7 @@ class DesktopPlayerRpcController(
         albumName: String?,
         timeStart: Long,
         timeEnd: Long,
+        isPlaying: Boolean = true,
     ) {
         // Keep the previous behaviour of waiting a bit for thumbnails to be available
         delay(2000)
@@ -27,6 +28,7 @@ class DesktopPlayerRpcController(
             albumName = albumName ?: item.artist,
             timeStart = timeStart,
             timeEnd = timeEnd,
+            isPlaying = isPlaying,
         )
     }
 

@@ -1023,4 +1023,5 @@
     <string name="sync_failed_local_backup">Fallo al crear copia de seguridad local</string>
     <string name="sync_initial_uploaded">Copia inicial subida</string>
     <string name="sync_failed_initial_upload">Fallo al subir copia inicial</string>
+    <string name="discord_paused">Pausado</string>
 </resources>

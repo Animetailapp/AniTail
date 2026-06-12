@@ -22,6 +22,8 @@ object DiscordActivityBuilder {
         btn2Enabled: Boolean = true,
         btn2Label: String = DiscordDefaults.BUTTON2_LABEL,
         btn2Url: String = DiscordDefaults.BUTTON2_URL,
+        isPlaying: Boolean = true,
+        pausedText: String? = null,
     ): DiscordActivity {
         val state: String
         val details: String?
@@ -35,10 +37,15 @@ object DiscordActivityBuilder {
                 stateTemplate.ifEmpty { DiscordDefaults.STATE_TEMPLATE },
                 songTitle, artistName, albumName, song.song.id
             )
-            details = DiscordTemplateRenderer.render(
+            val rawDetails = DiscordTemplateRenderer.render(
                 detailsTemplate.ifEmpty { DiscordDefaults.DETAILS_TEMPLATE },
                 songTitle, artistName, albumName, song.song.id
             )
+            details = if (!isPlaying) {
+                if (pausedText != null) "⏸️ $rawDetails ($pausedText)" else "⏸️ $rawDetails"
+            } else {
+                rawDetails
+            }
             renderedBtn1Label = if (btn1Enabled) {
                 DiscordTemplateRenderer.render(
                     btn1Label.ifEmpty { DiscordDefaults.BUTTON1_LABEL },
@@ -65,7 +72,11 @@ object DiscordActivityBuilder {
             } else null
         } else {
             state = artistName
-            details = songTitle
+            details = if (!isPlaying) {
+                if (pausedText != null) "⏸️ $songTitle ($pausedText)" else "⏸️ $songTitle"
+            } else {
+                songTitle
+            }
             renderedBtn1Label = DiscordDefaults.BUTTON1_LABEL
             renderedBtn1Url = "${DiscordDefaults.YOUTUBE_WATCH_URL}${song.song.id}"
             renderedBtn2Label = DiscordDefaults.BUTTON2_LABEL

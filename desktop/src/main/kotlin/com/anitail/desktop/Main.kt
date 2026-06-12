@@ -681,9 +681,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
         }
     }
 
-    LaunchedEffect(enableDiscordRPC, playerState.isPlaying, playerState.currentItem == null) {
-        val shouldBeRunning = enableDiscordRPC &&
-            playerState.isPlaying && playerState.currentItem != null
+    LaunchedEffect(enableDiscordRPC, playerState.currentItem == null) {
+        val shouldBeRunning = enableDiscordRPC && playerState.currentItem != null
         if (shouldBeRunning) {
             if (discordRPC == null) {
                 discordRPC = DesktopDiscordRPC()
@@ -711,17 +710,16 @@ private fun FrameWindowScope.AniTailDesktopApp(
         currentSongId?.let { id -> songsById[id]?.duration }
     }
 
-    LaunchedEffect(currentSongId, currentArtistThumbnail, currentAlbumName, discordRpcController) {
+    LaunchedEffect(currentSongId, currentArtistThumbnail, currentAlbumName, playerState.isPlaying, discordRpcController) {
         val controller = discordRpcController ?: return@LaunchedEffect
         val item = playerState.currentItem ?: return@LaunchedEffect
 
-        val timeStart = System.currentTimeMillis()
+        val timeStart = System.currentTimeMillis() - playerState.position
         val durationMs = item.durationMs
             ?: (currentDbDuration?.toLong()?.times(1000L))
             ?: 0L
 
-        val remainingMs = (durationMs - playerState.position).coerceAtLeast(0L)
-        val timeEnd = if (durationMs > 0) timeStart + remainingMs else 0L
+        val timeEnd = if (durationMs > 0) timeStart + durationMs else 0L
 
         controller.onTrackChanged(
             item = item,
@@ -729,6 +727,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
             albumName = currentAlbumName,
             timeStart = timeStart,
             timeEnd = timeEnd,
+            isPlaying = playerState.isPlaying,
         )
     }
 

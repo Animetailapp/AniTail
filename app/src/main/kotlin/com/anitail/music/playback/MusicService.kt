@@ -1749,7 +1749,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     }
 
     if (events.containsAny(
-        Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_PLAY_WHEN_READY_CHANGED)) {
+        Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_PLAY_WHEN_READY_CHANGED, Player.EVENT_IS_PLAYING_CHANGED)) {
         scheduleCrossfade()
       val isBufferingOrReady =
           player.playbackState == Player.STATE_BUFFERING || player.playbackState == STATE_READY
@@ -1783,6 +1783,11 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
           stopPeriodicWidgetUpdates()
           stopPeriodicScrobbleCheck()
         }
+      }
+      currentSong.value?.let { song ->
+          scope.launch {
+              updateDiscordRPC(song)
+          }
       }
     }
     if (events.containsAny(EVENT_TIMELINE_CHANGED, EVENT_POSITION_DISCONTINUITY)) {
@@ -2777,7 +2782,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
           val albumTitle = song.album?.title
           val artistThumbnail = song.artists.firstOrNull()?.thumbnailUrl
 
-          val startTimestamp = if (isPlaying) System.currentTimeMillis() / 1000L else 0L
+          val startTimestamp = if (isPlaying) (System.currentTimeMillis() - currentPosition) / 1000L else 0L
           val endTimestamp = if (isPlaying && duration > 0) {
               (System.currentTimeMillis() + (duration - currentPosition)) / 1000L
           } else {
@@ -2802,7 +2807,9 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
               btn1Url = btn1Url,
               btn2Enabled = btn2Enabled,
               btn2Label = btn2Label,
-              btn2Url = btn2Url
+              btn2Url = btn2Url,
+              isPlaying = isPlaying,
+              pausedText = getString(R.string.discord_paused)
           )
 
           DiscordRpcManager.setActivity(activity)

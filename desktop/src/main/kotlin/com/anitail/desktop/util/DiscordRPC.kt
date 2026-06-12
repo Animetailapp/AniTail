@@ -30,7 +30,8 @@ class DesktopDiscordRPC {
         artistThumbnailUrl: String?,
         albumName: String?,
         timeStart: Long,  // milliseconds
-        timeEnd: Long     // milliseconds
+        timeEnd: Long,    // milliseconds
+        isPlaying: Boolean = true,
     ) = withContext(Dispatchers.IO) {
         runCatching {
             val presenceState = item.artist.takeIf { it.isNotBlank() } ?: "Unknown artist"
@@ -47,12 +48,15 @@ class DesktopDiscordRPC {
             val activityJson = JSONObject().apply {
                 put("type", 2) // Listening
                 put("name", "AniTail Music")
-                put("details", item.title.take(128))
+                val detailsText = if (isPlaying) item.title else "⏸️ ${item.title} (Paused)"
+                put("details", detailsText.take(128))
                 put("state", presenceState.take(128))
-                put("timestamps", JSONObject().apply {
-                    put("start", startSec)
-                    if (endSec > startSec) put("end", endSec)
-                })
+                if (isPlaying) {
+                    put("timestamps", JSONObject().apply {
+                        put("start", startSec)
+                        if (endSec > startSec) put("end", endSec)
+                    })
+                }
                 put("assets", JSONObject().apply {
                     put("large_image", largeImage)
                     put("large_text", ("Album: " + (albumName?.takeIf { it.isNotBlank() } ?: "Unknown")).take(128))
