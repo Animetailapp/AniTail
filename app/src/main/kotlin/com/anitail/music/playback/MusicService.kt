@@ -6,9 +6,11 @@ import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.database.SQLException
 import android.media.MediaMetadataRetriever
@@ -17,6 +19,8 @@ import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Binder
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.NotificationCompat
@@ -74,10 +78,9 @@ import com.anitail.music.constants.AutoDownloadOnLikeKey
 import com.anitail.music.constants.AutoLoadMoreKey
 import com.anitail.music.constants.AutoSkipNextOnErrorKey
 import com.anitail.music.constants.CrossfadeDurationKey
-import android.content.BroadcastReceiver
-import android.content.IntentFilter
-import android.os.Handler
-import android.os.Looper
+import com.anitail.music.constants.DiscordActivityNameKey
+import com.anitail.music.constants.DiscordActivityTypeKey
+import com.anitail.music.constants.DiscordAdvancedModeKey
 import com.anitail.music.constants.DiscordButton1EnabledKey
 import com.anitail.music.constants.DiscordButton1LabelKey
 import com.anitail.music.constants.DiscordButton1UrlKey
@@ -87,15 +90,7 @@ import com.anitail.music.constants.DiscordButton2UrlKey
 import com.anitail.music.constants.DiscordDetailsTemplateKey
 import com.anitail.music.constants.DiscordStateTemplateKey
 import com.anitail.music.constants.DiscordUserStatusKey
-import com.anitail.music.constants.DiscordActivityNameKey
-import com.anitail.music.constants.DiscordActivityTypeKey
-import com.anitail.music.constants.DiscordAdvancedModeKey
 import com.anitail.music.constants.EnableDiscordRPCKey
-import com.anitail.music.discord.DiscordActivity
-import com.anitail.music.discord.DiscordDefaults
-import com.anitail.music.discord.DiscordRpcManager
-import com.anitail.music.discord.DiscordActivityBuilder
-import com.anitail.music.discord.DiscordTemplateRenderer
 import com.anitail.music.constants.HideExplicitKey
 import com.anitail.music.constants.HistoryDuration
 import com.anitail.music.constants.JamConnectionHistoryKey
@@ -120,6 +115,10 @@ import com.anitail.music.db.entities.RelatedSongMap
 import com.anitail.music.db.entities.Song
 import com.anitail.music.di.DownloadCache
 import com.anitail.music.di.PlayerCache
+import com.anitail.music.discord.DiscordActivityBuilder
+import com.anitail.music.discord.DiscordDefaults
+import com.anitail.music.discord.DiscordListenAlongManager
+import com.anitail.music.discord.DiscordRpcManager
 import com.anitail.music.eq.EqualizerService
 import com.anitail.music.eq.audio.CustomEqualizerAudioProcessor
 import com.anitail.music.extensions.SilentHandler
@@ -178,7 +177,6 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
@@ -250,6 +248,9 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
   var isJamEnabled: Boolean = false
     private set
+
+    var discordListenAlongManager: DiscordListenAlongManager? = null
+
 
   private var ignoreNextRemoteQueue: Boolean = false
 
@@ -730,6 +731,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
     // Start periodic scrobble checking
     startPeriodicScrobbleCheck()
+
+        discordListenAlongManager = DiscordListenAlongManager(this)
   }
 
     private fun waitOnNetworkError() {
@@ -1443,7 +1446,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
   private fun ensureForegroundBootstrap() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
       val channel =
           NotificationChannel(
               CHANNEL_ID,
@@ -2328,6 +2331,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       saveQueueToDisk()
     }
       DiscordRpcManager.disconnect()
+      discordListenAlongManager?.onDestroy()
+      discordListenAlongManager = null
     mediaSession.release()
     player.removeListener(this)
     player.removeListener(sleepTimer)
@@ -2789,6 +2794,12 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
               0L
           }
 
+          val listenManager = discordListenAlongManager
+          val partyId = listenManager?.activeLobbyId?.value?.toString()
+          val joinSecret = listenManager?.joinSecret?.value
+          val currentSize = if (partyId != null) 1 else 0
+          val maxSize = if (partyId != null) 10 else 0
+
           val activity = DiscordActivityBuilder.build(
               song = song,
               artistName = primaryArtist,
@@ -2809,7 +2820,11 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
               btn2Label = btn2Label,
               btn2Url = btn2Url,
               isPlaying = isPlaying,
-              pausedText = getString(R.string.discord_paused)
+              pausedText = getString(R.string.discord_paused),
+              partyId = partyId,
+              partyCurrentSize = currentSize,
+              partyMaxSize = maxSize,
+              joinSecret = joinSecret
           )
 
           DiscordRpcManager.setActivity(activity)

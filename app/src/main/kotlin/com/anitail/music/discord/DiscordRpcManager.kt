@@ -4,25 +4,25 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
-import com.discord.socialsdk.NativeCalls
-import com.discord.socialsdk.AuthenticationClientCallback
 import com.anitail.music.BuildConfig
+import com.discord.socialsdk.AuthenticationClientCallback
+import com.discord.socialsdk.NativeCalls
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.json.JSONObject
+import timber.log.Timber
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 import java.security.SecureRandom
-import timber.log.Timber
 
 data class DiscordUser(
     val id: String,
@@ -33,7 +33,7 @@ data class DiscordUser(
 
 object DiscordRpcManager {
     private val APP_ID = BuildConfig.DISCORD_APP_ID
-    private const val SCOPES = "identify openid sdk.social_layer_presence"
+    private const val SCOPES = "identify openid sdk.social_layer sdk.social_layer_presence"
     private val REDIRECT_URI = "discord-$APP_ID:///authorize/callback"
     private const val TOKEN_URL = "https://discord.com/api/v10/oauth2/token"
     private const val AUTH_URL = "https://discord.com/oauth2/authorize"
@@ -93,7 +93,13 @@ object DiscordRpcManager {
         smallImage: String?, smallText: String?,
         button1Label: String?, button1Url: String?,
         button2Label: String?, button2Url: String?,
+        partyId: String?, partyCurrentSize: Int, partyMaxSize: Int, joinSecret: String?
     )
+
+    private external fun nativeCreateLobby(secret: String)
+    private external fun nativeJoinLobby(lobbyId: Long, secret: String)
+    private external fun nativeSendLobbyMessage(lobbyId: Long, message: String)
+    private external fun nativeLeaveLobby(lobbyId: Long)
     private external fun nativeSetOnlineStatus(statusType: Int)
     private external fun nativeClear()
     private external fun nativeRunCallbacks()
@@ -333,11 +339,14 @@ object DiscordRpcManager {
                 return
             }
         }
-        Timber.i("setActivity: type=%d name=%s state=%s details=%s start=%d end=%d largeImage=%s smallImage=%s btn1=%s btn2=%s",
+        Timber.i(
+            "setActivity: type=%d name=%s state=%s details=%s start=%d end=%d largeImage=%s smallImage=%s btn1=%s btn2=%s party=%s size=%d/%d join=%s",
             activity.activityType, activity.name, activity.state, activity.details,
             activity.startTimestamp, activity.endTimestamp ?: 0L,
             activity.largeImage, activity.smallImage,
-            activity.button1Label, activity.button2Label)
+            activity.button1Label, activity.button2Label,
+            activity.partyId, activity.partyCurrentSize, activity.partyMaxSize, activity.joinSecret
+        )
         nativeSetActivity(
             activity.activityType,
             activity.name, activity.state, activity.details,
@@ -346,8 +355,61 @@ object DiscordRpcManager {
             activity.smallImage, activity.smallText,
             activity.button1Label, activity.button1Url,
             activity.button2Label, activity.button2Url,
+            activity.partyId,
+            activity.partyCurrentSize,
+            activity.partyMaxSize,
+            activity.joinSecret
         )
         Timber.i("setActivity: nativeSetActivity call completed")
+    }
+
+    interface LobbyListener {
+        fun onLobbyMessage(lobbyId: Long, authorId: Long, message: String)
+        fun onLobbyJoined(lobbyId: Long, secret: String)
+    }
+
+    @Volatile
+    private var lobbyListener: LobbyListener? = null
+
+    fun setLobbyListener(listener: LobbyListener?) {
+        lobbyListener = listener
+    }
+
+    @JvmStatic
+    fun onNativeLobbyMessage(lobbyId: Long, authorId: Long, message: String) {
+        Timber.tag("DiscordRpc").d(
+            "onNativeLobbyMessage: lobbyId=%d, authorId=%d, message=%s",
+            lobbyId,
+            authorId,
+            message
+        )
+        lobbyListener?.onLobbyMessage(lobbyId, authorId, message)
+    }
+
+    @JvmStatic
+    fun onNativeLobbyJoined(lobbyId: Long, secret: String) {
+        Timber.tag("DiscordRpc").d("onNativeLobbyJoined: lobbyId=%d, secret=%s", lobbyId, secret)
+        lobbyListener?.onLobbyJoined(lobbyId, secret)
+    }
+
+    fun createLobby(secret: String) {
+        if (!initialized.get()) return
+        nativeCreateLobby(secret)
+    }
+
+    fun joinLobby(lobbyId: Long, secret: String) {
+        if (!initialized.get()) return
+        nativeJoinLobby(lobbyId, secret)
+    }
+
+    fun sendLobbyMessage(lobbyId: Long, message: String) {
+        if (!initialized.get()) return
+        nativeSendLobbyMessage(lobbyId, message)
+    }
+
+    fun leaveLobby(lobbyId: Long) {
+        if (!initialized.get()) return
+        nativeLeaveLobby(lobbyId)
     }
 
     fun setOnlineStatus(status: StatusType) {

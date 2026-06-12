@@ -13,6 +13,8 @@ DiscordBridge g_discordBridge;
 
 jclass DiscordBridge::discordRpcManagerClass_ = nullptr;
 jmethodID DiscordBridge::onNativeStatusChangedMethod_ = nullptr;
+jmethodID DiscordBridge::onNativeLobbyMessageMethod_ = nullptr;
+jmethodID DiscordBridge::onNativeLobbyJoinedMethod_ = nullptr;
 
 DiscordBridge::DiscordBridge()
     : client_(nullptr), ready_(false), authorized_(false), appId_(0), javaVm_(nullptr) {
@@ -86,6 +88,27 @@ bool DiscordBridge::Init(int64_t appId) {
                 }
                 FireNativeStatusCallback(static_cast<int>(status), ready_, authorized_);
             });
+
+        client_->SetMessageCreatedCallback(
+                [this](uint64_t messageId) {
+                    if (!client_) return;
+                    try {
+                        auto msgOpt = client_->GetMessageHandle(messageId);
+                        if (msgOpt) {
+                            auto &msg = *msgOpt;
+                            std::string content = msg.Content();
+                            auto lobbyOpt = msg.Lobby();
+                            if (lobbyOpt) {
+                                uint64_t lobbyId = lobbyOpt->Id();
+                                FireLobbyMessageCallback(lobbyId, msg.AuthorId(), content.c_str());
+                            }
+                        }
+                    } catch (const std::exception &e) {
+                        LOGE("SetMessageCreatedCallback exception: %s", e.what());
+                    }
+                }
+        );
+
         LOGI("Init: success");
         return true;
     } catch (const std::exception& e) {
@@ -243,7 +266,11 @@ void DiscordBridge::SetActivity(
     const char* largeImage, const char* largeText,
     const char* smallImage, const char* smallText,
     const char* button1Label, const char* button1Url,
-    const char* button2Label, const char* button2Url
+    const char *button2Label, const char *button2Url,
+    const char *partyId,
+    int32_t partyCurrentSize,
+    int32_t partyMaxSize,
+    const char *joinSecret
 ) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (!client_) { LOGW("SetActivity: no client, skipping"); return; }
@@ -301,6 +328,23 @@ void DiscordBridge::SetActivity(
             LOGI("SetActivity: added button2");
         }
 
+        if (partyId && strlen(partyId) > 0) {
+            discordpp::ActivityParty party;
+            party.SetId(std::string(partyId));
+            party.SetCurrentSize(partyCurrentSize);
+            party.SetMaxSize(partyMaxSize);
+            party.SetPrivacy(discordpp::ActivityPartyPrivacy::Public);
+            activity.SetParty(std::move(party));
+            LOGI("SetActivity: added party %s (%d/%d)", partyId, partyCurrentSize, partyMaxSize);
+        }
+
+        if (joinSecret && strlen(joinSecret) > 0) {
+            discordpp::ActivitySecrets secrets;
+            secrets.SetJoin(std::string(joinSecret));
+            activity.SetSecrets(std::move(secrets));
+            LOGI("SetActivity: added join secret %s", joinSecret);
+        }
+
         LOGI("SetActivity: calling client_->UpdateRichPresence...");
         client_->UpdateRichPresence(
             std::move(activity),
@@ -319,6 +363,151 @@ void DiscordBridge::SetActivity(
         LOGE("SetActivity threw exception: %s", e.what());
     } catch (...) {
         LOGE("SetActivity threw unknown exception");
+    }
+}
+
+void DiscordBridge::CreateLobby(const char *secret) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!client_) {
+        LOGW("CreateLobby: no client");
+        return;
+    }
+    if (!ready_) {
+        LOGW("CreateLobby: not ready");
+        return;
+    }
+    std::string secStr(secret);
+    LOGI("CreateLobby with secret=%s", secret);
+    try {
+        client_->CreateOrJoinLobby(secStr, [this, secStr](discordpp::ClientResult result,
+                                                          uint64_t lobbyId) {
+            if (result.Successful()) {
+                LOGI("CreateLobby: success, lobbyId=%llu", (unsigned long long) lobbyId);
+                FireLobbyJoinedCallback(lobbyId, secStr.c_str());
+            } else {
+                LOGE("CreateLobby: error: %s", result.Error().c_str());
+            }
+        });
+    } catch (const std::exception &e) {
+        LOGE("CreateLobby threw exception: %s", e.what());
+    }
+}
+
+void DiscordBridge::JoinLobby(uint64_t lobbyId, const char *secret) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!client_) {
+        LOGW("JoinLobby: no client");
+        return;
+    }
+    if (!ready_) {
+        LOGW("JoinLobby: not ready");
+        return;
+    }
+    std::string secStr(secret);
+    LOGI("JoinLobby id=%llu, secret=%s", (unsigned long long) lobbyId, secret);
+    try {
+        client_->CreateOrJoinLobby(secStr, [this, secStr](discordpp::ClientResult result,
+                                                          uint64_t actualLobbyId) {
+            if (result.Successful()) {
+                LOGI("JoinLobby: success, lobbyId=%llu", (unsigned long long) actualLobbyId);
+                FireLobbyJoinedCallback(actualLobbyId, secStr.c_str());
+            } else {
+                LOGE("JoinLobby: error: %s", result.Error().c_str());
+            }
+        });
+    } catch (const std::exception &e) {
+        LOGE("JoinLobby threw exception: %s", e.what());
+    }
+}
+
+void DiscordBridge::SendLobbyMessage(uint64_t lobbyId, const char *message) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!client_) {
+        LOGW("SendLobbyMessage: no client");
+        return;
+    }
+    if (!ready_) {
+        LOGW("SendLobbyMessage: not ready");
+        return;
+    }
+    std::string msgStr(message);
+    try {
+        client_->SendLobbyMessage(lobbyId, msgStr,
+                                  [](discordpp::ClientResult result, uint64_t messageId) {
+                                      if (!result.Successful()) {
+                                          LOGE("SendLobbyMessage failed: %s",
+                                               result.Error().c_str());
+                                      }
+                                  });
+    } catch (const std::exception &e) {
+        LOGE("SendLobbyMessage threw exception: %s", e.what());
+    }
+}
+
+void DiscordBridge::LeaveLobby(uint64_t lobbyId) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!client_) return;
+    try {
+        client_->LeaveLobby(lobbyId, [](discordpp::ClientResult result) {
+            if (!result.Successful()) {
+                LOGE("LeaveLobby failed: %s", result.Error().c_str());
+            } else {
+                LOGI("LeaveLobby succeeded");
+            }
+        });
+    } catch (const std::exception &e) {
+        LOGE("LeaveLobby threw exception: %s", e.what());
+    }
+}
+
+void
+DiscordBridge::FireLobbyMessageCallback(uint64_t lobbyId, uint64_t authorId, const char *message) {
+    if (!javaVm_) return;
+    JNIEnv *env = nullptr;
+    int getEnvStat = javaVm_->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    bool needsDetach = false;
+    if (getEnvStat == JNI_EDETACHED) {
+        JavaVMAttachArgs args = {JNI_VERSION_1_6, "DiscordCallback", nullptr};
+        if (javaVm_->AttachCurrentThread(&env, &args) != JNI_OK) return;
+        needsDetach = true;
+    } else if (getEnvStat != JNI_OK) {
+        return;
+    }
+
+    if (discordRpcManagerClass_ && onNativeLobbyMessageMethod_) {
+        jstring jmsg = env->NewStringUTF(message);
+        env->CallStaticVoidMethod(discordRpcManagerClass_, onNativeLobbyMessageMethod_,
+                                  static_cast<jlong>(lobbyId), static_cast<jlong>(authorId), jmsg);
+        env->DeleteLocalRef(jmsg);
+    }
+
+    if (needsDetach) {
+        javaVm_->DetachCurrentThread();
+    }
+}
+
+void DiscordBridge::FireLobbyJoinedCallback(uint64_t lobbyId, const char *secret) {
+    if (!javaVm_) return;
+    JNIEnv *env = nullptr;
+    int getEnvStat = javaVm_->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
+    bool needsDetach = false;
+    if (getEnvStat == JNI_EDETACHED) {
+        JavaVMAttachArgs args = {JNI_VERSION_1_6, "DiscordCallback", nullptr};
+        if (javaVm_->AttachCurrentThread(&env, &args) != JNI_OK) return;
+        needsDetach = true;
+    } else if (getEnvStat != JNI_OK) {
+        return;
+    }
+
+    if (discordRpcManagerClass_ && onNativeLobbyJoinedMethod_) {
+        jstring jsec = env->NewStringUTF(secret);
+        env->CallStaticVoidMethod(discordRpcManagerClass_, onNativeLobbyJoinedMethod_,
+                                  static_cast<jlong>(lobbyId), jsec);
+        env->DeleteLocalRef(jsec);
+    }
+
+    if (needsDetach) {
+        javaVm_->DetachCurrentThread();
     }
 }
 
@@ -527,6 +716,16 @@ Java_com_anitail_music_discord_DiscordRpcManager_nativeInit(
         if (method) {
             DiscordBridge::SetOnNativeStatusChangedMethod(method);
         }
+        jmethodID lobbyMsgMethod = env->GetStaticMethodID(localClass, "onNativeLobbyMessage",
+                                                          "(JJLjava/lang/String;)V");
+        if (lobbyMsgMethod) {
+            DiscordBridge::SetOnNativeLobbyMessageMethod(lobbyMsgMethod);
+        }
+        jmethodID lobbyJoinedMethod = env->GetStaticMethodID(localClass, "onNativeLobbyJoined",
+                                                             "(JLjava/lang/String;)V");
+        if (lobbyJoinedMethod) {
+            DiscordBridge::SetOnNativeLobbyJoinedMethod(lobbyJoinedMethod);
+        }
         env->DeleteLocalRef(localClass);
     }
 
@@ -581,7 +780,11 @@ Java_com_anitail_music_discord_DiscordRpcManager_nativeSetActivity(
     jstring largeImage, jstring largeText,
     jstring smallImage, jstring smallText,
     jstring button1Label, jstring button1Url,
-    jstring button2Label, jstring button2Url
+    jstring button2Label, jstring button2Url,
+    jstring partyId,
+    jint partyCurrentSize,
+    jint partyMaxSize,
+    jstring joinSecret
 ) {
     const char* cName = name ? env->GetStringUTFChars(name, nullptr) : nullptr;
     const char* cState = state ? env->GetStringUTFChars(state, nullptr) : nullptr;
@@ -594,13 +797,19 @@ Java_com_anitail_music_discord_DiscordRpcManager_nativeSetActivity(
     const char* cBtn1Url = button1Url ? env->GetStringUTFChars(button1Url, nullptr) : nullptr;
     const char* cBtn2Label = button2Label ? env->GetStringUTFChars(button2Label, nullptr) : nullptr;
     const char* cBtn2Url = button2Url ? env->GetStringUTFChars(button2Url, nullptr) : nullptr;
+    const char *cPartyId = partyId ? env->GetStringUTFChars(partyId, nullptr) : nullptr;
+    const char *cJoinSecret = joinSecret ? env->GetStringUTFChars(joinSecret, nullptr) : nullptr;
 
     g_discordBridge.SetActivity(
         static_cast<int>(activityType),
         cName, cState, cDetails,
         static_cast<int64_t>(startSecs), static_cast<int64_t>(endSecs),
         cLargeImage, cLargeText, cSmallImage, cSmallText,
-        cBtn1Label, cBtn1Url, cBtn2Label, cBtn2Url
+        cBtn1Label, cBtn1Url, cBtn2Label, cBtn2Url,
+        cPartyId,
+        static_cast<int32_t>(partyCurrentSize),
+        static_cast<int32_t>(partyMaxSize),
+        cJoinSecret
     );
 
     if (cName) env->ReleaseStringUTFChars(name, cName);
@@ -614,6 +823,48 @@ Java_com_anitail_music_discord_DiscordRpcManager_nativeSetActivity(
     if (cBtn1Url) env->ReleaseStringUTFChars(button1Url, cBtn1Url);
     if (cBtn2Label) env->ReleaseStringUTFChars(button2Label, cBtn2Label);
     if (cBtn2Url) env->ReleaseStringUTFChars(button2Url, cBtn2Url);
+    if (cPartyId) env->ReleaseStringUTFChars(partyId, cPartyId);
+    if (cJoinSecret) env->ReleaseStringUTFChars(joinSecret, cJoinSecret);
+}
+
+JNIEXPORT void JNICALL
+Java_com_anitail_music_discord_DiscordRpcManager_nativeCreateLobby(
+        JNIEnv *env, jobject thiz, jstring secret
+) {
+    const char *cSecret = secret ? env->GetStringUTFChars(secret, nullptr) : nullptr;
+    if (cSecret) {
+        g_discordBridge.CreateLobby(cSecret);
+        env->ReleaseStringUTFChars(secret, cSecret);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_anitail_music_discord_DiscordRpcManager_nativeJoinLobby(
+        JNIEnv *env, jobject thiz, jlong lobbyId, jstring secret
+) {
+    const char *cSecret = secret ? env->GetStringUTFChars(secret, nullptr) : nullptr;
+    if (cSecret) {
+        g_discordBridge.JoinLobby(static_cast<uint64_t>(lobbyId), cSecret);
+        env->ReleaseStringUTFChars(secret, cSecret);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_anitail_music_discord_DiscordRpcManager_nativeSendLobbyMessage(
+        JNIEnv *env, jobject thiz, jlong lobbyId, jstring message
+) {
+    const char *cMsg = message ? env->GetStringUTFChars(message, nullptr) : nullptr;
+    if (cMsg) {
+        g_discordBridge.SendLobbyMessage(static_cast<uint64_t>(lobbyId), cMsg);
+        env->ReleaseStringUTFChars(message, cMsg);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_anitail_music_discord_DiscordRpcManager_nativeLeaveLobby(
+        JNIEnv *env, jobject thiz, jlong lobbyId
+) {
+    g_discordBridge.LeaveLobby(static_cast<uint64_t>(lobbyId));
 }
 
 JNIEXPORT void JNICALL

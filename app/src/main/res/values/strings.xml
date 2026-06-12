@@ -569,6 +569,13 @@
     <string name="preview">Preview</string>
     <string name="not_logged_in_youtube">Not logged in to YouTube</string>
     <string name="enable_discord_rpc">Enable Rich Presence</string>
+    <string name="discord_listen_along_host">Host Listen Along Session</string>
+    <string name="discord_listen_along_host_desc">Allow other Discord users to listen along to your music in real-time.</string>
+    <string name="discord_listen_along_active_host">Hosting Group Session</string>
+    <string name="discord_listen_along_active_guest">Listening Along (Guest)</string>
+    <string name="discord_listen_along_lobby_id">Lobby ID: %1$s</string>
+    <string name="discord_listen_along_stop">Stop Hosting</string>
+    <string name="discord_listen_along_leave">Leave Session</string>
     <string name="discord_connection_state">Connection</string>
     <string name="discord_last_sync">Last sync</string>
     <string name="discord_last_sync_never">Never</string>

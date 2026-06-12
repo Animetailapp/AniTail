@@ -15,6 +15,10 @@ data class DiscordActivity(
     val button1Url: String?,
     val button2Label: String?,
     val button2Url: String?,
+    val partyId: String? = null,
+    val partyCurrentSize: Int = 0,
+    val partyMaxSize: Int = 0,
+    val joinSecret: String? = null,
 ) {
     companion object {
         const val TYPE_PLAYING = 0

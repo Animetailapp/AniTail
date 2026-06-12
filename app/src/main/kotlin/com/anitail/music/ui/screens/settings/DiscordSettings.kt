@@ -1,7 +1,6 @@
 package com.anitail.music.ui.screens.settings
 
 import android.content.Intent
-import androidx.datastore.preferences.core.edit
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -21,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,10 +38,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -50,7 +49,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,6 +69,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import androidx.datastore.preferences.core.edit
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player.STATE_READY
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -102,11 +102,10 @@ import com.anitail.music.discord.DiscordTemplateRenderer
 import com.anitail.music.discord.DiscordTokenStore
 import com.anitail.music.ui.component.DefaultDialog
 import com.anitail.music.ui.component.IconButton
+import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.component.PreferenceEntry
 import com.anitail.music.ui.component.PreferenceGroupTitle
 import com.anitail.music.ui.component.SwitchPreference
-import com.anitail.music.ui.component.ListPreference
-import com.anitail.music.ui.component.ListDialog
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.ui.utils.tvClickable
 import com.anitail.music.utils.dataStore
@@ -118,8 +117,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.RadioButton
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -172,6 +169,14 @@ fun DiscordSettings(
 
     val isLoggedIn = remember(discordName) { discordName.isNotEmpty() }
     var isBusy by remember { mutableStateOf(false) }
+
+    val listenManager = playerConnection.service.discordListenAlongManager
+    val activeLobbyId by (listenManager?.activeLobbyId ?: kotlinx.coroutines.flow.MutableStateFlow(
+        null
+    )).collectAsStateWithLifecycle()
+    val isListenAlongHost by (listenManager?.isHost ?: kotlinx.coroutines.flow.MutableStateFlow(
+        false
+    )).collectAsStateWithLifecycle()
 
     val connectionStatus by DiscordRpcManager.connectionStatus.collectAsState()
 
@@ -232,7 +237,8 @@ fun DiscordSettings(
                     LocalPlayerAwareWindowInsets.current.only(
                         WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
                     ),
-                ).verticalScroll(rememberScrollState())
+                )
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
     ) {
         Spacer(
@@ -309,7 +315,8 @@ fun DiscordSettings(
                             end = 20.dp,
                             top = 20.dp,
                             bottom = if (isLoggedIn) 20.dp else 8.dp,
-                        ).fillMaxWidth(),
+                        )
+                        .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(modifier = Modifier.size(56.dp)) {
@@ -448,6 +455,71 @@ fun DiscordSettings(
             },
             isEnabled = isLoggedIn,
         )
+
+        val isDiscordReady = connectionStatus == DiscordRpcManager.Status.Connected
+
+        if (activeLobbyId == null) {
+            SwitchPreference(
+                title = { Text(stringResource(R.string.discord_listen_along_host)) },
+                description = stringResource(R.string.discord_listen_along_host_desc),
+                checked = isListenAlongHost,
+                onCheckedChange = { checked ->
+                    if (checked) {
+                        listenManager?.startHostSession()
+                    } else {
+                        listenManager?.leaveSession()
+                    }
+                },
+                isEnabled = isLoggedIn && discordRPC && isDiscordReady,
+            )
+            if (isListenAlongHost) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                )
+            }
+        } else {
+            if (isListenAlongHost) {
+                PreferenceEntry(
+                    title = { Text(stringResource(R.string.discord_listen_along_active_host)) },
+                    description = stringResource(
+                        R.string.discord_listen_along_lobby_id,
+                        activeLobbyId.toString()
+                    ),
+                    onClick = {
+                        listenManager?.leaveSession()
+                    },
+                    trailingContent = {
+                        Text(
+                            text = stringResource(R.string.discord_listen_along_stop),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                    }
+                )
+            } else {
+                PreferenceEntry(
+                    title = { Text(stringResource(R.string.discord_listen_along_active_guest)) },
+                    description = stringResource(
+                        R.string.discord_listen_along_lobby_id,
+                        activeLobbyId.toString()
+                    ),
+                    onClick = {
+                        listenManager?.leaveSession()
+                    },
+                    trailingContent = {
+                        Text(
+                            text = stringResource(R.string.discord_listen_along_leave),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                    }
+                )
+            }
+        }
 
         SwitchPreference(
             title = { Text(stringResource(R.string.discord_advanced_mode)) },
@@ -747,7 +819,9 @@ fun DiscordSettings(
                             showUserStatusDialog = false
                             onUserStatusChange(value)
                             coroutineScope.launch(Dispatchers.IO) {
-                                context.dataStore.edit { prefs -> prefs[DiscordUserStatusKey] = value }
+                                context.dataStore.edit { prefs ->
+                                    prefs[DiscordUserStatusKey] = value
+                                }
                                 withContext(Dispatchers.Main) { onPrefChanged() }
                             }
                         }
@@ -935,7 +1009,8 @@ fun RichPresence(
                                         2.dp,
                                         MaterialTheme.colorScheme.surfaceContainer,
                                         CircleShape,
-                                    ).padding(2.dp)
+                                    )
+                                    .padding(2.dp)
                                     .align(Alignment.BottomEnd),
                         ) {
                             AsyncImage(

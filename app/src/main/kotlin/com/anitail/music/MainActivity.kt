@@ -9,6 +9,7 @@ import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.graphics.drawable.BitmapDrawable
 import android.os.Build
+import android.os.Build.VERSION_CODES.TIRAMISU
 import android.os.Bundle
 import android.os.Environment
 import android.os.IBinder
@@ -16,7 +17,6 @@ import android.provider.Settings
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
-import android.os.Build.VERSION_CODES.TIRAMISU
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -29,7 +29,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -42,8 +41,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -133,8 +132,8 @@ import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.music.constants.AppBarHeight
-import com.anitail.music.constants.DarkModeKey
 import com.anitail.music.constants.CustomThemeSeedColorKey
+import com.anitail.music.constants.DarkModeKey
 import com.anitail.music.constants.DefaultOpenTabKey
 import com.anitail.music.constants.DisableScreenshotKey
 import com.anitail.music.constants.DynamicIconKey
@@ -148,9 +147,9 @@ import com.anitail.music.constants.PauseSearchHistoryKey
 import com.anitail.music.constants.PureBlackKey
 import com.anitail.music.constants.SearchSource
 import com.anitail.music.constants.SearchSourceKey
+import com.anitail.music.constants.ShowLyricsKey
 import com.anitail.music.constants.SlimNavBarHeight
 import com.anitail.music.constants.SlimNavBarKey
-import com.anitail.music.constants.ShowLyricsKey
 import com.anitail.music.constants.StopMusicOnTaskClearKey
 import com.anitail.music.constants.ThemePalette
 import com.anitail.music.constants.ThemePaletteKey
@@ -187,8 +186,8 @@ import com.anitail.music.ui.theme.ColorSaver
 import com.anitail.music.ui.theme.DefaultThemeColor
 import com.anitail.music.ui.theme.ThemePreviewState
 import com.anitail.music.ui.theme.extractThemeColor
-import com.anitail.music.ui.utils.LocalIsTelevision
 import com.anitail.music.ui.theme.seedColor
+import com.anitail.music.ui.utils.LocalIsTelevision
 import com.anitail.music.ui.utils.appBarScrollBehavior
 import com.anitail.music.ui.utils.backToMain
 import com.anitail.music.ui.utils.rememberIsTelevision
@@ -238,6 +237,8 @@ class MainActivity : AppCompatActivity() {
     private var pendingIntent: Intent? = null
     private var latestVersionName by mutableStateOf(BuildConfig.VERSION_NAME)
     private var pendingExternalAction by mutableStateOf<String?>(null)
+    private var pendingJoinLobbyId: Long? = null
+    private var pendingJoinSecret: String? = null
 
     private var playerConnection by mutableStateOf<PlayerConnection?>(null)
     private val serviceConnection =
@@ -406,6 +407,17 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            LaunchedEffect(playerConnection) {
+                val connection = playerConnection
+                val lobbyId = pendingJoinLobbyId
+                val secret = pendingJoinSecret
+                if (connection != null && lobbyId != null && secret != null) {
+                    connection.service.discordListenAlongManager?.joinSession(lobbyId, secret)
+                    pendingJoinLobbyId = null
+                    pendingJoinSecret = null
+                }
+            }
+
             LaunchedEffect(Unit) {
                 if (System.currentTimeMillis() - Updater.lastCheckTime > 1.days.inWholeMilliseconds) {
                     Updater.getLatestVersionName().onSuccess {
@@ -416,7 +428,7 @@ class MainActivity : AppCompatActivity() {
 
             val dynamicIconEnabled by rememberPreference(
                 DynamicIconKey,
-                defaultValue = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                defaultValue = Build.VERSION.SDK_INT >= TIRAMISU
             )
             val highRefreshRateEnabled by rememberPreference(
                 HighRefreshRateKey,
@@ -1503,6 +1515,24 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 }
+            } else if (uri.host.equals("join", ignoreCase = true)) {
+                val lobbyIdString = uri.getQueryParameter("lobbyId")
+                val secret = uri.getQueryParameter("secret")
+                if (lobbyIdString != null && secret != null) {
+                    val lobbyId = lobbyIdString.toLongOrNull()
+                    if (lobbyId != null) {
+                        val connection = playerConnection
+                        if (connection != null) {
+                            connection.service.discordListenAlongManager?.joinSession(
+                                lobbyId,
+                                secret
+                            )
+                        } else {
+                            pendingJoinLobbyId = lobbyId
+                            pendingJoinSecret = secret
+                        }
+                    }
+                }
             } else {
                 val deepLinkQuery = uri.getQueryParameter("q")
                     ?.takeIf { it.isNotBlank() }
@@ -1586,7 +1616,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyDynamicLauncherIcon(enabled: Boolean) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (Build.VERSION.SDK_INT < TIRAMISU) return
 
         val dynamicComponent = ComponentName(this, "$packageName$DYNAMIC_LAUNCHER_ALIAS_SUFFIX")
         val defaultComponent = ComponentName(this, "$packageName$DEFAULT_LAUNCHER_ALIAS_SUFFIX")

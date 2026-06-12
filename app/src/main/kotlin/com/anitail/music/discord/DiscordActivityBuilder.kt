@@ -24,6 +24,10 @@ object DiscordActivityBuilder {
         btn2Url: String = DiscordDefaults.BUTTON2_URL,
         isPlaying: Boolean = true,
         pausedText: String? = null,
+        partyId: String? = null,
+        partyCurrentSize: Int = 0,
+        partyMaxSize: Int = 0,
+        joinSecret: String? = null,
     ): DiscordActivity {
         val state: String
         val details: String?
@@ -98,6 +102,10 @@ object DiscordActivityBuilder {
             button1Url = renderedBtn1Url,
             button2Label = renderedBtn2Label,
             button2Url = renderedBtn2Url,
+            partyId = partyId,
+            partyCurrentSize = partyCurrentSize,
+            partyMaxSize = partyMaxSize,
+            joinSecret = joinSecret,
         )
     }
 }
