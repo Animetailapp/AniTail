@@ -36,6 +36,32 @@ fun rememberIsTelevision(): Boolean {
 }
 
 @Composable
+fun Modifier.tvFocusHighlight(
+    shape: Shape = RoundedCornerShape(8.dp),
+    focusedBorderWidth: Dp = 2.dp,
+    focusedScale: Float = 1.03f,
+    interactionSource: MutableInteractionSource,
+): Modifier = composed {
+    val isTelevision = LocalIsTelevision.current
+    if (!isTelevision) {
+        return@composed this
+    }
+
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val focusedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+    val targetScale = if (isFocused) focusedScale else 1f
+    val scale by animateFloatAsState(targetValue = targetScale, label = "tvFocusScale")
+
+    this
+        .graphicsLayer(scaleX = scale, scaleY = scale)
+        .border(
+            width = if (isFocused) focusedBorderWidth else 0.dp,
+            color = if (isFocused) focusedColor else LocalContentColor.current.copy(alpha = 0f),
+            shape = shape,
+        )
+}
+
+@Composable
 fun Modifier.tvClickable(
     enabled: Boolean = true,
     shape: Shape = RoundedCornerShape(8.dp),
@@ -48,8 +74,7 @@ fun Modifier.tvClickable(
     onClick: () -> Unit,
 ): Modifier = composed {
     this
-        .tvFocusable(
-            enabled = enabled,
+        .tvFocusHighlight(
             shape = shape,
             focusedBorderWidth = focusedBorderWidth,
             focusedScale = focusedScale,
@@ -77,18 +102,12 @@ fun Modifier.tvFocusable(
     if (!isTelevision) {
         return@composed this
     }
-
-    val isFocused by interactionSource.collectIsFocusedAsState()
-    val focusedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-    val targetScale = if (isFocused) focusedScale else 1f
-    val scale by animateFloatAsState(targetValue = targetScale, label = "tvFocusScale")
-
     this
-        .graphicsLayer(scaleX = scale, scaleY = scale)
-        .border(
-            width = if (isFocused) focusedBorderWidth else 0.dp,
-            color = if (isFocused) focusedColor else LocalContentColor.current.copy(alpha = 0f),
+        .tvFocusHighlight(
             shape = shape,
+            focusedBorderWidth = focusedBorderWidth,
+            focusedScale = focusedScale,
+            interactionSource = interactionSource,
         )
         .focusable(enabled = enabled, interactionSource = interactionSource)
 }
@@ -108,8 +127,7 @@ fun Modifier.tvCombinedClickable(
     onLongClick: (() -> Unit)? = null,
 ): Modifier = composed {
     this
-        .tvFocusable(
-            enabled = enabled,
+        .tvFocusHighlight(
             shape = shape,
             focusedBorderWidth = focusedBorderWidth,
             focusedScale = focusedScale,

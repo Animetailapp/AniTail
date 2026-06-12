@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.anitail.music.constants.NavigationBarAnimationSpec
 import com.anitail.music.ui.utils.tvClickable
+import com.anitail.music.ui.utils.LocalIsTelevision
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.pow
@@ -121,17 +122,26 @@ fun BottomSheet(
         }
 
         if (!state.isExpanded && (onDismiss == null || !state.isDismissed)) {
-            Box(
-                modifier = Modifier
-                    .graphicsLayer {
-                        alpha = 1f - (state.progress * 4).coerceAtMost(1f)
-                    }
+            val isTelevision = LocalIsTelevision.current
+            val collapsedModifier = if (isTelevision) {
+                Modifier
+                    .fillMaxWidth()
+                    .height(state.collapsedBound)
+            } else {
+                Modifier
                     .tvClickable(
                         indication = null,
                         onClick = state::expandSoft
                     )
                     .fillMaxWidth()
-                    .height(state.collapsedBound),
+                    .height(state.collapsedBound)
+            }
+            Box(
+                modifier = Modifier
+                    .graphicsLayer {
+                        alpha = 1f - (state.progress * 4).coerceAtMost(1f)
+                    }
+                    .then(collapsedModifier),
                 content = collapsedContent
             )
         }
