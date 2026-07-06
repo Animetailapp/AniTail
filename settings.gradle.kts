@@ -8,7 +8,7 @@ pluginManagement {
         maven { setUrl("https://maven.pkg.jetbrains.space/public/p/compose/dev") }
     }
     plugins {
-        id("org.jetbrains.compose") version "1.12.0-SNAPSHOT+v-mazunin-enable-lifecycle-and-nav3-for-1-12-0-alpha02"
+        id("org.jetbrains.compose") version "1.12.10-alpha01+snapshot.ok-kotlin-2-4-20"
         id("org.jetbrains.kotlin.plugin.compose") version "2.4.0"
     }
 }
