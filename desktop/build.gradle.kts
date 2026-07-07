@@ -65,7 +65,7 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.53.2.0")
     implementation("com.google.api-client:google-api-client:2.9.0")
     implementation("com.google.oauth-client:google-oauth-client-jetty:1.39.0")
-    implementation("com.google.http-client:google-http-client-gson:2.1.0")
+    implementation("com.google.http-client:google-http-client-gson:2.1.1")
     implementation(libs.google.api.services.drive)
     implementation(libs.google.auth.library.oauth2.http)
 
