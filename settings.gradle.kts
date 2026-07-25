@@ -8,7 +8,7 @@ pluginManagement {
         maven { setUrl("https://maven.pkg.jetbrains.space/public/p/compose/dev") }
     }
     plugins {
-        id("org.jetbrains.compose") version "1.12.10-alpha01+snapshot.ok-kotlin-2-4-20"
+        id("org.jetbrains.compose") version "1.12.10-alpha01+snapshot.svastven-CMP-10440-test-build"
         id("org.jetbrains.kotlin.plugin.compose") version "2.4.20-Beta1"
     }
 }
