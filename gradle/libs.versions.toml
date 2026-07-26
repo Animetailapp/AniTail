@@ -26,7 +26,7 @@ jna = "5.19.1"
 ksp = "2.3.10"
 okhttp = "5.4.0"
 newpipe = "v0.26.0"
-workRuntimeKtx = "2.11.2"
+workRuntimeKtx = "2.12.0-alpha01"
 
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.8.0-alpha01" }
