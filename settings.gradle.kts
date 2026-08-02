@@ -9,7 +9,7 @@ pluginManagement {
     }
     plugins {
         id("org.jetbrains.compose") version "1.12.10-alpha01+snapshot.svastven-CMP-10440-test-build"
-        id("org.jetbrains.kotlin.plugin.compose") version "2.4.20-Beta1"
+        id("org.jetbrains.kotlin.plugin.compose") version "2.4.20-Beta2"
     }
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
