@@ -2,7 +2,7 @@
 androidGradlePlugin = "9.4.0-alpha03"
 documentfile = "1.1.0"
 hiltWork = "1.4.0"
-commonsCodec = "1.22.0"
+commonsCodec = "1.22.1"
 json = "20250517"
 jsoup = "1.22.2"
 kotlin = "2.4.20-Beta2"
