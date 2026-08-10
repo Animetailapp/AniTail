@@ -23,13 +23,13 @@ object PlayerSliderColors {
     @Composable
     fun getSliderColors(
         activeColor: Color,
-        inactiveAlpha: Float = 0.15f
+        inactiveAlpha: Float = Config.INACTIVE_TRACK_ALPHA
     ): SliderColors {
         return SliderDefaults.colors(
             activeTrackColor = activeColor,
             activeTickColor = activeColor,
             thumbColor = activeColor,
-            inactiveTrackColor = Color.White.copy(alpha = inactiveAlpha)
+            inactiveTrackColor = activeColor.copy(alpha = inactiveAlpha)
         )
     }
 
@@ -48,7 +48,7 @@ object PlayerSliderColors {
     }
 
     /**
-     * Squiggly slider colors using button color scheme
+     * Squiggly / wavy slider colors using button color scheme
      *
      * @param buttonColor The active button color from player theme
      * @return SliderColors configuration for squiggly slider
@@ -73,7 +73,8 @@ object PlayerSliderColors {
         return SliderDefaults.colors(
             activeTrackColor = buttonColor,
             activeTickColor = buttonColor,
-            inactiveTrackColor = Color.White.copy(alpha = Config.INACTIVE_TRACK_ALPHA)
+            thumbColor = buttonColor,
+            inactiveTrackColor = buttonColor.copy(alpha = Config.INACTIVE_TRACK_ALPHA)
         )
     }
 
@@ -81,8 +82,8 @@ object PlayerSliderColors {
      * Configuration constants for slider colors
      */
     object Config {
-        /** Alpha transparency for inactive track - subtle white appearance */
-        const val INACTIVE_TRACK_ALPHA = 0.15f
+        /** Alpha transparency for inactive track - subtle appearance */
+        const val INACTIVE_TRACK_ALPHA = 0.25f
 
         /** Alpha transparency for inactive ticks */
         const val INACTIVE_TICK_ALPHA = 0.2f
@@ -91,6 +92,6 @@ object PlayerSliderColors {
         val DEFAULT_ACTIVE_COLOR = Color(0xFF1976D2)
 
         /** Default inactive color when no theme color is available */
-        val DEFAULT_INACTIVE_COLOR = Color.White.copy(alpha = INACTIVE_TRACK_ALPHA)
+        val DEFAULT_INACTIVE_COLOR = DEFAULT_ACTIVE_COLOR.copy(alpha = INACTIVE_TRACK_ALPHA)
     }
 }
