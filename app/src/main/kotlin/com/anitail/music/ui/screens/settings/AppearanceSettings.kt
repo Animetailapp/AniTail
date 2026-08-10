@@ -100,7 +100,7 @@ import com.anitail.music.utils.FontUtils
 import com.anitail.music.utils.rememberEnumPreference
 import com.anitail.music.utils.rememberPreference
 import kotlinx.coroutines.launch
-import me.saket.squiggles.SquigglySlider
+import com.anitail.music.ui.component.WavySlider
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -370,7 +370,7 @@ fun AppearanceSettings(
                     var sliderValue by remember {
                         mutableFloatStateOf(0.5f)
                     }
-                    SquigglySlider(
+                    WavySlider(
                         value = sliderValue,
                         valueRange = 0f..1f,
                         onValueChange = {

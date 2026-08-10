@@ -82,6 +82,29 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
         CrashHandler.install(this)
         instance = this
 
+        val currentProcessName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            getProcessName()
+        } else {
+            val pid = android.os.Process.myPid()
+            val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+            activityManager?.runningAppProcesses?.find { it.pid == pid }?.processName
+        }
+
+        // Set WebView data directory suffix for multi-process safety (API 28+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && currentProcessName != null && currentProcessName != packageName) {
+            val suffix = currentProcessName.substringAfterLast(":", currentProcessName.replace('.', '_'))
+            try {
+                android.webkit.WebView.setDataDirectorySuffix(suffix)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to set WebView data directory suffix for process: $currentProcessName")
+            }
+        }
+
+        // If running in the dedicated crash reporter process, skip main app background initialization
+        if (currentProcessName?.endsWith(":crash") == true) {
+            Timber.d("Running in crash process ($currentProcessName), skipping main application initialization")
+            return
+        }
 
         Timber.plant(Timber.DebugTree())
         // OneSignal initialization
@@ -100,6 +123,16 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
 
         // Initialize automatic update checks
         UpdateCheckWorker.schedule(this)
+
+        // Initialize Cipher and YouTube Deobfuscation engine
+        try {
+            com.anitail.music.utils.cipher.CipherDeobfuscator.initialize(this)
+            applicationScope.launch(Dispatchers.IO) {
+                com.anitail.music.utils.cipher.CipherDeobfuscator.prewarm()
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to initialize CipherDeobfuscator")
+        }
 
         // Initialize automatic backup (only schedule, don't run immediately)
         try {
@@ -153,6 +186,12 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
                                 settings[VisitorDataKey] = newVisitorData
                             }
                         }
+                    // Prewarm PoToken when visitorData is ready
+                    if (YouTube.visitorData != null) {
+                        applicationScope.launch(Dispatchers.IO) {
+                            com.anitail.music.utils.YTPlayerUtils.prewarmPoToken()
+                        }
+                    }
                 }
         }
         applicationScope.launch {

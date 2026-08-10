@@ -147,7 +147,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import me.saket.squiggles.SquigglySlider
+import com.anitail.music.ui.component.WavySlider
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -926,7 +926,7 @@ fun BottomSheetPlayer(
                 SliderStyle.DEFAULT -> {
                     Slider(
                         value = (sliderPosition ?: position).toFloat(),
-                        valueRange = 0f..(if (duration == C.TIME_UNSET) 0f else duration.toFloat()),
+                        valueRange = 0f..(if (duration == C.TIME_UNSET || duration <= 0L) 1f else duration.toFloat()),
                         onValueChange = {
                             sliderPosition = it.toLong()
                         },
@@ -945,11 +945,7 @@ fun BottomSheetPlayer(
                             }
                             sliderPosition = null
                         },
-                        colors = SliderDefaults.colors(
-                            activeTrackColor = textButtonColor,
-                            activeTickColor = textButtonColor,
-                            thumbColor = textButtonColor
-                        ),
+                        colors = PlayerSliderColors.defaultSliderColors(textButtonColor),
                         modifier = Modifier
                             .padding(horizontal = PlayerHorizontalPadding)
                             .then(sliderTvModifier),
@@ -957,9 +953,9 @@ fun BottomSheetPlayer(
                 }
 
                 SliderStyle.SQUIGGLY -> {
-                    SquigglySlider(
+                    WavySlider(
                         value = (sliderPosition ?: position).toFloat(),
-                        valueRange = 0f..(if (duration == C.TIME_UNSET) 0f else duration.toFloat()),
+                        valueRange = 0f..(if (duration == C.TIME_UNSET || duration <= 0L) 1f else duration.toFloat()),
                         onValueChange = {
                             sliderPosition = it.toLong()
                         },
@@ -978,26 +974,18 @@ fun BottomSheetPlayer(
                             }
                             sliderPosition = null
                         },
-                        colors = SliderDefaults.colors(
-                            activeTrackColor = textButtonColor,
-                            activeTickColor = textButtonColor,
-                            thumbColor = textButtonColor
-                        ),
+                        colors = PlayerSliderColors.squigglySliderColors(textButtonColor),
+                        isPlaying = isPlaying,
                         modifier = Modifier
                             .padding(horizontal = PlayerHorizontalPadding)
                             .then(sliderTvModifier),
-                        squigglesSpec =
-                            SquigglySlider.SquigglesSpec(
-                                amplitude = if (isPlaying) (2.dp).coerceAtLeast(2.dp) else 0.dp,
-                                strokeWidth = 3.dp,
-                            ),
                     )
                 }
 
                 SliderStyle.SLIM -> {
                     Slider(
                         value = (sliderPosition ?: position).toFloat(),
-                        valueRange = 0f..(if (duration == C.TIME_UNSET) 0f else duration.toFloat()),
+                        valueRange = 0f..(if (duration == C.TIME_UNSET || duration <= 0L) 1f else duration.toFloat()),
                         onValueChange = {
                             sliderPosition = it.toLong()
                         },

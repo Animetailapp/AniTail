@@ -14,18 +14,25 @@ import com.anitail.innertube.models.YouTubeClient.Companion.WEB_CREATOR
 import com.anitail.innertube.models.YouTubeClient.Companion.WEB_REMIX
 import com.anitail.innertube.models.response.PlayerResponse
 import com.anitail.music.constants.AudioQuality
-import com.anitail.music.utils.YTPlayerUtils.MAIN_CLIENT
-import com.anitail.music.utils.YTPlayerUtils.STREAM_FALLBACK_CLIENTS
-import com.anitail.music.utils.YTPlayerUtils.validateStatus
+import com.anitail.music.playback.CachedStreamUrl
+import com.anitail.music.playback.StreamUrlCache
+import com.anitail.music.utils.cipher.CipherDeobfuscator
+import com.anitail.music.utils.potoken.PoTokenGenerator
+import com.anitail.music.utils.potoken.PoTokenResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import timber.log.Timber
 
 object YTPlayerUtils {
     private const val logTag = "YTPlayerUtils"
+    private const val TAG = "YTPlayerUtils"
 
     private val httpClient = OkHttpClient.Builder()
         .proxy(YouTube.proxy)
         .build()
+
+    private val poTokenGenerator = PoTokenGenerator()
 
     /**
      * The main client is used for metadata and initial streams.
@@ -36,8 +43,8 @@ object YTPlayerUtils {
      * - the correct metadata (like loudnessDb)
      * - premium formats
      */
-
     private val MAIN_CLIENT: YouTubeClient = WEB_REMIX
+
     /**
      * Clients used for fallback streams in case the streams of the main client do not work.
      */
@@ -49,6 +56,22 @@ object YTPlayerUtils {
         WEB,
         WEB_CREATOR
     )
+
+    private const val POTOKEN_WARMUP_VIDEO_ID = "jNQXAC9IVRw"
+
+    /**
+     * Best-effort warm-up of the PoToken generator.
+     */
+    suspend fun prewarmPoToken() {
+        val sessionId = YouTube.visitorData ?: return
+        if (!MAIN_CLIENT.useWebPoTokens) return
+        runCatching {
+            withContext(Dispatchers.IO) {
+                poTokenGenerator.getWebClientPoToken(POTOKEN_WARMUP_VIDEO_ID, sessionId)
+            }
+        }.onFailure { Timber.tag(TAG).w(it, "PoToken prewarm skipped: ${it.message}") }
+    }
+
     data class PlaybackData(
         val audioConfig: PlayerResponse.PlayerConfig.AudioConfig?,
         val videoDetails: PlayerResponse.VideoDetails?,
@@ -56,7 +79,10 @@ object YTPlayerUtils {
         val format: PlayerResponse.StreamingData.Format,
         val streamUrl: String,
         val streamExpiresInSeconds: Int,
+        val streamClient: String = "unknown",
+        val streamHeaders: Map<String, String> = emptyMap(),
     )
+
     /**
      * Custom player response intended to use for playback.
      * Metadata like audioConfig and videoDetails are from [MAIN_CLIENT].
@@ -70,30 +96,45 @@ object YTPlayerUtils {
         targetItag: Int = 0,
     ): Result<PlaybackData> = runCatching {
         Timber.tag(logTag).d("Fetching player response for videoId: $videoId, playlistId: $playlistId")
-        /**
-         * This is required for some clients to get working streams however
-         * it should not be forced for the [MAIN_CLIENT] because the response of the [MAIN_CLIENT]
-         * is required even if the streams won't work from this client.
-         * This is why it is allowed to be null.
-         */
+
+        // 1. Check StreamUrlCache first
+        val cachedStream = StreamUrlCache.get(videoId, targetItag)
+        if (cachedStream != null) {
+            Timber.tag(logTag).d("Using valid cached stream URL from StreamUrlCache")
+        }
+
         val signatureTimestamp = getSignatureTimestampOrNull(videoId)
         Timber.tag(logTag).d("Signature timestamp: $signatureTimestamp")
 
-        val isLoggedIn = YouTube.cookie != null
-        if (isLoggedIn) {
-            // signed in sessions use dataSyncId as identifier
-            YouTube.dataSyncId
-        } else {
-            // signed out sessions use visitorData as identifier
-            YouTube.visitorData
+        // 2. Generate PoToken for Web Client
+        var poToken: PoTokenResult? = null
+        val sessionId = YouTube.visitorData
+        if (MAIN_CLIENT.useWebPoTokens && sessionId != null) {
+            try {
+                poToken = poTokenGenerator.getWebClientPoToken(videoId, sessionId)
+                if (poToken != null) {
+                    Timber.tag(logTag).d("PoToken generated successfully for playback")
+                }
+            } catch (e: Exception) {
+                Timber.tag(logTag).w(e, "PoToken generation failed: ${e.message}")
+            }
         }
+
+        val isLoggedIn = YouTube.cookie != null
         Timber.tag(logTag).d("Session authentication status: ${if (isLoggedIn) "Logged in" else "Not logged in"}")
 
         Timber.tag(logTag).d("Attempting to get player response using MAIN_CLIENT: ${MAIN_CLIENT.clientName}")
         var mainPlayerResponse: PlayerResponse? = null
         var mainPlayerResponseError: Throwable? = null
         try {
-            val response = YouTube.player(videoId, playlistId, MAIN_CLIENT, signatureTimestamp).getOrThrow()
+            val response = YouTube.player(
+                videoId = videoId,
+                playlistId = playlistId,
+                client = MAIN_CLIENT,
+                signatureTimestamp = signatureTimestamp,
+                poToken = poToken?.playerRequestPoToken
+            ).getOrThrow()
+
             if (isPlayable(response.playabilityStatus.status)) {
                 mainPlayerResponse = response
             } else {
@@ -110,7 +151,12 @@ object YTPlayerUtils {
             for (client in STREAM_FALLBACK_CLIENTS) {
                 if (client.loginRequired && !isLoggedIn && YouTube.cookie == null) continue
                 try {
-                    val response = YouTube.player(videoId, playlistId, client, signatureTimestamp).getOrNull()
+                    val response = YouTube.player(
+                        videoId = videoId,
+                        playlistId = playlistId,
+                        client = client,
+                        signatureTimestamp = if (client.useSignatureTimestamp) signatureTimestamp else null,
+                    ).getOrNull()
                     if (isPlayable(response?.playabilityStatus?.status)) {
                         Timber.tag(logTag).d("Successfully fetched playable player response using fallback client: ${client.clientName}")
                         mainPlayerResponse = response
@@ -134,6 +180,7 @@ object YTPlayerUtils {
         var streamUrl: String? = null
         var streamExpiresInSeconds: Int? = null
         var streamPlayerResponse: PlayerResponse? = null
+        var successClientName = MAIN_CLIENT.clientName
 
         for (clientIndex in (-1 until STREAM_FALLBACK_CLIENTS.size)) {
             // reset for each client
@@ -154,14 +201,18 @@ object YTPlayerUtils {
                 Timber.tag(logTag).d("Trying fallback client ${clientIndex + 1}/${STREAM_FALLBACK_CLIENTS.size}: ${client.clientName}")
 
                 if (client.loginRequired && !isLoggedIn && YouTube.cookie == null) {
-                    // skip client if it requires login but user is not logged in
                     Timber.tag(logTag).d("Skipping client ${client.clientName} - requires login but user is not logged in")
                     continue
                 }
 
                 Timber.tag(logTag).d("Fetching player response for fallback client: ${client.clientName}")
                 streamPlayerResponse =
-                    YouTube.player(videoId, playlistId, client, signatureTimestamp).getOrNull()
+                    YouTube.player(
+                        videoId = videoId,
+                        playlistId = playlistId,
+                        client = client,
+                        signatureTimestamp = if (client.useSignatureTimestamp) signatureTimestamp else null,
+                    ).getOrNull()
             }
 
             // process current client response
@@ -190,23 +241,20 @@ object YTPlayerUtils {
                     continue
                 }
 
-                streamExpiresInSeconds = response.streamingData?.expiresInSeconds
-                if (streamExpiresInSeconds == null) {
-                    Timber.tag(logTag).d("Stream expiration time not found")
-                    continue
-                }
-
+                streamExpiresInSeconds = response.streamingData?.expiresInSeconds ?: 21600
                 Timber.tag(logTag).d("Stream expires in: $streamExpiresInSeconds seconds")
 
                 if (clientIndex == STREAM_FALLBACK_CLIENTS.size - 1) {
                     /** skip [validateStatus] for last client */
                     Timber.tag(logTag).d("Using last fallback client without validation: ${STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
+                    successClientName = STREAM_FALLBACK_CLIENTS[clientIndex].clientName
                     break
                 }
 
                 if (validateStatus(streamUrl)) {
                     // working stream found
                     Timber.tag(logTag).d("Stream validated successfully with client: ${if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
+                    successClientName = if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName
                     break
                 } else {
                     Timber.tag(logTag).d("Stream validation failed for client: ${if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
@@ -246,16 +294,27 @@ object YTPlayerUtils {
             throw Exception("Could not find stream url")
         }
 
+        // Cache in StreamUrlCache
+        StreamUrlCache.put(
+            mediaId = videoId,
+            url = streamUrl,
+            clientName = successClientName,
+            expiresInSeconds = streamExpiresInSeconds,
+            itag = format.itag,
+        )
+
         Timber.tag(logTag).d("Successfully obtained playback data with format: ${format.mimeType}, bitrate: ${format.bitrate}")
         PlaybackData(
-            audioConfig,
-            videoDetails,
-            playbackTracking,
-            format,
-            streamUrl,
-            streamExpiresInSeconds,
+            audioConfig = audioConfig,
+            videoDetails = videoDetails,
+            playbackTracking = playbackTracking,
+            format = format,
+            streamUrl = streamUrl,
+            streamExpiresInSeconds = streamExpiresInSeconds,
+            streamClient = successClientName,
         )
     }
+
     /**
      * Simple player response intended to use for metadata only.
      * Stream URLs of this response might not work so don't use them.
@@ -277,7 +336,12 @@ object YTPlayerUtils {
         for (client in STREAM_FALLBACK_CLIENTS) {
             if (client.loginRequired && !isLoggedIn && YouTube.cookie == null) continue
             try {
-                val res = YouTube.player(videoId, playlistId, client = client, signatureTimestamp = signatureTimestamp).getOrNull()
+                val res = YouTube.player(
+                    videoId = videoId,
+                    playlistId = playlistId,
+                    client = client,
+                    signatureTimestamp = if (client.useSignatureTimestamp) signatureTimestamp else null
+                ).getOrNull()
                 if (res != null && isPlayable(res.playabilityStatus?.status)) {
                     Timber.tag(logTag).d("Successfully fetched playable player response for metadata using fallback client: ${client.clientName}")
                     return Result.success(res)
@@ -412,40 +476,80 @@ object YTPlayerUtils {
         }
         return false
     }
+
     /**
-     * Wrapper around the [NewPipeExtractor.getSignatureTimestamp] function which reports exceptions
+     * Wrapper around the [CipherDeobfuscator.signatureTimestamp] and [NewPipeExtractor.getSignatureTimestamp]
      */
-    private fun getSignatureTimestampOrNull(
+    private suspend fun getSignatureTimestampOrNull(
         videoId: String
     ): Int? {
         Timber.tag(logTag).d("Getting signature timestamp for videoId: $videoId")
+
+        // First attempt with CipherDeobfuscator
+        val cipherSts = try {
+            CipherDeobfuscator.signatureTimestamp()
+                ?.also { Timber.tag(logTag).d("Signature timestamp from cipher player: $it") }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.tag(logTag).w(e, "Cipher player STS fetch failed")
+            null
+        }
+
+        if (cipherSts != null) return cipherSts
+
+        // Fallback to NewPipeExtractor
         return NewPipeExtractor.getSignatureTimestamp(videoId)
-            .onSuccess { Timber.tag(logTag).d("Signature timestamp obtained: $it") }
+            .onSuccess { Timber.tag(logTag).d("Signature timestamp obtained via NewPipe: $it") }
             .onFailure {
                 Timber.tag(logTag).e(it, "Failed to get signature timestamp")
                 reportException(it)
             }
             .getOrNull()
     }
+
     /**
-     * Wrapper around the [NewPipeExtractor.getStreamUrl] function which reports exceptions
+     * Finds stream URL by evaluating direct url, CipherDeobfuscator, and NewPipeExtractor
      */
-    private fun findUrlOrNull(
+    private suspend fun findUrlOrNull(
         format: PlayerResponse.StreamingData.Format,
         videoId: String
     ): String? {
         Timber.tag(logTag).d("Finding stream URL for format: ${format.mimeType}, videoId: $videoId")
+
+        // 1. Check if format already contains direct URL
+        if (!format.url.isNullOrEmpty()) {
+            Timber.tag(logTag).d("Using URL from format directly")
+            return format.url
+        }
+
+        // 2. Try custom cipher deobfuscation for signatureCipher formats
+        val signatureCipher = format.signatureCipher
+        if (!signatureCipher.isNullOrEmpty()) {
+            Timber.tag(logTag).d("Format has signatureCipher, attempting CipherDeobfuscator")
+            try {
+                val customDeobfuscatedUrl = CipherDeobfuscator.deobfuscateStreamUrl(signatureCipher, videoId)
+                if (customDeobfuscatedUrl != null) {
+                    Timber.tag(logTag).d("Stream URL obtained via CipherDeobfuscator")
+                    return customDeobfuscatedUrl
+                }
+            } catch (e: Exception) {
+                Timber.tag(logTag).w(e, "CipherDeobfuscator deobfuscation failed")
+            }
+        }
+
+        // 3. Fallback to NewPipe signature deobfuscator
         return try {
             NewPipeExtractor.getStreamUrl(format, videoId)
                 .also {
                     if (it != null) {
-                        Timber.tag(logTag).d("Stream URL obtained successfully")
+                        Timber.tag(logTag).d("Stream URL obtained via NewPipeExtractor")
                     } else {
-                        Timber.tag(logTag).d("Stream URL not found")
+                        Timber.tag(logTag).d("Stream URL not found via NewPipeExtractor")
                     }
                 }
         } catch (e: Exception) {
-            Timber.tag(logTag).e(e, "Failed to get stream URL")
+            Timber.tag(logTag).e(e, "Failed to get stream URL via NewPipe")
             reportException(e)
             null
         }
