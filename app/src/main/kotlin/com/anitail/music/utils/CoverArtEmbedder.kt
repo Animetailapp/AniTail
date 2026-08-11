@@ -31,6 +31,11 @@ class CoverArtEmbedder @Inject constructor(
         trackNumber: Int = 0,
         totalTracks: Int = 0
     ): Boolean = withContext(Dispatchers.IO) {
+        if (!CoverArtNative.isAvailable) {
+            Timber.tag(TAG).w("CoverArtNative is not available, skipping metadata embedding")
+            return@withContext false
+        }
+
         val tempDir = File(context.cacheDir, "coverart_temp")
         if (!tempDir.exists()) {
             tempDir.mkdirs()
@@ -83,8 +88,8 @@ class CoverArtEmbedder @Inject constructor(
             }
 
             true
-        } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "Error embedding metadata")
+        } catch (t: Throwable) {
+            Timber.tag(TAG).e(t, "Error embedding metadata")
             false
         } finally {
             if (inputFile.exists()) {
@@ -107,6 +112,11 @@ class CoverArtEmbedder @Inject constructor(
         trackNumber: Int = 0,
         totalTracks: Int = 0
     ): Boolean = withContext(Dispatchers.IO) {
+        if (!CoverArtNative.isAvailable) {
+            Timber.tag(TAG).w("CoverArtNative is not available, skipping metadata embedding")
+            return@withContext false
+        }
+
         val inputFile = File(filePath)
         if (!inputFile.exists()) {
             Timber.tag(TAG).e("Input file does not exist: %s", filePath)
@@ -140,8 +150,8 @@ class CoverArtEmbedder @Inject constructor(
                 Timber.tag(TAG).e("Failed to replace original file")
                 false
             }
-        } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "Error embedding metadata into local file")
+        } catch (t: Throwable) {
+            Timber.tag(TAG).e(t, "Error embedding metadata into local file")
             outputFile.delete()
             false
         }

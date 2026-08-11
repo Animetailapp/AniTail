@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project("anitail_discord")
+project("anitail_native")
 
 find_package(discord_partner_sdk REQUIRED CONFIG)
 
@@ -27,3 +27,5 @@ target_compile_features(
         PUBLIC
         cxx_std_17
 )
+
+add_subdirectory(coverart)

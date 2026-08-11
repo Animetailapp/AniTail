@@ -1,8 +1,14 @@
 package com.anitail.music.utils
 
+import timber.log.Timber
+
 object CoverArtNative {
-    init {
+    val isAvailable: Boolean = try {
         System.loadLibrary("coverart")
+        true
+    } catch (t: Throwable) {
+        Timber.tag("CoverArtNative").e(t, "Failed to load libcoverart.so native library")
+        false
     }
 
     external fun embedMetadata(
@@ -23,3 +29,4 @@ object CoverArtNative {
         outputPath: String
     ): Boolean
 }
+

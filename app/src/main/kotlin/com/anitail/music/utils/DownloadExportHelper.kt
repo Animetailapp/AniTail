@@ -289,8 +289,8 @@ class DownloadExportHelper @Inject constructor(
                 Timber.tag(TAG).w("Metadata embedding failed for: %s", fileUri)
             }
             embedded
-        } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "Error embedding metadata, continuing without metadata")
+        } catch (t: Throwable) {
+            Timber.tag(TAG).e(t, "Error embedding metadata, continuing without metadata")
             false
         }
     }
