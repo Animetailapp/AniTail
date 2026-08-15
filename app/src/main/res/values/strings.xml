@@ -340,6 +340,8 @@
     <string name="notification_button_type">Notification button type</string>
     <string name="notification_button_close">Close button</string>
     <string name="notification_button_like">Like button</string>
+    <string name="notification_system_settings">System notification settings</string>
+    <string name="notification_system_settings_desc">Configure lock screen, status bar, and media control permissions</string>
 
     <!-- Settings -->
     <string name="settings">Settings</string>

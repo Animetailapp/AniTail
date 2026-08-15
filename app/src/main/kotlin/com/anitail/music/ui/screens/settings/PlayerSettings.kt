@@ -1,5 +1,9 @@
 package com.anitail.music.ui.screens.settings
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -434,6 +438,24 @@ fun PlayerSettings(
                     NotificationButtonType.CLOSE -> stringResource(R.string.notification_button_close)
                     NotificationButtonType.LIKE -> stringResource(R.string.notification_button_like)
                 }
+            }
+        )
+
+        PreferenceEntry(
+            title = { Text(stringResource(R.string.notification_system_settings)) },
+            description = stringResource(R.string.notification_system_settings_desc),
+            icon = { Icon(painterResource(R.drawable.tune), null) },
+            onClick = {
+                val intent = Intent().apply {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        action = Settings.ACTION_APP_NOTIFICATION_SETTINGS
+                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    } else {
+                        action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                        data = Uri.fromParts("package", context.packageName, null)
+                    }
+                }
+                context.startActivity(intent)
             }
         )
     }

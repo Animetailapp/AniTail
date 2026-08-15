@@ -121,6 +121,23 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
             Timber.e(e, "OneSignal initialization failed")
         }
 
+        // Initialize notification channel for music playback
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+            val channel = android.app.NotificationChannel(
+                com.anitail.music.playback.MusicService.CHANNEL_ID,
+                getString(R.string.music_player),
+                android.app.NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                setShowBadge(false)
+                description = getString(R.string.music_player)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                setSound(null, null)
+                enableVibration(false)
+            }
+            notificationManager?.createNotificationChannel(channel)
+        }
+
         // Initialize automatic update checks
         UpdateCheckWorker.schedule(this)
 

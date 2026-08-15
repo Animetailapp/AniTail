@@ -54,16 +54,25 @@ constructor(
         controller: MediaSession.ControllerInfo,
     ): MediaSession.ConnectionResult {
         val connectionResult = super.onConnect(session, controller)
+        val sessionCommands = connectionResult.availableSessionCommands
+            .buildUpon()
+            .add(MediaSessionConstants.CommandToggleLike)
+            .add(MediaSessionConstants.CommandToggleLibrary)
+            .add(MediaSessionConstants.CommandToggleShuffle)
+            .add(MediaSessionConstants.CommandToggleRepeatMode)
+            .add(MediaSessionConstants.CommandClosePlayer)
+            .build()
+        val playerCommands = connectionResult.availablePlayerCommands
+            .buildUpon()
+            .add(androidx.media3.common.Player.COMMAND_PLAY_PAUSE)
+            .add(androidx.media3.common.Player.COMMAND_SEEK_TO_NEXT)
+            .add(androidx.media3.common.Player.COMMAND_SEEK_TO_PREVIOUS)
+            .add(androidx.media3.common.Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+            .add(androidx.media3.common.Player.COMMAND_STOP)
+            .build()
         return MediaSession.ConnectionResult.accept(
-            connectionResult.availableSessionCommands
-                .buildUpon()
-                .add(MediaSessionConstants.CommandToggleLike)
-                .add(MediaSessionConstants.CommandToggleLibrary)
-                .add(MediaSessionConstants.CommandToggleShuffle)
-                .add(MediaSessionConstants.CommandToggleRepeatMode)
-                .add(MediaSessionConstants.CommandClosePlayer)
-                .build(),
-            connectionResult.availablePlayerCommands,
+            sessionCommands,
+            playerCommands,
         )
     }
     override fun onCustomCommand(

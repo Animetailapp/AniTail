@@ -3,6 +3,7 @@
 package com.anitail.music.playback
 
 import android.annotation.SuppressLint
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -19,6 +20,10 @@ import android.os.Binder
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.ui.graphics.toArgb
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
+import coil.imageLoader
+import coil.request.ImageRequest
 import androidx.core.app.NotificationCompat
 import androidx.core.net.toUri
 import androidx.datastore.preferences.core.edit
@@ -55,12 +60,10 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.session.CommandButton
-import androidx.media3.session.DefaultMediaNotificationProvider
-import androidx.media3.session.MediaController
 import androidx.media3.session.MediaLibraryService
-import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaSession
-import androidx.media3.session.SessionToken
+import androidx.media3.session.MediaSessionService
+import androidx.media3.session.MediaStyleNotificationHelper
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint
@@ -179,6 +182,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
@@ -301,11 +305,16 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     @Volatile private var discordRpcEnabled = false
     private val screenOffHandler = Handler(Looper.getMainLooper())
     private val screenOffTimeout = Runnable {
-        Timber.tag("DiscordSvc").i("screenOffTimeout: isPlaying=%s, isReady=%s",
-            player.isPlaying, DiscordRpcManager.isReady())
-        if (!player.isPlaying && DiscordRpcManager.isReady()) {
-            Timber.tag("DiscordSvc").i("screenOffTimeout: disconnecting")
-            DiscordRpcManager.disconnect()
+        runCatching {
+            val isPlaying = if (this::player.isInitialized) player.isPlaying else false
+            Timber.tag("DiscordSvc").i("screenOffTimeout: isPlaying=%s, isReady=%s",
+                isPlaying, DiscordRpcManager.isReady())
+            if (!isPlaying && DiscordRpcManager.isReady()) {
+                Timber.tag("DiscordSvc").i("screenOffTimeout: disconnecting")
+                DiscordRpcManager.disconnect()
+            }
+        }.onFailure { e ->
+            Timber.tag("DiscordSvc").w(e, "screenOffTimeout: error checking player state")
         }
     }
 
@@ -324,7 +333,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                     Intent.ACTION_SCREEN_ON -> {
                         Timber.tag("DiscordSvc").i("SCREEN_ON: removing disconnect delay")
                         screenOffHandler.removeCallbacks(screenOffTimeout)
-                        if (player.isPlaying && DiscordRpcManager.isReady()) {
+                        if (this@MusicService::player.isInitialized &&
+                            player.isPlaying && DiscordRpcManager.isReady()) {
                             currentSong.value?.let { song ->
                                 Timber.tag("DiscordSvc").i("SCREEN_ON: updating RPC")
                                 scope.launch {
@@ -350,42 +360,16 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
     override fun onCreate() {
     super.onCreate()
+    isRunning = true
     instance = this
-        // Proveedor base
-        val baseNotificationProvider =
-            DefaultMediaNotificationProvider(
-                this, { NOTIFICATION_ID }, CHANNEL_ID, R.string.music_player
-            )
-                .apply { setSmallIcon(R.drawable.ic_ani) }
-
-        val suppressingProvider = object : MediaNotification.Provider {
-            override fun createNotification(
-                mediaSession: MediaSession,
-                mediaButtonPreferences: com.google.common.collect.ImmutableList<CommandButton>,
-                actionFactory: MediaNotification.ActionFactory,
-                onNotificationChangedCallback: MediaNotification.Provider.Callback
-            ): MediaNotification {
-                return (baseNotificationProvider as MediaNotification.Provider)
-                    .createNotification(
-                        mediaSession,
-                        mediaButtonPreferences,
-                        actionFactory,
-                        onNotificationChangedCallback
-                    )
+    setListener(
+        object : MediaSessionService.Listener {
+            override fun onForegroundServiceStartNotAllowedException() {
+                Timber.w("ForegroundServiceStartNotAllowedException in MusicService")
             }
-
-            override fun handleCustomCommand(
-                session: MediaSession,
-                action: String,
-                extras: android.os.Bundle
-            ): Boolean =
-                (baseNotificationProvider as MediaNotification.Provider)
-                    .handleCustomCommand(session, action, extras)
-
-            override fun getNotificationChannelInfo(): MediaNotification.Provider.NotificationChannelInfo =
-                (baseNotificationProvider as MediaNotification.Provider).getNotificationChannelInfo()
         }
-        setMediaNotificationProvider(suppressingProvider)
+    )
+    ensureForegroundChannelExists()
 
     connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
 
@@ -430,12 +414,10 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             )
             .setBitmapLoader(CoilBitmapLoader(this, scope))
             .build()
-    player.repeatMode = dataStore.get(RepeatModeKey, REPEAT_MODE_OFF)
 
-    // Keep a connected controller so that notification works
-    val sessionToken = SessionToken(this, ComponentName(this, MusicService::class.java))
-    val controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
-    controllerFuture.addListener({ controllerFuture.get() }, MoreExecutors.directExecutor())
+    addSession(mediaSession)
+
+    player.repeatMode = dataStore.get(RepeatModeKey, REPEAT_MODE_OFF)
 
         connectivityObserver = NetworkConnectivity(this)
         audioQuality =
@@ -1064,7 +1046,10 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             .setSessionCommand(CommandToggleShuffle)
             .build())
 
-    mediaSession.setCustomLayout(buttons)
+    if (this::mediaSession.isInitialized) {
+        mediaSession.setCustomLayout(buttons)
+        showMediaNotification()
+    }
   }
 
   private suspend fun recoverSong(
@@ -1414,8 +1399,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         sendWidgetUpdateBroadcast()
       }
       ACTION_PLAY_PAUSE -> {
-        ensureForegroundBootstrap()
-
         val wasPlaying = player.isPlaying
 
         if (wasPlaying) {
@@ -1425,23 +1408,31 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         }
 
         sendWidgetUpdateBroadcast()
+        showMediaNotification()
       }
       ACTION_NEXT -> {
-        ensureForegroundBootstrap()
         player.seekToNext()
         player.playWhenReady = true
+        showMediaNotification()
       }
       ACTION_PREV -> {
-        ensureForegroundBootstrap()
         player.seekToPrevious()
         player.playWhenReady = true
+        showMediaNotification()
+      }
+      "com.anitail.music.action.TOGGLE_LIKE" -> {
+        toggleLike()
+        showMediaNotification()
+      }
+      "com.anitail.music.action.CLOSE_PLAYER" -> {
+        closePlayer()
       }
     }
 
     return super.onStartCommand(intent, flags, startId)
   }
 
-  private fun ensureForegroundBootstrap() {
+  private fun ensureForegroundChannelExists() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
       val channel =
@@ -1452,33 +1443,218 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
           ).apply {
             setShowBadge(false)
             description = getString(R.string.music_player)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            setSound(null, null)
+            enableVibration(false)
           }
       notificationManager.createNotificationChannel(channel)
     }
+  }
 
-    val notification =
-        NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_ani)
-            .setContentTitle(getString(R.string.music_player))
-            .setContentText(getString(R.string.app_name))
-            .setOngoing(true)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
+  private var isForegroundService = false
+  private var lastArtworkBitmap: Bitmap? = null
+  private var lastArtworkUrl: String? = null
+  private var artworkJob: Job? = null
 
-    runCatching {
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        startForeground(
-            NOTIFICATION_ID,
-            notification,
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
-        )
-      } else {
-        startForeground(NOTIFICATION_ID, notification)
+  private fun showMediaNotification() {
+    if (!this::player.isInitialized || !this::mediaSession.isInitialized) return
+
+    if (player.playbackState == STATE_IDLE) {
+      val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+      notificationManager?.cancel(NOTIFICATION_ID)
+      if (isForegroundService) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+          stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+          @Suppress("DEPRECATION")
+          stopForeground(true)
+        }
+        isForegroundService = false
       }
-    }.onFailure { error ->
-      Timber.w(error, "Failed to bootstrap foreground state for MusicService")
+      return
     }
+
+    ensureForegroundChannelExists()
+
+    val currentMetadata = player.currentMetadata ?: currentMediaMetadata.value
+    val title = currentMetadata?.title?.takeIf { it.isNotBlank() }
+        ?: currentSong.value?.song?.title
+        ?: getString(R.string.music_player)
+    val artist = currentMetadata?.artistName
+        ?: currentSong.value?.song?.artistName
+        ?: currentSong.value?.artists?.joinToString { it.name }
+        ?: ""
+    val artworkUrl = currentSong.value?.song?.thumbnailUrl
+        ?: currentMetadata?.thumbnailUrl
+        ?: player.currentMediaItem?.mediaMetadata?.artworkUri?.toString()
+
+    val isPlaying = player.playWhenReady &&
+        (player.playbackState == Player.STATE_READY || player.playbackState == Player.STATE_BUFFERING)
+
+    buildAndPostNotification(title, artist, isPlaying, lastArtworkBitmap)
+
+    if (!artworkUrl.isNullOrBlank() && artworkUrl != lastArtworkUrl) {
+      artworkJob?.cancel()
+      artworkJob = scope.launch(Dispatchers.IO) {
+        val bitmap = runCatching {
+          val request = ImageRequest.Builder(this@MusicService)
+              .data(artworkUrl)
+              .size(512, 512)
+              .allowHardware(false)
+              .build()
+          (imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap
+        }.getOrNull()
+
+        if (bitmap != null && isActive) {
+          lastArtworkBitmap = bitmap
+          lastArtworkUrl = artworkUrl
+          withContext(Dispatchers.Main) {
+            if (this@MusicService::player.isInitialized) {
+              val currentIsPlaying = player.playWhenReady &&
+                  (player.playbackState == Player.STATE_READY || player.playbackState == Player.STATE_BUFFERING)
+              buildAndPostNotification(title, artist, currentIsPlaying, bitmap)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private fun buildAndPostNotification(
+      title: String,
+      artist: String,
+      isPlaying: Boolean,
+      artwork: Bitmap?,
+  ) {
+    val openAppIntent = PendingIntent.getActivity(
+        this,
+        0,
+        Intent(this, MainActivity::class.java).apply {
+          flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        },
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
+    val prevIntent = PendingIntent.getService(
+        this,
+        1,
+        Intent(this, MusicService::class.java).apply { action = ACTION_PREV },
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
+    val playPauseIntent = PendingIntent.getService(
+        this,
+        2,
+        Intent(this, MusicService::class.java).apply { action = ACTION_PLAY_PAUSE },
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
+    val nextIntent = PendingIntent.getService(
+        this,
+        3,
+        Intent(this, MusicService::class.java).apply { action = ACTION_NEXT },
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
+    val closeIntent = PendingIntent.getService(
+        this,
+        4,
+        Intent(this, MusicService::class.java).apply { action = "com.anitail.music.action.CLOSE_PLAYER" },
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
+    val isFavorite = currentSong.value?.song?.let { song ->
+      if (song.isEpisode) song.inLibrary != null else song.liked
+    } == true
+
+    val likeIntent = PendingIntent.getService(
+        this,
+        5,
+        Intent(this, MusicService::class.java).apply { action = "com.anitail.music.action.TOGGLE_LIKE" },
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
+    val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+        .setSmallIcon(R.drawable.ic_ani)
+        .setContentTitle(title)
+        .setContentText(artist)
+        .setContentIntent(openAppIntent)
+        .setDeleteIntent(closeIntent)
+        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+        .setPriority(NotificationCompat.PRIORITY_LOW)
+        .setOngoing(isPlaying)
+        .setSilent(true)
+        .setOnlyAlertOnce(true)
+        .setStyle(
+            MediaStyleNotificationHelper.MediaStyle(mediaSession)
+                .setShowActionsInCompactView(0, 1, 2)
+        )
+
+    if (artwork != null && !artwork.isRecycled) {
+      builder.setLargeIcon(artwork)
+    }
+
+    // Action 0: Previous
+    builder.addAction(R.drawable.skip_previous, getString(R.string.previous), prevIntent)
+
+    // Action 1: Play / Pause
+    if (isPlaying) {
+      builder.addAction(R.drawable.pause, getString(R.string.pause), playPauseIntent)
+    } else {
+      builder.addAction(R.drawable.play, getString(R.string.play), playPauseIntent)
+    }
+
+    // Action 2: Next
+    builder.addAction(R.drawable.skip_next, getString(R.string.next), nextIntent)
+
+    // Action 3: Like
+    builder.addAction(
+        if (isFavorite) R.drawable.favorite else R.drawable.favorite_border,
+        getString(if (isFavorite) R.string.action_remove_like else R.string.action_like),
+        likeIntent
+    )
+
+    val notification = builder.build()
+    val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+
+    if (isPlaying) {
+      if (!isForegroundService) {
+        startForegroundSafely(notification)
+        isForegroundService = true
+      } else {
+        notificationManager?.notify(NOTIFICATION_ID, notification)
+      }
+    } else {
+      notificationManager?.notify(NOTIFICATION_ID, notification)
+    }
+  }
+
+  private fun startForegroundSafely(
+      notification: Notification,
+      stopOnFailure: Boolean = false,
+  ): Boolean =
+      try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+          startForeground(
+              NOTIFICATION_ID,
+              notification,
+              ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+          )
+        } else {
+          startForeground(NOTIFICATION_ID, notification)
+        }
+        true
+      } catch (e: Exception) {
+        Timber.w(e, "Failed to startForeground in MusicService")
+        if (stopOnFailure) {
+          stopSelf()
+        }
+        false
+      }
+
+  private fun ensureForegroundBootstrap() {
+    ensureForegroundChannelExists()
+    showMediaNotification()
   }
 
   fun toggleLike() {
@@ -1792,6 +1968,20 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       scope.launch(Dispatchers.Main) {
         delay(100)
         sendWidgetUpdateBroadcast()
+      }
+    }
+
+    if (events.containsAny(
+        Player.EVENT_PLAYBACK_STATE_CHANGED,
+        Player.EVENT_PLAY_WHEN_READY_CHANGED,
+        Player.EVENT_MEDIA_ITEM_TRANSITION,
+        Player.EVENT_IS_PLAYING_CHANGED,
+    )) {
+      if (this::mediaSession.isInitialized) {
+        val shouldBeInForeground = player.playWhenReady &&
+            (player.playbackState == Player.STATE_READY || player.playbackState == Player.STATE_BUFFERING)
+        onUpdateNotification(mediaSession, shouldBeInForeground)
+        showMediaNotification()
       }
     }
   }
@@ -2309,6 +2499,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   }
 
   override fun onDestroy() {
+      isRunning = false
       try {
           castPlayer?.release()
       } catch (_: Exception) {
@@ -2323,7 +2514,15 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       saveQueueToDisk()
     }
       DiscordRpcManager.disconnect()
-    mediaSession.release()
+
+    // Cancel all coroutines before releasing the player to prevent
+    // accessing the player after it has been released.
+    scope.cancel()
+
+    if (this::mediaSession.isInitialized) {
+        removeSession(mediaSession)
+        mediaSession.release()
+    }
     player.removeListener(this)
     player.removeListener(sleepTimer)
     player.release()
@@ -2339,10 +2538,16 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
   override fun onTaskRemoved(rootIntent: Intent?) {
     super.onTaskRemoved(rootIntent)
-    stopSelf()
+    if (!player.playWhenReady) {
+      stopSelf()
+    }
   }
 
   override fun onGetSession(controllerInfo: MediaSession.ControllerInfo) = mediaSession
+
+  override fun onUpdateNotification(session: MediaSession, startForeground: Boolean) {
+    showMediaNotification()
+  }
 
   inner class MusicBinder : Binder() {
     val service: MusicService
@@ -2367,8 +2572,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     const val ALBUM = "album"
     const val PLAYLIST = "playlist"
 
-    const val CHANNEL_ID = "music_channel_01"
-    const val NOTIFICATION_ID = 888
+    const val CHANNEL_ID = "anitail_playback_channel"
+    const val NOTIFICATION_ID = 1001
     const val ERROR_CODE_NO_STREAM = 1000001
     const val CHUNK_LENGTH = 512 * 1024L
     const val PERSISTENT_QUEUE_FILE = "persistent_queue.data"
@@ -2388,6 +2593,9 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     // Static instance to access the service from callbacks
     var instance: MusicService? = null
       private set
+    @Volatile
+    var isRunning: Boolean = false
+      private set
   }
 
   /**
@@ -2395,6 +2603,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
    * playback, saves state, and cleans up resources
    */
   fun closePlayer() {
+    if (!this::player.isInitialized) return
     player.pause()
       resetCrossfadeState()
     widgetStaticCache = null
@@ -2414,8 +2623,16 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       closeAudioEffectSession()
     }
 
+    val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+    notificationManager?.cancel(NOTIFICATION_ID)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+      stopForeground(STOP_FOREGROUND_REMOVE)
+    } else {
+      @Suppress("DEPRECATION")
+      stopForeground(true)
+    }
+
     mediaSession.setCustomLayout(emptyList())
-    updateNotification()
     stopSelf()
   }
 

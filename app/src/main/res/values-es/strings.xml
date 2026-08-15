@@ -295,6 +295,8 @@
     <string name="notification_button_type">Tipo de botón de notificación</string>
     <string name="notification_button_close">Botón de cierre</string>
     <string name="notification_button_like">Botón de me gusta</string>
+    <string name="notification_system_settings">Ajustes de notificaciones del sistema</string>
+    <string name="notification_system_settings_desc">Configurar permisos de pantalla de bloqueo, barra de estado y controles multimedia</string>
 
     <!-- Configuración -->
     <string name="settings">Configuración</string>

@@ -69,6 +69,11 @@ fun SongItem.toMediaItem() =
                 .setArtworkUri(thumbnail.toUri())
                 .setAlbumTitle(album?.name)
                 .setMediaType(MEDIA_TYPE_MUSIC)
+                .setExtras(
+                    Bundle().apply {
+                        putString("artwork_uri", thumbnail)
+                    },
+                )
                 .build(),
         ).build()
 
@@ -88,5 +93,10 @@ fun MediaMetadata.toMediaItem() =
                 .setArtworkUri(thumbnailUrl?.toUri())
                 .setAlbumTitle(album?.title)
                 .setMediaType(MEDIA_TYPE_MUSIC)
+                .setExtras(
+                    Bundle().apply {
+                        putString("artwork_uri", thumbnailUrl)
+                    },
+                )
                 .build(),
         ).build()

@@ -239,6 +239,7 @@ class MainActivity : AppCompatActivity() {
     private var latestVersionName by mutableStateOf(BuildConfig.VERSION_NAME)
     private var pendingExternalAction by mutableStateOf<String?>(null)
 
+    private var isServiceBound = false
     private var playerConnection by mutableStateOf<PlayerConnection?>(null)
     private val serviceConnection =
         object : ServiceConnection {
@@ -284,29 +285,42 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        startMusicServiceSafely()
-        bindService(
-            Intent(this, MusicService::class.java),
-            serviceConnection,
-            BIND_AUTO_CREATE
-        )
-    }
-
-    private fun startMusicServiceSafely() {
         val serviceIntent = Intent(this, MusicService::class.java)
         try {
             startService(serviceIntent)
-        } catch (e: IllegalStateException) {
-            Timber.w(
-                e,
-                "MusicService start deferred due background start restriction; binding will proceed"
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to start MusicService")
+        }
+        if (!isServiceBound) {
+            bindService(
+                Intent(this, MusicService::class.java),
+                serviceConnection,
+                BIND_AUTO_CREATE
             )
+            isServiceBound = true
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        requestNotificationPermissionIfNeeded()
+    }
+
     override fun onStop() {
-        unbindService(serviceConnection)
+        // Keep the service binding and PlayerConnection alive while
+        // the Activity is backgrounded so playback controls and listeners stay intact.
         super.onStop()
+    }
+
+    private fun safeUnbindService() {
+        if (isServiceBound) {
+            try {
+                unbindService(serviceConnection)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to unbind service")
+            }
+            isServiceBound = false
+        }
     }
 
     override fun onDestroy() {
@@ -314,14 +328,18 @@ class MainActivity : AppCompatActivity() {
             com.discord.socialsdk.DiscordSocialSdkInit.setEngineActivity(null)
         } catch (_: Exception) {}
         super.onDestroy()
-        if (dataStore.get(
+        val stopServiceOnClear =
+            dataStore.get(
                 StopMusicOnTaskClearKey,
                 false
             ) && playerConnection?.isPlaying?.value == true && isFinishing
-        ) {
+
+        playerConnection?.dispose()
+        playerConnection = null
+        safeUnbindService()
+
+        if (stopServiceOnClear) {
             stopService(Intent(this, MusicService::class.java))
-            unbindService(serviceConnection)
-            playerConnection = null
         }
     }
 
