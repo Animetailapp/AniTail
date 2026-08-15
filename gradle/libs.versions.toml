@@ -29,7 +29,7 @@ newpipe = "v0.26.0"
 workRuntimeKtx = "2.12.0-beta01"
 
 [libraries]
-appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.8.0-rc01" }
+appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.8.0" }
 browser = { module = "androidx.browser:browser", version.ref = "browser" }
 security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 commons-codec = { module = "commons-codec:commons-codec", version.ref = "commonsCodec" }
