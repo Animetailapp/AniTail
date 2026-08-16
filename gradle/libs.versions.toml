@@ -115,7 +115,7 @@ junit = { group = "junit", name = "junit", version = "4.13.2" }
 timber = { group = "com.jakewharton.timber", name = "timber", version = "5.0.1" }
 
 #newpipe-extractor = { group = "com.github.libre-tube", name = "NewPipeExtractor", version = "f3bb450" }
-newpipe-extractor = { group = "com.github.TeamNewPipe", name = "NewPipeExtractor", version = "0.26.4" }
+newpipe-extractor = { group = "com.github.TeamNewPipe", name = "NewPipeExtractor", version = "0.26.5" }
 work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version = "21.6.0" }
 google-api-client-android = { module = "com.google.api-client:google-api-client-android", version = "2.9.0" }
