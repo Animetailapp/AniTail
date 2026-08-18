@@ -71,120 +71,136 @@ fun SpeedDialSection(
 ) {
     if (items.isEmpty()) return
 
-    val displayItems = remember(items) {
+    // Calculate dynamic columns & rows to fill wide desktop screens
+    val columns = when {
+        maxWidth >= 1350.dp -> 6
+        maxWidth >= 1080.dp -> 5
+        maxWidth >= 750.dp -> 4
+        else -> 3
+    }
+    val rows = 3
+    val pageSize = columns * rows
+
+    val displayItems = remember(items, pageSize) {
         val prepared = items.map { it as YTItem? }.toMutableList()
-        prepared.add(min(8, prepared.size), null)
+        val insertPos = min(pageSize - 1, prepared.size)
+        prepared.add(insertPos, null) // Dice lucky tile
         prepared
     }
-    val pages = remember(displayItems) { displayItems.chunked(9) }
+    val pages = remember(displayItems, pageSize) { displayItems.chunked(pageSize) }
     var currentPage by remember { mutableStateOf(0) }
     val activePageIndex = currentPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
 
-    // Responsive sizing that fills available space harmoniously
-    val gridWidth = (maxWidth - 48.dp).coerceIn(360.dp, 620.dp)
     val spacing = 10.dp
-    val tileSize = (gridWidth - (spacing * 2)) / 3
+    val maxAvailableWidth = (maxWidth - 120.dp).coerceAtLeast(320.dp)
+    val tileSize = ((maxAvailableWidth - (spacing * (columns - 1))) / columns).coerceIn(110.dp, 160.dp)
+    val gridWidth = (tileSize * columns) + (spacing * (columns - 1))
 
-    Column(
-        modifier = modifier.padding(horizontal = 16.dp),
+    Box(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 16.dp),
         ) {
-            if (pages.size > 1) {
-                IconButton(
-                    onClick = { if (activePageIndex > 0) currentPage-- },
-                    enabled = activePageIndex > 0,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (activePageIndex > 0) 0.85f else 0.3f)),
-                ) {
-                    Icon(
-                        imageVector = IconAssets.arrowBack(),
-                        contentDescription = "Anterior",
-                        tint = if (activePageIndex > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                        modifier = Modifier.size(20.dp)
-                    )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+            ) {
+                if (pages.size > 1) {
+                    IconButton(
+                        onClick = { if (activePageIndex > 0) currentPage-- },
+                        enabled = activePageIndex > 0,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (activePageIndex > 0) 0.85f else 0.3f)),
+                    ) {
+                        Icon(
+                            imageVector = IconAssets.arrowBack(),
+                            contentDescription = "Anterior",
+                            tint = if (activePageIndex > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
-            }
 
-            AnimatedContent(
-                targetState = activePageIndex,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "SpeedDialPageAnimation"
-            ) { pageIdx ->
-                val pageItems = pages.getOrElse(pageIdx) { emptyList() }
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(spacing),
-                    modifier = Modifier.width(gridWidth),
-                ) {
-                    repeat(3) { rowIndex ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
-                            repeat(3) { columnIndex ->
-                                val tileIndex = rowIndex * 3 + columnIndex
-                                if (tileIndex >= pageItems.size) {
-                                    Spacer(modifier = Modifier.size(tileSize))
-                                } else {
-                                    val pageItem = pageItems[tileIndex]
-                                    if (pageItem == null) {
-                                        SpeedDialSurpriseTile(
-                                            onClick = onSurpriseClick,
-                                            modifier = Modifier.size(tileSize),
-                                        )
+                AnimatedContent(
+                    targetState = activePageIndex,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "SpeedDialPageAnimation"
+                ) { pageIdx ->
+                    val pageItems = pages.getOrElse(pageIdx) { emptyList() }
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(spacing),
+                        modifier = Modifier.width(gridWidth),
+                    ) {
+                        repeat(rows) { rowIndex ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
+                                repeat(columns) { columnIndex ->
+                                    val tileIndex = rowIndex * columns + columnIndex
+                                    if (tileIndex >= pageItems.size) {
+                                        Spacer(modifier = Modifier.size(tileSize))
                                     } else {
-                                        SpeedDialTile(
-                                            item = pageItem,
-                                            onClick = { onItemClick(pageItem) },
-                                            modifier = Modifier.size(tileSize),
-                                        )
+                                        val pageItem = pageItems[tileIndex]
+                                        if (pageItem == null) {
+                                            SpeedDialSurpriseTile(
+                                                onClick = onSurpriseClick,
+                                                modifier = Modifier.size(tileSize),
+                                            )
+                                        } else {
+                                            SpeedDialTile(
+                                                item = pageItem,
+                                                onClick = { onItemClick(pageItem) },
+                                                modifier = Modifier.size(tileSize),
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
+
+                if (pages.size > 1) {
+                    IconButton(
+                        onClick = { if (activePageIndex < pages.size - 1) currentPage++ },
+                        enabled = activePageIndex < pages.size - 1,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (activePageIndex < pages.size - 1) 0.85f else 0.3f)),
+                    ) {
+                        Icon(
+                            imageVector = IconAssets.arrowForward(),
+                            contentDescription = "Siguiente",
+                            tint = if (activePageIndex < pages.size - 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
 
             if (pages.size > 1) {
-                IconButton(
-                    onClick = { if (activePageIndex < pages.size - 1) currentPage++ },
-                    enabled = activePageIndex < pages.size - 1,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (activePageIndex < pages.size - 1) 0.85f else 0.3f)),
+                Spacer(modifier = Modifier.height(14.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
                 ) {
-                    Icon(
-                        imageVector = IconAssets.arrowForward(),
-                        contentDescription = "Siguiente",
-                        tint = if (activePageIndex < pages.size - 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-
-        if (pages.size > 1) {
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-                modifier = Modifier.width(gridWidth + if (pages.size > 1) 108.dp else 0.dp),
-            ) {
-                repeat(pages.size) { index ->
-                    Box(
-                        modifier = Modifier
-                            .size(if (index == activePageIndex) 8.dp else 6.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (index == activePageIndex)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
-                            )
-                            .clickable { currentPage = index }
-                    )
+                    repeat(pages.size) { index ->
+                        Box(
+                            modifier = Modifier
+                                .size(if (index == activePageIndex) 8.dp else 6.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (index == activePageIndex)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                                )
+                                .clickable { currentPage = index }
+                        )
+                    }
                 }
             }
         }
@@ -248,12 +264,12 @@ private fun SpeedDialSurpriseTile(
             .background(Color(0xFF6A5D82))
             .clickable(onClick = onClick),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 repeat(2) {
                     Box(
                         modifier = Modifier
-                            .size(15.dp)
+                            .size(14.dp)
                             .clip(CircleShape)
                             .background(Color(0xFFE2D8F3)),
                     )
@@ -262,15 +278,15 @@ private fun SpeedDialSurpriseTile(
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
-                    .size(15.dp)
+                    .size(14.dp)
                     .clip(CircleShape)
                     .background(Color(0xFFE2D8F3)),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 repeat(2) {
                     Box(
                         modifier = Modifier
-                            .size(15.dp)
+                            .size(14.dp)
                             .clip(CircleShape)
                             .background(Color(0xFFE2D8F3)),
                     )

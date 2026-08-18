@@ -105,6 +105,6 @@ object HomeDiscoveryService {
 
         return (localItems + homeItems + similarItems + dailyItems + communityItems)
             .distinctBy { it.id }
-            .take(26)
+            .take(60)
     }
 }
