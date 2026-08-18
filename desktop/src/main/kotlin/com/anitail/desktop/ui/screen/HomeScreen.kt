@@ -109,6 +109,14 @@ import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.net.URI
 
+import com.anitail.desktop.model.CommunityPlaylistItem
+import com.anitail.desktop.model.DailyDiscoverItem
+import com.anitail.desktop.ui.screen.home.CommunityPlaylistsSection
+import com.anitail.desktop.ui.screen.home.DailyDiscoverSection
+import com.anitail.desktop.ui.screen.home.MoodAndGenresGrid
+import com.anitail.desktop.ui.screen.home.SpeedDialSection
+import com.anitail.innertube.pages.ExplorePage
+
 // Constantes de dimensiones
 private val ListItemHeight = 64.dp
 private val ListThumbnailSize = 48.dp
@@ -131,6 +139,10 @@ fun HomeScreen(
     accountPlaylists: List<PlaylistItem>,
     similarRecommendations: List<SimilarRecommendation>,
     playerState: PlayerState,
+    dailyDiscover: List<DailyDiscoverItem> = emptyList(),
+    communityPlaylists: List<CommunityPlaylistItem> = emptyList(),
+    speedDialItems: List<YTItem> = emptyList(),
+    explorePage: ExplorePage? = null,
     accountName: String? = null,
     accountThumbnailUrl: String? = null,
     database: DesktopDatabase,
@@ -146,6 +158,7 @@ fun HomeScreen(
     onShuffleAll: () -> Unit,
     onOpenArtist: (String, String?) -> Unit,
     onOpenAlbum: (String, String?) -> Unit,
+    onOpenPlaylist: (String, String?) -> Unit = { _, _ -> },
     onNavigate: (String) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
@@ -376,7 +389,30 @@ fun HomeScreen(
                  item { ShimmerQuickPicksGrid() }
             }
 
-            // 2. Keep Listening (Grid of Cards)
+            // 2. Speed Dial (Acceso Rápido con botón de Sorpréndeme)
+            if (speedDialItems.isNotEmpty()) {
+                item {
+                    NavigationTitle(
+                        title = "Acceso rápido",
+                        label = "Speed Dial",
+                    )
+                }
+                item {
+                    SpeedDialSection(
+                        items = speedDialItems,
+                        maxWidth = maxWidth,
+                        onItemClick = { item -> onItemSelected(item) },
+                        onSurpriseClick = {
+                            val lucky = speedDialItems.randomOrNull()
+                            if (lucky != null) {
+                                onItemSelected(lucky)
+                            }
+                        },
+                    )
+                }
+            }
+
+            // 3. Keep Listening (Grid of Cards)
             if (keepListening.isNotEmpty()) {
                 item { NavigationTitle(title = stringResource("keep_listening")) }
                 item {
@@ -392,7 +428,65 @@ fun HomeScreen(
                 item { ShimmerSectionRow() }
             }
 
-            // 3. Account Playlists (Row of Cards)
+            // 4. Community Playlists (Playlists de la comunidad con previews)
+            if (communityPlaylists.isNotEmpty()) {
+                item {
+                    NavigationTitle(
+                        title = "De la comunidad",
+                        label = "Playlists destacadas",
+                    )
+                }
+                item {
+                    CommunityPlaylistsSection(
+                        playlists = communityPlaylists,
+                        maxWidth = maxWidth,
+                        onOpenPlaylist = { cp -> onOpenPlaylist(cp.playlist.id, cp.playlist.title) },
+                        onSongClick = { song ->
+                            playerState.play(songItemToLibraryItem(song))
+                        },
+                        onPlayAllClick = { cp ->
+                            val librarySongs = cp.songs.map { songItemToLibraryItem(it) }
+                            playerState.playQueue(librarySongs, startIndex = 0)
+                        },
+                        onRadioClick = { cp ->
+                            val firstSong = cp.songs.firstOrNull()
+                            if (firstSong != null) {
+                                coroutineScope.launch {
+                                    val result = YouTube.next(WatchEndpoint(videoId = firstSong.id)).getOrNull()
+                                    if (result != null) {
+                                        val plan = buildRadioQueuePlan(songItemToLibraryItem(firstSong), result)
+                                        playerState.playQueue(plan.items, plan.startIndex)
+                                    }
+                                }
+                            }
+                        },
+                        onAddClick = { cp ->
+                            onOpenPlaylist(cp.playlist.id, cp.playlist.title)
+                        },
+                    )
+                }
+            }
+
+            // 5. Daily Discover (Descubrimiento Diario)
+            if (dailyDiscover.isNotEmpty()) {
+                item {
+                    NavigationTitle(
+                        title = "Descubrimiento diario",
+                        label = "Nuevas recomendaciones para ti",
+                    )
+                }
+                item {
+                    DailyDiscoverSection(
+                        discoverItems = dailyDiscover,
+                        maxWidth = maxWidth,
+                        onItemClick = { item ->
+                            playerState.play(songItemToLibraryItem(item.recommendation))
+                        },
+                    )
+                }
+            }
+
+            // 6. Account Playlists (Row of Cards)
             if (accountPlaylists.isNotEmpty()) {
                 item {
                     NavigationTitle(
@@ -419,7 +513,7 @@ fun HomeScreen(
                 }
             }
 
-            // 4. Forgotten Favorites (Grid of List Items)
+            // 7. Forgotten Favorites (Grid of List Items)
             if (forgottenFavorites.isNotEmpty()) {
                 item { NavigationTitle(title = stringResource("forgotten_favorites")) }
                 item {
@@ -437,7 +531,7 @@ fun HomeScreen(
                 }
             }
 
-            // 5. Similar Recommendations (Row of Cards)
+            // 8. Similar Recommendations (Row of Cards)
             similarRecommendations.forEach { recommendation ->
                 item {
                     val shape = if (recommendation.isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
@@ -463,6 +557,28 @@ fun HomeScreen(
                         items = recommendation.items,
                         onItemSelected = onItemSelected,
                         menuActionsForSong = menuActionsForSongItem,
+                    )
+                }
+            }
+
+            // 9. Estados de ánimo y géneros
+            if (explorePage?.moodAndGenres?.isNotEmpty() == true) {
+                item {
+                    NavigationTitle(
+                        title = "Estados de ánimo y géneros",
+                        onClick = { onNavigate("moods_and_genres") }
+                    )
+                }
+                item {
+                    MoodAndGenresGrid(
+                        explorePage = explorePage,
+                        onMoodGenreClick = { browseId, params ->
+                            if (params != null) {
+                                onNavigate("browse/$browseId?params=$params")
+                            } else {
+                                onNavigate("browse/$browseId")
+                            }
+                        }
                     )
                 }
             }
@@ -1078,5 +1194,5 @@ fun toContextMenuItems(actions: List<ContextMenuAction>): List<ContextMenuItem> 
 }
 
 fun songItemToLibraryItem(item: SongItem): LibraryItem {
-    return item.toSongEntity().toLibraryItem()
+    return item.toSongEntity(inLibrary = false).toLibraryItem()
 }

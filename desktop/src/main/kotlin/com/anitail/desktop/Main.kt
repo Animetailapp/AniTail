@@ -120,6 +120,9 @@ import com.anitail.desktop.ui.screen.SettingsScreen
 import com.anitail.desktop.ui.screen.StatsScreen
 import com.anitail.desktop.ui.screen.songItemToLibraryItem
 import com.anitail.desktop.util.DesktopDiscordRPC
+import com.anitail.desktop.home.HomeDiscoveryService
+import com.anitail.desktop.model.CommunityPlaylistItem
+import com.anitail.desktop.model.DailyDiscoverItem
 import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
@@ -750,6 +753,18 @@ private fun FrameWindowScope.AniTailDesktopApp(
     var forgottenFavorites by remember { mutableStateOf<List<LibraryItem>>(emptyList()) }
     var accountPlaylists by remember { mutableStateOf<List<PlaylistItem>>(emptyList()) }
     var similarRecommendations by remember { mutableStateOf<List<SimilarRecommendation>>(emptyList()) }
+    var dailyDiscover by remember { mutableStateOf<List<DailyDiscoverItem>>(emptyList()) }
+    var communityPlaylists by remember { mutableStateOf<List<CommunityPlaylistItem>>(emptyList()) }
+    val speedDialItems = remember(quickPicks, keepListening, homePage, similarRecommendations, dailyDiscover, communityPlaylists) {
+        HomeDiscoveryService.buildSpeedDialItems(
+            quickPicks = quickPicks,
+            keepListening = keepListening,
+            homePage = homePage,
+            similarRecommendations = similarRecommendations,
+            dailyDiscover = dailyDiscover,
+            communityPlaylists = communityPlaylists,
+        )
+    }
     var detailNavigation by remember { mutableStateOf(DetailNavigation()) }
     val navigationHistory = remember { mutableStateListOf<DesktopScreen>() }
 
@@ -1188,6 +1203,18 @@ private fun FrameWindowScope.AniTailDesktopApp(
         }
     }
 
+    LaunchedEffect(allSongs.size, hideExplicit) {
+        delay(1000)
+        scope.launch(Dispatchers.IO) {
+            val discover = HomeDiscoveryService.loadDailyDiscover(database, hideExplicit)
+            val community = HomeDiscoveryService.loadCommunityPlaylists(database)
+            withContext(Dispatchers.Main) {
+                dailyDiscover = discover
+                communityPlaylists = community
+            }
+        }
+    }
+
     val allYtItems = remember(homePage, accountPlaylists, similarRecommendations) {
         buildAllYtItems(
             homePage = homePage,
@@ -1231,6 +1258,15 @@ private fun FrameWindowScope.AniTailDesktopApp(
             albumName = albumName,
         )
         currentScreen = DesktopScreen.AlbumDetail
+    }
+
+    val openPlaylist: (String, String?) -> Unit = { playlistId, playlistName ->
+        navigationHistory.add(DesktopScreen.Home)
+        detailNavigation = detailNavigation.copy(
+            playlistId = playlistId,
+            playlistName = playlistName,
+        )
+        currentScreen = DesktopScreen.PlaylistDetail
     }
 
     val baseDensity = LocalDensity.current
@@ -1523,6 +1559,10 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             accountPlaylists = accountPlaylists,
                             similarRecommendations = similarRecommendations,
                             playerState = playerState,
+                            dailyDiscover = dailyDiscover,
+                            communityPlaylists = communityPlaylists,
+                            speedDialItems = speedDialItems,
+                            explorePage = explorePage,
                             accountName = when (preferredAvatarSource) {
                                 AvatarSourcePreference.YOUTUBE -> accountInfo?.name ?: authCredentials?.accountName
                                 AvatarSourcePreference.DISCORD -> discordUsername
@@ -1576,6 +1616,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             onRefresh = refreshHome,
                             onOpenArtist = openArtist,
                             onOpenAlbum = openAlbum,
+                            onOpenPlaylist = openPlaylist,
                             onNavigate = { route ->
                                 when (route) {
                                     "account" -> currentScreen = DesktopScreen.Library
