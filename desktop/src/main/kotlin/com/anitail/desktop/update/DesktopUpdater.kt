@@ -270,18 +270,20 @@ object DesktopUpdater {
         osName: String,
         archName: String,
     ): String? {
+        val os = osName.lowercase(Locale.ROOT)
+        val arch = archName.lowercase(Locale.ROOT)
         val suffixPriority = when {
-            osName.contains("win") && archName.contains("aarch64") ->
+            os.contains("win") && arch.contains("aarch64") ->
                 listOf("windows-arm64.msi", "windows-x64.msi")
-            osName.contains("win") ->
+            os.contains("win") ->
                 listOf("windows-x64.msi", "windows-arm64.msi")
-            osName.contains("mac") && archName.contains("aarch64") ->
+            os.contains("mac") && arch.contains("aarch64") ->
                 listOf("macos-arm64.dmg", "macos-x64.dmg")
-            osName.contains("mac") ->
+            os.contains("mac") ->
                 listOf("macos-x64.dmg", "macos-arm64.dmg")
-            osName.contains("linux") && archName.contains("aarch64") ->
+            os.contains("linux") && arch.contains("aarch64") ->
                 listOf("linux-arm64.deb", "linux-arm64.rpm", "linux-x64.deb", "linux-x64.rpm")
-            osName.contains("linux") ->
+            os.contains("linux") ->
                 listOf("linux-x64.deb", "linux-x64.rpm", "linux-arm64.deb", "linux-arm64.rpm")
             else -> emptyList()
         }
@@ -293,9 +295,9 @@ object DesktopUpdater {
         }
 
         val osToken = when {
-            osName.contains("win") -> "windows"
-            osName.contains("mac") -> "macos"
-            osName.contains("linux") -> "linux"
+            os.contains("win") -> "windows"
+            os.contains("mac") -> "macos"
+            os.contains("linux") -> "linux"
             else -> ""
         }
         if (osToken.isNotEmpty()) {

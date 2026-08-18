@@ -1,5 +1,11 @@
 package com.anitail.desktop.ui.screen
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -35,6 +41,16 @@ fun PlayerProgressSlider(
     modifier: Modifier = Modifier,
 ) {
     var dragInProgress by remember { mutableStateOf(false) }
+    val infiniteTransition = rememberInfiniteTransition(label = "wave")
+    val wavePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = if (isPlaying) (2 * PI).toFloat() else 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "wavePhase"
+    )
 
     Box(
         modifier = modifier
@@ -83,14 +99,14 @@ fun PlayerProgressSlider(
             )
 
             if (style == SliderStyle.SQUIGGLY) {
-                val amplitude = if (isPlaying) 2.dp.toPx() else 0.dp.toPx()
+                val amplitude = if (isPlaying) 2.5.dp.toPx() else 0.dp.toPx()
                 val wavelength = 28.dp.toPx()
-                val step = 6.dp.toPx()
+                val step = 4.dp.toPx()
                 val path = Path()
                 var x = 0f
                 path.moveTo(0f, centerY)
                 while (x <= activeWidth) {
-                    val y = centerY + sin((x / wavelength) * (2 * PI)).toFloat() * amplitude
+                    val y = centerY + sin((x / wavelength) * (2 * PI) - wavePhase).toFloat() * amplitude
                     path.lineTo(x, y)
                     x += step
                 }
