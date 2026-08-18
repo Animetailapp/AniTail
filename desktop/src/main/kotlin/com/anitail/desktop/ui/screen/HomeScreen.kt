@@ -329,6 +329,7 @@ fun HomeScreen(
             ),
         contentAlignment = Alignment.TopStart,
     ) {
+        val containerMaxWidth = maxWidth
         val horizontalLazyGridItemWidthFactor =
             computeHorizontalLazyGridItemWidthFactor(maxWidth)
         val horizontalLazyGridItemWidth =
@@ -480,25 +481,59 @@ fun HomeScreen(
                 }
             }
 
-            // 6. Speed Dial (Acceso Rápido con botón de Sorpréndeme)
-            if (speedDialItems.isNotEmpty()) {
+            // 6. Speed Dial & Daily Discover (Widescreen Dual-Column or Single Column)
+            if (containerMaxWidth >= 960.dp && speedDialItems.isNotEmpty() && dailyDiscover.isNotEmpty()) {
                 item {
-                    NavigationTitle(
-                        title = stringResource("speed_dial"),
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    ) {
+                        Column(modifier = Modifier.weight(1.1f)) {
+                            NavigationTitle(title = stringResource("speed_dial"))
+                            SpeedDialSection(
+                                items = speedDialItems,
+                                maxWidth = containerMaxWidth * 0.55f,
+                                onItemClick = { item -> onItemSelected(item) },
+                                onSurpriseClick = {
+                                    val lucky = speedDialItems.randomOrNull()
+                                    if (lucky != null) {
+                                        onItemSelected(lucky)
+                                    }
+                                },
+                            )
+                        }
+                        Column(modifier = Modifier.weight(0.9f)) {
+                            NavigationTitle(title = stringResource("daily_discover"))
+                            DailyDiscoverSection(
+                                discoverItems = dailyDiscover,
+                                maxWidth = containerMaxWidth * 0.45f,
+                                onItemClick = { item ->
+                                    playerState.play(songItemToLibraryItem(item.recommendation))
+                                },
+                            )
+                        }
+                    }
                 }
-                item {
-                    SpeedDialSection(
-                        items = speedDialItems,
-                        maxWidth = maxWidth,
-                        onItemClick = { item -> onItemSelected(item) },
-                        onSurpriseClick = {
-                            val lucky = speedDialItems.randomOrNull()
-                            if (lucky != null) {
-                                onItemSelected(lucky)
-                            }
-                        },
-                    )
+            } else {
+                if (speedDialItems.isNotEmpty()) {
+                    item {
+                        NavigationTitle(
+                            title = stringResource("speed_dial"),
+                        )
+                    }
+                    item {
+                        SpeedDialSection(
+                            items = speedDialItems,
+                            maxWidth = containerMaxWidth,
+                            onItemClick = { item -> onItemSelected(item) },
+                            onSurpriseClick = {
+                                val lucky = speedDialItems.randomOrNull()
+                                if (lucky != null) {
+                                    onItemSelected(lucky)
+                                }
+                            },
+                        )
+                    }
                 }
             }
 
@@ -512,7 +547,7 @@ fun HomeScreen(
                 item {
                     CommunityPlaylistsSection(
                         playlists = communityPlaylists,
-                        maxWidth = maxWidth,
+                        maxWidth = containerMaxWidth,
                         onOpenPlaylist = { cp -> onOpenPlaylist(cp.playlist.id, cp.playlist.title) },
                         onSongClick = { song ->
                             playerState.play(songItemToLibraryItem(song))
@@ -540,8 +575,8 @@ fun HomeScreen(
                 }
             }
 
-            // 8. Daily Discover (Descubrimiento Diario)
-            if (dailyDiscover.isNotEmpty()) {
+            // 8. Daily Discover (if not shown in dual-column above)
+            if (dailyDiscover.isNotEmpty() && (containerMaxWidth < 960.dp || speedDialItems.isEmpty())) {
                 item {
                     NavigationTitle(
                         title = stringResource("daily_discover"),
@@ -550,7 +585,7 @@ fun HomeScreen(
                 item {
                     DailyDiscoverSection(
                         discoverItems = dailyDiscover,
-                        maxWidth = maxWidth,
+                        maxWidth = containerMaxWidth,
                         onItemClick = { item ->
                             playerState.play(songItemToLibraryItem(item.recommendation))
                         },

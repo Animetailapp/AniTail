@@ -80,31 +80,32 @@ fun SpeedDialSection(
     var currentPage by remember { mutableStateOf(0) }
     val activePageIndex = currentPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
 
-    val tileSize = 120.dp
-    val spacing = 8.dp
-    val gridWidth = (tileSize * 3) + (spacing * 2)
+    // Responsive sizing that fills available space harmoniously
+    val gridWidth = (maxWidth - 48.dp).coerceIn(360.dp, 620.dp)
+    val spacing = 10.dp
+    val tileSize = (gridWidth - (spacing * 2)) / 3
 
     Column(
         modifier = modifier.padding(horizontal = 16.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             if (pages.size > 1) {
                 IconButton(
                     onClick = { if (activePageIndex > 0) currentPage-- },
                     enabled = activePageIndex > 0,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (activePageIndex > 0) 0.8f else 0.3f)),
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (activePageIndex > 0) 0.85f else 0.3f)),
                 ) {
                     Icon(
                         imageVector = IconAssets.arrowBack(),
                         contentDescription = "Anterior",
                         tint = if (activePageIndex > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -151,25 +152,25 @@ fun SpeedDialSection(
                     onClick = { if (activePageIndex < pages.size - 1) currentPage++ },
                     enabled = activePageIndex < pages.size - 1,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (activePageIndex < pages.size - 1) 0.8f else 0.3f)),
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (activePageIndex < pages.size - 1) 0.85f else 0.3f)),
                 ) {
                     Icon(
                         imageVector = IconAssets.arrowForward(),
                         contentDescription = "Siguiente",
                         tint = if (activePageIndex < pages.size - 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
         }
 
         if (pages.size > 1) {
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-                modifier = Modifier.width(gridWidth + if (pages.size > 1) 96.dp else 0.dp),
+                modifier = Modifier.width(gridWidth + if (pages.size > 1) 108.dp else 0.dp),
             ) {
                 repeat(pages.size) { index ->
                     Box(
@@ -198,14 +199,14 @@ private fun SpeedDialTile(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
     ) {
         RemoteImage(
             url = item.thumbnail,
             contentDescription = item.title,
             modifier = Modifier.fillMaxSize(),
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(12.dp),
         )
         Box(
             modifier = Modifier
@@ -214,7 +215,7 @@ private fun SpeedDialTile(
                     Brush.verticalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            Color.Black.copy(alpha = 0.72f),
+                            Color.Black.copy(alpha = 0.76f),
                         ),
                     ),
                 ),
@@ -223,14 +224,14 @@ private fun SpeedDialTile(
             text = item.title,
             color = Color.White,
             style = MaterialTheme.typography.bodyLarge.copy(
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
             ),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(horizontal = 10.dp, vertical = 8.dp),
         )
     }
 }
@@ -243,16 +244,16 @@ private fun SpeedDialSurpriseTile(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(Color(0xFF6A5D82))
             .clickable(onClick = onClick),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 repeat(2) {
                     Box(
                         modifier = Modifier
-                            .size(13.dp)
+                            .size(15.dp)
                             .clip(CircleShape)
                             .background(Color(0xFFE2D8F3)),
                     )
@@ -261,15 +262,15 @@ private fun SpeedDialSurpriseTile(
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
-                    .size(13.dp)
+                    .size(15.dp)
                     .clip(CircleShape)
                     .background(Color(0xFFE2D8F3)),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                 repeat(2) {
                     Box(
                         modifier = Modifier
-                            .size(13.dp)
+                            .size(15.dp)
                             .clip(CircleShape)
                             .background(Color(0xFFE2D8F3)),
                     )
@@ -295,7 +296,7 @@ private fun PlaylistCollage(
 
     Column(
         modifier = modifier
-            .size(80.dp)
+            .size(86.dp)
             .clip(RoundedCornerShape(14.dp)),
     ) {
         repeat(2) { rowIndex ->
@@ -327,13 +328,13 @@ fun CommunityPlaylistsSection(
     modifier: Modifier = Modifier,
 ) {
     val rowState = rememberLazyListState()
-    val cardWidth = (maxWidth * 0.38f).coerceIn(320.dp, 400.dp)
+    val cardWidth = (maxWidth * 0.32f).coerceIn(320.dp, 440.dp)
 
     LazyRow(
         state = rowState,
         flingBehavior = rememberSnapFlingBehavior(rowState),
         contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
         items(
@@ -368,9 +369,9 @@ fun CommunityPlaylistCard(
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1828)),
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             // Header: 2x2 Collage + Title + Count
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 val collageThumbnails = remember(item.songs, item.playlist.thumbnail) {
                     item.songs.take(4).map { it.thumbnail } + item.playlist.thumbnail
                 }
@@ -382,7 +383,7 @@ fun CommunityPlaylistCard(
                     Text(
                         text = item.playlist.title,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 15.sp,
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.SemiBold,
                         ),
                         color = Color.White,
@@ -392,7 +393,7 @@ fun CommunityPlaylistCard(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = item.playlist.author?.name ?: item.playlist.songCountText.orEmpty(),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
                         color = Color.White.copy(alpha = 0.72f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -400,13 +401,13 @@ fun CommunityPlaylistCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Top 3 songs preview
             item.songs.take(3).forEach { song ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 3.dp)
@@ -418,7 +419,7 @@ fun CommunityPlaylistCard(
                         url = song.thumbnail,
                         contentDescription = null,
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(52.dp)
                             .clip(RoundedCornerShape(10.dp)),
                         shape = RoundedCornerShape(10.dp),
                     )
@@ -444,17 +445,17 @@ fun CommunityPlaylistCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Action Buttons
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 IconButton(
                     onClick = onPlayAllClick,
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(52.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.45f))
                 ) {
@@ -462,13 +463,13 @@ fun CommunityPlaylistCard(
                         imageVector = IconAssets.play(),
                         contentDescription = stringResource("play_all"),
                         tint = Color.White,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
                 IconButton(
                     onClick = onRadioClick,
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(52.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.28f))
                 ) {
@@ -476,13 +477,13 @@ fun CommunityPlaylistCard(
                         imageVector = IconAssets.radio(),
                         contentDescription = stringResource("radio"),
                         tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
                 IconButton(
                     onClick = onAddClick,
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(52.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.28f))
                 ) {
@@ -490,7 +491,7 @@ fun CommunityPlaylistCard(
                         imageVector = IconAssets.playlistAdd(),
                         contentDescription = stringResource("add_to_playlist"),
                         tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -509,11 +510,11 @@ fun DailyDiscoverSection(
 ) {
     if (discoverItems.isEmpty()) return
 
-    val preferredCardWidth = (maxWidth * 0.32f).coerceIn(240.dp, 320.dp)
+    val preferredCardWidth = (maxWidth * 0.28f).coerceIn(240.dp, 360.dp)
 
     LazyRow(
         contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
         modifier = modifier.fillMaxWidth(),
     ) {
         items(
@@ -525,7 +526,7 @@ fun DailyDiscoverSection(
                 onClick = { onItemClick(item) },
                 modifier = Modifier
                     .width(preferredCardWidth)
-                    .height(300.dp),
+                    .height(320.dp),
             )
         }
     }
@@ -567,13 +568,13 @@ fun DailyDiscoverCard(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
+                    .padding(18.dp),
             ) {
                 Text(
                     text = item.recommendation.title,
                     color = Color.White,
                     style = MaterialTheme.typography.titleLarge.copy(
-                        fontSize = 15.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
                     ),
                     maxLines = 2,
@@ -582,7 +583,7 @@ fun DailyDiscoverCard(
                 Text(
                     text = item.recommendation.artists.joinToString(", ") { it.name },
                     color = Color.White.copy(alpha = 0.84f),
-                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 13.sp),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -590,7 +591,7 @@ fun DailyDiscoverCard(
                 Text(
                     text = stringResource("daily_discover_based_on", item.seed.title),
                     color = Color.White.copy(alpha = 0.84f),
-                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 10.sp),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 11.sp),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -613,11 +614,11 @@ fun MoodAndGenresGrid(
     LazyHorizontalGrid(
         rows = GridCells.Fixed(4),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = modifier
             .fillMaxWidth()
-            .height(200.dp),
+            .height(210.dp),
     ) {
         items(
             items = items,
@@ -627,8 +628,8 @@ fun MoodAndGenresGrid(
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier
-                    .width(180.dp)
-                    .height(44.dp)
+                    .width(190.dp)
+                    .height(46.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .clickable {
                         onMoodGenreClick(moodItem.endpoint.browseId, moodItem.endpoint.params)
