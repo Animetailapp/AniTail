@@ -14,6 +14,7 @@ import androidx.media3.exoplayer.offline.DownloadManager
 import androidx.media3.exoplayer.offline.DownloadNotificationHelper
 import androidx.media3.exoplayer.offline.DownloadService
 import com.anitail.innertube.YouTube
+import com.anitail.innertube.models.YouTubeClient
 import com.anitail.music.constants.AudioQuality
 import com.anitail.music.constants.AudioQualityKey
 import com.anitail.music.constants.CustomDownloadPathEnabledKey
@@ -193,7 +194,7 @@ constructor(
                                 } ?: response.request
                             }
                             .build(),
-                    ),
+                    ).setUserAgent(YouTubeClient.USER_AGENT_WEB),
                 ),
         ) { dataSpec ->
             val mediaId = dataSpec.key ?: error("No media id")
@@ -264,6 +265,7 @@ constructor(
             val streamExpiryMs = System.currentTimeMillis() + (playbackData.streamExpiresInSeconds * 1000L)
             songUrlCache[mediaId] = streamUrl to streamExpiryMs
             dataSpec.withUri(streamUrl.toUri())
+                .withRequestHeaders(dataSpec.httpRequestHeaders + playbackData.streamHeaders)
         }
 
     private fun fetchPlaybackDataBlocking(

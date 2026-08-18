@@ -44,11 +44,14 @@ import androidx.media3.common.Timeline
 import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR
 import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import com.anitail.innertube.models.YouTubeClient
+import com.anitail.music.utils.cipher.CipherDeobfuscator
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -1971,6 +1974,10 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       }
     }
 
+    if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)) {
+      player.currentMediaItem?.mediaId?.let { songRetryCount.remove(it) }
+    }
+
     if (events.containsAny(
         Player.EVENT_PLAYBACK_STATE_CHANGED,
         Player.EVENT_PLAY_WHEN_READY_CHANGED,
@@ -2011,14 +2018,101 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     }
   }
 
+  private val songRetryCount = java.util.concurrent.ConcurrentHashMap<String, Int>()
+  private var retryJob: Job? = null
+  private val MAX_RETRY_PER_SONG = 3
+  private val RETRY_DELAY_MS = 300L
+
+  private fun getHttpResponseCode(error: PlaybackException): Int? {
+      var cause: Throwable? = error.cause
+      while (cause != null) {
+          if (cause is HttpDataSource.InvalidResponseCodeException) {
+              return cause.responseCode
+          }
+          cause = cause.cause
+      }
+      return null
+  }
+
+  private fun isExpiredUrlError(error: PlaybackException): Boolean {
+      val responseCode = getHttpResponseCode(error)
+      return responseCode == 403 || responseCode == 410
+  }
+
+  private fun handleExpiredUrlError(mediaId: String?, failedStreamClient: String?) {
+      if (mediaId == null) {
+          stopOnError()
+          return
+      }
+
+      val retryCount = songRetryCount[mediaId] ?: 0
+      if (retryCount >= MAX_RETRY_PER_SONG) {
+          Timber.tag("MusicService").w("Song $mediaId reached retry limit for expired URL error")
+          songRetryCount.remove(mediaId)
+          if (dataStore.get(AutoSkipNextOnErrorKey, false)) {
+              skipOnError()
+          } else {
+              stopOnError()
+          }
+          return
+      }
+      songRetryCount[mediaId] = retryCount + 1
+
+      StreamUrlCache.invalidate(mediaId)
+      streamUrlCache.remove(mediaId)
+      if (failedStreamClient == "WEB_REMIX") {
+          YTPlayerUtils.markWebRemixFailed(mediaId)
+      }
+      Timber.tag("MusicService").d("Cleared cached URL for $mediaId after 403/410 error (client=$failedStreamClient)")
+
+      scope.launch(Dispatchers.IO) {
+          if (CipherDeobfuscator.onStreamRejected()) {
+              Timber.tag("MusicService").d("Player config changed after stream rejection -> restoring WEB_REMIX")
+              YTPlayerUtils.clearWebRemixFailures()
+          }
+      }
+
+      val retryPosition = player.currentPosition
+      val retryIndex = player.currentMediaItemIndex
+      val retryPlayWhenReady = player.playWhenReady
+      retryJob?.cancel()
+      retryJob = scope.launch(Dispatchers.Main) {
+          delay(RETRY_DELAY_MS)
+          if (player.currentMediaItem?.mediaId != mediaId ||
+              player.currentMediaItemIndex != retryIndex
+          ) {
+              Timber.tag("MusicService").d("Skipping stale retry for $mediaId")
+              return@launch
+          }
+          retryJob = null
+          player.seekTo(retryIndex, retryPosition)
+          player.prepare()
+          if (retryPlayWhenReady) {
+              player.play()
+          }
+          Timber.tag("MusicService").d("Retrying playback for $mediaId after expired URL error")
+      }
+  }
+
   override fun onPlayerError(error: PlaybackException) {
+      val mediaId = player.currentMediaItem?.mediaId
+      val failedStreamClient = mediaId?.let { StreamUrlCache.clientName(it) }
+
+      Timber.tag("MusicService").w(error, "Player error occurred for $mediaId: errorCode=${error.errorCode}, message=${error.message}")
+
+      if (isExpiredUrlError(error)) {
+          Timber.tag("MusicService").d("Expired/Forbidden URL (403/410) detected, refreshing stream URL for $mediaId")
+          handleExpiredUrlError(mediaId, failedStreamClient)
+          return
+      }
+
       val isConnectionError = (error.cause?.cause is PlaybackException) &&
               (error.cause?.cause as PlaybackException).errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
 
       if (!isNetworkConnected.value || isConnectionError) {
           waitOnNetworkError()
           return
-    }
+      }
       if (dataStore.get(AutoSkipNextOnErrorKey, false)) {
           skipOnError()
       } else {
@@ -2278,7 +2372,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                                         } ?: response.request
                                     }
                                     .build(),
-                            ),
+                            ).setUserAgent(YouTubeClient.USER_AGENT_WEB),
                         ),
                     ).setCacheWriteDataSinkFactory(null),
             )
@@ -2308,13 +2402,12 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         if (isCached) {
             Timber.d("Cache hit for $mediaId")
             // Try to get a valid streaming URL from cache first
-            val cachedUrl = streamUrlCache[mediaId]
-                ?.takeIf { it.expiry > System.currentTimeMillis() }
-                ?.url
-
-            if (cachedUrl != null) {
+            val cachedStream = StreamUrlCache.get(mediaId)
+            if (cachedStream != null) {
                 scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
-                return@Factory dataSpec.withUri(cachedUrl.toUri())
+                return@Factory dataSpec
+                    .withUri(cachedStream.url.toUri())
+                    .withRequestHeaders(dataSpec.httpRequestHeaders + cachedStream.requestHeaders)
             }
 
             // If no URL in memory cache, get it from YouTube
@@ -2323,12 +2416,12 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             Timber.d("No cached URL for $mediaId, fetching from YouTube")
         } else {
             // Check URL cache before making API call
-            streamUrlCache[mediaId]
-                ?.takeIf { it.expiry > System.currentTimeMillis() }
-                ?.let { cached ->
-                    scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
-                    return@Factory dataSpec.withUri(cached.url.toUri())
-                }
+            StreamUrlCache.get(mediaId)?.let { cached ->
+                scope.launch(Dispatchers.IO) { recoverSong(mediaId) }
+                return@Factory dataSpec
+                    .withUri(cached.url.toUri())
+                    .withRequestHeaders(dataSpec.httpRequestHeaders + cached.requestHeaders)
+            }
         }
 
         // Fetch streaming URL from YouTube
@@ -2368,6 +2461,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
         return@Factory dataSpec.withUri(streamUrl.toUri())
             .subrange(dataSpec.uriPositionOffset, CHUNK_LENGTH)
+            .withRequestHeaders(dataSpec.httpRequestHeaders + playbackData.streamHeaders)
     }
   }
 

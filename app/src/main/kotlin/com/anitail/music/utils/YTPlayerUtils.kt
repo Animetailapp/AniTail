@@ -1,6 +1,7 @@
 package com.anitail.music.utils
 
 import android.net.ConnectivityManager
+import android.net.Uri
 import androidx.media3.common.PlaybackException
 import com.anitail.innertube.NewPipeExtractor
 import com.anitail.innertube.YouTube
@@ -19,7 +20,10 @@ import com.anitail.music.playback.StreamUrlCache
 import com.anitail.music.utils.cipher.CipherDeobfuscator
 import com.anitail.music.utils.potoken.PoTokenGenerator
 import com.anitail.music.utils.potoken.PoTokenResult
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import timber.log.Timber
@@ -33,6 +37,28 @@ object YTPlayerUtils {
         .build()
 
     private val poTokenGenerator = PoTokenGenerator()
+
+    private const val WEB_REMIX_FAILURE_TTL_MS = 5 * 60 * 1000L
+    private val webRemixFailures = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    fun markWebRemixFailed(videoId: String) {
+        webRemixFailures[videoId] = System.currentTimeMillis()
+    }
+
+    private fun hasRecentWebRemixFailure(videoId: String): Boolean {
+        val failedAt = webRemixFailures[videoId] ?: return false
+        if ((System.currentTimeMillis() - failedAt) !in 0 until WEB_REMIX_FAILURE_TTL_MS) {
+            webRemixFailures.remove(videoId, failedAt)
+            return false
+        }
+        return true
+    }
+
+    fun clearWebRemixFailures() {
+        webRemixFailures.clear()
+    }
+
+    private val cipherRefreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * The main client is used for metadata and initial streams.
@@ -180,7 +206,7 @@ object YTPlayerUtils {
         var streamUrl: String? = null
         var streamExpiresInSeconds: Int? = null
         var streamPlayerResponse: PlayerResponse? = null
-        var successClientName = MAIN_CLIENT.clientName
+        var successClient: YouTubeClient = MAIN_CLIENT
 
         for (clientIndex in (-1 until STREAM_FALLBACK_CLIENTS.size)) {
             // reset for each client
@@ -191,6 +217,10 @@ object YTPlayerUtils {
             // decide which client to use for streams and load its player response
             val client: YouTubeClient
             if (clientIndex == -1) {
+                if (hasRecentWebRemixFailure(videoId)) {
+                    Timber.tag(logTag).d("Skipping MAIN_CLIENT ($MAIN_CLIENT) due to recent failure")
+                    continue
+                }
                 // try with streams from main client first
                 client = MAIN_CLIENT
                 streamPlayerResponse = mainPlayerResponse
@@ -206,19 +236,22 @@ object YTPlayerUtils {
                 }
 
                 Timber.tag(logTag).d("Fetching player response for fallback client: ${client.clientName}")
+                val clientPoToken = if (client.useWebPoTokens) poToken?.playerRequestPoToken else null
+                val clientSigTimestamp = if (client.useSignatureTimestamp) signatureTimestamp else null
                 streamPlayerResponse =
                     YouTube.player(
                         videoId = videoId,
                         playlistId = playlistId,
                         client = client,
-                        signatureTimestamp = if (client.useSignatureTimestamp) signatureTimestamp else null,
+                        signatureTimestamp = clientSigTimestamp,
+                        poToken = clientPoToken,
                     ).getOrNull()
             }
 
             // process current client response
             val response = streamPlayerResponse
             if (response != null && isPlayable(response.playabilityStatus.status)) {
-                Timber.tag(logTag).d("Player response status OK for client: ${if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
+                Timber.tag(logTag).d("Player response status OK for client: ${client.clientName}")
 
                 format =
                     findFormat(
@@ -229,7 +262,7 @@ object YTPlayerUtils {
                     )
 
                 if (format == null) {
-                    Timber.tag(logTag).d("No suitable format found for client: ${if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
+                    Timber.tag(logTag).d("No suitable format found for client: ${client.clientName}")
                     continue
                 }
 
@@ -241,23 +274,54 @@ object YTPlayerUtils {
                     continue
                 }
 
+                // Apply n-transform and PoToken for web clients
+                val currentClient = client
+                val needsNTransform = currentClient.useWebPoTokens ||
+                    currentClient.clientName in listOf("WEB", "WEB_REMIX", "WEB_CREATOR", "TVHTML5")
+
+                if (needsNTransform) {
+                    try {
+                        streamUrl = CipherDeobfuscator.transformNParamInUrl(streamUrl)
+                        val needsPoToken = currentClient.useWebPoTokens && poToken?.streamingDataPoToken != null
+                        if (needsPoToken) {
+                            val separator = if ("?" in streamUrl) "&" else "?"
+                            streamUrl = "${streamUrl}${separator}pot=${Uri.encode(poToken.streamingDataPoToken)}"
+                        }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Timber.tag(TAG).e(e, "N-transform or pot append failed: ${e.message}")
+                    }
+                }
+
                 streamExpiresInSeconds = response.streamingData?.expiresInSeconds ?: 21600
                 Timber.tag(logTag).d("Stream expires in: $streamExpiresInSeconds seconds")
 
                 if (clientIndex == STREAM_FALLBACK_CLIENTS.size - 1) {
                     /** skip [validateStatus] for last client */
-                    Timber.tag(logTag).d("Using last fallback client without validation: ${STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
-                    successClientName = STREAM_FALLBACK_CLIENTS[clientIndex].clientName
+                    Timber.tag(logTag).d("Using last fallback client without validation: ${client.clientName}")
+                    successClient = client
                     break
                 }
 
-                if (validateStatus(streamUrl)) {
+                if (currentClient.clientName == "WEB_REMIX") {
+                    Timber.tag(logTag).d("WEB_REMIX - skipping HEAD validation, letting ExoPlayer try directly")
+                    successClient = currentClient
+                    break
+                }
+
+                if (validateStatus(streamUrl, currentClient.streamHeaders())) {
                     // working stream found
-                    Timber.tag(logTag).d("Stream validated successfully with client: ${if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
-                    successClientName = if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName
+                    Timber.tag(logTag).d("Stream validated successfully with client: ${currentClient.clientName}")
+                    successClient = currentClient
                     break
                 } else {
-                    Timber.tag(logTag).d("Stream validation failed for client: ${if (clientIndex == -1) MAIN_CLIENT.clientName else STREAM_FALLBACK_CLIENTS[clientIndex].clientName}")
+                    Timber.tag(logTag).d("Stream validation failed for client: ${currentClient.clientName}")
+                    if (needsNTransform) {
+                        cipherRefreshScope.launch {
+                            if (CipherDeobfuscator.onStreamRejected()) clearWebRemixFailures()
+                        }
+                    }
                 }
             } else {
                 Timber.tag(logTag).d("Player response status not OK: ${streamPlayerResponse?.playabilityStatus?.status}, reason: ${streamPlayerResponse?.playabilityStatus?.reason}")
@@ -294,11 +358,14 @@ object YTPlayerUtils {
             throw Exception("Could not find stream url")
         }
 
+        val streamHeaders = successClient.streamHeaders()
+
         // Cache in StreamUrlCache
         StreamUrlCache.put(
             mediaId = videoId,
             url = streamUrl,
-            clientName = successClientName,
+            requestHeaders = streamHeaders,
+            clientName = successClient.clientName,
             expiresInSeconds = streamExpiresInSeconds,
             itag = format.itag,
         )
@@ -311,7 +378,8 @@ object YTPlayerUtils {
             format = format,
             streamUrl = streamUrl,
             streamExpiresInSeconds = streamExpiresInSeconds,
-            streamClient = successClientName,
+            streamClient = successClient.clientName,
+            streamHeaders = streamHeaders,
         )
     }
 
@@ -460,22 +528,59 @@ object YTPlayerUtils {
      * If this returns true the url is likely to work.
      * If this returns false the url might cause an error during playback.
      */
-    private fun validateStatus(url: String): Boolean {
+    private fun validateStatus(
+        url: String,
+        requestHeaders: Map<String, String> = emptyMap(),
+    ): Boolean {
         Timber.tag(logTag).d("Validating stream URL status")
         try {
             val requestBuilder = okhttp3.Request.Builder()
                 .head()
                 .url(url)
-            val response = httpClient.newCall(requestBuilder.build()).execute()
-            val isSuccessful = response.isSuccessful
-            Timber.tag(logTag).d("Stream URL validation result: ${if (isSuccessful) "Success" else "Failed"} (${response.code})")
-            return isSuccessful
+
+            requestHeaders.forEach { (name, value) ->
+                requestBuilder.header(name, value)
+            }
+
+            YouTube.cookie?.let { cookie ->
+                requestBuilder.addHeader("Cookie", cookie)
+            }
+
+            httpClient.newCall(requestBuilder.build()).execute().use { response ->
+                val isSuccessful = response.isSuccessful
+                Timber.tag(logTag).d("Stream URL validation result: ${if (isSuccessful) "Success" else "Failed"} (${response.code})")
+                return isSuccessful
+            }
         } catch (e: Exception) {
             Timber.tag(logTag).e(e, "Stream URL validation failed with exception")
             reportException(e)
         }
         return false
     }
+
+    private fun YouTubeClient.streamHeaders(): Map<String, String> =
+        buildMap {
+            put("User-Agent", userAgent)
+            put("Accept", "*/*")
+            put("Accept-Language", "en-US,en;q=0.9")
+
+            when (clientName) {
+                "WEB_REMIX" -> {
+                    put("Referer", "https://music.youtube.com/")
+                    put("Origin", "https://music.youtube.com")
+                }
+
+                "WEB_CREATOR" -> {
+                    put("Referer", "https://studio.youtube.com/")
+                    put("Origin", "https://studio.youtube.com")
+                }
+
+                else -> {
+                    put("Referer", "https://www.youtube.com/")
+                    put("Origin", "https://www.youtube.com")
+                }
+            }
+        }
 
     /**
      * Wrapper around the [CipherDeobfuscator.signatureTimestamp] and [NewPipeExtractor.getSignatureTimestamp]
