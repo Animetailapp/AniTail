@@ -393,8 +393,7 @@ fun HomeScreen(
             if (speedDialItems.isNotEmpty()) {
                 item {
                     NavigationTitle(
-                        title = "Acceso rápido",
-                        label = "Speed Dial",
+                        title = stringResource("speed_dial"),
                     )
                 }
                 item {
@@ -432,8 +431,7 @@ fun HomeScreen(
             if (communityPlaylists.isNotEmpty()) {
                 item {
                     NavigationTitle(
-                        title = "De la comunidad",
-                        label = "Playlists destacadas",
+                        title = stringResource("from_the_community"),
                     )
                 }
                 item {
@@ -471,8 +469,7 @@ fun HomeScreen(
             if (dailyDiscover.isNotEmpty()) {
                 item {
                     NavigationTitle(
-                        title = "Descubrimiento diario",
-                        label = "Nuevas recomendaciones para ti",
+                        title = stringResource("daily_discover"),
                     )
                 }
                 item {
@@ -565,7 +562,7 @@ fun HomeScreen(
             if (explorePage?.moodAndGenres?.isNotEmpty() == true) {
                 item {
                     NavigationTitle(
-                        title = "Estados de ánimo y géneros",
+                        title = stringResource("mood_and_genres"),
                         onClick = { onNavigate("moods_and_genres") }
                     )
                 }
