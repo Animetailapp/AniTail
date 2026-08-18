@@ -1,5 +1,9 @@
 package com.anitail.desktop.ui.screen.home
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
@@ -31,15 +35,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -73,33 +77,50 @@ fun SpeedDialSection(
         prepared
     }
     val pages = remember(displayItems) { displayItems.chunked(9) }
-    val pagerState = rememberLazyListState()
-    val currentPage by remember(pagerState, pages.size) {
-        derivedStateOf { pagerState.firstVisibleItemIndex.coerceAtMost((pages.size - 1).coerceAtLeast(0)) }
-    }
+    var currentPage by remember { mutableStateOf(0) }
+    val activePageIndex = currentPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))
 
-    // On Desktop, size each 3x3 page nicely (e.g. 440.dp - 520.dp wide)
-    val pageWidth = (maxWidth - 48.dp).coerceIn(340.dp, 520.dp)
-    val tileSize = (pageWidth - 16.dp) / 3
+    val tileSize = 120.dp
+    val spacing = 8.dp
+    val gridWidth = (tileSize * 3) + (spacing * 2)
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        LazyRow(
-            state = pagerState,
-            flingBehavior = rememberSnapFlingBehavior(pagerState),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+    Column(
+        modifier = modifier.padding(horizontal = 16.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(
-                count = pages.size,
-                key = { "speed_dial_page_$it" },
-            ) { pageIndex ->
-                val pageItems = pages[pageIndex]
+            if (pages.size > 1) {
+                IconButton(
+                    onClick = { if (activePageIndex > 0) currentPage-- },
+                    enabled = activePageIndex > 0,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (activePageIndex > 0) 0.8f else 0.3f)),
+                ) {
+                    Icon(
+                        imageVector = IconAssets.arrowBack(),
+                        contentDescription = "Anterior",
+                        tint = if (activePageIndex > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            AnimatedContent(
+                targetState = activePageIndex,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "SpeedDialPageAnimation"
+            ) { pageIdx ->
+                val pageItems = pages.getOrElse(pageIdx) { emptyList() }
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.width(pageWidth),
+                    verticalArrangement = Arrangement.spacedBy(spacing),
+                    modifier = Modifier.width(gridWidth),
                 ) {
                     repeat(3) { rowIndex ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
                             repeat(3) { columnIndex ->
                                 val tileIndex = rowIndex * 3 + columnIndex
                                 if (tileIndex >= pageItems.size) {
@@ -124,25 +145,44 @@ fun SpeedDialSection(
                     }
                 }
             }
+
+            if (pages.size > 1) {
+                IconButton(
+                    onClick = { if (activePageIndex < pages.size - 1) currentPage++ },
+                    enabled = activePageIndex < pages.size - 1,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (activePageIndex < pages.size - 1) 0.8f else 0.3f)),
+                ) {
+                    Icon(
+                        imageVector = IconAssets.arrowForward(),
+                        contentDescription = "Siguiente",
+                        tint = if (activePageIndex < pages.size - 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
         }
 
         if (pages.size > 1) {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.width(gridWidth + if (pages.size > 1) 96.dp else 0.dp),
             ) {
                 repeat(pages.size) { index ->
                     Box(
                         modifier = Modifier
-                            .size(if (index == currentPage) 8.dp else 6.dp)
+                            .size(if (index == activePageIndex) 8.dp else 6.dp)
                             .clip(CircleShape)
                             .background(
-                                if (index == currentPage)
+                                if (index == activePageIndex)
                                     MaterialTheme.colorScheme.primary
                                 else
                                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
                             )
+                            .clickable { currentPage = index }
                     )
                 }
             }
@@ -183,14 +223,14 @@ private fun SpeedDialTile(
             text = item.title,
             color = Color.White,
             style = MaterialTheme.typography.bodyLarge.copy(
-                fontSize = 14.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
             ),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 8.dp, vertical = 6.dp),
         )
     }
 }
@@ -207,12 +247,12 @@ private fun SpeedDialSurpriseTile(
             .background(Color(0xFF6A5D82))
             .clickable(onClick = onClick),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 repeat(2) {
                     Box(
                         modifier = Modifier
-                            .size(16.dp)
+                            .size(13.dp)
                             .clip(CircleShape)
                             .background(Color(0xFFE2D8F3)),
                     )
@@ -221,15 +261,15 @@ private fun SpeedDialSurpriseTile(
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
-                    .size(16.dp)
+                    .size(13.dp)
                     .clip(CircleShape)
                     .background(Color(0xFFE2D8F3)),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 repeat(2) {
                     Box(
                         modifier = Modifier
-                            .size(16.dp)
+                            .size(13.dp)
                             .clip(CircleShape)
                             .background(Color(0xFFE2D8F3)),
                     )
@@ -255,7 +295,7 @@ private fun PlaylistCollage(
 
     Column(
         modifier = modifier
-            .size(90.dp)
+            .size(80.dp)
             .clip(RoundedCornerShape(14.dp)),
     ) {
         repeat(2) { rowIndex ->
@@ -287,7 +327,7 @@ fun CommunityPlaylistsSection(
     modifier: Modifier = Modifier,
 ) {
     val rowState = rememberLazyListState()
-    val cardWidth = (maxWidth * 0.40f).coerceIn(340.dp, 440.dp)
+    val cardWidth = (maxWidth * 0.38f).coerceIn(320.dp, 400.dp)
 
     LazyRow(
         state = rowState,
@@ -342,7 +382,7 @@ fun CommunityPlaylistCard(
                     Text(
                         text = item.playlist.title,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 16.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                         ),
                         color = Color.White,
@@ -352,7 +392,7 @@ fun CommunityPlaylistCard(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = item.playlist.author?.name ?: item.playlist.songCountText.orEmpty(),
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
                         color = Color.White.copy(alpha = 0.72f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -366,11 +406,11 @@ fun CommunityPlaylistCard(
             item.songs.take(3).forEach { song ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .padding(vertical = 3.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .clickable { onSongClick(song) }
                         .padding(horizontal = 4.dp, vertical = 2.dp),
                 ) {
@@ -378,16 +418,16 @@ fun CommunityPlaylistCard(
                         url = song.thumbnail,
                         contentDescription = null,
                         modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(12.dp)),
-                        shape = RoundedCornerShape(12.dp),
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(10.dp)),
+                        shape = RoundedCornerShape(10.dp),
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = song.title,
                             color = Color.White,
                             style = MaterialTheme.typography.bodyLarge.copy(
-                                fontSize = 14.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium,
                             ),
                             maxLines = 1,
@@ -395,7 +435,7 @@ fun CommunityPlaylistCard(
                         )
                         Text(
                             text = song.artists.joinToString(", ") { it.name },
-                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.sp),
                             color = Color.White.copy(alpha = 0.68f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -408,13 +448,13 @@ fun CommunityPlaylistCard(
 
             // Action Buttons
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 IconButton(
                     onClick = onPlayAllClick,
                     modifier = Modifier
-                        .size(56.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.45f))
                 ) {
@@ -422,13 +462,13 @@ fun CommunityPlaylistCard(
                         imageVector = IconAssets.play(),
                         contentDescription = stringResource("play_all"),
                         tint = Color.White,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 IconButton(
                     onClick = onRadioClick,
                     modifier = Modifier
-                        .size(56.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.28f))
                 ) {
@@ -436,13 +476,13 @@ fun CommunityPlaylistCard(
                         imageVector = IconAssets.radio(),
                         contentDescription = stringResource("radio"),
                         tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 IconButton(
                     onClick = onAddClick,
                     modifier = Modifier
-                        .size(56.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.28f))
                 ) {
@@ -450,7 +490,7 @@ fun CommunityPlaylistCard(
                         imageVector = IconAssets.playlistAdd(),
                         contentDescription = stringResource("add_to_playlist"),
                         tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -469,7 +509,7 @@ fun DailyDiscoverSection(
 ) {
     if (discoverItems.isEmpty()) return
 
-    val preferredCardWidth = (maxWidth * 0.35f).coerceIn(260.dp, 360.dp)
+    val preferredCardWidth = (maxWidth * 0.32f).coerceIn(240.dp, 320.dp)
 
     LazyRow(
         contentPadding = PaddingValues(horizontal = 16.dp),
@@ -485,7 +525,7 @@ fun DailyDiscoverSection(
                 onClick = { onItemClick(item) },
                 modifier = Modifier
                     .width(preferredCardWidth)
-                    .height(340.dp),
+                    .height(300.dp),
             )
         }
     }
@@ -499,9 +539,9 @@ fun DailyDiscoverCard(
 ) {
     Card(
         modifier = modifier
-            .clip(RoundedCornerShape(30.dp))
+            .clip(RoundedCornerShape(26.dp))
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(30.dp),
+        shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1828)),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -509,7 +549,7 @@ fun DailyDiscoverCard(
                 url = item.recommendation.thumbnail,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(30.dp),
+                shape = RoundedCornerShape(26.dp),
             )
             Box(
                 modifier = Modifier
@@ -527,13 +567,13 @@ fun DailyDiscoverCard(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(18.dp),
+                    .padding(16.dp),
             ) {
                 Text(
                     text = item.recommendation.title,
                     color = Color.White,
                     style = MaterialTheme.typography.titleLarge.copy(
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                     ),
                     maxLines = 2,
@@ -542,7 +582,7 @@ fun DailyDiscoverCard(
                 Text(
                     text = item.recommendation.artists.joinToString(", ") { it.name },
                     color = Color.White.copy(alpha = 0.84f),
-                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 13.sp),
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 12.sp),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
