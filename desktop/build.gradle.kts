@@ -47,11 +47,16 @@ dependencies {
     implementation(project(":innertube"))
     implementation(project(":betterlyrics"))
     implementation(project(":simpmusic"))
+    implementation(project(":shazamkit"))
 
 
     implementation(compose.desktop.currentOs)
-    implementation(compose.material3)
-    implementation(libs.materialKolor)
+    implementation("org.jetbrains.compose.material3:material3:1.9.0")
+    implementation(libs.materialKolor) {
+        exclude(group = "org.jetbrains.compose.material3")
+        exclude(group = "org.jetbrains.compose.foundation")
+        exclude(group = "org.jetbrains.compose.ui")
+    }
     implementation(libs.compose.reorderable)
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
