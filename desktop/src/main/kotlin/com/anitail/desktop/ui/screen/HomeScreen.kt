@@ -389,7 +389,98 @@ fun HomeScreen(
                  item { ShimmerQuickPicksGrid() }
             }
 
-            // 2. Speed Dial (Acceso Rápido con botón de Sorpréndeme)
+            // 2. Keep Listening (Grid of Cards)
+            if (keepListening.isNotEmpty()) {
+                item { NavigationTitle(title = stringResource("keep_listening")) }
+                item {
+                    KeepListeningRow(
+                        items = keepListening,
+                        playerState = playerState,
+                        onOpen = { onLocalItemSelected(it) },
+                        menuActions = { item -> menuActionsForSong(item, null) },
+                    )
+                }
+            } else if (isLoading && homePage == null) {
+                item { NavigationTitle(title = stringResource("keep_listening")) }
+                item { ShimmerSectionRow() }
+            }
+
+            // 3. Account Playlists (Row of Cards)
+            if (accountPlaylists.isNotEmpty()) {
+                item {
+                    NavigationTitle(
+                        title = accountName ?: stringResource("avatar_source_youtube"),
+                        label = stringResource("your_ytb_playlists"),
+                        thumbnail = accountThumbnailUrl?.let { url ->
+                            {
+                                RemoteImage(
+                                    url = url,
+                                    modifier = Modifier.size(ListThumbnailSize),
+                                    shape = CircleShape,
+                                )
+                            }
+                        },
+                        onClick = { onNavigate("account") },
+                    )
+                }
+                item {
+                    HomeSectionRow(
+                        items = accountPlaylists,
+                        onItemSelected = onItemSelected,
+                        menuActionsForSong = menuActionsForSongItem,
+                    )
+                }
+            }
+
+            // 4. Forgotten Favorites (Grid of List Items)
+            if (forgottenFavorites.isNotEmpty()) {
+                item { NavigationTitle(title = stringResource("forgotten_favorites")) }
+                item {
+                    val rows = minOf(4, forgottenFavorites.size)
+                    QuickPicksGrid(
+                        items = forgottenFavorites,
+                        playerState = playerState,
+                        onPrimary = { onLocalItemSelected(it) },
+                        menuActions = { item -> menuActionsForSong(item, null) },
+                        rows = rows,
+                        gridState = forgottenFavoritesLazyGridState,
+                        flingBehavior = forgottenFavoritesFlingBehavior,
+                        itemWidth = horizontalLazyGridItemWidth,
+                    )
+                }
+            }
+
+            // 5. Similar Recommendations (Row of Cards)
+            similarRecommendations.forEach { recommendation ->
+                item {
+                    val shape = if (recommendation.isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
+                    NavigationTitle(
+                        title = recommendation.title,
+                        label = stringResource("similar_to"),
+                        thumbnail = if (recommendation.thumbnailUrl != null) {
+                            {
+                                RemoteImage(
+                                    url = recommendation.thumbnailUrl,
+                                    modifier = Modifier.size(ListThumbnailSize),
+                                    shape = shape,
+                                )
+                            }
+                        } else null,
+                        onClick = recommendation.sourceItem?.let { source ->
+                            { onLocalItemSelected(source) }
+                        },
+                    )
+                }
+                item {
+                    HomeSectionRow(
+                        items = recommendation.items,
+                        onItemSelected = onItemSelected,
+                        menuActionsForSong = menuActionsForSongItem,
+                    )
+                }
+            }
+
+            // 6. Speed Dial (Acceso Rápido con botón de Sorpréndeme)
             if (speedDialItems.isNotEmpty()) {
                 item {
                     NavigationTitle(
@@ -411,23 +502,7 @@ fun HomeScreen(
                 }
             }
 
-            // 3. Keep Listening (Grid of Cards)
-            if (keepListening.isNotEmpty()) {
-                item { NavigationTitle(title = stringResource("keep_listening")) }
-                item {
-                    KeepListeningRow(
-                        items = keepListening,
-                        playerState = playerState,
-                        onOpen = { onLocalItemSelected(it) },
-                        menuActions = { item -> menuActionsForSong(item, null) },
-                    )
-                }
-            } else if (isLoading && homePage == null) {
-                item { NavigationTitle(title = stringResource("keep_listening")) }
-                item { ShimmerSectionRow() }
-            }
-
-            // 4. Community Playlists (Playlists de la comunidad con previews)
+            // 7. Community Playlists (Playlists de la comunidad con previews)
             if (communityPlaylists.isNotEmpty()) {
                 item {
                     NavigationTitle(
@@ -465,7 +540,7 @@ fun HomeScreen(
                 }
             }
 
-            // 5. Daily Discover (Descubrimiento Diario)
+            // 8. Daily Discover (Descubrimiento Diario)
             if (dailyDiscover.isNotEmpty()) {
                 item {
                     NavigationTitle(
@@ -479,81 +554,6 @@ fun HomeScreen(
                         onItemClick = { item ->
                             playerState.play(songItemToLibraryItem(item.recommendation))
                         },
-                    )
-                }
-            }
-
-            // 6. Account Playlists (Row of Cards)
-            if (accountPlaylists.isNotEmpty()) {
-                item {
-                    NavigationTitle(
-                        title = accountName ?: stringResource("avatar_source_youtube"),
-                        label = stringResource("your_ytb_playlists"),
-                        thumbnail = accountThumbnailUrl?.let { url ->
-                            {
-                                RemoteImage(
-                                    url = url,
-                                    modifier = Modifier.size(ListThumbnailSize),
-                                    shape = CircleShape,
-                                )
-                            }
-                        },
-                        onClick = { onNavigate("account") },
-                    )
-                }
-                item {
-                    HomeSectionRow(
-                        items = accountPlaylists,
-                        onItemSelected = onItemSelected,
-                        menuActionsForSong = menuActionsForSongItem,
-                    )
-                }
-            }
-
-            // 7. Forgotten Favorites (Grid of List Items)
-            if (forgottenFavorites.isNotEmpty()) {
-                item { NavigationTitle(title = stringResource("forgotten_favorites")) }
-                item {
-                    val rows = minOf(4, forgottenFavorites.size)
-                    QuickPicksGrid(
-                        items = forgottenFavorites,
-                        playerState = playerState,
-                        onPrimary = { onLocalItemSelected(it) },
-                        menuActions = { item -> menuActionsForSong(item, null) },
-                        rows = rows,
-                        gridState = forgottenFavoritesLazyGridState,
-                        flingBehavior = forgottenFavoritesFlingBehavior,
-                        itemWidth = horizontalLazyGridItemWidth,
-                    )
-                }
-            }
-
-            // 8. Similar Recommendations (Row of Cards)
-            similarRecommendations.forEach { recommendation ->
-                item {
-                    val shape = if (recommendation.isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
-                    NavigationTitle(
-                        title = recommendation.title,
-                        label = stringResource("similar_to"),
-                        thumbnail = if (recommendation.thumbnailUrl != null) {
-                            {
-                                RemoteImage(
-                                    url = recommendation.thumbnailUrl,
-                                    modifier = Modifier.size(ListThumbnailSize),
-                                    shape = shape,
-                                )
-                            }
-                        } else null,
-                        onClick = recommendation.sourceItem?.let { source ->
-                            { onLocalItemSelected(source) }
-                        },
-                    )
-                }
-                item {
-                    HomeSectionRow(
-                        items = recommendation.items,
-                        onItemSelected = onItemSelected,
-                        menuActionsForSong = menuActionsForSongItem,
                     )
                 }
             }
