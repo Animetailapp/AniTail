@@ -34,7 +34,7 @@ browser = { module = "androidx.browser:browser", version.ref = "browser" }
 security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 commons-codec = { module = "commons-codec:commons-codec", version.ref = "commonsCodec" }
 documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
-guava = { group = "com.google.guava", name = "guava", version = "33.6.0-jre" }
+guava = { group = "com.google.guava", name = "guava", version = "33.7.1-jre" }
 coroutines-guava = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-guava", version = "1.11.0" }
 concurrent-futures = { group = "androidx.concurrent", name = "concurrent-futures-ktx", version = "1.4.0-alpha01" }
 
