@@ -166,10 +166,11 @@ class InnerTube {
             }
 
             if (setLogin && client.loginSupported) {
-                cookie?.let { cookie ->
-                    if ("SAPISID" in cookieMap) {
+                cookie?.let {
+                    val sapisid = cookieMap["SAPISID"] ?: cookieMap["__Secure-3PAPISID"] ?: cookieMap["__Secure-1PAPISID"]
+                    if (sapisid != null) {
                         val currentTime = System.currentTimeMillis() / 1000
-                        val sapisidHash = sha1("$currentTime ${cookieMap["SAPISID"]} ${YouTubeClient.ORIGIN_YOUTUBE_MUSIC}")
+                        val sapisidHash = sha1("$currentTime $sapisid ${YouTubeClient.ORIGIN_YOUTUBE_MUSIC}")
                         append("Authorization", "SAPISIDHASH ${currentTime}_${sapisidHash}")
                     }
                 }
@@ -210,21 +211,40 @@ class InnerTube {
         params: String? = null,
         continuation: String? = null,
     ) = withRetry {
-        httpClient.post("search") {
-            ytClient(client, setLogin = useLoginForBrowse)
-            setBody(
-                SearchBody(
-                    context = client.toContext(
-                        locale,
-                        visitorData,
-                        if (useLoginForBrowse) dataSyncId else null
-                    ),
-                    query = query,
-                    params = params
+        try {
+            httpClient.post("search") {
+                ytClient(client, setLogin = false)
+                setBody(
+                    SearchBody(
+                        context = client.toContext(
+                            locale,
+                            visitorData,
+                            null
+                        ),
+                        query = query,
+                        params = params
+                    )
                 )
-            )
-            parameter("continuation", continuation)
-            parameter("ctoken", continuation)
+                parameter("continuation", continuation)
+                parameter("ctoken", continuation)
+            }
+        } catch (e: Exception) {
+            httpClient.post("search") {
+                ytClient(client, setLogin = false)
+                setBody(
+                    SearchBody(
+                        context = client.toContext(
+                            locale,
+                            null,
+                            null
+                        ),
+                        query = query,
+                        params = params
+                    )
+                )
+                parameter("continuation", continuation)
+                parameter("ctoken", continuation)
+            }
         }
     }
 
@@ -291,20 +311,40 @@ class InnerTube {
         continuation: String? = null,
         setLogin: Boolean = false,
     ) = withRetry {
-        httpClient.post("browse") {
-            ytClient(client, setLogin = setLogin || useLoginForBrowse)
-            setBody(
-                BrowseBody(
-                    context = client.toContext(
-                        locale,
-                        visitorData,
-                        if (setLogin || useLoginForBrowse) dataSyncId else null
-                    ),
-                    browseId = browseId,
-                    params = params,
-                    continuation = continuation
+        val isPublicBrowse = browseId in listOf("FEmusic_explore", "FEmusic_charts", "FEmusic_new_releases_albums", "FEmusic_moods_and_genres")
+        val effectiveLogin = if (isPublicBrowse) false else (setLogin || useLoginForBrowse)
+        try {
+            httpClient.post("browse") {
+                ytClient(client, setLogin = effectiveLogin)
+                setBody(
+                    BrowseBody(
+                        context = client.toContext(
+                            locale,
+                            visitorData,
+                            if (effectiveLogin) dataSyncId else null
+                        ),
+                        browseId = browseId,
+                        params = params,
+                        continuation = continuation
+                    )
                 )
-            )
+            }
+        } catch (e: Exception) {
+            if (effectiveLogin) {
+                httpClient.post("browse") {
+                    ytClient(client, setLogin = false)
+                    setBody(
+                        BrowseBody(
+                            context = client.toContext(locale, visitorData, null),
+                            browseId = browseId,
+                            params = params,
+                            continuation = continuation
+                        )
+                    )
+                }
+            } else {
+                throw e
+            }
         }
     }
 

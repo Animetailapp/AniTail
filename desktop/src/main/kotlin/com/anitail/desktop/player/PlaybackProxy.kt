@@ -155,6 +155,9 @@ object PlaybackProxy {
         try {
             val requestBuilder = Request.Builder()
                 .url(targetUrl)
+            requestBuilder.header("Accept", "*/*")
+            requestBuilder.header("Accept-Language", "en-US,en;q=0.9")
+
             if (!userAgent.isNullOrEmpty()) {
                 requestBuilder.header("User-Agent", userAgent)
                 
@@ -175,6 +178,8 @@ object PlaybackProxy {
 
             if (!referer.isNullOrBlank()) {
                 requestBuilder.addHeader("Referer", referer)
+                val origin = referer.trimEnd('/')
+                requestBuilder.addHeader("Origin", origin)
             }
 
             if (!cookie.isNullOrBlank()) {

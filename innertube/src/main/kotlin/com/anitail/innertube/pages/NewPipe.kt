@@ -124,12 +124,15 @@ class NewPipeUtils(
                     url.toString()
                 } ?: throw ParsingException("Could not find format url")
 
-            YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
-                videoId,
-                url,
-            )
+            try {
+                YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
+                    videoId,
+                    url,
+                ) ?: url
+            } catch (e: Exception) {
+                url
+            }
         } catch (e: Exception) {
-            // Don't print stack trace - caller handles errors
             null
         }
 }

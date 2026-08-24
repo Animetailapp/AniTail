@@ -1021,12 +1021,10 @@ object YouTube {
                     )
                 }
 
-                else -> { // contents?.musicShelfRenderer != null
+                else -> {
                     val shelfContents = contents?.musicShelfRenderer?.contents
-                    println("[UPLOAD_DEBUG] musicShelfRenderer contents count: ${shelfContents?.size ?: 0}")
                     if (shelfContents == null) {
-                        println("[UPLOAD_DEBUG] ERROR: musicShelfRenderer contents is null!")
-                        throw IllegalStateException("No content found for browseId=$browseId")
+                        return@runCatching LibraryPage(emptyList(), null)
                     }
                     val listItemRenderers = shelfContents.mapNotNull(MusicShelfRenderer.Content::musicResponsiveListItemRenderer)
                     println("[UPLOAD_DEBUG] musicResponsiveListItemRenderer count: ${listItemRenderers.size}")

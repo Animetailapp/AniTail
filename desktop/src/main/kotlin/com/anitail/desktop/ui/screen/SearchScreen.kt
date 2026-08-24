@@ -28,8 +28,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -84,13 +84,14 @@ import kotlinx.coroutines.launch
 fun SearchScreen(
     database: DesktopDatabase,
     playerState: PlayerState,
+    initialQuery: String? = null,
     onBack: () -> Unit,
     onArtistClick: (String, String) -> Unit,
     onAlbumClick: (String, String) -> Unit,
     onPlaylistClick: (String, String) -> Unit,
     onSongClick: (LibraryItem) -> Unit,
 ) {
-    var query by remember { mutableStateOf("") }
+    var query by remember(initialQuery) { mutableStateOf(initialQuery.orEmpty()) }
     var isSearching by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
 
@@ -110,6 +111,54 @@ fun SearchScreen(
     val coroutineScope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
 
+    // Función de búsqueda
+    fun performSearch(searchQuery: String) {
+        if (searchQuery.isBlank()) return
+
+        if (!pauseSearchHistory) {
+            coroutineScope.launch {
+                database.insertSearch(searchQuery)
+            }
+        }
+
+        isSearching = true
+        isLoading = true
+        currentFilter = null
+
+        coroutineScope.launch {
+            YouTube.searchSummary(searchQuery).onSuccess { summary ->
+                if (summary.summaries.isNotEmpty()) {
+                    searchSummary = summary
+                    filteredResults = emptyList()
+                } else {
+                    YouTube.search(searchQuery, YouTube.SearchFilter.FILTER_SONG).onSuccess { result ->
+                        filteredResults = result.items
+                        searchSummary = null
+                    }.onFailure {
+                        searchSummary = summary
+                        filteredResults = emptyList()
+                    }
+                }
+            }.onFailure {
+                YouTube.search(searchQuery, YouTube.SearchFilter.FILTER_SONG).onSuccess { result ->
+                    filteredResults = result.items
+                    searchSummary = null
+                }.onFailure {
+                    searchSummary = null
+                    filteredResults = emptyList()
+                }
+            }
+            isLoading = false
+        }
+    }
+
+    LaunchedEffect(initialQuery) {
+        if (!initialQuery.isNullOrBlank()) {
+            query = initialQuery
+            performSearch(initialQuery)
+        }
+    }
+
     // Cargar sugerencias cuando cambia el query
     LaunchedEffect(query) {
         if (query.isEmpty()) {
@@ -128,30 +177,6 @@ fun SearchScreen(
                     }
                 }
             }
-    }
-
-    // Función de búsqueda
-    fun performSearch(searchQuery: String) {
-        if (searchQuery.isBlank()) return
-
-        if (!pauseSearchHistory) {
-            coroutineScope.launch {
-                database.insertSearch(searchQuery)
-            }
-        }
-
-        isSearching = true
-        isLoading = true
-        currentFilter = null
-
-        coroutineScope.launch {
-            YouTube.searchSummary(searchQuery).onSuccess { summary ->
-                searchSummary = summary
-            }.onFailure {
-                searchSummary = null
-            }
-            isLoading = false
-        }
     }
 
     // Función para buscar con filtro
@@ -322,7 +347,7 @@ fun SearchScreen(
                             )
                         }
                     }
-                } else {
+                } else if (searchSummary != null) {
                     // Resumen de búsqueda (todas las categorías)
                     searchSummary?.summaries?.forEach { summary ->
                         item {
@@ -357,6 +382,28 @@ fun SearchScreen(
                             EmptySearchResults()
                         }
                     }
+                } else if (filteredResults.isNotEmpty()) {
+                    items(filteredResults, key = { it.id }) { item ->
+                        SearchResultItem(
+                            item = item,
+                            isActive = playerState.currentItem?.id == item.id,
+                            isPlaying = playerState.isPlaying,
+                            onClick = {
+                                when (item) {
+                                    is SongItem -> onSongClick(songItemToLibraryItem(item))
+                                    is EpisodeItem -> onSongClick(songItemToLibraryItem(item.asSongItem()))
+                                    is AlbumItem -> onAlbumClick(item.browseId, item.title)
+                                    is ArtistItem -> onArtistClick(item.id, item.title)
+                                    is PlaylistItem -> onPlaylistClick(item.id, item.title)
+                                    is PodcastItem -> onPlaylistClick(item.id, item.title)
+                                }
+                            },
+                        )
+                    }
+                } else {
+                    item {
+                        EmptySearchResults()
+                    }
                 }
             }
 
@@ -389,7 +436,7 @@ private fun SearchBar(
             Icon(IconAssets.arrowBack(), contentDescription = stringResource("back"))
         }
 
-        OutlinedTextField(
+        TextField(
             value = query,
             onValueChange = onQueryChange,
             placeholder = { Text(stringResource("search_yt_music")) },
@@ -410,9 +457,9 @@ private fun SearchBar(
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = Color.Transparent,
+            colors = TextFieldDefaults.colors(
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),

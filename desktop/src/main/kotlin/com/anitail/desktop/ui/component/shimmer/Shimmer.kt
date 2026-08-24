@@ -20,14 +20,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+val LocalShimmerBrush = compositionLocalOf<Brush?> { null }
+
 /**
- * Shimmer host composable that provides shimmer animation effect.
+ * Shimmer host composable that provides shimmer animation effect to its children.
  */
 @Composable
 fun ShimmerHost(
@@ -35,18 +42,18 @@ fun ShimmerHost(
     content: @Composable () -> Unit,
 ) {
     val shimmerColors = listOf(
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
     )
 
     val transition = rememberInfiniteTransition(label = ShimmerAnimationLabel)
-    val translateAnimation = transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1000f,
+    val translateAnimation by transition.animateFloat(
+        initialValue = -800f,
+        targetValue = 1600f,
         animationSpec = infiniteRepeatable(
             animation = tween(
-                durationMillis = 1200,
+                durationMillis = 1300,
                 easing = FastOutSlowInEasing,
             ),
             repeatMode = RepeatMode.Restart,
@@ -54,14 +61,16 @@ fun ShimmerHost(
         label = ShimmerTranslateLabel,
     )
 
-    Brush.linearGradient(
+    val brush = Brush.linearGradient(
         colors = shimmerColors,
-        start = Offset.Zero,
-        end = Offset(translateAnimation.value, translateAnimation.value),
+        start = Offset(translateAnimation - 600f, translateAnimation - 600f),
+        end = Offset(translateAnimation, translateAnimation),
     )
 
-    Box(modifier = modifier) {
-        content()
+    CompositionLocalProvider(LocalShimmerBrush provides brush) {
+        Box(modifier = modifier) {
+            content()
+        }
     }
 }
 
@@ -72,6 +81,8 @@ fun ShimmerHost(
 fun GridItemPlaceholder(
     modifier: Modifier = Modifier,
 ) {
+    val brush = LocalShimmerBrush.current ?: SolidColor(MaterialTheme.colorScheme.surfaceVariant)
+
     Column(
         modifier = modifier
             .width(160.dp)
@@ -82,7 +93,7 @@ fun GridItemPlaceholder(
             modifier = Modifier
                 .size(160.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(brush),
         )
         Spacer(modifier = Modifier.height(8.dp))
         // Title placeholder
@@ -91,7 +102,7 @@ fun GridItemPlaceholder(
                 .fillMaxWidth()
                 .height(16.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(brush),
         )
         Spacer(modifier = Modifier.height(4.dp))
         // Subtitle placeholder
@@ -100,7 +111,7 @@ fun GridItemPlaceholder(
                 .fillMaxWidth(0.7f)
                 .height(12.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(brush),
         )
     }
 }
@@ -112,6 +123,8 @@ fun GridItemPlaceholder(
 fun ListItemPlaceholder(
     modifier: Modifier = Modifier,
 ) {
+    val brush = LocalShimmerBrush.current ?: SolidColor(MaterialTheme.colorScheme.surfaceVariant)
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -122,7 +135,7 @@ fun ListItemPlaceholder(
             modifier = Modifier
                 .size(56.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(brush),
         )
         Spacer(modifier = Modifier.width(12.dp))
         Column(
@@ -135,7 +148,7 @@ fun ListItemPlaceholder(
                     .fillMaxWidth()
                     .height(18.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(brush),
             )
             Spacer(modifier = Modifier.height(6.dp))
             // Subtitle placeholder
@@ -144,7 +157,7 @@ fun ListItemPlaceholder(
                     .fillMaxWidth(0.6f)
                     .height(14.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .background(brush),
             )
         }
     }
@@ -156,13 +169,15 @@ fun ListItemPlaceholder(
 @Composable
 fun TextPlaceholder(
     modifier: Modifier = Modifier,
-    height: androidx.compose.ui.unit.Dp = 16.dp,
+    height: Dp = 16.dp,
 ) {
+    val brush = LocalShimmerBrush.current ?: SolidColor(MaterialTheme.colorScheme.surfaceVariant)
+
     Box(
         modifier = modifier
             .height(height)
             .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(brush),
     )
 }
 
