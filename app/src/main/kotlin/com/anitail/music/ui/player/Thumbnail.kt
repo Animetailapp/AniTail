@@ -551,6 +551,7 @@ fun Thumbnail(
         ) {
             Lyrics(
                 sliderPositionProvider = sliderPositionProvider,
+                showLyrics = showLyrics,
             )
         }
 

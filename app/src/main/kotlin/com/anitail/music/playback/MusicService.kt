@@ -458,6 +458,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         }
       }
     }
+    // Collecting this flow activates the internal map that updates lyricsProviders in LyricsHelper
+    lyricsHelper.preferred.collectLatest(scope) {}
     combine(
             currentMediaMetadata.distinctUntilChangedBy { it?.id },
             dataStore.data.map { it[ShowLyricsKey] ?: false }.distinctUntilChanged(),

@@ -1,5 +1,5 @@
 /**
- * AniTail Project (C) 2026
+ * Metrolist Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
  */
 
@@ -10,9 +10,9 @@ import com.anitail.music.betterlyrics.TTMLParser
 import com.anitail.music.constants.EnableLyricsPlus
 import com.anitail.music.utils.dataStore
 import com.anitail.music.utils.get
-import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
@@ -287,7 +287,7 @@ object LyricsPlusProvider : LyricsProvider {
 
     /**
      * Converts a LyricsPlus JSON response to
-     * AniTail's extended LRC:
+     * Metrolist's extended LRC:
      *
      *   [mm:ss.cc]{agent:v1}line text     ← multi-voice agent tag
      *   <word:startSec:endSec|word:...>   ← word-sync block (Word mode only)
@@ -406,6 +406,7 @@ object LyricsPlusProvider : LyricsProvider {
     }
 
     override suspend fun getLyrics(
+        context: Context,
         id: String,
         title: String,
         artist: String,
@@ -440,6 +441,7 @@ object LyricsPlusProvider : LyricsProvider {
     }
 
     override suspend fun getAllLyrics(
+        context: Context,
         id: String,
         title: String,
         artist: String,
@@ -447,6 +449,6 @@ object LyricsPlusProvider : LyricsProvider {
         album: String?,
         callback: (String) -> Unit,
     ) {
-        getLyrics(id, title, artist, duration, album).onSuccess { callback(it) }
+        getLyrics(context, id, title, artist, duration, album).onSuccess { callback(it) }
     }
 }

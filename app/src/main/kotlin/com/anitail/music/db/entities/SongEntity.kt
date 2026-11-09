@@ -43,6 +43,8 @@ data class SongEntity(
     val isLocal: Boolean = false,
     @ColumnInfo(defaultValue = "1")
     val romanizeLyrics: Boolean = true,
+    @ColumnInfo(defaultValue = "0")
+    val lyricsOffset: Int = 0,
     @ColumnInfo(name = "mediaStoreUri", defaultValue = "NULL")
     val mediaStoreUri: String? = null,
     @ColumnInfo(name = "localPath", defaultValue = "NULL")

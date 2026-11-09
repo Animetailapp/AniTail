@@ -1,5 +1,5 @@
 /**
- * AniTail Project (C) 2026
+ * Metrolist Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
  */
 
@@ -8,11 +8,11 @@ package com.anitail.music.lyrics
 object LyricsProviderRegistry {
     private val providerMap = mapOf(
         "BetterLyrics" to BetterLyricsProvider,
-        "SimpMusic" to SimpMusicLyricsProvider,
         "Paxsenix" to PaxsenixLyricsProvider,
         "LrcLib" to LrcLibLyricsProvider,
         "KuGou" to KuGouLyricsProvider,
         "LyricsPlus" to LyricsPlusProvider,
+        "Zemer" to ZemerLyricsProvider,
         "YouTubeSubtitle" to YouTubeSubtitleLyricsProvider,
         "YouTube" to YouTubeLyricsProvider,
     )
@@ -28,7 +28,8 @@ object LyricsProviderRegistry {
         if (orderString.isBlank()) {
             return getDefaultProviderOrder()
         }
-        return orderString.split(",").map { it.trim() }.filter { it in providerNames }
+        val saved = orderString.split(",").map { it.trim() }.filter { it in providerNames }
+        return saved + getDefaultProviderOrder().filter { it !in saved }
     }
 
     fun serializeProviderOrder(providers: List<String>): String {
@@ -37,11 +38,11 @@ object LyricsProviderRegistry {
 
     fun getDefaultProviderOrder(): List<String> = listOf(
         "BetterLyrics",
-        "SimpMusic",
         "LrcLib",
         "KuGou",
         "Paxsenix",
         "LyricsPlus",
+        "Zemer",
         "YouTubeSubtitle",
         "YouTube",
     )

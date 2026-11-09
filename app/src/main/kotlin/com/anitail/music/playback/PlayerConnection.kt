@@ -138,7 +138,13 @@ class PlayerConnection(
 
     fun toggleLike() {
         service.toggleLike()
-    }    fun seekToNext() {
+    }
+
+    fun seekTo(position: Long) {
+        player.seekTo(position)
+    }
+
+    fun seekToNext() {
         player.seekToNext()
         player.prepare()
         player.playWhenReady = true

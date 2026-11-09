@@ -1,3 +1,8 @@
+/**
+ * Metrolist Project (C) 2026
+ * Licensed under GPL-3.0 | See git history for contributors
+ */
+
 package com.anitail.music.lyrics
 
 import android.content.Context
@@ -9,6 +14,7 @@ object YouTubeSubtitleLyricsProvider : LyricsProvider {
     override fun isEnabled(context: Context) = true
 
     override suspend fun getLyrics(
+        context: Context,
         id: String,
         title: String,
         artist: String,

@@ -94,7 +94,9 @@ val EnableSimpMusicKey = booleanPreferencesKey("enableSimpMusic")
 val EnableBetterLyricsKey = booleanPreferencesKey("enableBetterLyrics")
 val EnablePaxsenixKey = booleanPreferencesKey("enablePaxsenix")
 val EnableLyricsPlus = booleanPreferencesKey("enableLyricsPlus")
+val EnableZemerKey = booleanPreferencesKey("enableZemer")
 val LyricsProviderOrderKey = stringPreferencesKey("lyricsProviderOrder")
+val SimpMusicMigrationDoneKey = booleanPreferencesKey("simpMusicMigrationDone")
 val HideExplicitKey = booleanPreferencesKey("hideExplicit")
 val ProxyEnabledKey = booleanPreferencesKey("proxyEnabled")
 val ProxyUrlKey = stringPreferencesKey("proxyUrl")
@@ -381,9 +383,9 @@ enum class PreferredLyricsProvider {
     LRCLIB,
     KUGOU,
     BETTER_LYRICS,
-    SIMPMUSIC,
     PAXSENIX,
     LYRICS_PLUS,
+    ZEMER,
 }
 
 enum class PlayerButtonsStyle {
@@ -403,6 +405,7 @@ val HistoryDuration = floatPreferencesKey("historyDuration")
 val PlayerButtonsStyleKey = stringPreferencesKey("player_buttons_style")
 val PlayerBackgroundStyleKey = stringPreferencesKey("playerBackgroundStyle")
 val ShowLyricsKey = booleanPreferencesKey("showLyrics")
+val ExperimentalLyricsKey = booleanPreferencesKey("experimentalLyrics")
 val WidgetActionLyricsEnabledKey = booleanPreferencesKey("widgetActionLyricsEnabled")
 val WidgetActionQueueEnabledKey = booleanPreferencesKey("widgetActionQueueEnabled")
 val WidgetActionSearchEnabledKey = booleanPreferencesKey("widgetActionSearchEnabled")
@@ -411,15 +414,22 @@ val WidgetActionExploreEnabledKey = booleanPreferencesKey("widgetActionExploreEn
 val LyricsTextPositionKey = stringPreferencesKey("lyricsTextPosition")
 val LyricsClickKey = booleanPreferencesKey("lyricsClick")
 val LyricsScrollKey = booleanPreferencesKey("lyricsScrollKey")
+val HideStatusBarOnFullscreenKey = booleanPreferencesKey("hideStatusBarOnFullscreen")
 val LyricsRomanizeJapaneseKey = booleanPreferencesKey("lyricsRomanizeJapanese")
 val LyricsRomanizeKoreanKey = booleanPreferencesKey("lyricsRomanizeKorean")
+val LyricsRomanizeChineseKey = booleanPreferencesKey("lyricsRomanizeChinese")
+val LyricsRomanizeHindiKey = booleanPreferencesKey("lyricsRomanizeHindi")
+val LyricsRomanizePunjabiKey = booleanPreferencesKey("lyricsRomanizePunjabi")
 val LyricsRomanizeRussianKey = booleanPreferencesKey("lyricsRomanizeRussian")
 val LyricsRomanizeUkrainianKey = booleanPreferencesKey("lyricsRomanizeUkrainian")
 val LyricsRomanizeSerbianKey = booleanPreferencesKey("lyricsRomanizeSerbian")
 val LyricsRomanizeBulgarianKey = booleanPreferencesKey("lyricsRomanizeBulgarian")
 val LyricsRomanizeBelarusianKey = booleanPreferencesKey("lyricsRomanizeBelarusian")
 val LyricsRomanizeKyrgyzKey = booleanPreferencesKey("lyricsRomanizeKyrgyz")
+val LyricsRomanizeMacedonianKey = booleanPreferencesKey("lyricsRomanizeMacedonian")
 val LyricsRomanizeCyrillicByLineKey = booleanPreferencesKey("lyricsRomanizeCyrillicByLine")
+val LyricsRomanizeAsMainKey = booleanPreferencesKey("lyricsRomanizeAsMain")
+val LyricsRomanizeList = stringPreferencesKey("lyricsRomanizeList")
 val TranslateLyricsKey = booleanPreferencesKey("translateLyrics")
 val OpenRouterApiKey = stringPreferencesKey("openRouterApiKey")
 val AiProviderKey = stringPreferencesKey("aiProvider")
@@ -433,10 +443,22 @@ val DeeplApiKey = stringPreferencesKey("deeplApiKey")
 val DeeplFormalityKey = stringPreferencesKey("deeplFormality")
 val MistralApiKey = stringPreferencesKey("mistralApiKey")
 val MistralModelKey = stringPreferencesKey("mistralModel")
-const val DEFAULT_AI_SYSTEM_PROMPT = """You are a precise lyrics translation assistant. Return a JSON array of strings with exactly {lineCount} items."""
+const val DEFAULT_AI_SYSTEM_PROMPT = """You are a precise lyrics translation assistant. Your output must ALWAYS be a valid JSON object of the form {"lines": ["line1", "line2", "line3"]}.
+
+CRITICAL RULES:
+1. Output ONLY the JSON object: {"lines": ["line1", "line2", "line3"]}
+2. NO explanations, NO questions, NO additional text
+3. Each input line maps to exactly one entry in the "lines" array
+4. Preserve empty lines as empty strings ""
+5. The "lines" array must contain EXACTLY {lineCount} items
+6. If uncertain, provide best approximation but maintain line count"""
 val AiSystemPromptKey = stringPreferencesKey("aiSystemPrompt")
 val LyricsGlowEffectKey = booleanPreferencesKey("lyricsGlowEffect")
 val LyricsAnimationStyleKey = stringPreferencesKey("lyricsAnimationStyle")
+val LyricsTextSizeKey = floatPreferencesKey("lyricsTextSize")
+val LyricsLineSpacingKey = floatPreferencesKey("lyricsLineSpacing")
+val RespectAgentPositioningKey = booleanPreferencesKey("respectAgentPositioning")
+val ShowIntervalIndicatorKey = booleanPreferencesKey("showIntervalIndicator")
 val LyricsFontSizeKey = floatPreferencesKey("lyricsFontSize")
 val LyricsCustomFontPathKey = stringPreferencesKey("lyricsCustomFontPath")
 val LyricsSmoothScrollKey = booleanPreferencesKey("lyricsSmoothScroll")
