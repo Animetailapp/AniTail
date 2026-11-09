@@ -555,16 +555,16 @@ fun Lyrics(
         if((currentLineIndex == 0 && shouldScrollToFirstLine) || !initialScrollDone) {
             shouldScrollToFirstLine = false
             lazyListState.scrollToItem(
-                currentLineIndex,
+                kotlin.math.max(0, currentLineIndex),
                 with(density) { 36.dp.toPx().toInt() } + calculateOffset())
             if(!isAppMinimized) {
                 initialScrollDone = true
             }
-        } else if (currentLineIndex != -1) {
+        } else if (currentLineIndex >= 0) {
             deferredCurrentLineIndex = currentLineIndex
             if (isSeeking) {
                 lazyListState.scrollToItem(
-                    currentLineIndex,
+                    currentLineIndex.coerceAtLeast(0),
                     with(density) { 36.dp.toPx().toInt() } + calculateOffset())
             } else if (lastPreviewTime == 0L || currentLineIndex != previousLineIndex) {
                 val visibleItemsInfo = lazyListState.layoutInfo.visibleItemsInfo
@@ -591,22 +591,28 @@ fun Lyrics(
                                 // Pre-animación: preparar el highlight de la línea siguiente
                                 delay(100)
 
-                                // Animación principal más fluida con easing personalizado
-                                lazyListState.animateScrollToItem(
-                                    index = currentLineIndex,
-                                    scrollOffset = scrollOffset
-                                )
+                                val targetIndex = currentLineIndex
+                                if (targetIndex >= 0) {
+                                    // Animación principal más fluida con easing personalizado
+                                    lazyListState.animateScrollToItem(
+                                        index = targetIndex,
+                                        scrollOffset = scrollOffset
+                                    )
 
-                                // Post-animación: estabilizar el highlight
-                                delay(150)
+                                    // Post-animación: estabilizar el highlight
+                                    delay(150)
+                                }
                             }
                         } else {
                             // Animación rápida pero aún suave
                             scope.launch {
-                                lazyListState.animateScrollToItem(
-                                    index = currentLineIndex,
-                                    scrollOffset = scrollOffset
-                                )
+                                val targetIndex = currentLineIndex
+                                if (targetIndex >= 0) {
+                                    lazyListState.animateScrollToItem(
+                                        index = targetIndex,
+                                        scrollOffset = scrollOffset
+                                    )
+                                }
                             }
                         }
                     }
