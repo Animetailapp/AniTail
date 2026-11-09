@@ -139,8 +139,9 @@ fun DraggableScrollbar(
 
                             val avgItemHeightPx = visibleItems.first().size
                             val targetOffset = (targetFraction * avgItemHeightPx).toInt()
+                            val maxValidIndex = (layoutInfo.totalItemsCount - 1).coerceAtLeast(headerItems)
                             val clampedIndex =
-                                targetIndex.coerceIn(headerItems, layoutInfo.totalItemsCount - 1)
+                                targetIndex.coerceIn(headerItems, maxValidIndex).coerceAtLeast(0)
 
                             if (clampedIndex != lastTargetIndex || targetOffset != lastTargetOffset) {
                                 lastTargetIndex = clampedIndex
