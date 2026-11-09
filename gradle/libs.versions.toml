@@ -41,7 +41,7 @@ coroutines-guava = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines
 concurrent-futures = { group = "androidx.concurrent", name = "concurrent-futures-ktx", version = "1.4.0-alpha01" }
 
 gradle = { module = "com.android.tools.build:gradle", version.ref = "androidGradlePlugin" }
-activity = { group = "androidx.activity", name = "activity-compose", version = "1.13.0" }
+activity = { group = "androidx.activity", name = "activity-compose", version = "1.14.0-alpha03" }
 hilt-work = { module = "androidx.hilt:hilt-work", version.ref = "hiltWork" }
 hilt-work-compiler = { module = "androidx.hilt:hilt-compiler", version.ref = "hiltWork" }
 lastfm-java = { module = "de.u-mass:lastfm-java", version.ref = "lastfmJava" }
