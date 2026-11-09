@@ -8,7 +8,7 @@ import com.anitail.paxsenix.models.LyricsResponse
 import com.anitail.paxsenix.models.SearchResult
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.engine.android.Android
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.ClientRequestException
@@ -47,7 +47,7 @@ object Paxsenix {
             
             Timber.d("Initializing Paxsenix with version: $appVersion")
             
-            client = HttpClient(Android) {
+            client = HttpClient(OkHttp) {
                 install(HttpTimeout) {
                     requestTimeoutMillis = 15000
                     connectTimeoutMillis = 10000
@@ -63,7 +63,7 @@ object Paxsenix {
 
                 defaultRequest {
                     url("https://lyrics.paxsenix.org")
-                    header("User-Agent", "AniTail/$appVersion")
+                    header("User-Agent", "Metrolist/$appVersion")
                 }
 
                 expectSuccess = true
@@ -493,7 +493,7 @@ object Paxsenix {
                 val indexJsResponse = httpClient.get("https://beta.music.apple.com$indexJsUri")
                 val indexJsBody = indexJsResponse.bodyAsText()
 
-                val tokenRegex = Regex("""eyJh([^"]*)""")
+                val tokenRegex = Regex("""eyJ[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+\.[A-Za-z0-9\-_=]+""")
                 val tokenMatch = tokenRegex.find(indexJsBody)
                     ?: throw Exception("Could not find token")
 

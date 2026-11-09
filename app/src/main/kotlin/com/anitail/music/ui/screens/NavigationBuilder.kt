@@ -32,6 +32,7 @@ import com.anitail.music.ui.screens.recognition.RecognitionScreen
 import com.anitail.music.ui.screens.search.OnlineSearchResult
 import com.anitail.music.ui.screens.settings.AboutScreen
 import com.anitail.music.ui.screens.settings.AccountSettings
+import com.anitail.music.ui.screens.settings.AiSettings
 import com.anitail.music.ui.screens.settings.AppearanceSettings
 import com.anitail.music.ui.screens.settings.AutoBackupSettings
 import com.anitail.music.ui.screens.settings.BackupAndRestore
@@ -386,7 +387,10 @@ fun NavGraphBuilder.navigationBuilder(
         ImportFromSpotifyScreen(navController, scrollBehavior)
     }
     composable("settings/content/romanization") {
-        RomanizationSettings(navController, scrollBehavior)
+        RomanizationSettings(navController)
+    }
+    composable("settings/ai") {
+        AiSettings(navController)
     }
     composable("settings/player") {
         PlayerSettings(navController, scrollBehavior)

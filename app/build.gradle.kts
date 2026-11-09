@@ -285,4 +285,7 @@ dependencies {
     implementation(libs.google.api.client.android)
     implementation(libs.google.api.services.drive)
     implementation(libs.google.auth.library.oauth2.http)
+
+    implementation(libs.kuromoji.ipadic)
+    implementation(libs.tinypinyin)
 }

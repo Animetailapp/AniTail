@@ -1,13 +1,27 @@
+/**
+ * Metrolist Project (C) 2026
+ * Licensed under GPL-3.0 | See git history for contributors
+ */
+
 package com.anitail.music.lyrics
 
 import kotlinx.coroutines.flow.MutableStateFlow
 
+data class WordTimestamp(
+    val text: String,
+    val startTime: Double,
+    val endTime: Double,
+    val hasTrailingSpace: Boolean = true
+)
+
 data class LyricsEntry(
     val time: Long,
     val text: String,
-    val wordTimestamps: List<WordTimestamp>? = null,
+    val words: List<WordTimestamp>? = null,
     val romanizedTextFlow: MutableStateFlow<String?> = MutableStateFlow(null),
-    val translatedTextFlow: MutableStateFlow<String?> = MutableStateFlow(null)
+    val translatedTextFlow: MutableStateFlow<String?> = MutableStateFlow(null),
+    val agent: String? = null,
+    val isBackground: Boolean = false
 ) : Comparable<LyricsEntry> {
     override fun compareTo(other: LyricsEntry): Int = (time - other.time).toInt()
 
@@ -15,9 +29,3 @@ data class LyricsEntry(
         val HEAD_LYRICS_ENTRY = LyricsEntry(0L, "")
     }
 }
-
-data class WordTimestamp(
-    val text: String,
-    val startTime: Double,
-    val endTime: Double,
-)

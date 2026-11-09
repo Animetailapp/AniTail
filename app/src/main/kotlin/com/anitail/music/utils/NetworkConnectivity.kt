@@ -46,4 +46,14 @@ class NetworkConnectivity(private val context: Context) {
         connectivityManager.registerDefaultNetworkCallback(callback)
         awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
     }.distinctUntilChanged()
+
+    fun isCurrentlyConnected(): Boolean {
+        return try {
+            val activeNetwork = connectivityManager.activeNetwork
+            val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
+            networkCapabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        } catch (e: Exception) {
+            false
+        }
+    }
 }
