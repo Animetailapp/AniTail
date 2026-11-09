@@ -16,9 +16,9 @@ android {
     compileSdk = 37
     defaultConfig {
         applicationId = "com.anitail.music"
-        minSdk = 23
+        minSdk = 24 
         targetSdk = 37
-        versionCode = 20
+        versionC1de = 20
         versionName = "1.17.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
