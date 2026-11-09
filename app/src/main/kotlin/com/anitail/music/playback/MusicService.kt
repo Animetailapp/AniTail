@@ -139,6 +139,7 @@ import com.anitail.music.extensions.setOffloadEnabled
 import com.anitail.music.extensions.toEnum
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.lyrics.LyricsHelper
+import com.anitail.music.lyrics.lyricsTextLooksSynced
 import com.anitail.music.models.PersistQueue
 import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.queues.EmptyQueue
@@ -473,19 +474,27 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
               try {
 
                 val existingLyrics = database.lyrics(mediaMetadata.id).firstOrNull()
+                val needsFetch = existingLyrics == null ||
+                    existingLyrics.lyrics == LyricsEntity.LYRICS_NOT_FOUND ||
+                    !lyricsTextLooksSynced(existingLyrics.lyrics)
 
-                if (existingLyrics == null) {
+                if (needsFetch) {
                   Timber.d("Descargando letras para ${mediaMetadata.title}")
                   val lyricsWithProvider = lyricsHelper.getLyrics(mediaMetadata)
+                  val shouldUpsert = existingLyrics == null ||
+                      existingLyrics.lyrics == LyricsEntity.LYRICS_NOT_FOUND ||
+                      lyricsTextLooksSynced(lyricsWithProvider.lyrics)
 
-                  database.query {
-                    upsert(
-                        LyricsEntity(
-                            id = mediaMetadata.id,
-                            lyrics = lyricsWithProvider.lyrics,
-                            provider = lyricsWithProvider.provider,
-                        ),
-                    )
+                  if (shouldUpsert) {
+                    database.query {
+                      upsert(
+                          LyricsEntity(
+                              id = mediaMetadata.id,
+                              lyrics = lyricsWithProvider.lyrics,
+                              provider = lyricsWithProvider.provider,
+                          ),
+                      )
+                    }
                   }
                 }
               } catch (e: Exception) {
@@ -500,18 +509,28 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                   val nextId = nextItem.mediaId
                   val metadata = nextItem.metadata ?: return@forEach
 
-                  if (database.lyrics(nextId).firstOrNull() == null) {
+                  val existingNext = database.lyrics(nextId).firstOrNull()
+                  val needsNextFetch = existingNext == null ||
+                      existingNext.lyrics == LyricsEntity.LYRICS_NOT_FOUND ||
+                      !lyricsTextLooksSynced(existingNext.lyrics)
+
+                  if (needsNextFetch) {
                     Timber.d("Precargando letras para próxima canción: ${metadata.title}")
                     try {
                       val lyricsWithProvider = lyricsHelper.getLyrics(metadata)
-                      database.query {
-                        upsert(
-                            LyricsEntity(
-                                id = nextId,
-                                lyrics = lyricsWithProvider.lyrics,
-                                provider = lyricsWithProvider.provider,
-                            ),
-                        )
+                      val shouldUpsert = existingNext == null ||
+                          existingNext.lyrics == LyricsEntity.LYRICS_NOT_FOUND ||
+                          lyricsTextLooksSynced(lyricsWithProvider.lyrics)
+                      if (shouldUpsert) {
+                        database.query {
+                          upsert(
+                              LyricsEntity(
+                                  id = nextId,
+                                  lyrics = lyricsWithProvider.lyrics,
+                                  provider = lyricsWithProvider.provider,
+                              ),
+                          )
+                        }
                       }
                     } catch (e: Exception) {
                       Timber.e(e, "Error precargando letras: ${e.message}")
@@ -1695,16 +1714,25 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   /** Downloads lyrics for a specific song */
   suspend fun downloadLyricsForSong(songId: String) {
     val mediaMetadata = database.song(songId).firstOrNull()?.toMediaMetadata() ?: return
-    if (database.lyrics(songId).firstOrNull() == null) {
+    val existing = database.lyrics(songId).firstOrNull()
+    val needsFetch = existing == null ||
+        existing.lyrics == LyricsEntity.LYRICS_NOT_FOUND ||
+        !lyricsTextLooksSynced(existing.lyrics)
+    if (needsFetch) {
       val lyricsWithProvider = lyricsHelper.getLyrics(mediaMetadata)
-      database.query {
-        upsert(
-            LyricsEntity(
-                id = songId,
-                lyrics = lyricsWithProvider.lyrics,
-                provider = lyricsWithProvider.provider,
-            ),
-        )
+      val shouldUpsert = existing == null ||
+          existing.lyrics == LyricsEntity.LYRICS_NOT_FOUND ||
+          lyricsTextLooksSynced(lyricsWithProvider.lyrics)
+      if (shouldUpsert) {
+        database.query {
+          upsert(
+              LyricsEntity(
+                  id = songId,
+                  lyrics = lyricsWithProvider.lyrics,
+                  provider = lyricsWithProvider.provider,
+              ),
+          )
+        }
       }
     }
   }

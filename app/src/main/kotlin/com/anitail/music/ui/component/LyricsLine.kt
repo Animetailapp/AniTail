@@ -354,7 +354,7 @@ private fun WordLevelLyrics(
                 withFrameMillis {
                     val now = System.currentTimeMillis()
                     val playerPos = playerConnection.player.currentPosition
-                    if (playerPos != lastPlayerPos) {
+                    if (playerPos != lastPlayerPos || !playerConnection.player.isPlaying) {
                         lastPlayerPos = playerPos
                         lastUpdateTime = now
                     }

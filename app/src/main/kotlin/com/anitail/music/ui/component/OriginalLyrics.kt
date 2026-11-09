@@ -260,7 +260,7 @@ fun OriginalLyrics(
         remember(lyrics, scope) {
             if (lyrics == null || lyrics == LYRICS_NOT_FOUND) {
                 emptyList()
-            } else if (lyrics.startsWith("[")) {
+            } else if (lyricsTextLooksSynced(lyrics)) {
                 val parsedLines = parseLyrics(lyrics)
 
                 parsedLines
@@ -553,7 +553,7 @@ fun OriginalLyrics(
     }
 
     LaunchedEffect(lyrics) {
-        if (lyrics.isNullOrEmpty() || !lyrics.startsWith("[")) {
+        if (lyrics.isNullOrEmpty() || !lyricsTextLooksSynced(lyrics)) {
             currentLineIndex = -1
             return@LaunchedEffect
         }

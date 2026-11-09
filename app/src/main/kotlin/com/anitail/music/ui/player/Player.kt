@@ -145,6 +145,7 @@ import com.anitail.music.db.entities.LyricsEntity
 import com.anitail.music.extensions.metadata
 import com.anitail.music.extensions.togglePlayPause
 import com.anitail.music.extensions.toggleRepeatMode
+import com.anitail.music.lyrics.lyricsTextLooksSynced
 import com.anitail.music.models.MediaMetadata
 import com.anitail.music.ui.component.ActionPromptDialog
 import com.anitail.music.ui.component.BottomSheet
@@ -484,17 +485,6 @@ fun BottomSheetPlayer(
         )
     }
 
-    LaunchedEffect(playbackState) {
-        if (playbackState == STATE_READY) {
-            while (isActive) {
-                delay(500)
-                position = playerConnection.player.currentPosition
-                duration = playerConnection.player.duration
-            }
-        }
-    }
-
-
     state.progress.coerceIn(0f, 1f)
 
     var showSleepTimerDialog by rememberSaveable { mutableStateOf(false) }
@@ -559,14 +549,21 @@ fun BottomSheetPlayer(
         )
     }
 
-    LaunchedEffect(playbackState) {
-        if (playbackState == STATE_READY) {
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
             while (isActive) {
                 delay(100)
-                position = playerConnection.player.currentPosition
-                duration = playerConnection.player.duration
+                if (sliderPosition == null) {
+                    position = playerConnection.player.currentPosition
+                    duration = playerConnection.player.duration
+                }
             }
         }
+    }
+
+    LaunchedEffect(playbackState, mediaMetadata?.id) {
+        position = playerConnection.player.currentPosition
+        duration = playerConnection.player.duration
     }
     // Use fixed dismissedBound to prevent background showing when nav bar disappears (only for new design)
     val dismissedBound = if (useNewMiniPlayerDesign) {
@@ -1776,7 +1773,7 @@ fun BottomSheetPlayer(
                                         InlineLyricsView(
                                             mediaMetadata = mediaMetadata,
                                             showLyrics = isLyricsVisible,
-                                            positionProvider = { sliderPosition ?: position },
+                                            sliderPositionProvider = { sliderPosition },
                                         )
                                     } else {
                                         Thumbnail(
@@ -1880,7 +1877,7 @@ fun BottomSheetPlayer(
                                     InlineLyricsView(
                                         mediaMetadata = mediaMetadata,
                                         showLyrics = isLyricsVisible,
-                                        positionProvider = { sliderPosition ?: position },
+                                        sliderPositionProvider = { sliderPosition },
                                     )
                                 } else {
                                     Thumbnail(
@@ -1932,7 +1929,7 @@ fun BottomSheetPlayer(
 fun InlineLyricsView(
     mediaMetadata: MediaMetadata?,
     showLyrics: Boolean,
-    positionProvider: () -> Long,
+    sliderPositionProvider: () -> Long?,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val currentLyrics by playerConnection.currentLyrics.collectAsStateWithLifecycle(initialValue = null)
@@ -1969,7 +1966,12 @@ fun InlineLyricsView(
         }
 
     LaunchedEffect(mediaMetadata?.id, currentLyrics) {
-        if (mediaMetadata != null && currentLyrics == null) {
+        val needsFetch = mediaMetadata != null && (
+            currentLyrics == null ||
+            currentLyrics?.lyrics == LyricsEntity.LYRICS_NOT_FOUND ||
+            !lyricsTextLooksSynced(currentLyrics?.lyrics)
+        )
+        if (needsFetch) {
             delay(500)
             coroutineScope.launch(Dispatchers.IO) {
                 try {
@@ -1980,8 +1982,13 @@ fun InlineLyricsView(
                         )
                     val lyricsHelper = entryPoint.lyricsHelper()
                     val fetchedLyricsWithProvider = lyricsHelper.getLyrics(mediaMetadata)
-                    database.query {
-                        upsert(LyricsEntity(mediaMetadata.id, fetchedLyricsWithProvider.lyrics, fetchedLyricsWithProvider.provider))
+                    val shouldUpsert = currentLyrics == null ||
+                        currentLyrics?.lyrics == LyricsEntity.LYRICS_NOT_FOUND ||
+                        lyricsTextLooksSynced(fetchedLyricsWithProvider.lyrics)
+                    if (shouldUpsert) {
+                        database.query {
+                            upsert(LyricsEntity(mediaMetadata.id, fetchedLyricsWithProvider.lyrics, fetchedLyricsWithProvider.provider))
+                        }
                     }
                 } catch (e: Exception) {
                     // Handle error
@@ -2012,7 +2019,10 @@ fun InlineLyricsView(
         withContext(Dispatchers.IO) {
             try {
                 val existing = database.lyrics(nextId).first()
-                if (existing != null) return@withContext
+                val needsNextFetch = existing == null ||
+                    existing.lyrics == LyricsEntity.LYRICS_NOT_FOUND ||
+                    !lyricsTextLooksSynced(existing.lyrics)
+                if (!needsNextFetch) return@withContext
                 val entryPoint =
                     EntryPointAccessors.fromApplication(
                         context.applicationContext,
@@ -2020,8 +2030,13 @@ fun InlineLyricsView(
                     )
                 val lyricsHelper = entryPoint.lyricsHelper()
                 val fetched = lyricsHelper.getLyrics(nextMetadata)
-                database.query {
-                    upsert(LyricsEntity(nextId, fetched.lyrics, fetched.provider))
+                val shouldUpsert = existing == null ||
+                    existing.lyrics == LyricsEntity.LYRICS_NOT_FOUND ||
+                    lyricsTextLooksSynced(fetched.lyrics)
+                if (shouldUpsert) {
+                    database.query {
+                        upsert(LyricsEntity(nextId, fetched.lyrics, fetched.provider))
+                    }
                 }
             } catch (_: Exception) {
             }
@@ -2052,7 +2067,7 @@ fun InlineLyricsView(
             else -> {
                 val lyricsContent: @Composable () -> Unit = {
                     Lyrics(
-                        sliderPositionProvider = positionProvider,
+                        sliderPositionProvider = sliderPositionProvider,
                         modifier = Modifier.padding(horizontal = 24.dp),
                         showLyrics = showLyrics,
                     )

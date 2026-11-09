@@ -340,6 +340,7 @@ fun ExperimentalLyrics(
         
         var lastPlayerPos = playerConnection.player.currentPosition
         var lastUpdateTime = System.currentTimeMillis()
+        activeLineIndices = emptySet()
         
         while (isActive) {
             withFrameNanos { _ -> }
@@ -351,7 +352,7 @@ fun ExperimentalLyrics(
                 sliderPosition!!
             } else {
                 val playerPos = playerConnection.player.currentPosition
-                if (playerPos != lastPlayerPos) {
+                if (playerPos != lastPlayerPos || !playerConnection.player.isPlaying) {
                     lastPlayerPos = playerPos
                     lastUpdateTime = now
                 }
