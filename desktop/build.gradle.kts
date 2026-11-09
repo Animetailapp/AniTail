@@ -62,7 +62,7 @@ dependencies {
     implementation(libs.commons.codec)
     implementation(libs.jna)
     implementation(libs.jna.platform)
-    implementation("org.xerial:sqlite-jdbc:3.53.2.1")
+    implementation("org.xerial:sqlite-jdbc:3.54.1.0")
     implementation("com.google.api-client:google-api-client:2.9.2")
     implementation("com.google.oauth-client:google-oauth-client-jetty:1.39.0")
     implementation("com.google.http-client:google-http-client-gson:2.2.0")
