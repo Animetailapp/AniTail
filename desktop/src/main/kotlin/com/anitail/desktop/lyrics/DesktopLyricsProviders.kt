@@ -99,7 +99,8 @@ private object BetterLyricsDesktopProvider : DesktopLyricsProvider {
         BetterLyrics.getLyrics(query.title, query.artist, query.durationSec, query.album)
 
     override suspend fun getAllLyrics(query: LyricsQuery, callback: (String) -> Unit) {
-        BetterLyrics.getAllLyrics(query.title, query.artist, query.durationSec, query.album, callback)
+        BetterLyrics.getLyrics(query.title, query.artist, query.durationSec, query.album)
+            .onSuccess(callback)
     }
 }
 
