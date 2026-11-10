@@ -8,7 +8,7 @@ pluginManagement {
         maven { setUrl("https://maven.pkg.jetbrains.space/public/p/compose/dev") }
     }
     plugins {
-        id("org.jetbrains.compose") version "1.12.10-alpha01+snapshot.svastven-ui-uikit-gradle-fix"
+        id("org.jetbrains.compose") version "1.13.0-rc01+snapshot.release-1-13"
         id("org.jetbrains.kotlin.plugin.compose") version "2.5.0-Beta2"
     }
 }
