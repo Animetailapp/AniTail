@@ -30,7 +30,6 @@ fun PlayerSliderTrack(
     val activeTrackColor = colors.activeTrackColor
     val inactiveTickColor = colors.inactiveTickColor
     val activeTickColor = colors.activeTickColor
-    val valueRange = sliderState.valueRange
     Canvas(
         modifier
             .fillMaxWidth()
@@ -39,11 +38,7 @@ fun PlayerSliderTrack(
         drawTrack(
             stepsToTickFractions(sliderState.steps),
             0f,
-            calcFraction(
-                valueRange.start,
-                valueRange.endInclusive,
-                sliderState.value.coerceIn(valueRange.start, valueRange.endInclusive)
-            ),
+            sliderState.coercedValueAsFraction,
             inactiveTrackColor,
             activeTrackColor,
             inactiveTickColor,
@@ -107,6 +102,3 @@ private fun DrawScope.drawTrack(
 private fun stepsToTickFractions(steps: Int): FloatArray {
     return if (steps == 0) floatArrayOf() else FloatArray(steps + 2) { it.toFloat() / (steps + 1) }
 }
-
-private fun calcFraction(a: Float, b: Float, pos: Float) =
-    (if (b - a == 0f) 0f else (pos - a) / (b - a)).coerceIn(0f, 1f)

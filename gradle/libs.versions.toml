@@ -10,17 +10,17 @@ browser = "1.10.0"
 securityCrypto = "1.1.0"
 compose = "1.12.0-rc01"
 lastfmJava = "0.1.2"
-lifecycle = "2.11.0"
+lifecycle = "2.12.0-alpha05"
 material3 = "1.5.0-alpha25"
 materialKolor = "5.0.1"
-media3 = "1.11.0"
+media3 = "1.12.0-alpha02"
 # 22.3.0 triggers R8 "Invalid stack map table" warnings during minify.
-playServicesCast = "22.3.1"
-playServicesBase = "18.10.0"
-onesignal = "5.9.8"
+playServicesCast = "23.0.0"
+playServicesBase = "18.11.1"
+onesignal = "5.11.0"
 room = "2.8.5"
 hilt = "2.60.1"
-ktor = "3.5.2"
+ktor = "3.6.1"
 vlcj = "5.0.0-M4"
 jna = "5.19.1"
 ksp = "2.3.13"
@@ -41,7 +41,7 @@ coroutines-guava = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines
 concurrent-futures = { group = "androidx.concurrent", name = "concurrent-futures-ktx", version = "1.4.0-alpha01" }
 
 gradle = { module = "com.android.tools.build:gradle", version.ref = "androidGradlePlugin" }
-activity = { group = "androidx.activity", name = "activity-compose", version = "1.13.0" }
+activity = { group = "androidx.activity", name = "activity-compose", version = "1.14.0-alpha03" }
 hilt-work = { module = "androidx.hilt:hilt-work", version.ref = "hiltWork" }
 hilt-work-compiler = { module = "androidx.hilt:hilt-compiler", version.ref = "hiltWork" }
 lastfm-java = { module = "de.u-mass:lastfm-java", version.ref = "lastfmJava" }
@@ -88,7 +88,7 @@ room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 
-apache-lang3 = { group = "org.apache.commons", name = "commons-lang3", version = "3.20.0" }
+apache-lang3 = { group = "org.apache.commons", name = "commons-lang3", version = "3.21.0" }
 
 hilt = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
@@ -117,12 +117,12 @@ junit = { group = "junit", name = "junit", version = "4.13.2" }
 timber = { group = "com.jakewharton.timber", name = "timber", version = "5.0.1" }
 
 #newpipe-extractor = { group = "com.github.libre-tube", name = "NewPipeExtractor", version = "f3bb450" }
-newpipe-extractor = { group = "com.github.TeamNewPipe", name = "NewPipeExtractor", version = "0.27.0" }
+newpipe-extractor = { group = "com.github.TeamNewPipe", name = "NewPipeExtractor", version = "0.27.1" }
 work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version = "21.6.0" }
 google-api-client-android = { module = "com.google.api-client:google-api-client-android", version = "2.9.2" }
 google-api-services-drive = { module = "com.google.apis:google-api-services-drive", version = "v3-rev20261106-2.9.2" }
-google-auth-library-oauth2-http = { module = "com.google.auth:google-auth-library-oauth2-http", version = "1.50.0" }
+google-auth-library-oauth2-http = { module = "com.google.auth:google-auth-library-oauth2-http", version = "1.57.0" }
 compose-multiplatform-media-player = { module = "network.chaintech:compose-multiplatform-media-player", version = "1.0.53" }
 kuromoji-ipadic = { group = "com.atilika.kuromoji", name = "kuromoji-ipadic", version.ref = "kuromojiIpadic" }
 tinypinyin = { group = "com.github.promeG", name = "tinypinyin", version.ref = "tinypinyin" }

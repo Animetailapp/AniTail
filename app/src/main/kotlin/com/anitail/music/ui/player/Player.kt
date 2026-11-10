@@ -327,10 +327,10 @@ fun BottomSheetPlayer(
         }
     }
 
-    var position by rememberSaveable(playbackState) {
+    var position by rememberSaveable {
         mutableLongStateOf(playerConnection.player.currentPosition)
     }
-    var duration by rememberSaveable(playbackState) {
+    var duration by rememberSaveable {
         mutableLongStateOf(playerConnection.player.duration)
     }
     var sliderPosition by remember {
@@ -549,8 +549,8 @@ fun BottomSheetPlayer(
         )
     }
 
-    LaunchedEffect(isPlaying) {
-        if (isPlaying) {
+    LaunchedEffect(playbackState, isPlaying) {
+        if (playbackState == STATE_READY) {
             while (isActive) {
                 delay(100)
                 if (sliderPosition == null) {
@@ -562,8 +562,10 @@ fun BottomSheetPlayer(
     }
 
     LaunchedEffect(playbackState, mediaMetadata?.id) {
-        position = playerConnection.player.currentPosition
-        duration = playerConnection.player.duration
+        if (sliderPosition == null) {
+            position = playerConnection.player.currentPosition
+            duration = playerConnection.player.duration
+        }
     }
     // Use fixed dismissedBound to prevent background showing when nav bar disappears (only for new design)
     val dismissedBound = if (useNewMiniPlayerDesign) {
