@@ -154,7 +154,7 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
-          java-version: "21"
+          java-version: "25"
           distribution: "temurin"
           architecture: ${{ matrix.java_arch }}
 
