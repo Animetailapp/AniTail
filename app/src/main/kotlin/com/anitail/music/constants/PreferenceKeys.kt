@@ -219,6 +219,7 @@ val LastCloudSyncKey = longPreferencesKey("last_cloud_sync")
 val LastCloudSyncRemoteModifiedTimeKey = longPreferencesKey("last_cloud_sync_remote_modified_time")
 val LastCloudSyncRemoteMd5Key = stringPreferencesKey("last_cloud_sync_remote_md5")
 val LastCloudSyncLocalFingerprintKey = stringPreferencesKey("last_cloud_sync_local_fingerprint")
+val GoogleDriveFolderIdKey = stringPreferencesKey("google_drive_folder_id")
 
 val ArtistViewTypeKey = stringPreferencesKey("artistViewType")
 val AlbumViewTypeKey = stringPreferencesKey("albumViewType")

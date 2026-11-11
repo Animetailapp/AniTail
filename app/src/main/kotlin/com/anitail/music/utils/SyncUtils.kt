@@ -3,12 +3,17 @@ package com.anitail.music.utils
 import android.content.Context
 import android.util.Base64
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
 import com.anitail.innertube.models.PlaylistItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.utils.completed
+import com.anitail.music.constants.GoogleDriveFolderIdKey
 import com.anitail.music.constants.LastCloudSyncKey
 import com.anitail.music.constants.LastCloudSyncLocalFingerprintKey
 import com.anitail.music.constants.LastCloudSyncRemoteMd5Key
@@ -86,6 +91,29 @@ constructor(
         private const val CLOUD_SYNC_REMOTE_BACKUP_NAME = "AniTail_CloudSync_Backup.zip"
         const val SYNC_THROTTLE_MS = 30 * 60 * 1000L // 30 minutes
         const val SYNC_TIMEOUT_MS = 5 * 60 * 1000L // 5 minutes for Drive download/merge/upload
+
+        /** Preference keys written by the sync itself; excluded from the local fingerprint. */
+        private val SYNC_BOOKKEEPING_PREF_NAMES = setOf(
+            LastCloudSyncKey.name,
+            LastCloudSyncRemoteModifiedTimeKey.name,
+            LastCloudSyncRemoteMd5Key.name,
+            LastCloudSyncLocalFingerprintKey.name,
+            GoogleDriveFolderIdKey.name,
+        )
+
+        /** Cheap aggregate query over the synced tables (all served by PK / rowid). */
+        private val LOCAL_FINGERPRINT_QUERY = """
+            SELECT
+                (SELECT COUNT(*) || '-' || IFNULL(MAX(rowid), 0) FROM event),
+                (SELECT COUNT(*) || '-' || IFNULL(MAX(likedDate), '') FROM song WHERE liked = 1),
+                (SELECT COUNT(*) || '-' || IFNULL(MAX(inLibrary), '') FROM song WHERE inLibrary IS NOT NULL),
+                (SELECT COUNT(*) || '-' || IFNULL(MAX(rowid), 0) || '-' || IFNULL(MAX(lastUpdateTime), '') FROM playlist),
+                (SELECT COUNT(*) || '-' || IFNULL(MAX(rowid), 0) FROM playlist_song_map),
+                (SELECT COUNT(*) || '-' || IFNULL(MAX(bookmarkedAt), '') FROM artist WHERE bookmarkedAt IS NOT NULL),
+                (SELECT COUNT(*) || '-' || IFNULL(MAX(bookmarkedAt), '') FROM album WHERE bookmarkedAt IS NOT NULL),
+                (SELECT COUNT(*) || '-' || IFNULL(MAX(rowid), 0) FROM search_history),
+                (SELECT COUNT(*) FROM lyrics)
+        """.trimIndent()
     }
 
     private val syncScope = CoroutineScope(Dispatchers.IO)
@@ -428,41 +456,49 @@ constructor(
         }
     }
 
-    private fun fileFingerprint(file: File): String {
-        return if (file.exists()) "${file.length()}:${file.lastModified()}" else "missing"
-    }
+    /**
+     * Content-based fingerprint of the data that cloud sync actually carries.
+     *
+     * Previously this used file size/mtime of the DB, WAL, SHM and settings files, which change on
+     * virtually every playback event or preference write (including the sync bookkeeping keys
+     * themselves), so the "unchanged" fast path almost never hit and every sync did a full
+     * download + merge + upload.
+     */
+    private suspend fun buildLocalCloudSyncFingerprint(): String? = withContext(Dispatchers.IO) {
+        if (!database.isSafeToUse()) return@withContext null
 
-    private suspend fun buildLocalCloudSyncFingerprint(): String? {
-        if (!database.isSafeToUse()) return null
-
-        val dbPath = try {
-            database.openHelper.writableDatabase.path
+        val dbFingerprint = try {
+            database.openHelper.readableDatabase.query(LOCAL_FINGERPRINT_QUERY).use { cursor ->
+                if (!cursor.moveToFirst()) return@use null
+                (0 until cursor.columnCount).joinToString(":") { cursor.getString(it) ?: "" }
+            }
         } catch (e: IllegalStateException) {
             if (e.message?.contains("already-closed") == true) {
                 Timber.w("syncCloud: Database was closed while computing local fingerprint")
-                return null
+                return@withContext null
             }
             throw e
-        } ?: return null
+        } catch (e: Exception) {
+            Timber.w(e, "syncCloud: Failed to compute DB fingerprint")
+            return@withContext null
+        } ?: return@withContext null
 
-        val dbFile = File(dbPath)
-        val walFile = File("$dbPath-wal")
-        val shmFile = File("$dbPath-shm")
-        val settingsFile = File(context.filesDir, "datastore/settings.preferences_pb")
+        val prefs = context.dataStore.data.first()
+        val settingsFingerprint = prefs.asMap()
+            .filterKeys { it.name !in SYNC_BOOKKEEPING_PREF_NAMES }
+            .entries
+            .sortedBy { it.key.name }
+            .joinToString("|") { "${it.key.name}=${it.value}" }
+            .hashCode()
+
         val lastFmOfflineFile = File(
             context.applicationInfo.dataDir,
             "shared_prefs/lastfm_offline.xml"
         )
-        val accountsFingerprint = createAccountsJson().hashCode().toString()
+        val lastFmFingerprint =
+            if (lastFmOfflineFile.exists()) lastFmOfflineFile.length().toString() else "missing"
 
-        return listOf(
-            fileFingerprint(dbFile),
-            fileFingerprint(walFile),
-            fileFingerprint(shmFile),
-            fileFingerprint(settingsFile),
-            fileFingerprint(lastFmOfflineFile),
-            accountsFingerprint,
-        ).joinToString("|")
+        listOf(dbFingerprint, settingsFingerprint.toString(), lastFmFingerprint).joinToString("|")
     }
 
     private fun matchesRemoteSnapshot(
@@ -502,15 +538,39 @@ constructor(
         }
     }
 
-    private suspend fun createCurrentBackupZip(outputZipFile: File) {
+    /**
+     * Produces a consistent, self-contained copy of the database without blocking writers.
+     *
+     * On API 30+ (SQLite >= 3.28) uses `VACUUM INTO`, which reads a snapshot under a normal read
+     * transaction (WAL mode lets writers continue). On older devices falls back to the previous
+     * `wal_checkpoint(FULL)` + file copy.
+     */
+    private fun snapshotDatabase(snapshotFile: File): File {
+        if (snapshotFile.exists()) snapshotFile.delete()
+        val db = database.openHelper.writableDatabase
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            try {
+                val target = snapshotFile.absolutePath.replace("'", "''")
+                db.query("VACUUM INTO '$target'").use { it.moveToFirst() }
+                if (snapshotFile.exists() && snapshotFile.length() > 0L) return snapshotFile
+            } catch (e: Exception) {
+                Timber.w(e, "syncCloud: VACUUM INTO failed, falling back to checkpoint + copy")
+                snapshotFile.delete()
+            }
+        }
+        db.query("PRAGMA wal_checkpoint(FULL)").use { it.moveToFirst() }
+        val dbPath = db.path ?: throw IllegalStateException("Database path is null")
+        return File(dbPath)
+    }
+
+    private suspend fun createCurrentBackupZip(outputZipFile: File) = withContext(Dispatchers.IO) {
         if (!database.isSafeToUse()) {
             throw IllegalStateException("Database closed before backup creation")
         }
 
-        val dbPath = try {
-            database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").moveToFirst()
-            database.openHelper.writableDatabase.path
-                ?: throw IllegalStateException("Database path is null")
+        val snapshotFile = File(context.cacheDir, "cloud_sync_snapshot.db")
+        val dbFile = try {
+            snapshotDatabase(snapshotFile)
         } catch (e: IllegalStateException) {
             if (e.message?.contains("already-closed") == true) {
                 throw IllegalStateException("Database closed during backup creation", e)
@@ -518,14 +578,13 @@ constructor(
             throw e
         }
 
-        withContext(Dispatchers.IO) {
-            FileOutputStream(outputZipFile)
-        }.use { fos ->
-            ZipOutputStream(BufferedOutputStream(fos)).use { zos ->
-                zos.putNextEntry(ZipEntry(InternalDatabase.DB_NAME))
-                FileInputStream(dbPath).use { fis ->
-                    fis.copyTo(zos, bufferSize = 16384)
-                }
+        try {
+            FileOutputStream(outputZipFile).use { fos ->
+                ZipOutputStream(BufferedOutputStream(fos)).use { zos ->
+                    zos.putNextEntry(ZipEntry(InternalDatabase.DB_NAME))
+                    FileInputStream(dbFile).use { fis ->
+                        fis.copyTo(zos, bufferSize = 16384)
+                    }
 
                 val settingsFile = File(context.filesDir, "datastore/settings.preferences_pb")
                 if (settingsFile.exists()) {
@@ -548,29 +607,35 @@ constructor(
                     FileInputStream(lastFmOfflineFile).use { fis -> fis.copyTo(zos) }
                 }
             }
+            }
+        } finally {
+            if (snapshotFile.exists()) snapshotFile.delete()
         }
     }
 
     private suspend fun uploadCurrentStateBackup(
         successMessage: String,
         failureMessage: String,
+        existingFileId: String? = null,
     ): String {
         val backupZip = File(context.cacheDir, "cloud_sync_upload.zip")
         try {
+            // Capture the fingerprint *before* snapshotting so changes made during upload
+            // are detected on the next sync instead of being silently marked as synced.
+            val localFingerprint = buildLocalCloudSyncFingerprint()
             createCurrentBackupZip(backupZip)
 
-            val uploadResult = googleDriveSyncManager.uploadBackupReplacingByName(
-                backupZip,
-                CLOUD_SYNC_REMOTE_BACKUP_NAME
+            val uploadResult = googleDriveSyncManager.uploadBackupReplacingByNameWithMetadata(
+                backupFile = backupZip,
+                remoteName = CLOUD_SYNC_REMOTE_BACKUP_NAME,
+                existingFileId = existingFileId,
             )
-            if (!uploadResult.isSuccess) {
-                Timber.e("syncCloud: Failed to upload current backup state")
+            val remoteMetadata = uploadResult.getOrElse {
+                Timber.e(it, "syncCloud: Failed to upload current backup state")
                 return failureMessage
             }
 
-            val latestRemoteMetadata = googleDriveSyncManager.getLatestBackupMetadata().getOrNull()
-            val latestLocalFingerprint = buildLocalCloudSyncFingerprint()
-            persistCloudSyncSnapshot(latestRemoteMetadata, latestLocalFingerprint)
+            persistCloudSyncSnapshot(remoteMetadata, localFingerprint)
             return successMessage
         } catch (e: Exception) {
             Timber.e(e, "Failed to upload current backup state")
@@ -597,7 +662,13 @@ constructor(
             val storedRemoteModifiedTime = prefs[LastCloudSyncRemoteModifiedTimeKey] ?: 0L
             val storedRemoteMd5 = prefs[LastCloudSyncRemoteMd5Key]
             val storedLocalFingerprint = prefs[LastCloudSyncLocalFingerprintKey]
-            val latestRemoteMetadata = googleDriveSyncManager.getLatestBackupMetadata().getOrElse {
+            // Only look at the dedicated cloud-sync file so manual/auto backups uploaded to the
+            // same folder don't make the remote look "changed" and force a full download+merge.
+            // Fall back to the newest legacy backup only if the sync file doesn't exist yet.
+            val latestRemoteMetadata = googleDriveSyncManager
+                .getLatestBackupMetadata(exactName = CLOUD_SYNC_REMOTE_BACKUP_NAME)
+                .mapCatching { it ?: googleDriveSyncManager.getLatestBackupMetadata().getOrThrow() }
+                .getOrElse {
                 Timber.e(it, "syncCloud: Failed to query remote backup metadata")
                 return@coroutineScope context.getString(R.string.sync_failed_download)
             }
@@ -622,6 +693,7 @@ constructor(
                     return@coroutineScope uploadCurrentStateBackup(
                         successMessage = context.getString(R.string.sync_completed),
                         failureMessage = context.getString(R.string.sync_failed_upload),
+                        existingFileId = latestRemoteMetadata.id,
                     )
                 }
             }
@@ -631,6 +703,7 @@ constructor(
                 return@coroutineScope uploadCurrentStateBackup(
                     successMessage = context.getString(R.string.sync_initial_uploaded),
                     failureMessage = context.getString(R.string.sync_failed_initial_upload),
+                    existingFileId = null,
                 )
             }
 
@@ -699,13 +772,10 @@ constructor(
 
                 databaseMerger.mergeDatabase(tempDbFile)
 
-                // 4. Restore settings if present
+                // 4. Restore settings if present (through DataStore, never by overwriting the
+                // live preferences file underneath an active DataStore instance)
                 if (tempSettingsFile.exists() && tempSettingsFile.length() > 0L) {
-                    val targetSettingsDir = File(context.filesDir, "datastore")
-                    if (!targetSettingsDir.exists()) targetSettingsDir.mkdirs()
-                    val targetSettingsFile =
-                        File(targetSettingsDir, "settings.preferences_pb")
-                    tempSettingsFile.copyTo(targetSettingsFile, overwrite = true)
+                    applyRemoteSettings(tempSettingsFile)
                     Timber.d("Settings restored from backup")
                 }
 
@@ -753,6 +823,7 @@ constructor(
                 return@coroutineScope uploadCurrentStateBackup(
                     successMessage = context.getString(R.string.sync_completed),
                     failureMessage = context.getString(R.string.sync_failed_upload),
+                    existingFileId = remoteBackupMetadata.id,
                 )
             } catch (e: Exception) {
                 Timber.e(e, "Failed to create merged backup")
@@ -764,6 +835,37 @@ constructor(
         }
     }
 
+
+    /**
+     * Reads a remote `.preferences_pb` file with a short-lived DataStore and copies its entries
+     * into the app DataStore (remote wins for shared keys; local-only keys are kept and the
+     * sync bookkeeping keys are never overwritten).
+     */
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun applyRemoteSettings(remoteSettingsFile: File) {
+        // Unique file name: DataStore forbids two instances on the same path in one process.
+        val readFile = File(
+            context.cacheDir,
+            "remote_settings_${System.nanoTime()}.preferences_pb"
+        )
+        val readScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        try {
+            remoteSettingsFile.copyTo(readFile, overwrite = true)
+            val remotePrefs = PreferenceDataStoreFactory.create(scope = readScope) { readFile }
+                .data.first()
+
+            context.dataStore.edit { local ->
+                remotePrefs.asMap().forEach { (key, value) ->
+                    if (key.name !in SYNC_BOOKKEEPING_PREF_NAMES) {
+                        local[key as Preferences.Key<Any>] = value
+                    }
+                }
+            }
+        } finally {
+            readScope.cancel()
+            readFile.delete()
+        }
+    }
 
     private suspend fun createAccountsJson(): String {
         val dataStore = context.dataStore

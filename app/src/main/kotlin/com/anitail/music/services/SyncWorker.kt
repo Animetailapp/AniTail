@@ -69,6 +69,12 @@ class SyncWorker @AssistedInject constructor(
         }
 
         suspend fun scheduleImmediate(context: Context) {
+            // Skip scheduling startup sync if user never signed in with a Google account
+            if (com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(context) == null) {
+                Timber.d("SyncWorker: No Google account found, skipping startup sync")
+                return
+            }
+
             val lastSync = context.dataStore.data.first()[LastCloudSyncKey] ?: 0L
             val now = System.currentTimeMillis()
             if (lastSync != 0L && now - lastSync < SyncUtils.SYNC_THROTTLE_MS) {
@@ -131,13 +137,13 @@ class SyncWorker @AssistedInject constructor(
 
                 result == timeoutMessage -> {
                     Timber.e("SyncWorker: Sync timed out")
-                    Result.retry()
+                    if (runAttemptCount >= 2) Result.failure() else Result.retry()
                 }
 
                 result.contains("failed", ignoreCase = true) ||
                         result.contains("fallo", ignoreCase = true) -> {
                     Timber.e("SyncWorker: Sync failed - $result")
-                    Result.retry()
+                    if (runAttemptCount >= 2) Result.failure() else Result.retry()
                 }
 
                 else -> {
@@ -152,11 +158,11 @@ class SyncWorker @AssistedInject constructor(
                 Result.success()
             } else {
                 Timber.e(e, "SyncWorker: IllegalStateException during sync")
-                Result.retry()
+                if (runAttemptCount >= 2) Result.failure() else Result.retry()
             }
         } catch (e: Exception) {
             Timber.e(e, "SyncWorker: Unexpected error during sync")
-            Result.retry()
+            if (runAttemptCount >= 2) Result.failure() else Result.retry()
         }
     }
 }
