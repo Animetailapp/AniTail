@@ -8,8 +8,8 @@ pluginManagement {
         maven { setUrl("https://maven.pkg.jetbrains.space/public/p/compose/dev") }
     }
     plugins {
-        id("org.jetbrains.compose") version "1.12.10-alpha01+snapshot.svastven-ui-uikit-gradle-fix"
-        id("org.jetbrains.kotlin.plugin.compose") version "2.4.20-RC"
+        id("org.jetbrains.compose") version "1.13.10-alpha01+snapshot.v-mazunin-webpack-compilation-error-gradle-plugin-tests"
+        id("org.jetbrains.kotlin.plugin.compose") version "2.5.0-Beta2"
     }
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
@@ -21,6 +21,7 @@ dependencyResolutionManagement {
         mavenCentral()
         maven { setUrl("https://maven.pkg.jetbrains.space/public/p/compose/dev") }
         maven { setUrl("https://jitpack.io") }
+        maven { setUrl("https://maven.aliyun.com/repository/public") }
         maven {
             setUrl("https://jogamp.org/deployment/maven/")
             content {

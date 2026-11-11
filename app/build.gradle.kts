@@ -13,10 +13,14 @@ plugins {
 
 android {
     namespace = "com.anitail.music"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 1
+        }
+    }
     defaultConfig {
         applicationId = "com.anitail.music"
-        minSdk = 23
+        minSdk = 24 
         targetSdk = 37
         versionCode = 20
         versionName = "1.17.2"
@@ -285,4 +289,7 @@ dependencies {
     implementation(libs.google.api.client.android)
     implementation(libs.google.api.services.drive)
     implementation(libs.google.auth.library.oauth2.http)
+
+    implementation(libs.kuromoji.ipadic)
+    implementation(libs.tinypinyin)
 }

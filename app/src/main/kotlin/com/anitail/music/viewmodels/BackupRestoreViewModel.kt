@@ -26,6 +26,7 @@ import com.anitail.music.utils.reportException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -49,17 +50,17 @@ class BackupRestoreViewModel @Inject constructor(
 ) : ViewModel() {
     val signedInAccount = googleDriveSyncManager.signedInAccount
 
-    // Sync state
-    private val _isSyncing = kotlinx.coroutines.flow.MutableStateFlow(false)
-    val isSyncing = _isSyncing.asStateFlow()
-
-    private val _syncMessage = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
-    val syncMessage = _syncMessage.asStateFlow()
+    // Sync state: observed directly from SyncUtils so background syncs (e.g. at startup)
+    // and manual syncs share the exact same UI state without desynchronization.
+    val isSyncing: StateFlow<Boolean> = syncUtils.isSyncing
+    val syncMessage: StateFlow<String?> = syncUtils.syncStatus
 
     init {
-        // Try to restore Google Sign-In session on ViewModel creation
+        // Try to restore Google Sign-In session on ViewModel creation (only if not already signed in)
         viewModelScope.launch {
-            googleDriveSyncManager.trySilentSignIn()
+            if (!googleDriveSyncManager.isSignedIn()) {
+                googleDriveSyncManager.trySilentSignIn()
+            }
         }
     }
 
@@ -67,21 +68,13 @@ class BackupRestoreViewModel @Inject constructor(
 
     fun syncWithDrive() {
         viewModelScope.launch(Dispatchers.IO) {
-            if (_isSyncing.value) return@launch
-            _isSyncing.value = true
-            _syncMessage.value = context.getString(R.string.sync_starting)
+            // Do not trigger a redundant second sync if one is already in progress
+            if (syncUtils.isSyncing.value) return@launch
 
             try {
-                val resultMessage = syncUtils.syncCloud(force = true)
-                _syncMessage.value = resultMessage ?: context.getString(R.string.sync_completed)
+                syncUtils.syncCloud(force = true)
             } catch (e: Exception) {
                 Timber.e(e, "Sync failed")
-                _syncMessage.value = context.getString(R.string.sync_failed, e.localizedMessage ?: "")
-            } finally {
-                _isSyncing.value = false
-                // Clear message after delay
-                kotlinx.coroutines.delay(3000)
-                _syncMessage.value = null
             }
         }
     }

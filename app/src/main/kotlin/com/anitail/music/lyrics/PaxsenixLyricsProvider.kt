@@ -1,12 +1,11 @@
 /**
- * AniTail Project (C) 2026
+ * Metrolist Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
  */
 
 package com.anitail.music.lyrics
 
 import android.content.Context
-import com.anitail.music.App
 import com.anitail.paxsenix.Paxsenix
 import com.anitail.music.constants.EnablePaxsenixKey
 import com.anitail.music.utils.dataStore
@@ -21,6 +20,7 @@ object PaxsenixLyricsProvider : LyricsProvider {
     override fun isEnabled(context: Context): Boolean = context.dataStore[EnablePaxsenixKey] ?: true
 
     override suspend fun getLyrics(
+        context: Context,
         id: String,
         title: String,
         artist: String,
@@ -30,7 +30,7 @@ object PaxsenixLyricsProvider : LyricsProvider {
         Timber.tag(TAG).d("getLyrics called: title='$title', artist='$artist', duration=$duration")
         
         try {
-            Paxsenix.init(App.instance)
+            Paxsenix.init(context)
             val result = Paxsenix.getLyrics(title, artist, duration, album)
             
             result.onSuccess { lyrics ->
@@ -47,6 +47,7 @@ object PaxsenixLyricsProvider : LyricsProvider {
     }
 
     override suspend fun getAllLyrics(
+        context: Context,
         id: String,
         title: String,
         artist: String,
@@ -56,7 +57,7 @@ object PaxsenixLyricsProvider : LyricsProvider {
     ) {
         Timber.tag(TAG).d("getAllLyrics called")
         try {
-            Paxsenix.init(App.instance)
+            Paxsenix.init(context)
             Paxsenix.getAllLyrics(title, artist, duration, album, callback)
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Error fetching lyrics from Paxsenix")

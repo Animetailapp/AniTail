@@ -1,5 +1,11 @@
+/**
+ * Metrolist Project (C) 2026
+ * Licensed under GPL-3.0 | See git history for contributors
+ */
+
 package com.anitail.music.viewmodels
 
+import android.content.Context
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -19,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 @HiltViewModel
@@ -45,6 +52,12 @@ constructor(
                 _isNetworkAvailable.value = isConnected
             }
         }
+
+        _isNetworkAvailable.value = try {
+            networkConnectivity.isCurrentlyConnected()
+        } catch (e: Exception) {
+            true
+        }
     }
 
     fun setCurrentSong(song: Song) {
@@ -63,12 +76,17 @@ constructor(
         job?.cancel()
         job =
             viewModelScope.launch(Dispatchers.IO) {
-                lyricsHelper.getAllLyrics(mediaId, title, artist, duration, album) { result ->
-                    results.update {
-                        it + result
+                try {
+                    lyricsHelper.getAllLyrics(mediaId, title, artist, duration, album) { result ->
+                        results.update {
+                            it + result
+                        }
                     }
+                } catch (e: Exception) {
+                    // Catch any remaining exceptions to prevent crashes
+                } finally {
+                    isLoading.value = false
                 }
-                isLoading.value = false
             }
     }
 
@@ -81,18 +99,13 @@ constructor(
         mediaMetadata: MediaMetadata,
         lyricsEntity: LyricsEntity?,
     ) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val lyricsWithProvider = lyricsHelper.getLyrics(mediaMetadata)
-            database.query {
-                lyricsEntity?.let(::delete)
-                upsert(
-                    LyricsEntity(
-                        id = mediaMetadata.id,
-                        lyrics = lyricsWithProvider.lyrics,
-                        provider = lyricsWithProvider.provider,
-                    )
-                )
-            }
+        database.query {
+            lyricsEntity?.let(::delete)
+            val lyricsWithProvider =
+                runBlocking {
+                    lyricsHelper.getLyrics(mediaMetadata)
+                }
+            upsert(LyricsEntity(mediaMetadata.id, lyricsWithProvider.lyrics, lyricsWithProvider.provider))
         }
     }
 }

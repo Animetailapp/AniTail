@@ -675,8 +675,9 @@ fun ImportFromSpotifyScreen(
         }
     }
     LaunchedEffect(logsListState.canScrollForward) {
-        if (logsListState.canScrollForward) {
-            logsListState.animateScrollToItem(logsListState.layoutInfo.totalItemsCount - 1)
+        val lastIndex = logsListState.layoutInfo.totalItemsCount - 1
+        if (logsListState.canScrollForward && lastIndex >= 0) {
+            logsListState.animateScrollToItem(lastIndex)
         }
     }
 }

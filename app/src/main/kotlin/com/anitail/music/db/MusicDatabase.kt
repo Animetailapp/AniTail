@@ -107,7 +107,7 @@ class MusicDatabase(
         SortedSongAlbumMap::class,
         PlaylistSongMapPreview::class,
     ],
-    version = 30,
+    version = 31,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 2, to = 3),
@@ -160,6 +160,7 @@ abstract class InternalDatabase : RoomDatabase() {
                         MIGRATION_27_28,
                         MIGRATION_28_30,
                         MIGRATION_29_30,
+                        MIGRATION_30_31,
                     )
                     .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
                     .addCallback(object : Callback() {
@@ -658,6 +659,79 @@ val MIGRATION_28_30 =
 
             // Create the missing view introduced in version 29
             database.execSQL("CREATE VIEW IF NOT EXISTS `sorted_song_album_map` AS SELECT * FROM song_album_map ORDER BY `index`")
+        }
+    }
+
+val MIGRATION_30_31 =
+    object : Migration(30, 31) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            val database = db
+
+            fun hasColumn(table: String, column: String): Boolean {
+                database.query("PRAGMA table_info($table)").use { cursor ->
+                    val nameColumnIndex = cursor.getColumnIndex("name")
+                    while (cursor.moveToNext()) {
+                        if (nameColumnIndex >= 0 && cursor.getString(nameColumnIndex) == column) {
+                            return true
+                        }
+                    }
+                }
+                return false
+            }
+
+            // Drop views before altering tables
+            database.execSQL("DROP VIEW IF EXISTS `sorted_song_artist_map`")
+            database.execSQL("DROP VIEW IF EXISTS `sorted_song_album_map`")
+            database.execSQL("DROP VIEW IF EXISTS `playlist_song_map_preview`")
+
+            // Add lyricsOffset column to song if missing
+            if (!hasColumn("song", "lyricsOffset")) {
+                database.execSQL("ALTER TABLE `song` ADD COLUMN `lyricsOffset` INTEGER NOT NULL DEFAULT 0")
+            }
+
+            // Clean up any stale temp table from a prior failed migration attempt
+            database.execSQL("DROP TABLE IF EXISTS `_new_lyrics`")
+
+            // Create new lyrics table matching schema 31
+            database.execSQL(
+                """
+                CREATE TABLE `_new_lyrics` (
+                    `id` TEXT NOT NULL,
+                    `lyrics` TEXT NOT NULL,
+                    `provider` TEXT NOT NULL DEFAULT 'Unknown',
+                    `translatedLyrics` TEXT NOT NULL DEFAULT '',
+                    `translationLanguage` TEXT NOT NULL DEFAULT '',
+                    `translationMode` TEXT NOT NULL DEFAULT '',
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent()
+            )
+
+            // Copy data safely replacing any NULL providers with 'Unknown'
+            val hasProvider = hasColumn("lyrics", "provider")
+            val hasTranslated = hasColumn("lyrics", "translatedLyrics")
+            val hasTranslationLang = hasColumn("lyrics", "translationLanguage")
+            val hasTranslationMode = hasColumn("lyrics", "translationMode")
+
+            val providerExpr = if (hasProvider) "COALESCE(`provider`, 'Unknown')" else "'Unknown'"
+            val translatedExpr = if (hasTranslated) "COALESCE(`translatedLyrics`, '')" else "''"
+            val langExpr = if (hasTranslationLang) "COALESCE(`translationLanguage`, '')" else "''"
+            val modeExpr = if (hasTranslationMode) "COALESCE(`translationMode`, '')" else "''"
+
+            database.execSQL(
+                """
+                INSERT INTO `_new_lyrics` (`id`, `lyrics`, `provider`, `translatedLyrics`, `translationLanguage`, `translationMode`)
+                SELECT `id`, `lyrics`, $providerExpr, $translatedExpr, $langExpr, $modeExpr FROM `lyrics`
+                """.trimIndent()
+            )
+
+            database.execSQL("DROP TABLE `lyrics`")
+            database.execSQL("ALTER TABLE `_new_lyrics` RENAME TO `lyrics`")
+
+            // Recreate views
+            database.execSQL("CREATE VIEW `sorted_song_artist_map` AS SELECT * FROM song_artist_map ORDER BY position")
+            database.execSQL("CREATE VIEW `sorted_song_album_map` AS SELECT * FROM song_album_map ORDER BY `index`")
+            database.execSQL("CREATE VIEW `playlist_song_map_preview` AS SELECT * FROM playlist_song_map WHERE position <= 3 ORDER BY position")
         }
     }
 

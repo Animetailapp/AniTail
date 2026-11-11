@@ -4,25 +4,18 @@ import com.anitail.music.betterlyrics.models.TTMLResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.HttpRequestTimeoutException
-import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
-import kotlin.coroutines.cancellation.CancellationException
+import io.ktor.client.request.headers
 
 object BetterLyrics {
-    private data class QueryVariant(
-        val artist: String,
-        val title: String,
-        val duration: Int,
-        val album: String?,
-    )
-
+    private const val TAG = "BetterLyrics"
     private val client by lazy {
         HttpClient(OkHttp) {
             install(ContentNegotiation) {
@@ -42,68 +35,43 @@ object BetterLyrics {
 
             defaultRequest {
                 url("https://lyrics-api.boidu.dev")
+                headers {
+                    append("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    append("Accept", "application/json")
+                }
             }
 
             expectSuccess = false
         }
     }
 
-    private fun buildQueryVariants(
+    private suspend fun fetchTTML(
         artist: String,
         title: String,
-        duration: Int,
-        album: String?,
-    ): List<QueryVariant> = buildList {
-        add(QueryVariant(artist = artist, title = title, duration = duration, album = album))
-        if (!album.isNullOrBlank()) {
-            add(QueryVariant(artist = artist, title = title, duration = duration, album = null))
-        }
-        if (duration > 0) {
-            add(QueryVariant(artist = artist, title = title, duration = -1, album = null))
-        }
-    }.distinct()
+        duration: Int = -1,
+        album: String? = null,
+    ): String? = runCatching {
 
-    private suspend fun fetchTTML(
-        query: QueryVariant,
-    ): String? {
-        val params = buildString {
-            append("s=${query.title}")
-            append(", a=${query.artist}")
-            if (query.duration > 0) append(", d=${query.duration}")
-            if (!query.album.isNullOrBlank()) append(", al=${query.album}")
-        }
-        println("[BetterLyrics] Fetching: $params")
-
-        return try {
-            val response = client.get("/getLyrics") {
-                parameter("s", query.title)
-                parameter("a", query.artist)
-                if (query.duration > 0) {
-                    parameter("d", query.duration)
-                }
-                if (!query.album.isNullOrBlank()) {
-                    parameter("al", query.album)
-                }
+        val response = client.get("/getLyrics") {
+            parameter("s", title)
+            parameter("a", artist)
+            if (duration > 0) {
+                parameter("d", duration)
             }
-
-            println("[BetterLyrics] Response status: ${response.status}")
-            if (response.status == HttpStatusCode.OK) {
-                val body = response.body<TTMLResponse>()
-                println("[BetterLyrics] TTML received: ${body.ttml?.take(100)}...")
-                body.ttml?.takeIf { it.isNotBlank() }
-            } else {
-                println("[BetterLyrics] HTTP ${response.status}")
-                null
+            if (!album.isNullOrBlank()) {
+                parameter("al", album)
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: HttpRequestTimeoutException) {
-            println("[BetterLyrics] Request timeout: ${e.message}")
-            throw e
-        } catch (e: Exception) {
-            println("[BetterLyrics] Exception in fetchTTML: ${e.message}")
-            throw e
         }
+        if (response.status == HttpStatusCode.OK) {
+            val ttml = response.body<TTMLResponse>().ttml?.trim()?.takeIf { it.isNotEmpty() }
+            ttml
+        } else {
+
+            null
+        }
+    }.getOrElse { e ->
+
+        null
     }
 
     suspend fun getLyrics(
@@ -112,57 +80,17 @@ object BetterLyrics {
         duration: Int,
         album: String? = null,
     ) = runCatching {
-        val normalizedTitle = title.trim()
-        val normalizedArtist = artist.trim()
-        val normalizedAlbum = album?.trim()?.takeIf { it.isNotEmpty() }
+        // Use exact title and artist - no normalization to ensure correct sync
+        // Normalizing can return wrong lyrics (e.g., radio edit vs original)
+        val ttml =
+            fetchTTML(artist, title, duration, album)
+                ?: throw IllegalStateException("Lyrics unavailable")
 
-        require(normalizedTitle.isNotEmpty()) { "Song title is blank" }
-        require(normalizedArtist.isNotEmpty()) { "Artist is blank; skipping BetterLyrics lookup" }
-
-        val attempts = buildQueryVariants(
-            artist = normalizedArtist,
-            title = normalizedTitle,
-            duration = duration,
-            album = normalizedAlbum,
-        )
-
-        var ttml: String? = null
-        for ((index, query) in attempts.withIndex()) {
-            ttml = try {
-                fetchTTML(query)
-            } catch (e: HttpRequestTimeoutException) {
-                throw IllegalStateException(
-                    "BetterLyrics request timed out on attempt ${index + 1}/${attempts.size}",
-                    e,
-                )
-            }
-            if (!ttml.isNullOrBlank()) {
-                break
-            }
-        }
-
-        val finalTtml =
-            ttml?.takeIf { it.isNotBlank() }
-                ?: throw IllegalStateException("Lyrics unavailable after all fallbacks")
-
-        val parsedLines = TTMLParser.parseTTML(finalTtml)
+        val parsedLines = TTMLParser.parseTTML(ttml)
         if (parsedLines.isEmpty()) {
             throw IllegalStateException("Failed to parse lyrics")
         }
-
+        
         TTMLParser.toLRC(parsedLines)
-    }
-
-    suspend fun getAllLyrics(
-        title: String,
-        artist: String,
-        duration: Int,
-        album: String? = null,
-        callback: (String) -> Unit,
-    ) {
-        getLyrics(title, artist, duration, album)
-            .onSuccess { lrcString ->
-                callback(lrcString)
-            }
     }
 }

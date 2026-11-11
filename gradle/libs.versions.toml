@@ -1,32 +1,34 @@
 [versions]
-androidGradlePlugin = "9.4.0-alpha08"
+androidGradlePlugin = "9.6.0-alpha03"
 documentfile = "1.1.0"
 hiltWork = "1.4.0"
-commonsCodec = "1.22.1"
+commonsCodec = "1.23.0"
 json = "20250517"
-jsoup = "1.23.1"
-kotlin = "2.4.20-RC"
+jsoup = "1.24.1"
+kotlin = "2.5.0-RC"
 browser = "1.10.0"
 securityCrypto = "1.1.0"
-compose = "1.12.0-rc01"
+compose = "1.13.0-rc01"
 lastfmJava = "0.1.2"
-lifecycle = "2.11.0"
-material3 = "1.5.0-alpha25"
-materialKolor = "5.0.0"
-media3 = "1.11.0"
+lifecycle = "2.12.0-alpha05"
+material3 = "1.5.0-rc01"
+materialKolor = "5.0.1"
+media3 = "1.12.0-alpha02"
 # 22.3.0 triggers R8 "Invalid stack map table" warnings during minify.
-playServicesCast = "22.3.1"
-playServicesBase = "18.10.0"
-onesignal = "5.9.8"
-room = "2.8.4"
+playServicesCast = "23.0.0"
+playServicesBase = "18.11.1"
+onesignal = "5.11.0"
+room = "2.8.5"
 hilt = "2.60.1"
-ktor = "3.5.2"
-vlcj = "4.8.3"
+ktor = "3.6.1"
+vlcj = "5.0.0-M6"
 jna = "5.19.1"
-ksp = "2.3.11"
-okhttp = "5.4.0"
+ksp = "2.3.13"
+okhttp = "5.5.1"
 newpipe = "v0.26.0"
-workRuntimeKtx = "2.12.0-beta01"
+workRuntimeKtx = "2.12.0"
+kuromojiIpadic = "0.9.0"
+tinypinyin = "2.0.3"
 
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.8.0" }
@@ -34,19 +36,19 @@ browser = { module = "androidx.browser:browser", version.ref = "browser" }
 security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 commons-codec = { module = "commons-codec:commons-codec", version.ref = "commonsCodec" }
 documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
-guava = { group = "com.google.guava", name = "guava", version = "33.6.0-jre" }
+guava = { group = "com.google.guava", name = "guava", version = "33.7.2-jre" }
 coroutines-guava = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-guava", version = "1.11.0" }
 concurrent-futures = { group = "androidx.concurrent", name = "concurrent-futures-ktx", version = "1.4.0-alpha01" }
 
 gradle = { module = "com.android.tools.build:gradle", version.ref = "androidGradlePlugin" }
-activity = { group = "androidx.activity", name = "activity-compose", version = "1.13.0" }
+activity = { group = "androidx.activity", name = "activity-compose", version = "1.14.0-alpha03" }
 hilt-work = { module = "androidx.hilt:hilt-work", version.ref = "hiltWork" }
 hilt-work-compiler = { module = "androidx.hilt:hilt-compiler", version.ref = "hiltWork" }
 lastfm-java = { module = "de.u-mass:lastfm-java", version.ref = "lastfmJava" }
-navigation = { group = "androidx.navigation", name = "navigation-compose", version = "2.10.0-beta01" }
+navigation = { group = "androidx.navigation", name = "navigation-compose", version = "2.10.2" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 hilt-navigation = { group = "androidx.hilt", name = "hilt-navigation-compose", version = "1.4.0" }
-datastore = { group = "androidx.datastore", name = "datastore-preferences", version = "1.3.0-alpha10" }
+datastore = { group = "androidx.datastore", name = "datastore-preferences", version = "1.3.0" }
 
 compose-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "compose" }
 compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "compose" }
@@ -73,7 +75,7 @@ coil-gif = { group = "io.coil-kt", name = "coil-gif", version = "2.7.0" }
 
 shimmer = { group = "com.valentinilk.shimmer", name = "compose-shimmer", version = "1.5.0" }
 
-palette = { group = "androidx.palette", name = "palette", version = "1.1.0-alpha01" }
+palette = { group = "androidx.palette", name = "palette", version = "1.1.0" }
 
 media3 = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
 media3-okhttp = { group = "androidx.media3", name = "media3-datasource-okhttp", version.ref = "media3" }
@@ -86,7 +88,7 @@ room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 
-apache-lang3 = { group = "org.apache.commons", name = "commons-lang3", version = "3.20.0" }
+apache-lang3 = { group = "org.apache.commons", name = "commons-lang3", version = "3.21.0" }
 
 hilt = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
@@ -115,13 +117,15 @@ junit = { group = "junit", name = "junit", version = "4.13.2" }
 timber = { group = "com.jakewharton.timber", name = "timber", version = "5.0.1" }
 
 #newpipe-extractor = { group = "com.github.libre-tube", name = "NewPipeExtractor", version = "f3bb450" }
-newpipe-extractor = { group = "com.github.TeamNewPipe", name = "NewPipeExtractor", version = "0.26.5" }
+newpipe-extractor = { group = "com.github.TeamNewPipe", name = "NewPipeExtractor", version = "0.27.1" }
 work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version = "21.6.0" }
-google-api-client-android = { module = "com.google.api-client:google-api-client-android", version = "2.9.0" }
-google-api-services-drive = { module = "com.google.apis:google-api-services-drive", version = "v3-rev20260720-2.0.0" }
-google-auth-library-oauth2-http = { module = "com.google.auth:google-auth-library-oauth2-http", version = "1.50.0" }
+google-api-client-android = { module = "com.google.api-client:google-api-client-android", version = "2.9.2" }
+google-api-services-drive = { module = "com.google.apis:google-api-services-drive", version = "v3-rev20261106-2.9.2" }
+google-auth-library-oauth2-http = { module = "com.google.auth:google-auth-library-oauth2-http", version = "1.57.0" }
 compose-multiplatform-media-player = { module = "network.chaintech:compose-multiplatform-media-player", version = "1.0.53" }
+kuromoji-ipadic = { group = "com.atilika.kuromoji", name = "kuromoji-ipadic", version.ref = "kuromojiIpadic" }
+tinypinyin = { group = "com.github.promeG", name = "tinypinyin", version.ref = "tinypinyin" }
 
 [plugins]
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

@@ -1,3 +1,8 @@
+/**
+ * Metrolist Project (C) 2026
+ * Licensed under GPL-3.0 | See git history for contributors
+ */
+
 package com.anitail.music.lyrics
 
 import android.content.Context
@@ -12,22 +17,24 @@ object KuGouLyricsProvider : LyricsProvider {
         context.dataStore[EnableKugouKey] ?: true
 
     override suspend fun getLyrics(
+        context: Context,
         id: String,
         title: String,
         artist: String,
         duration: Int,
         album: String?,
     ): Result<String> =
-        KuGou.getLyrics(title, artist, duration)
+        KuGou.getLyrics(title, artist, duration, album)
 
     override suspend fun getAllLyrics(
+        context: Context,
         id: String,
         title: String,
         artist: String,
         duration: Int,
         album: String?,
-        callback: (String) -> Unit
+        callback: (String) -> Unit,
     ) {
-        KuGou.getAllPossibleLyricsOptions(title, artist, duration, callback)
+        KuGou.getAllPossibleLyricsOptions(title, artist, duration, album, callback)
     }
 }
