@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -416,9 +417,13 @@ fun AppearanceSettings(
                     var sliderValue by remember {
                         mutableFloatStateOf(0.5f)
                     }
-                    Slider(
+                    val sliderState = rememberSliderState(
                         value = sliderValue,
-                        valueRange = 0f..1f,
+                        trackRange = 0f..1f,
+                    )
+                    sliderState.value = sliderValue
+                    Slider(
+                        state = sliderState,
                         onValueChange = {
                             sliderValue = it
                         },
