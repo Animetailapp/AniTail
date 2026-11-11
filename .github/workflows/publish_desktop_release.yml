@@ -18,13 +18,13 @@ permissions:
 
 jobs:
   check-version:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
       should_publish: ${{ steps.resolve.outputs.should_publish }}
       release_tag: ${{ steps.resolve.outputs.release_tag }}
       release_version: ${{ steps.resolve.outputs.release_version }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: useblacksmith/checkout@v1
         with:
           fetch-depth: 2
 
@@ -105,35 +105,35 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runs_on: ubuntu-latest
+          - runs_on: blacksmith-4vcpu-ubuntu-2404
             label: Linux DEB
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageReleaseDeb
             java_arch: x64
             ext: deb
             asset_suffix: linux-x64
-          - runs_on: ubuntu-latest
+          - runs_on: blacksmith-4vcpu-ubuntu-2404
             label: Linux RPM
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageReleaseRpm
             java_arch: x64
             ext: rpm
             asset_suffix: linux-x64
-          - runs_on: ubuntu-latest
+          - runs_on: blacksmith-4vcpu-ubuntu-2404
             label: Linux AppImage
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageReleaseAppImage
             java_arch: x64
             ext: AppImage
             asset_suffix: linux-x64
-          - runs_on: macos-latest
+          - runs_on: blacksmith-6vcpu-macos-15
             label: macOS DMG
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageReleaseDmg
             java_arch: aarch64
             ext: dmg
             asset_suffix: macos-arm64
-          - runs_on: windows-latest
+          - runs_on: blacksmith-4vcpu-windows-2025
             label: Windows MSI
             gradle_cmd: ./gradlew.bat
             gradle_task: :desktop:packageReleaseMsi
@@ -328,7 +328,7 @@ jobs:
   publish:
     needs: [check-version, build_desktop]
     if: needs.check-version.outputs.should_publish == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     env:
       TARGET_REPO: Animetailapp/Anitail-Desktop
       RELEASE_TAG: ${{ needs.check-version.outputs.release_tag }}
