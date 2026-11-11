@@ -17,7 +17,7 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
-          java-version: 25
+          java-version: 21
           distribution: "temurin"
           cache: 'gradle'
 
@@ -102,7 +102,7 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
-          java-version: 25
+          java-version: 21
           distribution: "temurin"
           cache: 'gradle'
           architecture: ${{ matrix.java_arch }}
