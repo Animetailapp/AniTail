@@ -158,6 +158,7 @@ import com.anitail.music.utils.LanJamServer
 import com.anitail.music.utils.LastFmService
 import com.anitail.music.utils.NetworkConnectivity
 import com.anitail.music.utils.SyncUtils
+import com.anitail.music.utils.InnerTubeXPlayer
 import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.utils.dataStore
 import com.anitail.music.utils.enumPreference
@@ -2090,12 +2091,16 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
       StreamUrlCache.invalidate(mediaId)
       streamUrlCache.remove(mediaId)
+      if (failedStreamClient != null) {
+          InnerTubeXPlayer.markStreamClientFailed(mediaId, failedStreamClient)
+      }
       if (failedStreamClient == "WEB_REMIX") {
           YTPlayerUtils.markWebRemixFailed(mediaId)
       }
       Timber.tag("MusicService").d("Cleared cached URL for $mediaId after 403/410 error (client=$failedStreamClient)")
 
       scope.launch(Dispatchers.IO) {
+          InnerTubeXPlayer.refreshAfterStreamRejection()
           if (CipherDeobfuscator.onStreamRejected()) {
               Timber.tag("MusicService").d("Player config changed after stream rejection -> restoring WEB_REMIX")
               YTPlayerUtils.clearWebRemixFailures()

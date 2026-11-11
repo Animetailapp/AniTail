@@ -1,6 +1,7 @@
 package com.anitail.desktop.download
 
 import com.anitail.desktop.YouTube
+import com.anitail.desktop.player.DesktopInnerTubeXPlayer
 import com.anitail.innertube.NewPipeExtractor
 import com.anitail.innertube.models.YouTubeClient
 import com.anitail.desktop.player.StreamClientOrder
@@ -256,7 +257,12 @@ class DesktopDownloadService {
         
         // Descargar archivo
         try {
-            httpClient.prepareGet(streamUrl).execute { response ->
+            val streamHeaders = resolvedStream?.headers.orEmpty()
+            httpClient.prepareGet(streamUrl) {
+                streamHeaders.forEach { (key, value) ->
+                    header(key, value)
+                }
+            }.execute { response ->
                 val channel = response.bodyAsChannel()
                 val file = RandomAccessFile(outputFile, "rw")
 
@@ -429,13 +435,47 @@ class DesktopDownloadService {
         val url: String,
         val format: com.anitail.innertube.models.response.PlayerResponse.StreamingData.Format,
         val client: YouTubeClient,
+        val headers: Map<String, String> = emptyMap(),
     )
 
     private suspend fun resolveStreamForDownload(videoId: String): ResolvedStream? {
+        val audioQuality = preferences.audioQuality.value
+
+        // Intento primario con InnerTubeX (Faraday + QuackJS)
+        val innertubexResult = DesktopInnerTubeXPlayer.extractStream(videoId, audioQuality)
+        if (innertubexResult.isSuccess) {
+            val stream = innertubexResult.getOrThrow()
+            val format = com.anitail.innertube.models.response.PlayerResponse.StreamingData.Format(
+                itag = stream.itag,
+                url = stream.audioUrl,
+                mimeType = if (stream.codecs.isNullOrBlank()) stream.mimeType.orEmpty() else "${stream.mimeType.orEmpty()}; codecs=\"${stream.codecs}\"",
+                bitrate = stream.bitrate ?: 0,
+                width = null,
+                height = null,
+                contentLength = stream.contentLengthBytes,
+                quality = "",
+                fps = null,
+                qualityLabel = null,
+                averageBitrate = stream.bitrate,
+                audioQuality = null,
+                approxDurationMs = stream.mediaMetadata?.durationSeconds?.times(1000)?.toString(),
+                audioSampleRate = stream.sampleRate,
+                audioChannels = null,
+                loudnessDb = stream.loudnessDb,
+                lastModified = null,
+                signatureCipher = null,
+            )
+            return ResolvedStream(
+                url = stream.audioUrl,
+                format = format,
+                client = YouTubeClient.WEB_REMIX,
+                headers = stream.headers,
+            )
+        }
+
         val signatureTimestamp = NewPipeExtractor.getSignatureTimestamp(videoId).getOrNull()
         val isLoggedIn = YouTube.cookie != null
         val clientsToTry = StreamClientOrder.build()
-        val audioQuality = preferences.audioQuality.value
 
         for (client in clientsToTry) {
             if (client.loginRequired && !isLoggedIn) continue

@@ -170,12 +170,40 @@ class NativeAudioPlayer {
 
         println("NativeAudioPlayer: Intentando reproducir videoId: $videoId con VLC")
 
+        val audioQuality = preferences.audioQuality.value
+        val normalizationEnabled = preferences.normalizeAudio.value
+
+        // Intento primario con InnerTubeX (Faraday + QuackJS)
+        val innertubexResult = DesktopInnerTubeXPlayer.extractStream(videoId, audioQuality)
+        if (innertubexResult.isSuccess) {
+            val stream = innertubexResult.getOrThrow()
+            val loudnessDb = stream.loudnessDb
+            val normalization = if (normalizationEnabled && loudnessDb != null) {
+                min(10.0.pow(-loudnessDb / 20.0), 1.0)
+            } else {
+                1.0
+            }
+            setNormalizationFactor(normalization)
+
+            val userAgent = stream.headers["User-Agent"]
+            val referer = stream.headers["Referer"]
+            println("NativeAudioPlayer: Iniciando VLC vía InnerTubeX (${stream.clientName}, itag=${stream.itag})")
+            val prepared = preparePlayer(stream.audioUrl, userAgent, referer)
+            if (prepared) {
+                println("NativeAudioPlayer: ¡Reproducción InnerTubeX iniciada con éxito! (${stream.clientName})")
+                return@withContext Result.success(Unit)
+            } else {
+                println("NativeAudioPlayer: VLC falló al cargar stream InnerTubeX (${stream.clientName}); recurriendo a fallback...")
+                DesktopInnerTubeXPlayer.markStreamClientFailed(videoId, stream.clientName)
+            }
+        } else {
+            println("NativeAudioPlayer: InnerTubeX no pudo resolver stream para $videoId: ${innertubexResult.exceptionOrNull()?.message}; recurriendo a fallback...")
+        }
+
         val signatureTimestamp = NewPipeExtractor.getSignatureTimestamp(videoId).getOrNull()
         val isLoggedIn = YouTube.cookie != null
         var lastError: String? = null
         val clientsToTry = StreamClientOrder.build()
-        val audioQuality = preferences.audioQuality.value
-        val normalizationEnabled = preferences.normalizeAudio.value
         val mainResponse = YouTube.player(videoId, null, YouTubeClient.WEB_REMIX, signatureTimestamp).getOrNull()
         val loudnessDb = mainResponse?.playerConfig?.audioConfig?.loudnessDb
         val normalization = if (normalizationEnabled && loudnessDb != null) {

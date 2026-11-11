@@ -274,14 +274,20 @@ object InnerTubeXPlayer {
         val failedAtMs: Long,
     )
 
-    private class AndroidPlayerConfigRepository(context: Context) : PlayerConfigRepository {
+    private class AndroidPlayerConfigRepository(private val context: Context) : PlayerConfigRepository {
         private val preferences = context.getSharedPreferences("innertubex_player_config", Context.MODE_PRIVATE)
 
         override val enabled: Boolean = true
         override val sourceUrl: String = PLAYER_CONFIG_URL
         override val defaultSourceUrl: String = PLAYER_CONFIG_URL
         override var cachedJson: String
-            get() = preferences.getString("json", "").orEmpty()
+            get() {
+                val stored = preferences.getString("json", null)
+                if (!stored.isNullOrEmpty()) return stored
+                return runCatching {
+                    context.assets.open("player_configs.json").bufferedReader().use { it.readText() }
+                }.getOrDefault("")
+            }
             set(value) = preferences.edit().putString("json", value).apply()
         override var cachedAtMs: Long
             get() = preferences.getLong("cached_at_ms", 0L)
@@ -295,7 +301,7 @@ object InnerTubeXPlayer {
 
         private companion object {
             const val PLAYER_CONFIG_URL =
-                "https://raw.githubusercontent.com/ZemerTeam/zemer-cipher/master/library/src/main/assets/player_configs.json"
+                "https://raw.githubusercontent.com/MetrolistGroup/faraday/master/registry/player_configs.json"
         }
     }
 
@@ -303,14 +309,21 @@ object InnerTubeXPlayer {
         override val enabled: Boolean = true
         override val sourceUrl: String = PLAYER_CONFIG_URL
         override val defaultSourceUrl: String = PLAYER_CONFIG_URL
-        override var cachedJson: String = ""
+        override var cachedJson: String =
+            runCatching {
+                InMemoryPlayerConfigRepository::class.java.classLoader
+                    ?.getResourceAsStream("player_configs.json")
+                    ?.bufferedReader()
+                    ?.use { it.readText() }
+                    .orEmpty()
+            }.getOrDefault("")
         override var cachedAtMs: Long = 0L
         override var cachedSourceUrl: String = ""
         override var cachedEtag: String = ""
 
         private companion object {
             const val PLAYER_CONFIG_URL =
-                "https://raw.githubusercontent.com/ZemerTeam/zemer-cipher/master/library/src/main/assets/player_configs.json"
+                "https://raw.githubusercontent.com/MetrolistGroup/faraday/master/registry/player_configs.json"
         }
     }
 
