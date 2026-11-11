@@ -132,7 +132,7 @@ class NativeAudioPlayer {
                 }
             }
 
-            override fun buffering(player: MediaPlayer?, newCache: Float) {
+            override fun bufferingChanged(player: MediaPlayer?, newCache: Float) {
                 SwingUtilities.invokeLater {
                     if (newCache < 100.0f) {
                         onBuffering?.invoke(true)
@@ -151,7 +151,7 @@ class NativeAudioPlayer {
                 }
             }
             
-            override fun timeChanged(player: MediaPlayer?, newTime: Long) {
+            override fun positionChanged(player: MediaPlayer?, newTime: Long, newPosition: Double) {
                  SwingUtilities.invokeLater {
                      onTimeChanged?.invoke(newTime, player?.status()?.length() ?: 0L)
                  }
