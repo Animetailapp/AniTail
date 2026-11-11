@@ -56,6 +56,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -1228,9 +1229,15 @@ fun BottomSheetPlayer(
                 }
 
                 SliderStyle.SLIM -> {
+                    val range = 0f..(if (duration == C.TIME_UNSET || duration <= 0L) 1f else duration.toFloat())
+                    val currentValue = (sliderPosition ?: position).toFloat().coerceIn(range.start, range.endInclusive)
+                    val sliderState = rememberSliderState(
+                        value = currentValue,
+                        trackRange = range,
+                    )
+                    sliderState.value = currentValue
                     Slider(
-                        value = (sliderPosition ?: position).toFloat(),
-                        valueRange = 0f..(if (duration == C.TIME_UNSET || duration <= 0L) 1f else duration.toFloat()),
+                        state = sliderState,
                         onValueChange = {
                             sliderPosition = it.toLong()
                         },
