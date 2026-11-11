@@ -392,19 +392,21 @@ object DiscordRpcManager {
         }
     }
 
-    fun destroy() = synchronized(this) {
-        if (!initialized.get()) {
-            Timber.i("destroy: skipping — not initialized")
-            return
+    fun destroy() {
+        synchronized(this) {
+            if (!initialized.get()) {
+                Timber.i("destroy: skipping — not initialized")
+                return
+            }
+            Timber.i("destroy: entering (_ready=%s, _authorized=%s, initialized=%s)", _ready, _authorized, initialized)
+            _ready = false
+            _authorized = false
+            initialized.set(false)
+            callbackJob?.cancel()
+            callbackJob = null
+            nativeDestroy()
+            Timber.i("destroy: complete")
         }
-        Timber.i("destroy: entering (_ready=%s, _authorized=%s, initialized=%s)", _ready, _authorized, initialized)
-        _ready = false
-        _authorized = false
-        initialized.set(false)
-        callbackJob?.cancel()
-        callbackJob = null
-        nativeDestroy()
-        Timber.i("destroy: complete")
     }
 
     fun disconnect() {
