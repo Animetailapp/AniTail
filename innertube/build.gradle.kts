@@ -1,4 +1,5 @@
 plugins {
+    `java-library`
     alias(libs.plugins.kotlin.serialization)
     kotlin("jvm")
 }
@@ -8,6 +9,7 @@ kotlin {
 }
 
 dependencies {
+    api(libs.innertubex)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
