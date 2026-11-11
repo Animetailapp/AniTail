@@ -100,6 +100,7 @@ import com.anitail.desktop.ui.loadBitmapResource
 import com.anitail.desktop.ui.component.BottomSheet
 import com.anitail.desktop.ui.component.DesktopTopBar
 import com.anitail.desktop.ui.component.MiniPlayer
+import com.anitail.desktop.ui.component.SongRecognitionDialog
 import com.anitail.desktop.ui.component.rememberBottomSheetState
 import com.anitail.desktop.ui.screen.AlbumDetailScreen
 import com.anitail.desktop.ui.screen.ArtistDetailScreen
@@ -117,7 +118,11 @@ import com.anitail.desktop.ui.screen.PlaylistDetailScreen
 import com.anitail.desktop.ui.screen.SearchScreen
 import com.anitail.desktop.ui.screen.SettingsScreen
 import com.anitail.desktop.ui.screen.StatsScreen
+import com.anitail.desktop.ui.screen.songItemToLibraryItem
 import com.anitail.desktop.util.DesktopDiscordRPC
+import com.anitail.desktop.home.HomeDiscoveryService
+import com.anitail.desktop.model.CommunityPlaylistItem
+import com.anitail.desktop.model.DailyDiscoverItem
 import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
@@ -378,6 +383,7 @@ private data class DetailNavigation(
     val playlistName: String? = null,
     val browseId: String? = null,
     val browseParams: String? = null,
+    val searchQuery: String? = null,
 )
 
 fun main(args: Array<String>) {
@@ -747,6 +753,18 @@ private fun FrameWindowScope.AniTailDesktopApp(
     var forgottenFavorites by remember { mutableStateOf<List<LibraryItem>>(emptyList()) }
     var accountPlaylists by remember { mutableStateOf<List<PlaylistItem>>(emptyList()) }
     var similarRecommendations by remember { mutableStateOf<List<SimilarRecommendation>>(emptyList()) }
+    var dailyDiscover by remember { mutableStateOf<List<DailyDiscoverItem>>(emptyList()) }
+    var communityPlaylists by remember { mutableStateOf<List<CommunityPlaylistItem>>(emptyList()) }
+    val speedDialItems = remember(quickPicks, keepListening, homePage, similarRecommendations, dailyDiscover, communityPlaylists) {
+        HomeDiscoveryService.buildSpeedDialItems(
+            quickPicks = quickPicks,
+            keepListening = keepListening,
+            homePage = homePage,
+            similarRecommendations = similarRecommendations,
+            dailyDiscover = dailyDiscover,
+            communityPlaylists = communityPlaylists,
+        )
+    }
     var detailNavigation by remember { mutableStateOf(DetailNavigation()) }
     val navigationHistory = remember { mutableStateListOf<DesktopScreen>() }
 
@@ -1185,6 +1203,18 @@ private fun FrameWindowScope.AniTailDesktopApp(
         }
     }
 
+    LaunchedEffect(allSongs.size, hideExplicit) {
+        delay(1000)
+        scope.launch(Dispatchers.IO) {
+            val discover = HomeDiscoveryService.loadDailyDiscover(database, hideExplicit)
+            val community = HomeDiscoveryService.loadCommunityPlaylists(database)
+            withContext(Dispatchers.Main) {
+                dailyDiscover = discover
+                communityPlaylists = community
+            }
+        }
+    }
+
     val allYtItems = remember(homePage, accountPlaylists, similarRecommendations) {
         buildAllYtItems(
             homePage = homePage,
@@ -1228,6 +1258,15 @@ private fun FrameWindowScope.AniTailDesktopApp(
             albumName = albumName,
         )
         currentScreen = DesktopScreen.AlbumDetail
+    }
+
+    val openPlaylist: (String, String?) -> Unit = { playlistId, playlistName ->
+        navigationHistory.add(DesktopScreen.Home)
+        detailNavigation = detailNavigation.copy(
+            playlistId = playlistId,
+            playlistName = playlistName,
+        )
+        currentScreen = DesktopScreen.PlaylistDetail
     }
 
     val baseDensity = LocalDensity.current
@@ -1422,12 +1461,15 @@ private fun FrameWindowScope.AniTailDesktopApp(
                 }
             }
 
+            var showSongRecognitionDialog by remember { mutableStateOf(false) }
+
             Box(modifier = Modifier.fillMaxSize()) {
                 Scaffold(
                     topBar = {
                         DesktopTopBar(
                             onSearch = {
                                 navigationHistory.add(currentScreen)
+                                detailNavigation = detailNavigation.copy(searchQuery = null)
                                 currentScreen = DesktopScreen.Search
                             },
                             onHistory = {
@@ -1484,6 +1526,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             },
                             onWindowClose = onCloseRequest,
                             onRefreshHome = if (currentScreen == DesktopScreen.Home) refreshHome else null,
+                            onSongRecognition = { showSongRecognitionDialog = true },
                             showUpdateBadge = showUpdateBadge,
                         )
                     },
@@ -1516,6 +1559,10 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             accountPlaylists = accountPlaylists,
                             similarRecommendations = similarRecommendations,
                             playerState = playerState,
+                            dailyDiscover = dailyDiscover,
+                            communityPlaylists = communityPlaylists,
+                            speedDialItems = speedDialItems,
+                            explorePage = explorePage,
                             accountName = when (preferredAvatarSource) {
                                 AvatarSourcePreference.YOUTUBE -> accountInfo?.name ?: authCredentials?.accountName
                                 AvatarSourcePreference.DISCORD -> discordUsername
@@ -1569,6 +1616,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             onRefresh = refreshHome,
                             onOpenArtist = openArtist,
                             onOpenAlbum = openAlbum,
+                            onOpenPlaylist = openPlaylist,
                             onNavigate = { route ->
                                 when (route) {
                                     "account" -> currentScreen = DesktopScreen.Library
@@ -2147,6 +2195,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     SearchScreen(
                         database = database,
                         playerState = playerState,
+                        initialQuery = detailNavigation.searchQuery,
                         onBack = {
                             currentScreen = navigationHistory.removeLastOrNull() ?: DesktopScreen.Home
                         },
@@ -2284,6 +2333,28 @@ private fun FrameWindowScope.AniTailDesktopApp(
                         colors = NavigationBarItemDefaults.colors(),
                     )
                 }
+
+                SongRecognitionDialog(
+                    visible = showSongRecognitionDialog,
+                    onDismiss = { showSongRecognitionDialog = false },
+                    onPlayTrack = { title, artist ->
+                        val searchQuery = if (artist.isNotBlank()) "$title $artist" else title
+                        navigationHistory.add(currentScreen)
+                        detailNavigation = detailNavigation.copy(searchQuery = searchQuery)
+                        currentScreen = DesktopScreen.Search
+                        scope.launch {
+                            YouTube.searchSummary(searchQuery).onSuccess { summary ->
+                                val firstSong = summary.summaries.firstOrNull { it.title.contains("cancion", ignoreCase = true) || it.title.contains("song", ignoreCase = true) }
+                                    ?.items?.filterIsInstance<SongItem>()?.firstOrNull()
+                                    ?: summary.summaries.flatMap { it.items }.filterIsInstance<SongItem>().firstOrNull()
+                                if (firstSong != null) {
+                                    playerState.play(songItemToLibraryItem(firstSong))
+                                    playerBottomSheetState.collapseSoft()
+                                }
+                            }
+                        }
+                    }
+                )
             }
         }
         }
@@ -2364,10 +2435,16 @@ private suspend fun loadExplorePage(
 ) {
     onLoading(true)
     YouTube.explore().onSuccess { page ->
+        println("Main: ExplorePage cargado con éxito (${page.newReleaseAlbums.size} álbumes, ${page.moodAndGenres.size} estados de ánimo/géneros)")
         onExplore(page)
+    }.onFailure {
+        println("Main: Falló la carga de ExplorePage: ${it.message}")
     }
     YouTube.getChartsPage().onSuccess { page ->
+        println("Main: ChartsPage cargado con éxito (${page.sections.size} secciones)")
         onCharts(page)
+    }.onFailure {
+        println("Main: Falló la carga de ChartsPage: ${it.message}")
     }
     onLoading(false)
 }

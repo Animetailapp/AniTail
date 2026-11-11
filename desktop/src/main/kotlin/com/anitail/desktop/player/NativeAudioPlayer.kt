@@ -81,6 +81,9 @@ class NativeAudioPlayer {
     private var normalizationFactor: Double = 1.0
     private var playbackRate: Float = 1.0f
 
+    private var _audioEqualizer: AudioEqualizer? = null
+    val audioEqualizer: AudioEqualizer? get() = _audioEqualizer
+
     // Callbacks de estado
     var onStatusChanged: ((PlaybackStatus) -> Unit)? = null
     var onTimeChanged: ((currentMs: Long, totalMs: Long) -> Unit)? = null
@@ -94,6 +97,7 @@ class NativeAudioPlayer {
             try {
                 factory = MediaPlayerFactory()
                 mediaPlayer = factory?.mediaPlayers()?.newMediaPlayer()
+                _audioEqualizer = AudioEqualizer(factory)
                 setupVlcEvents()
             } catch (e: Exception) {
                 println("NativeAudioPlayer: Error al inicializar VLC Factory: ${e.message}")
@@ -103,6 +107,11 @@ class NativeAudioPlayer {
             println("NativeAudioPlayer: CRITICAL - No se encontró VLC nativo en el sistema.")
             // Aquí podríamos fallar o notificar, pero dejaremos que los métodos fallen controladamente
         }
+    }
+
+    fun applyEqualizer() {
+        val eq = _audioEqualizer?.getEqualizerForPlayer()
+        mediaPlayer?.audio()?.setEqualizer(eq)
     }
 
     private fun setupVlcEvents() {
@@ -193,17 +202,19 @@ class NativeAudioPlayer {
             val currentTimestamp = if (client.clientName.contains("TVHTML5")) null else signatureTimestamp
 
             try {
-                val playerResponse = if (client == YouTubeClient.WEB_REMIX && mainResponse != null) {
-                    mainResponse
+                val playerResult = if (client == YouTubeClient.WEB_REMIX && mainResponse != null) {
+                    Result.success(mainResponse)
                 } else {
-                    YouTube.player(videoId, null, client, currentTimestamp).getOrNull()
+                    YouTube.player(videoId, null, client, currentTimestamp)
                 }
+                val playerResponse = playerResult.getOrNull()
                 val status = playerResponse?.playabilityStatus?.status
                 val hasFormats = playerResponse?.streamingData?.adaptiveFormats?.isNotEmpty() == true
+                println("NativeAudioPlayer: [${client.clientName}] isSuccess=${playerResult.isSuccess}, status=$status, reason=${playerResponse?.playabilityStatus?.reason}, error=${playerResult.exceptionOrNull()?.message}")
 
-                if (status == "OK" || hasFormats) {
+                if (playerResponse != null && (status == "OK" || hasFormats)) {
                     println("NativeAudioPlayer: Formatos encontrados para cliente ${client.clientName}")
-                    val rawFormats = playerResponse?.streamingData?.adaptiveFormats
+                    val rawFormats = playerResponse.streamingData?.adaptiveFormats
                         ?.filter { it.isAudio } ?: emptyList()
                     val formats = orderFormatsByQuality(rawFormats, audioQuality)
 
@@ -242,16 +253,38 @@ class NativeAudioPlayer {
                 candidate.client.clientName.contains("WEB") -> "https://www.youtube.com/"
                 else -> ""
             }
+            val proxyUrl = PlaybackProxy.createProxyUrl(candidate.url, candidate.client.userAgent, referer.takeIf { it.isNotBlank() })
             println(
                 "NativeAudioPlayer: Iniciando VLC con formato ${candidate.format.mimeType} " +
-                    "(${candidate.format.bitrate}) del cliente ${candidate.client.clientName}"
+                    "(${candidate.format.bitrate}) del cliente ${candidate.client.clientName} vía Proxy"
             )
-            val prepared = preparePlayer(candidate.url, candidate.client.userAgent, referer)
+            var prepared = preparePlayer(proxyUrl, candidate.client.userAgent, referer)
+            if (!prepared) {
+                println("NativeAudioPlayer: Proxy falló, intentando directo con formato ${candidate.format.mimeType} (${candidate.client.clientName})")
+                prepared = preparePlayer(candidate.url, candidate.client.userAgent, referer)
+            }
             if (prepared) {
                 println("NativeAudioPlayer: ¡Reproducción iniciada con éxito! (Cliente: ${candidate.client.clientName})")
                 return@withContext Result.success(Unit)
             } else {
                 println("NativeAudioPlayer: VLC falló al cargar stream del cliente ${candidate.client.clientName}")
+            }
+        }
+
+        if (candidates.isEmpty()) {
+            println("NativeAudioPlayer: Intentando extracción directa mediante NewPipeExtractor...")
+            val newPipeStreams = runCatching { NewPipeExtractor.newPipePlayer(videoId) }.getOrDefault(emptyList())
+            for ((itag, streamUrl) in newPipeStreams) {
+                println("NativeAudioPlayer: NewPipe extractor stream disponible (itag=$itag)")
+                val proxyUrl = PlaybackProxy.createProxyUrl(streamUrl, null, "https://www.youtube.com/")
+                var prepared = preparePlayer(proxyUrl, null, "https://www.youtube.com/")
+                if (!prepared) {
+                    prepared = preparePlayer(streamUrl, null, null)
+                }
+                if (prepared) {
+                    println("NativeAudioPlayer: ¡Reproducción iniciada con éxito vía NewPipe!")
+                    return@withContext Result.success(Unit)
+                }
             }
         }
 

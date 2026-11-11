@@ -140,5 +140,6 @@ internal suspend fun collectPlaylistSongs(
 
 internal fun parseSongCountText(text: String?): Int? {
     if (text.isNullOrBlank()) return null
-    return Regex("""\d+""").find(text)?.value?.toIntOrNull()
+    val digits = text.filter { it.isDigit() }
+    return digits.toIntOrNull()
 }

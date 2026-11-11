@@ -84,6 +84,7 @@ fun DesktopTopBar(
     onWindowClose: () -> Unit,
     showUpdateBadge: Boolean = false,
     onRefreshHome: (() -> Unit)? = null,
+    onSongRecognition: (() -> Unit)? = null,
 ) {
     val logoBitmap = remember { loadBitmapResource("drawable/ic_anitail.png") }
     var rightSideWidthPx by remember { mutableStateOf(0) }
@@ -106,9 +107,7 @@ fun DesktopTopBar(
             isMaximized = isMaximized,
             onRestoreFromSnap = onRestoreFromSnap,
             onSnapFromDragEnd = onSnapFromDragEnd,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
+            modifier = Modifier.weight(1f),
         ) {
             TitleContent(
                 logoBitmap = logoBitmap,
@@ -119,6 +118,7 @@ fun DesktopTopBar(
                 chipOffsetXPx = rightSideWidthPx / 2,
             )
         }
+
         Row(
             modifier = Modifier.onGloballyPositioned { rightSideWidthPx = it.size.width },
             verticalAlignment = Alignment.CenterVertically,
@@ -128,6 +128,7 @@ fun DesktopTopBar(
                 onHistory = onHistory,
                 onStats = onStats,
                 onSearch = onSearch,
+                onSongRecognition = onSongRecognition,
                 onSettings = onSettings,
                 showUpdateBadge = showUpdateBadge,
                 colors = actionColors,
@@ -250,6 +251,7 @@ private fun ActionButtons(
     onHistory: () -> Unit,
     onStats: () -> Unit,
     onSearch: () -> Unit,
+    onSongRecognition: (() -> Unit)?,
     onSettings: () -> Unit,
     showUpdateBadge: Boolean,
     colors: IconButtonColors,
@@ -263,6 +265,11 @@ private fun ActionButtons(
         if (onRefreshHome != null) {
             IconButton(onClick = onRefreshHome, colors = colors) {
                 Icon(IconAssets.cached(), contentDescription = refreshLabel)
+            }
+        }
+        if (onSongRecognition != null) {
+            IconButton(onClick = onSongRecognition, colors = colors) {
+                Icon(IconAssets.equalizer(), contentDescription = "Identificar canción")
             }
         }
         IconButton(onClick = onHistory, colors = colors) {
