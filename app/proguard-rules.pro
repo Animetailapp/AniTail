@@ -90,6 +90,17 @@
 -dontwarn java.beans.Introspector
 -dontwarn java.beans.PropertyDescriptor
 
+# Keep all classes within the kuromoji package to load binary dictionaries (doubleArrayTrie.bin, etc.)
+-keep class com.atilika.kuromoji.** { *; }
+-keepclassmembers class com.atilika.kuromoji.** {
+    *;
+}
+-dontwarn com.atilika.kuromoji.**
+
+# Keep tinypinyin package
+-keep class com.github.promeg.pinyinhelper.** { *; }
+-dontwarn com.github.promeg.pinyinhelper.**
+
 
 
 ## Queue Persistence Rules
