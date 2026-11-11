@@ -8,7 +8,7 @@ pluginManagement {
         maven { setUrl("https://maven.pkg.jetbrains.space/public/p/compose/dev") }
     }
     plugins {
-        id("org.jetbrains.compose") version "1.13.0-rc01+snapshot.release-1-13"
+        id("org.jetbrains.compose") version "1.13.10-alpha01+snapshot.v-mazunin-webpack-compilation-error-gradle-plugin-tests"
         id("org.jetbrains.kotlin.plugin.compose") version "2.5.0-Beta2"
     }
 }
