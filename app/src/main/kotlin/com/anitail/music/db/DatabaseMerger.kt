@@ -13,6 +13,15 @@ class DatabaseMerger @Inject constructor(
 ) {
     companion object {
         private const val REMOTE_SCHEMA_PREFIX = "remote_db_"
+        private const val TEMP_LOCAL_ARTIST_NAMES = "_temp_local_artist_names"
+        private const val TEMP_REMOTE_LA_BOOKMARKS = "_temp_remote_la_bookmarks"
+        private const val ARTIST_NOT_PRESENT_LOCALLY = """
+            remoteArtist.id NOT IN (SELECT id FROM main.artist)
+            AND (
+                remoteArtist.id NOT LIKE 'LA%'
+                OR LOWER(TRIM(remoteArtist.name)) NOT IN (SELECT norm FROM _temp_local_artist_names)
+            )
+        """
     }
 
     /**
@@ -54,6 +63,12 @@ class DatabaseMerger @Inject constructor(
             }
 
             try {
+                // Build indexed lookup tables for normalized artist names. The previous
+                // correlated `LOWER(TRIM(name)) = LOWER(TRIM(name))` comparisons cannot use any
+                // index and scaled as local × remote artists, holding the write lock for a long
+                // time and freezing every other DB access in the app.
+                runMergeStep("prepare_lookups") { prepareLookupTables(db, remoteSchema) }
+
                 // 1. Merge Songs (Favorited status mainly)
                 runMergeStep("favorites") { mergeFavorites(db, remoteSchema) }
 
@@ -86,6 +101,8 @@ class DatabaseMerger @Inject constructor(
             } finally {
                 // DETACH inside the transaction before ending it,
                 // so the connection goes back to the pool clean.
+                runCatching { dropLookupTables(db) }
+                    .onFailure { Timber.w(it, "Failed to drop merge lookup tables") }
                 runCatching {
                     if (isDatabaseAttached(db, remoteSchema)) {
                         db.compileStatement("DETACH DATABASE $remoteSchema").execute()
@@ -252,10 +269,7 @@ class DatabaseMerger @Inject constructor(
             table = "song",
             remoteSchema = remoteSchema,
             sourceAlias = "s",
-            whereClause = """
-                s.id IN (SELECT DISTINCT songId FROM $remoteEventTable)
-                AND s.id NOT IN (SELECT id FROM main.song)
-            """.trimIndent()
+            whereClause = "s.id IN (SELECT DISTINCT songId FROM $remoteEventTable)"
         )
 
         // Ensure artist entities and song-artist mappings exist for merged history songs.
@@ -302,7 +316,9 @@ class DatabaseMerger @Inject constructor(
         // This handles cases where database state was already bad or merge introduced issues.
         val cleanupOrphansQuery = """
              DELETE FROM event 
-             WHERE songId NOT IN (SELECT id FROM song)
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM main.song WHERE main.song.id = main.event.songId
+             )
          """
         db.execSQL(cleanupOrphansQuery)
     }
@@ -318,18 +334,9 @@ class DatabaseMerger @Inject constructor(
             table = "artist",
             remoteSchema = remoteSchema,
             sourceAlias = "remoteArtist",
-            whereClause = """
-                NOT EXISTS (
-                    SELECT 1
-                    FROM main.artist localArtist
-                    WHERE localArtist.id = remoteArtist.id
-                       OR (
-                            remoteArtist.id LIKE 'LA%'
-                            AND LOWER(TRIM(localArtist.name)) = LOWER(TRIM(remoteArtist.name))
-                       )
-                )
-            """.trimIndent()
+            whereClause = ARTIST_NOT_PRESENT_LOCALLY
         )
+        refreshLocalArtistNames(db)
 
         if (!hasColumn(db, remoteSchema, "artist", "bookmarkedAt")) {
             return
@@ -342,17 +349,13 @@ class DatabaseMerger @Inject constructor(
                 (
                     SELECT remoteArtist.bookmarkedAt
                     FROM $remoteArtistTable remoteArtist
-                    WHERE remoteArtist.bookmarkedAt IS NOT NULL
-                      AND remoteArtist.id = artist.id
-                    LIMIT 1
+                    WHERE remoteArtist.id = artist.id
+                      AND remoteArtist.bookmarkedAt IS NOT NULL
                 ),
                 (
-                    SELECT remoteArtist.bookmarkedAt
-                    FROM $remoteArtistTable remoteArtist
-                    WHERE remoteArtist.bookmarkedAt IS NOT NULL
-                      AND remoteArtist.id LIKE 'LA%'
-                      AND LOWER(TRIM(remoteArtist.name)) = LOWER(TRIM(artist.name))
-                    LIMIT 1
+                    SELECT rb.bookmarkedAt
+                    FROM $TEMP_REMOTE_LA_BOOKMARKS rb
+                    WHERE rb.norm = LOWER(TRIM(artist.name))
                 )
             )
             WHERE bookmarkedAt IS NULL
@@ -360,15 +363,13 @@ class DatabaseMerger @Inject constructor(
                     EXISTS (
                         SELECT 1
                         FROM $remoteArtistTable remoteArtist
-                        WHERE remoteArtist.bookmarkedAt IS NOT NULL
-                          AND remoteArtist.id = artist.id
+                        WHERE remoteArtist.id = artist.id
+                          AND remoteArtist.bookmarkedAt IS NOT NULL
                     )
                     OR EXISTS (
                         SELECT 1
-                        FROM $remoteArtistTable remoteArtist
-                        WHERE remoteArtist.bookmarkedAt IS NOT NULL
-                          AND remoteArtist.id LIKE 'LA%'
-                          AND LOWER(TRIM(remoteArtist.name)) = LOWER(TRIM(artist.name))
+                        FROM $TEMP_REMOTE_LA_BOOKMARKS rb
+                        WHERE rb.norm = LOWER(TRIM(artist.name))
                     )
               )
         """.trimIndent()
@@ -436,7 +437,7 @@ class DatabaseMerger @Inject constructor(
         val remoteSongTable = "$remoteSchema.song"
         val remoteArtistTable = "$remoteSchema.artist"
         // Insert missing artists referenced by matching songs.
-        // For generated IDs (LA*), dedupe by normalized artist name.
+        // For generated IDs (LA*), dedupe by normalized artist name using indexed temp table.
         insertOrIgnoreBySharedColumns(
             db = db,
             table = "artist",
@@ -449,17 +450,10 @@ class DatabaseMerger @Inject constructor(
                     JOIN $remoteSongTable remoteSong ON remoteSong.id = remoteMap.songId
                     WHERE $remoteSongWhereClause
                 )
-                AND NOT EXISTS (
-                    SELECT 1
-                    FROM main.artist localArtist
-                    WHERE localArtist.id = remoteArtist.id
-                       OR (
-                            remoteArtist.id LIKE 'LA%'
-                            AND LOWER(TRIM(localArtist.name)) = LOWER(TRIM(remoteArtist.name))
-                       )
-                )
+                AND $ARTIST_NOT_PRESENT_LOCALLY
             """.trimIndent()
         )
+        refreshLocalArtistNames(db)
 
         val mergeSongArtistMapsQuery = """
             INSERT OR IGNORE INTO main.song_artist_map (songId, artistId, position)
@@ -468,29 +462,14 @@ class DatabaseMerger @Inject constructor(
                 CASE
                     WHEN remoteArtist.id LIKE 'LA%' THEN COALESCE(
                         (
-                            SELECT localByName.id
-                            FROM main.artist localByName
-                            WHERE LOWER(TRIM(localByName.name)) = LOWER(TRIM(remoteArtist.name))
-                            ORDER BY localByName.rowid
-                            LIMIT 1
-                        ),
-                        (
-                            SELECT localById.id
-                            FROM main.artist localById
-                            WHERE localById.id = remoteMap.artistId
+                            SELECT t.id
+                            FROM $TEMP_LOCAL_ARTIST_NAMES t
+                            WHERE t.norm = LOWER(TRIM(remoteArtist.name))
                             LIMIT 1
                         ),
                         remoteMap.artistId
                     )
-                    ELSE COALESCE(
-                        (
-                            SELECT localById.id
-                            FROM main.artist localById
-                            WHERE localById.id = remoteMap.artistId
-                            LIMIT 1
-                        ),
-                        remoteMap.artistId
-                    )
+                    ELSE remoteMap.artistId
                 END AS resolvedArtistId,
                 remoteMap.position
             FROM $remoteSongArtistMapTable remoteMap
@@ -502,14 +481,17 @@ class DatabaseMerger @Inject constructor(
                     FROM main.song localSong
                     WHERE localSong.id = remoteMap.songId
               )
-              AND EXISTS (
-                    SELECT 1
-                    FROM main.artist localArtist
-                    WHERE localArtist.id = remoteMap.artistId
-                       OR (
-                            remoteArtist.id LIKE 'LA%'
-                            AND LOWER(TRIM(localArtist.name)) = LOWER(TRIM(remoteArtist.name))
-                       )
+              AND (
+                    EXISTS (
+                        SELECT 1
+                        FROM main.artist localArtist
+                        WHERE localArtist.id = remoteMap.artistId
+                    )
+                    OR EXISTS (
+                        SELECT 1
+                        FROM $TEMP_LOCAL_ARTIST_NAMES t
+                        WHERE t.norm = LOWER(TRIM(remoteArtist.name))
+                    )
               )
         """.trimIndent()
         db.execSQL(mergeSongArtistMapsQuery)
@@ -597,6 +579,50 @@ class DatabaseMerger @Inject constructor(
         }
         columnCache[cacheKey] = columns
         return columns
+    }
+
+    private fun prepareLookupTables(db: SupportSQLiteDatabase, remoteSchema: String) {
+        db.execSQL("CREATE TEMP TABLE IF NOT EXISTS $TEMP_LOCAL_ARTIST_NAMES (id TEXT PRIMARY KEY, norm TEXT)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_${TEMP_LOCAL_ARTIST_NAMES}_norm ON $TEMP_LOCAL_ARTIST_NAMES(norm)")
+        db.execSQL("DELETE FROM $TEMP_LOCAL_ARTIST_NAMES")
+        db.execSQL(
+            """
+            INSERT OR IGNORE INTO $TEMP_LOCAL_ARTIST_NAMES (id, norm)
+            SELECT id, LOWER(TRIM(name))
+            FROM main.artist
+            WHERE name IS NOT NULL
+            """.trimIndent()
+        )
+
+        db.execSQL("CREATE TEMP TABLE IF NOT EXISTS $TEMP_REMOTE_LA_BOOKMARKS (norm TEXT PRIMARY KEY, bookmarkedAt TEXT)")
+        db.execSQL("DELETE FROM $TEMP_REMOTE_LA_BOOKMARKS")
+        if (hasTable(db, remoteSchema, "artist") && hasColumn(db, remoteSchema, "artist", "bookmarkedAt")) {
+            db.execSQL(
+                """
+                INSERT OR IGNORE INTO $TEMP_REMOTE_LA_BOOKMARKS (norm, bookmarkedAt)
+                SELECT LOWER(TRIM(name)), bookmarkedAt
+                FROM $remoteSchema.artist
+                WHERE id LIKE 'LA%' AND bookmarkedAt IS NOT NULL AND name IS NOT NULL
+                """.trimIndent()
+            )
+        }
+    }
+
+    private fun refreshLocalArtistNames(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            INSERT OR IGNORE INTO $TEMP_LOCAL_ARTIST_NAMES (id, norm)
+            SELECT id, LOWER(TRIM(name))
+            FROM main.artist
+            WHERE name IS NOT NULL
+              AND id NOT IN (SELECT id FROM $TEMP_LOCAL_ARTIST_NAMES)
+            """.trimIndent()
+        )
+    }
+
+    private fun dropLookupTables(db: SupportSQLiteDatabase) {
+        db.execSQL("DROP TABLE IF EXISTS $TEMP_LOCAL_ARTIST_NAMES")
+        db.execSQL("DROP TABLE IF EXISTS $TEMP_REMOTE_LA_BOOKMARKS")
     }
 
     private fun buildRemoteSchemaName(): String {

@@ -5,6 +5,8 @@ package com.anitail.music.utils
 import android.content.Context
 import android.content.Intent
 import androidx.activity.result.ActivityResult
+import androidx.datastore.preferences.core.edit
+import com.anitail.music.constants.GoogleDriveFolderIdKey
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
@@ -21,9 +23,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
@@ -41,7 +45,23 @@ class GoogleDriveSyncManager @Inject constructor(
     private val _signedInAccount = MutableStateFlow<GoogleSignInAccount?>(null)
     val signedInAccount: StateFlow<GoogleSignInAccount?> = _signedInAccount.asStateFlow()
 
-    private var driveService: Drive? = null
+    @Volatile
+    private var driveServiceInstance: Drive? = null
+
+    /**
+     * Drive client, built lazily on first use (always from IO callers) instead of in the
+     * constructor, which may run on the main thread when the singleton is first injected.
+     */
+    private var driveService: Drive?
+        get() = driveServiceInstance ?: synchronized(this) {
+            driveServiceInstance ?: _signedInAccount.value?.let { account ->
+                initializeDriveService(account)
+                driveServiceInstance
+            }
+        }
+        set(value) {
+            driveServiceInstance = value
+        }
 
     /** Cached folder ID to avoid repeated Drive API lookups within a session. */
     @Volatile
@@ -62,7 +82,7 @@ class GoogleDriveSyncManager @Inject constructor(
         if (account != null) {
             Timber.d("Found existing Google account: ${account.email}")
             _signedInAccount.value = account
-            initializeDriveService(account)
+            // Drive client is created lazily on first use (see driveService getter).
         }
     }
 
@@ -70,11 +90,13 @@ class GoogleDriveSyncManager @Inject constructor(
      * Try to restore session silently. Call this on app startup from a coroutine.
      */
     suspend fun trySilentSignIn(): Boolean = withContext(Dispatchers.IO) {
+        if (GoogleSignIn.getLastSignedInAccount(context) == null) {
+            return@withContext false
+        }
         try {
             val account = googleSignInClient.silentSignIn().await()
             Timber.d("Silent sign-in successful: ${account.email}")
             _signedInAccount.value = account
-            initializeDriveService(account)
             true
         } catch (e: Exception) {
             Timber.d("Silent sign-in failed or no previous session: ${e.message}")
@@ -90,7 +112,6 @@ class GoogleDriveSyncManager @Inject constructor(
                 val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
                 val account = task.await()
                 _signedInAccount.value = account
-                initializeDriveService(account)
                 true
             } catch (e: Exception) {
                 Timber.e(e, "Google Sign-In failed")
@@ -106,6 +127,7 @@ class GoogleDriveSyncManager @Inject constructor(
                 _signedInAccount.value = null
                 driveService = null
                 cachedFolderId = null
+                context.dataStore.edit { it.remove(GoogleDriveFolderIdKey) }
             } catch (e: Exception) {
                 Timber.e(e, "Sign out failed")
             }
@@ -118,7 +140,7 @@ class GoogleDriveSyncManager @Inject constructor(
         )
         credential.selectedAccount = account.account
 
-        driveService = Drive.Builder(
+        driveServiceInstance = Drive.Builder(
             NetHttpTransport(),
             GsonFactory.getDefaultInstance(),
             credential
@@ -259,7 +281,57 @@ class GoogleDriveSyncManager @Inject constructor(
             }
         }
 
-    suspend fun getLatestBackupMetadata(): Result<DriveBackupMetadata?> =
+    /**
+     * Uploads [backupFile] replacing any existing file with [remoteName] and returns the
+     * resulting remote metadata directly, avoiding an extra list query after upload.
+     * When [existingFileId] is known, the lookup query inside the folder is completely bypassed.
+     */
+    suspend fun uploadBackupReplacingByNameWithMetadata(
+        backupFile: File,
+        remoteName: String = backupFile.name,
+        existingFileId: String? = null,
+    ): Result<DriveBackupMetadata> = withContext(Dispatchers.IO) {
+        val service = driveService ?: return@withContext Result.failure(Exception("Not signed in"))
+
+        try {
+            val folderId = getOrCreateBackupFolder()
+            val mediaContent = FileContent("application/octet-stream", backupFile)
+            val fileIdToUpdate = existingFileId ?: findFileIdInFolder(folderId, remoteName)
+            val fields = "id, name, modifiedTime, createdTime, md5Checksum"
+
+            val file = if (fileIdToUpdate != null) {
+                service.files().update(fileIdToUpdate, null, mediaContent)
+                    .setFields(fields)
+                    .execute()
+            } else {
+                val fileMetadata = com.google.api.services.drive.model.File().apply {
+                    name = remoteName
+                    parents = listOf(folderId)
+                }
+                service.files().create(fileMetadata, mediaContent)
+                    .setFields(fields)
+                    .execute()
+            }
+
+            Result.success(
+                DriveBackupMetadata(
+                    id = file.id,
+                    name = file.name,
+                    modifiedTime = file.modifiedTime?.value ?: file.createdTime?.value ?: 0L,
+                    md5 = file.md5Checksum,
+                )
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to upload backup with metadata")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * @param exactName when provided, only a file with exactly this name is considered.
+     * Otherwise the newest AniTail/legacy backup in the folder is returned.
+     */
+    suspend fun getLatestBackupMetadata(exactName: String? = null): Result<DriveBackupMetadata?> =
         withContext(Dispatchers.IO) {
             val service =
                 driveService ?: return@withContext Result.failure(Exception("Not signed in"))
@@ -267,14 +339,18 @@ class GoogleDriveSyncManager @Inject constructor(
             try {
                 val folderId = getOrCreateBackupFolder()
 
+                val nameFilter = if (exactName != null) {
+                    "name = '${exactName.replace("'", "\\'")}'"
+                } else {
+                    "(" +
+                        "name contains 'AniTail' or " +
+                        "name = '$LEGACY_INITIAL_BACKUP_NAME' or " +
+                        "name = '$LEGACY_MERGED_BACKUP_NAME'" +
+                        ")"
+                }
+
                 val result = service.files().list()
-                    .setQ(
-                        "'$folderId' in parents and (" +
-                            "name contains 'AniTail' or " +
-                            "name = '$LEGACY_INITIAL_BACKUP_NAME' or " +
-                            "name = '$LEGACY_MERGED_BACKUP_NAME'" +
-                            ") and trashed = false"
-                    )
+                    .setQ("'$folderId' in parents and $nameFilter and trashed = false")
                     .setOrderBy("modifiedTime desc")
                     .setPageSize(1)
                     .setFields("files(id, name, modifiedTime, createdTime, md5Checksum)")
@@ -304,7 +380,7 @@ class GoogleDriveSyncManager @Inject constructor(
         val service = driveService ?: return@withContext Result.failure(Exception("Not signed in"))
 
         try {
-            FileOutputStream(destinationFile).use { outputStream ->
+            BufferedOutputStream(FileOutputStream(destinationFile)).use { outputStream ->
                 service.files().get(backupMetadata.id).executeMediaAndDownloadTo(outputStream)
             }
 
@@ -380,6 +456,13 @@ class GoogleDriveSyncManager @Inject constructor(
         // Return cached folder ID if available
         cachedFolderId?.let { return@withContext it }
 
+        // Check persistent storage to avoid an unnecessary folder search on every app launch
+        val storedFolderId = context.dataStore.data.first()[GoogleDriveFolderIdKey]
+        if (!storedFolderId.isNullOrBlank()) {
+            cachedFolderId = storedFolderId
+            return@withContext storedFolderId
+        }
+
         val service = driveService ?: throw Exception("Not signed in")
         val folderName = "AniTail Backups"
 
@@ -393,6 +476,7 @@ class GoogleDriveSyncManager @Inject constructor(
         if (result.files.isNotEmpty()) {
             val id = result.files.first().id
             cachedFolderId = id
+            context.dataStore.edit { it[GoogleDriveFolderIdKey] = id }
             return@withContext id
         }
 
@@ -408,6 +492,7 @@ class GoogleDriveSyncManager @Inject constructor(
 
         Timber.d("Created backup folder: ${folder.id}")
         cachedFolderId = folder.id
+        context.dataStore.edit { it[GoogleDriveFolderIdKey] = folder.id }
         folder.id
     }
 
