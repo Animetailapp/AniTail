@@ -149,7 +149,7 @@ jobs:
             gradle_task: :desktop:packageReleaseMsi
             artifact_name: desktop-msi-release
             java_arch: x64
-          - os: blacksmith-4vcpu-windows-2025
+          - os: windows-11-arm
             label: Windows ARM64 MSI
             gradle_cmd: ./gradlew.bat
             gradle_task: :desktop:packageReleaseMsi

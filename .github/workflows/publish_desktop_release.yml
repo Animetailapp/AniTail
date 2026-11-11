@@ -140,7 +140,7 @@ jobs:
             java_arch: x64
             ext: msi
             asset_suffix: windows-x64
-          - runs_on: blacksmith-4vcpu-windows-2025
+          - runs_on: windows-11-arm
             label: Windows ARM64 MSI
             gradle_cmd: ./gradlew.bat
             gradle_task: :desktop:packageReleaseMsi
