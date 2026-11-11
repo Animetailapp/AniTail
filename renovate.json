@@ -18,6 +18,18 @@
       "matchPackageNames": [
         "/^com\\.github\\.libre\\-tube:NewPipeExtractor$/"
       ]
+    },
+    {
+      "matchPackageNames": [
+        "com.google.android.gms:play-services-auth"
+      ],
+      "allowedVersions": "<22.0.0"
+    },
+    {
+      "matchPackageNames": [
+        "java-jdk"
+      ],
+      "enabled": false
     }
   ]
 }
