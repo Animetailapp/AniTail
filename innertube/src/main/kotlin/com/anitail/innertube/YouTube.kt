@@ -1152,9 +1152,12 @@ object YouTube {
         ).body<BrowseResponse>()
 
         val sections = mutableListOf<ChartsPage.ChartSection>()
+        val sectionList = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+            ?.tabRenderer?.content?.sectionListRenderer
+            ?: response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer
+            ?: response.contents?.sectionListRenderer
     
-        response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
-            ?.tabRenderer?.content?.sectionListRenderer?.contents?.forEach { content ->
+        sectionList?.contents?.forEach { content ->
             
                 content.musicCarouselShelfRenderer?.let { renderer ->
                     val title = renderer.header?.musicCarouselShelfBasicHeaderRenderer?.title?.runs?.firstOrNull()?.text
@@ -1219,34 +1222,39 @@ object YouTube {
 
     private fun convertToChartItem(renderer: MusicResponsiveListItemRenderer): YTItem? {
         return try {
+            val videoId = renderer.playlistItemData?.videoId
+                ?: renderer.navigationEndpoint?.watchEndpoint?.videoId
+                ?: renderer.overlay?.musicItemThumbnailOverlayRenderer?.content
+                    ?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchEndpoint?.videoId
+
             when {
-                renderer.flexColumns.size >= 3 && renderer.playlistItemData?.videoId != null -> {
+                videoId != null && renderer.flexColumns.isNotEmpty() -> {
                     val firstColumn = renderer.flexColumns.getOrNull(0)
                         ?.musicResponsiveListItemFlexColumnRenderer
                         ?.text ?: return null
                 
                     val secondColumn = renderer.flexColumns.getOrNull(1)
                         ?.musicResponsiveListItemFlexColumnRenderer
-                        ?.text ?: return null
+                        ?.text
 
                     val titleRun = firstColumn.runs?.firstOrNull() ?: return null
                     val title = titleRun.text.takeIf { it.isNotBlank() } ?: return null
 
-                    val artists = secondColumn.runs?.mapNotNull { run ->
+                    val artists = secondColumn?.runs?.mapNotNull { run ->
                         run.text.takeIf { it.isNotBlank() }?.let { name ->
                             Artist(
                                 name = name,
                                 id = run.navigationEndpoint?.browseEndpoint?.browseId
                             )
                         }
-                    } ?: emptyList()
+                    }.orEmpty()
 
                     val thirdColumn = renderer.flexColumns.getOrNull(2)
                         ?.musicResponsiveListItemFlexColumnRenderer
                         ?.text
 
                     SongItem(
-                        id = renderer.playlistItemData.videoId,
+                        id = videoId,
                         title = title,
                         artists = artists,
                         thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
@@ -1256,6 +1264,18 @@ object YouTube {
                         } == true,
                         chartPosition = thirdColumn?.runs?.firstOrNull()?.text?.toIntOrNull(),
                         chartChange = thirdColumn?.runs?.getOrNull(1)?.text
+                    )
+                }
+                renderer.navigationEndpoint?.browseEndpoint?.browseId?.startsWith("UC") == true -> {
+                    val firstColumn = renderer.flexColumns.getOrNull(0)
+                        ?.musicResponsiveListItemFlexColumnRenderer?.text
+                    val title = firstColumn?.runs?.firstOrNull()?.text ?: return null
+                    ArtistItem(
+                        id = renderer.navigationEndpoint.browseEndpoint.browseId,
+                        title = title,
+                        thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl(),
+                        shuffleEndpoint = null,
+                        radioEndpoint = null,
                     )
                 }
                 else -> null
@@ -1284,6 +1304,21 @@ object YouTube {
                         explicit = renderer.subtitleBadges?.any {
                             it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
                         } == true
+                    )
+                }
+                renderer.isPlaylist -> {
+                    PlaylistItem(
+                        id = renderer.navigationEndpoint.browseEndpoint?.browseId?.removePrefix("VL") ?: return null,
+                        title = renderer.title.runs?.firstOrNull()?.text ?: return null,
+                        author = renderer.subtitle?.runs?.firstOrNull()?.let {
+                            Artist(name = it.text, id = it.navigationEndpoint?.browseEndpoint?.browseId)
+                        },
+                        songCountText = renderer.subtitle?.runs?.getOrNull(2)?.text,
+                        thumbnail = renderer.thumbnailRenderer.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
+                        playEndpoint = renderer.thumbnailOverlay?.musicItemThumbnailOverlayRenderer?.content
+                            ?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchPlaylistEndpoint,
+                        shuffleEndpoint = null,
+                        radioEndpoint = null
                     )
                 }
                 renderer.isAlbum -> {

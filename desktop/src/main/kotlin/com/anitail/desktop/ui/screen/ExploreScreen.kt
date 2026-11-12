@@ -38,6 +38,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -81,9 +82,9 @@ import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.PlayingIndicatorBox
 import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.component.RemoteImage
-import com.anitail.desktop.ui.component.shimmer.GridItemPlaceholder
-import com.anitail.desktop.ui.component.shimmer.ShimmerHost
-import com.anitail.desktop.ui.component.shimmer.TextPlaceholder
+import com.anitail.desktop.ui.component.ShimmerBox
+import com.anitail.desktop.ui.component.ShimmerGridItem
+import com.anitail.desktop.ui.component.ShimmerQuickPicksGrid
 import com.anitail.desktop.i18n.LocalStrings
 import com.anitail.desktop.i18n.StringResolver
 import com.anitail.desktop.i18n.stringResource
@@ -134,6 +135,7 @@ fun ExploreScreen(
     onBrowse: (String, String?) -> Unit = { _, _ -> },
     onMoodGreClick: () -> Unit = {},
     onNewReleaseClick: () -> Unit = {},
+    onRetry: () -> Unit = {},
 ) {
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
@@ -443,10 +445,20 @@ fun ExploreScreen(
     ) {
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (isLoading || chartsPage == null || explorePage == null) {
+        val hasExploreContent = explorePage != null && (explorePage.newReleaseAlbums.isNotEmpty() || explorePage.moodAndGenres.isNotEmpty())
+        val hasChartsContent = chartsPage != null && chartsPage.sections.isNotEmpty()
+
+        if (isLoading && !hasExploreContent && !hasChartsContent) {
             ExploreShimmer()
+        } else if (!isLoading && !hasExploreContent && !hasChartsContent) {
+            ExploreErrorState(
+                onRetry = onRetry,
+                errorMessage = strings.get("network_error"),
+                retryLabel = strings.get("retry"),
+            )
         } else {
-            chartsPage.sections.filter { it.title != TopMusicVideosTitle }.forEach { section ->
+            val chartSections = chartsPage?.sections?.filter { it.title != TopMusicVideosTitle }.orEmpty()
+            chartSections.forEach { section ->
                 NavigationTitle(
                     title = mapExploreChartsTitle(section.title, strings),
                 )
@@ -539,7 +551,7 @@ fun ExploreScreen(
                 }
             }
 
-            explorePage.newReleaseAlbums.takeIf { it.isNotEmpty() }?.let { newReleaseAlbums ->
+            explorePage?.newReleaseAlbums?.takeIf { it.isNotEmpty() }?.let { newReleaseAlbums ->
                 NavigationTitle(
                     title = stringResource("new_release_albums"),
                     onClick = onNewReleaseClick,
@@ -595,7 +607,7 @@ fun ExploreScreen(
                     }
                 }
             }
-            chartsPage.sections.find { it.title == TopMusicVideosTitle }?.let { topVideos ->
+            chartsPage?.sections?.find { it.title == TopMusicVideosTitle }?.let { topVideos ->
                 NavigationTitle(title = stringResource("top_music_videos"))
                 LazyRow(
                     contentPadding = WindowInsets.systemBars
@@ -664,7 +676,7 @@ fun ExploreScreen(
                 }
             }
 
-            explorePage.moodAndGenres.takeIf { it.isNotEmpty() }?.let { moodAndGenres ->
+            explorePage?.moodAndGenres?.takeIf { it.isNotEmpty() }?.let { moodAndGenres ->
                 NavigationTitle(
                     title = stringResource("mood_and_genres"),
                     onClick = onMoodGreClick,
@@ -1015,102 +1027,91 @@ private fun ExploreGridItem(
 }
 @Composable
 private fun ExploreShimmer() {
-    ShimmerHost {
-        TextPlaceholder(
-            height = 36.dp,
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        // Charts title placeholder
+        ShimmerBox(
             modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(0.5f),
+                .width(220.dp)
+                .height(28.dp),
+            shape = RoundedCornerShape(6.dp),
         )
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val horizontalLazyGridItemWidthFactor = if (maxWidth * 0.475f >= 320.dp) 0.475f else 0.9f
-            val horizontalLazyGridItemWidth = maxWidth * horizontalLazyGridItemWidthFactor
 
-            LazyHorizontalGrid(
-                rows = GridCells.Fixed(4),
-                contentPadding = PaddingValues(start = 4.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(ListItemHeight * 4),
-            ) {
-                items(4) {
-                    Row(
-                        modifier = Modifier
-                            .width(horizontalLazyGridItemWidth)
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
+        // Grid of items placeholder (charts songs)
+        ShimmerQuickPicksGrid(rows = 4, columns = 2)
+
+        // New release albums title placeholder
+        ShimmerBox(
+            modifier = Modifier
+                .width(200.dp)
+                .height(28.dp),
+            shape = RoundedCornerShape(6.dp),
+        )
+
+        // Albums horizontal row placeholder
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            repeat(5) {
+                ShimmerGridItem(size = 140.dp)
+            }
+        }
+
+        // Moods & Genres title placeholder
+        ShimmerBox(
+            modifier = Modifier
+                .width(180.dp)
+                .height(28.dp),
+            shape = RoundedCornerShape(6.dp),
+        )
+
+        // Moods & Genres buttons placeholder
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(3) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    repeat(2) {
+                        ShimmerBox(
                             modifier = Modifier
-                                .size(ListItemHeight - 16.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.onSurface),
+                                .weight(1f)
+                                .height(MoodAndGenresButtonHeight),
+                            shape = RoundedCornerShape(8.dp),
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column(
-                            modifier = Modifier.height(ListItemHeight - 16.dp),
-                            verticalArrangement = Arrangement.Center,
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .height(16.dp)
-                                    .width(120.dp)
-                                    .background(MaterialTheme.colorScheme.onSurface),
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .height(12.dp)
-                                    .width(80.dp)
-                                    .background(MaterialTheme.colorScheme.onSurface),
-                            )
-                        }
                     }
                 }
             }
         }
+    }
+}
 
-        TextPlaceholder(
-            height = 36.dp,
-            modifier = Modifier
-                .padding(vertical = 12.dp, horizontal = 12.dp)
-                .width(250.dp),
+@Composable
+private fun ExploreErrorState(
+    onRetry: () -> Unit,
+    errorMessage: String,
+    retryLabel: String,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(vertical = 64.dp, horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = errorMessage,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row {
-            repeat(2) {
-                GridItemPlaceholder()
-            }
-        }
-
-        TextPlaceholder(
-            height = 36.dp,
-            modifier = Modifier
-                .padding(vertical = 12.dp, horizontal = 12.dp)
-                .width(250.dp),
-        )
-        Row {
-            repeat(2) {
-                GridItemPlaceholder()
-            }
-        }
-
-        TextPlaceholder(
-            height = 36.dp,
-            modifier = Modifier
-                .padding(vertical = 12.dp, horizontal = 12.dp)
-                .width(250.dp),
-        )
-        repeat(4) {
-            Row {
-                repeat(2) {
-                    TextPlaceholder(
-                        height = MoodAndGenresButtonHeight,
-                        modifier = Modifier
-                            .padding(horizontal = 6.dp)
-                            .width(180.dp),
-                    )
-                }
-            }
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+            onClick = onRetry,
+            shape = RoundedCornerShape(12.dp),
+        ) {
+            Text(text = retryLabel)
         }
     }
 }
