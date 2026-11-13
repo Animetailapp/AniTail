@@ -13,7 +13,7 @@ lastfmJava = "0.1.2"
 lifecycle = "2.12.0-alpha05"
 material3 = "1.5.0-rc01"
 materialKolor = "5.0.1"
-media3 = "1.12.0-alpha02"
+media3 = "1.12.0-beta01"
 # 22.3.0 triggers R8 "Invalid stack map table" warnings during minify.
 playServicesCast = "23.0.0"
 playServicesBase = "18.11.1"
@@ -89,7 +89,7 @@ room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 
-apache-lang3 = { group = "org.apache.commons", name = "commons-lang3", version = "3.21.0" }
+apache-lang3 = { group = "org.apache.commons", name = "commons-lang3", version = "3.22.0" }
 
 hilt = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }

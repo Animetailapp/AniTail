@@ -478,6 +478,13 @@ class PlayerState {
         }
     }
 
+    val audioEqualizer: AudioEqualizer?
+        get() = nativePlayer.audioEqualizer
+
+    fun applyEqualizer() {
+        nativePlayer.applyEqualizer()
+    }
+
     fun release() {
         stopPositionTracker()
         cancelSleepTimer()

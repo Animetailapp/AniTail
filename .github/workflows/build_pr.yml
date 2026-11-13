@@ -7,10 +7,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: useblacksmith/checkout@v1
         with:
           submodules: recursive
 
@@ -57,31 +57,31 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: blacksmith-4vcpu-ubuntu-2404
             label: Linux DEB
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageReleaseDeb
             artifact_name: desktop-deb-release
             java_arch: x64
-          - os: ubuntu-latest
+          - os: blacksmith-4vcpu-ubuntu-2404
             label: Linux RPM
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageReleaseRpm
             artifact_name: desktop-rpm-release
             java_arch: x64
-          - os: ubuntu-latest
+          - os: blacksmith-4vcpu-ubuntu-2404
             label: Linux AppImage
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageReleaseAppImage
             artifact_name: desktop-appimage-release
             java_arch: x64
-          - os: macos-latest
+          - os: blacksmith-6vcpu-macos-15
             label: macOS DMG
             gradle_cmd: ./gradlew
             gradle_task: :desktop:packageReleaseDmg
             artifact_name: desktop-dmg-release
             java_arch: aarch64
-          - os: windows-latest
+          - os: blacksmith-4vcpu-windows-2025
             label: Windows MSI
             gradle_cmd: ./gradlew.bat
             gradle_task: :desktop:packageReleaseMsi
