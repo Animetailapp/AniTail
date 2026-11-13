@@ -51,7 +51,7 @@ dependencies {
 
 
     implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.compose.material3:material3:1.13.10-alpha01+dev5171")
+    implementation("org.jetbrains.compose.material3:material3:1.13.10-alpha01+dev5175")
     implementation(libs.materialKolor) {
         exclude(group = "org.jetbrains.compose.material3")
         exclude(group = "org.jetbrains.compose.foundation")
