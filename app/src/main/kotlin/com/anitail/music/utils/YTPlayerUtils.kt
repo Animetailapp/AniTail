@@ -43,6 +43,7 @@ object YTPlayerUtils {
 
     fun markWebRemixFailed(videoId: String) {
         webRemixFailures[videoId] = System.currentTimeMillis()
+        InnerTubeXPlayer.markStreamClientFailed(videoId, "WEB_REMIX")
     }
 
     private fun hasRecentWebRemixFailure(videoId: String): Boolean {
@@ -56,6 +57,7 @@ object YTPlayerUtils {
 
     fun clearWebRemixFailures() {
         webRemixFailures.clear()
+        InnerTubeXPlayer.clearStreamClientFailures()
     }
 
     private val cipherRefreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -107,6 +109,9 @@ object YTPlayerUtils {
         val streamExpiresInSeconds: Int,
         val streamClient: String = "unknown",
         val streamHeaders: Map<String, String> = emptyMap(),
+        val requireBoundedRange: Boolean = false,
+        val rangeChunkSizeBytes: Long = 0L,
+        val useRangeChunks: Boolean = false,
     )
 
     /**
@@ -120,8 +125,22 @@ object YTPlayerUtils {
         audioQuality: AudioQuality,
         connectivityManager: ConnectivityManager,
         targetItag: Int = 0,
-    ): Result<PlaybackData> = runCatching {
-        Timber.tag(logTag).d("Fetching player response for videoId: $videoId, playlistId: $playlistId")
+    ): Result<PlaybackData> {
+        val innertubexResult = InnerTubeXPlayer.playerResponseForPlayback(
+            videoId = videoId,
+            playlistId = playlistId,
+            audioQuality = audioQuality,
+            connectivityManager = connectivityManager,
+            targetItag = targetItag,
+        )
+        if (innertubexResult.isSuccess) {
+            Timber.tag(logTag).d("Successfully obtained playback data via InnerTubeX for videoId: $videoId")
+            return innertubexResult
+        }
+        Timber.tag(logTag).w(innertubexResult.exceptionOrNull(), "InnerTubeX resolution failed for $videoId; falling back to legacy pipeline")
+
+        return runCatching {
+            Timber.tag(logTag).d("Fetching player response for videoId: $videoId, playlistId: $playlistId")
 
         // 1. Check StreamUrlCache first
         val cachedStream = StreamUrlCache.get(videoId, targetItag)
@@ -381,6 +400,7 @@ object YTPlayerUtils {
             streamClient = successClient.clientName,
             streamHeaders = streamHeaders,
         )
+    }
     }
 
     /**

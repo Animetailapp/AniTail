@@ -29,6 +29,7 @@ newpipe = "v0.26.0"
 workRuntimeKtx = "2.12.0"
 kuromojiIpadic = "0.9.0"
 tinypinyin = "2.0.3"
+innertubex = "v0.11.6"
 
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.8.0" }
@@ -126,6 +127,7 @@ google-auth-library-oauth2-http = { module = "com.google.auth:google-auth-librar
 compose-multiplatform-media-player = { module = "network.chaintech:compose-multiplatform-media-player", version = "1.0.53" }
 kuromoji-ipadic = { group = "com.atilika.kuromoji", name = "kuromoji-ipadic", version.ref = "kuromojiIpadic" }
 tinypinyin = { group = "com.github.promeG", name = "tinypinyin", version.ref = "tinypinyin" }
+innertubex = { module = "com.github.MetrolistGroup.innertubex:innertubex", version.ref = "innertubex" }
 
 [plugins]
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

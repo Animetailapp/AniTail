@@ -38,6 +38,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -81,10 +82,9 @@ import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.PlayingIndicatorBox
 import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.component.RemoteImage
-import com.anitail.desktop.ui.component.shimmer.GridItemPlaceholder
-import com.anitail.desktop.ui.component.shimmer.ListItemPlaceholder
-import com.anitail.desktop.ui.component.shimmer.ShimmerHost
-import com.anitail.desktop.ui.component.shimmer.TextPlaceholder
+import com.anitail.desktop.ui.component.ShimmerBox
+import com.anitail.desktop.ui.component.ShimmerGridItem
+import com.anitail.desktop.ui.component.ShimmerQuickPicksGrid
 import com.anitail.desktop.i18n.LocalStrings
 import com.anitail.desktop.i18n.StringResolver
 import com.anitail.desktop.i18n.stringResource
@@ -135,6 +135,7 @@ fun ExploreScreen(
     onBrowse: (String, String?) -> Unit = { _, _ -> },
     onMoodGreClick: () -> Unit = {},
     onNewReleaseClick: () -> Unit = {},
+    onRetry: () -> Unit = {},
 ) {
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
@@ -444,10 +445,20 @@ fun ExploreScreen(
     ) {
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (isLoading && chartsPage == null && explorePage == null) {
+        val hasExploreContent = explorePage != null && (explorePage.newReleaseAlbums.isNotEmpty() || explorePage.moodAndGenres.isNotEmpty())
+        val hasChartsContent = chartsPage != null && chartsPage.sections.isNotEmpty()
+
+        if (isLoading && !hasExploreContent && !hasChartsContent) {
             ExploreShimmer()
+        } else if (!isLoading && !hasExploreContent && !hasChartsContent) {
+            ExploreErrorState(
+                onRetry = onRetry,
+                errorMessage = strings.get("network_error"),
+                retryLabel = strings.get("retry"),
+            )
         } else {
-            chartsPage?.sections?.filter { it.title != TopMusicVideosTitle }?.forEach { section ->
+            val chartSections = chartsPage?.sections?.filter { it.title != TopMusicVideosTitle }.orEmpty()
+            chartSections.forEach { section ->
                 NavigationTitle(
                     title = mapExploreChartsTitle(section.title, strings),
                 )
@@ -1016,72 +1027,91 @@ private fun ExploreGridItem(
 }
 @Composable
 private fun ExploreShimmer() {
-    ShimmerHost(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Column(
+        // Charts title placeholder
+        ShimmerBox(
+            modifier = Modifier
+                .width(220.dp)
+                .height(28.dp),
+            shape = RoundedCornerShape(6.dp),
+        )
+
+        // Grid of items placeholder (charts songs)
+        ShimmerQuickPicksGrid(rows = 4, columns = 2)
+
+        // New release albums title placeholder
+        ShimmerBox(
+            modifier = Modifier
+                .width(200.dp)
+                .height(28.dp),
+            shape = RoundedCornerShape(6.dp),
+        )
+
+        // Albums horizontal row placeholder
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Mood and genres buttons row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                repeat(4) {
-                    TextPlaceholder(
-                        height = MoodAndGenresButtonHeight,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp)),
-                    )
-                }
+            repeat(5) {
+                ShimmerGridItem(size = 140.dp)
             }
+        }
 
-            // Charts section title
-            TextPlaceholder(
-                height = 28.dp,
-                modifier = Modifier
-                    .padding(top = 8.dp)
-                    .width(220.dp),
-            )
+        // Moods & Genres title placeholder
+        ShimmerBox(
+            modifier = Modifier
+                .width(180.dp)
+                .height(28.dp),
+            shape = RoundedCornerShape(6.dp),
+        )
 
-            // Horizontal grid of charts items
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                repeat(3) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        repeat(4) {
-                            ListItemPlaceholder(modifier = Modifier.fillMaxWidth())
-                        }
+        // Moods & Genres buttons placeholder
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            repeat(3) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    repeat(2) {
+                        ShimmerBox(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(MoodAndGenresButtonHeight),
+                            shape = RoundedCornerShape(8.dp),
+                        )
                     }
                 }
             }
+        }
+    }
+}
 
-            // New Releases section title
-            TextPlaceholder(
-                height = 28.dp,
-                modifier = Modifier
-                    .padding(top = 8.dp)
-                    .width(240.dp),
-            )
-
-            // Albums row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                repeat(5) {
-                    GridItemPlaceholder(modifier = Modifier.weight(1f))
-                }
-            }
+@Composable
+private fun ExploreErrorState(
+    onRetry: () -> Unit,
+    errorMessage: String,
+    retryLabel: String,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(vertical = 64.dp, horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = errorMessage,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+            onClick = onRetry,
+            shape = RoundedCornerShape(12.dp),
+        ) {
+            Text(text = retryLabel)
         }
     }
 }

@@ -10,6 +10,7 @@ import com.atilika.kuromoji.ipadic.Tokenizer
 import com.github.promeg.pinyinhelper.Pinyin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.util.Locale
 
 val LINE_REGEX = "((\\[\\d\\d:\\d\\d\\.\\d{2,3}\\] ?)+)(.*)".toRegex()
@@ -362,8 +363,12 @@ object LyricsUtils {
     )
 
     // Lazy initialized Tokenizer
-    private val kuromojiTokenizer: Tokenizer by lazy {
-        Tokenizer()
+    private val kuromojiTokenizer: Tokenizer? by lazy {
+        runCatching {
+            Tokenizer()
+        }.onFailure { error ->
+            Timber.e(error, "Failed to initialize Kuromoji Tokenizer")
+        }.getOrNull()
     }
 
     private val HEX_ENTITY_REGEX = "&#x([0-9a-fA-F]+);".toRegex()
@@ -868,21 +873,27 @@ object LyricsUtils {
     } */
 
     suspend fun romanizeJapanese(text: String): String = withContext(Dispatchers.Default) {
-        val tokens = kuromojiTokenizer.tokenize(text)
-        val romanizedTokens = tokens.mapIndexed { index, token ->
-            val currentReading = if (token.reading.isNullOrEmpty() || token.reading == "*") {
-                token.surface
-            } else {
-                token.reading
+        val tokenizer = kuromojiTokenizer ?: return@withContext text
+        runCatching {
+            val tokens = tokenizer.tokenize(text)
+            val romanizedTokens = tokens.mapIndexed { index, token ->
+                val currentReading = if (token.reading.isNullOrEmpty() || token.reading == "*") {
+                    token.surface
+                } else {
+                    token.reading
+                }
+                val nextTokenReading = if (index + 1 < tokens.size) {
+                    tokens[index + 1].reading?.takeIf { it.isNotEmpty() && it != "*" } ?: tokens[index + 1].surface
+                } else {
+                    null
+                }
+                katakanaToRomaji(currentReading, nextTokenReading)
             }
-            val nextTokenReading = if (index + 1 < tokens.size) {
-                tokens[index + 1].reading?.takeIf { it.isNotEmpty() && it != "*" } ?: tokens[index + 1].surface
-            } else {
-                null
-            }
-            katakanaToRomaji(currentReading, nextTokenReading)
+            romanizedTokens.joinToString(" ")
+        }.getOrElse { error ->
+            Timber.e(error, "Failed to romanize Japanese lyrics: $text")
+            text
         }
-        romanizedTokens.joinToString(" ")
     }
 
     fun katakanaToRomaji(katakana: String?, nextKatakana: String? = null): String {

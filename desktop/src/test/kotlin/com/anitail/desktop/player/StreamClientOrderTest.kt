@@ -11,8 +11,8 @@ class StreamClientOrderTest {
 
         assertEquals(
             listOf(
-                YouTubeClient.WEB_REMIX,
                 YouTubeClient.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+                YouTubeClient.WEB_REMIX,
                 YouTubeClient.WEB,
                 YouTubeClient.ANDROID_VR_NO_AUTH,
                 YouTubeClient.MOBILE,

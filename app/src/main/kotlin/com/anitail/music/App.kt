@@ -141,7 +141,16 @@ class App : Application(), ImageLoaderFactory, Configuration.Provider {
         // Initialize automatic update checks
         UpdateCheckWorker.schedule(this)
 
-        // Initialize Cipher and YouTube Deobfuscation engine
+        // Initialize InnerTubeX and Cipher engines
+        try {
+            com.anitail.music.utils.InnerTubeXPlayer.initialize(this)
+            applicationScope.launch(Dispatchers.IO) {
+                com.anitail.music.utils.InnerTubeXPlayer.prewarm()
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to initialize InnerTubeXPlayer")
+        }
+
         try {
             com.anitail.music.utils.cipher.CipherDeobfuscator.initialize(this)
             applicationScope.launch(Dispatchers.IO) {

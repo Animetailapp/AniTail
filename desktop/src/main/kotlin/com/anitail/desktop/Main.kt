@@ -138,6 +138,7 @@ import com.anitail.shared.model.LibraryItem
 import java.net.URI
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -1042,6 +1043,17 @@ private fun FrameWindowScope.AniTailDesktopApp(
         
     }
 
+    // Lazy load explore page on tab switch if not loaded
+    LaunchedEffect(currentScreen) {
+        if (currentScreen == DesktopScreen.Explore && explorePage == null && chartsPage == null && !isExploreLoading) {
+            loadExplorePage(
+                onLoading = { isExploreLoading = it },
+                onExplore = { page -> explorePage = page },
+                onCharts = { page -> chartsPage = page },
+            )
+        }
+    }
+
     // Trigger library sync when enabled and cookie available
     LaunchedEffect(ytmSync, authCredentials?.cookie, youtubeCookie) {
         val activeCookie = authCredentials?.cookie ?: youtubeCookie
@@ -1855,6 +1867,15 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             },
                             onMoodGreClick = { currentScreen = DesktopScreen.MoodAndGenres },
                             onNewReleaseClick = { currentScreen = DesktopScreen.NewRelease },
+                            onRetry = {
+                                scope.launch {
+                                    loadExplorePage(
+                                        onLoading = { isExploreLoading = it },
+                                        onExplore = { page -> explorePage = page },
+                                        onCharts = { page -> chartsPage = page },
+                                    )
+                                }
+                            },
                         )
                     }
 
@@ -2422,10 +2443,15 @@ private suspend fun loadHomePage(
     onPage: (HomePage) -> Unit,
 ) {
     onLoading(true)
-    YouTube.home().onSuccess { page ->
-        onPage(page)
+    try {
+        YouTube.home().onSuccess { page ->
+            onPage(page)
+        }.onFailure {
+            System.err.println("Main: Failed to load home page: ${it.message}")
+        }
+    } finally {
+        onLoading(false)
     }
-    onLoading(false)
 }
 
 private suspend fun loadExplorePage(
@@ -2434,19 +2460,26 @@ private suspend fun loadExplorePage(
     onCharts: (ChartsPage) -> Unit,
 ) {
     onLoading(true)
-    YouTube.explore().onSuccess { page ->
-        println("Main: ExplorePage cargado con éxito (${page.newReleaseAlbums.size} álbumes, ${page.moodAndGenres.size} estados de ánimo/géneros)")
-        onExplore(page)
-    }.onFailure {
-        println("Main: Falló la carga de ExplorePage: ${it.message}")
+    try {
+        coroutineScope {
+            launch {
+                YouTube.explore().onSuccess { page ->
+                    onExplore(page)
+                }.onFailure {
+                    System.err.println("Main: Failed to load explore page: ${it.message}")
+                }
+            }
+            launch {
+                YouTube.getChartsPage().onSuccess { page ->
+                    onCharts(page)
+                }.onFailure {
+                    System.err.println("Main: Failed to load charts page: ${it.message}")
+                }
+            }
+        }
+    } finally {
+        onLoading(false)
     }
-    YouTube.getChartsPage().onSuccess { page ->
-        println("Main: ChartsPage cargado con éxito (${page.sections.size} secciones)")
-        onCharts(page)
-    }.onFailure {
-        println("Main: Falló la carga de ChartsPage: ${it.message}")
-    }
-    onLoading(false)
 }
 
 private suspend fun handleChipSelection(

@@ -36,17 +36,45 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 @OptIn(ExperimentalEncodingApi::class)
 class InnerTube {
     private var httpClient = createClient()
+    private var innerTubeX = com.metrolist.innertubex.InnerTube(httpClient)
+    private var transportGeneration = 0L
+
+    class ExtractionTransport internal constructor(
+        val innerTube: com.metrolist.innertubex.InnerTube,
+        val httpClient: HttpClient,
+        val generation: Long,
+    )
+
+    fun extractionTransport(): ExtractionTransport =
+        ExtractionTransport(
+            innerTube = innerTubeX,
+            httpClient = httpClient,
+            generation = transportGeneration,
+        )
 
     var locale = YouTubeLocale(
         gl = Locale.getDefault().country,
         hl = Locale.getDefault().toLanguageTag()
     )
+        set(value) {
+            field = value
+            innerTubeX.locale = com.metrolist.innertubex.models.YouTubeLocale(gl = value.gl, hl = value.hl)
+        }
     var visitorData: String? = null
+        set(value) {
+            field = value
+            innerTubeX.visitorData = value
+        }
     var dataSyncId: String? = null
+        set(value) {
+            field = value
+            innerTubeX.dataSyncId = value
+        }
     var cookie: String? = null
         set(value) {
             field = value
             cookieMap = if (value == null) emptyMap() else parseCookieString(value)
+            innerTubeX.cookie = value
         }
     private var cookieMap = emptyMap<String, String>()
 
@@ -55,9 +83,34 @@ class InnerTube {
             field = value
             httpClient.close()
             httpClient = createClient()
+            innerTubeX = com.metrolist.innertubex.InnerTube(httpClient).also { replacement ->
+                replacement.locale = com.metrolist.innertubex.models.YouTubeLocale(gl = locale.gl, hl = locale.hl)
+                replacement.cookie = cookie
+                replacement.visitorData = visitorData
+                replacement.dataSyncId = dataSyncId
+            }
+            transportGeneration++
         }
     
     var proxyAuth: String? = null
+        set(value) {
+            field = value
+            if (proxy != null) {
+                httpClient.close()
+                httpClient = createClient()
+                innerTubeX = com.metrolist.innertubex.InnerTube(httpClient).also { replacement ->
+                    replacement.locale = com.metrolist.innertubex.models.YouTubeLocale(gl = locale.gl, hl = locale.hl)
+                    replacement.cookie = cookie
+                    replacement.visitorData = visitorData
+                    replacement.dataSyncId = dataSyncId
+                }
+                transportGeneration++
+            }
+        }
+
+    init {
+        innerTubeX.locale = com.metrolist.innertubex.models.YouTubeLocale(gl = locale.gl, hl = locale.hl)
+    }
 
     var useLoginForBrowse: Boolean = false
     var autoAcceptYouTubeTerms: Boolean = false

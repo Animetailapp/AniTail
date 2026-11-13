@@ -36,3 +36,20 @@ internal object NewPipeStreamUrlResolver : StreamUrlResolver {
         }
     }
 }
+
+internal object InnerTubeXStreamUrlResolver : StreamUrlResolver {
+    override fun resolve(
+        format: PlayerResponse.StreamingData.Format,
+        videoId: String,
+        userAgentOverride: String?
+    ): Result<String> {
+        val streamUrl = format.url
+        if (!streamUrl.isNullOrBlank()) {
+            return Result.success(streamUrl)
+        }
+        return runCatching {
+            NewPipeExtractor.getStreamUrl(format, videoId)
+                ?: error("Could not resolve stream URL")
+        }
+    }
+}
