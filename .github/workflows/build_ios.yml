@@ -4,7 +4,16 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - 'master'
+      - '**'
+    paths:
+      - 'iosApp/**'
+      - 'shared/**'
+      - 'scripts/build_ios.sh'
+      - 'scripts/ios_version.sh'
+      - '.github/workflows/build_ios.yml'
+  pull_request:
+    branches:
+      - '**'
     paths:
       - 'iosApp/**'
       - 'shared/**'
