@@ -65,7 +65,7 @@ import com.anitail.shared.generated.resources.token_login
 import com.anitail.shared.state.SongLikeState
 import com.anitail.shared.ui.components.AccountPickerList
 import com.anitail.shared.ui.components.ContainedLoadingIndicator
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.sanitizeDataSyncId
 import com.anitail.shared.utils.BlockScreenshots
 import com.anitail.shared.utils.Logger
@@ -264,7 +264,7 @@ internal fun IosLoginScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = ::close, shapes = IconButtonDefaults.shapes()) {
-                        Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
+                        Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
                     }
                 },
                 actions = {

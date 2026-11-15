@@ -77,7 +77,7 @@ import com.anitail.shared.ui.components.AlertDialog
 import com.anitail.shared.ui.components.BasicAlertDialog
 import com.anitail.shared.ui.components.PopupContent
 import com.anitail.shared.ui.components.PopupVisibility
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.utils.toPolygonShape
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -171,7 +171,7 @@ private fun EqualizerProfileDialog(
                         )
                     }
                     IconButton(onClick = onDismiss, shapes = IconButtonDefaults.shapes()) {
-                        Icon(MetrolistIcons.Default.Close, stringResource(Res.string.close))
+                        Icon(AnitailIcons.Default.Close, stringResource(Res.string.close))
                     }
                 }
                 if (!isAudioProcessingAvailable) {
@@ -197,7 +197,7 @@ private fun EqualizerProfileDialog(
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Icon(
-                                        MetrolistIcons.Outlined.BarChart,
+                                        AnitailIcons.Outlined.BarChart,
                                         null,
                                         Modifier.size(36.dp),
                                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -334,13 +334,13 @@ private fun EqualizerProfileRow(
             Box {
                 var expanded by remember { mutableStateOf(false) }
                 IconButton(onClick = { expanded = true }, shapes = IconButtonDefaults.shapes()) {
-                    Icon(MetrolistIcons.Default.MoreVert, stringResource(Res.string.more_options))
+                    Icon(AnitailIcons.Default.MoreVert, stringResource(Res.string.more_options))
                 }
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     Text(name, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelLarge)
                     DropdownMenuItem(
                         text = { Text(stringResource(Res.string.edit_in_metroeq)) },
-                        leadingIcon = { Icon(MetrolistIcons.Outlined.Tune, null) },
+                        leadingIcon = { Icon(AnitailIcons.Outlined.Tune, null) },
                         onClick = {
                             expanded = false
                             onEdit()
@@ -348,7 +348,7 @@ private fun EqualizerProfileRow(
                     )
                     DropdownMenuItem(
                         text = { Text(stringResource(Res.string.delete)) },
-                        leadingIcon = { Icon(MetrolistIcons.Outlined.Delete, null) },
+                        leadingIcon = { Icon(AnitailIcons.Outlined.Delete, null) },
                         onClick = {
                             expanded = false
                             onDelete()

@@ -82,8 +82,8 @@ import com.anitail.shared.ui.components.focusOutline
 import com.anitail.shared.ui.components.singleLineMarquee
 import com.anitail.shared.ui.components.sliders.PlaybackProgressSlider
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.theme.parseThemeSeedColor
 import com.anitail.shared.ui.theme.themeColorScheme
 import org.jetbrains.compose.resources.stringResource
@@ -160,7 +160,7 @@ internal fun CanvasContentOrderSetting(
                     enabled = sourceEnabled && index > 0,
                     shapes = IconButtonDefaults.shapes(),
                 ) {
-                    Icon(MetrolistIcons.Outlined.KeyboardArrowUp, stringResource(Res.string.move_up))
+                    Icon(AnitailIcons.Outlined.KeyboardArrowUp, stringResource(Res.string.move_up))
                 }
                 IconButton(
                     onClick = {
@@ -169,7 +169,7 @@ internal fun CanvasContentOrderSetting(
                     enabled = sourceEnabled && index < availableSources.lastIndex,
                     shapes = IconButtonDefaults.shapes(),
                 ) {
-                    Icon(MetrolistIcons.Outlined.KeyboardArrowDown, stringResource(Res.string.move_down))
+                    Icon(AnitailIcons.Outlined.KeyboardArrowDown, stringResource(Res.string.move_down))
                 }
                 ExpressiveSwitch(
                     checked = source in enabledSources,
@@ -198,7 +198,7 @@ private fun canvasContentSourceLabel(source: CanvasContentSource): String =
 @Composable
 internal fun LyricsProviderOrderSetting() {
     val settings = Settings.shared
-    val haptics = rememberMetrolistHaptics()
+    val haptics = rememberAnitailHaptics()
     val providerOrder = LyricsProvider.parseUserOrderFromStoredCsv(settings.lyricsProviderOrder)
     val enabledProviders = LyricsProvider.parseEnabledFromStoredCsv(settings.lyricsEnabledProviders)
 
@@ -534,7 +534,7 @@ internal fun ThemeSeedColorSetting(
                         shapes = IconButtonDefaults.shapes(),
                     ) {
                         Icon(
-                            imageVector = MetrolistIcons.Filled.Check,
+                            imageVector = AnitailIcons.Filled.Check,
                             contentDescription = stringResource(Res.string.done),
                             tint = MaterialTheme.colorScheme.primary,
                         )
@@ -574,7 +574,7 @@ fun SettingsMainSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val haptics = rememberMetrolistHaptics()
+    val haptics = rememberAnitailHaptics()
     val interactionSource = remember { MutableInteractionSource() }
     val colors = MaterialTheme.colorScheme
     val density = LocalDensity.current

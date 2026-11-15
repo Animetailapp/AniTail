@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Imported from the official Metrolist Android translations. --><!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
+<!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
     <string name="home">Beranda</string>
     <string name="offline_mode">Mode offline</string>
     <string name="songs">Lagu</string>
@@ -1231,7 +1231,7 @@
     <string name="menu_keyboard_shortcuts">Pintasan keyboard</string>
     <string name="menu_application_logs">Log aplikasi</string>
     <string name="menu_report_issue">Laporkan masalah…</string>
-    <string name="menu_about_metrolist">Tentang AniTail</string>
+    <string name="menu_about_anitail">Tentang AniTail</string>
     <string name="menu_song">Lagu</string>
     <string name="menu_back">Kembali</string>
     <string name="menu_new_playlist">Playlist baru</string>
@@ -1281,7 +1281,7 @@
     <string name="tray_show_window">Tampilkan jendela</string>
     <string name="tray_show_miniplayer">Tampilkan pemutar mini</string>
     <string name="tray_settings">Pengaturan</string>
-    <string name="tray_quit_metrolist">Keluar AniTail</string>
+    <string name="tray_quit_anitail">Keluar AniTail</string>
     <string name="sign_in_discord">Masuk ke Discord</string>
     <string name="openrouter_auth_instruction">Tempel kode otorisasi yang ditampilkan OpenRouter di peramban Anda.</string>
     <string name="openrouter_auth_code">Kode otorisasi</string>
@@ -1414,7 +1414,7 @@
     <string name="history_playlist_weekly">Lagu Teratas Mingguan</string>
     <string name="history_playlist_monthly">Lagu Teratas Bulanan</string>
     <string name="queue_youtube_history_when_offline_desc">Simpan laporan pemutaran di perangkat ini dan coba lagi setelah terhubung kembali saat aplikasi berjalan. Riwayat yang sedang dijeda tidak akan dicatat</string>
-    <string name="discord_listen_to_metrolist">Dengarkan AniTail</string>
+    <string name="discord_listen_to_anitail">Dengarkan AniTail</string>
     <string name="app_icon_zenith_black">Zenith Black</string>
     <string name="app_icon_zenith_white">Zenith White</string>
     <string name="mysterious_fourth_tab">Tab keempat yang misterius</string>

@@ -2,7 +2,7 @@ package com.anitail.shared.discord
 
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.utils.Logger
-import com.anitail.shared.utils.MetrolistClock
+import com.anitail.shared.utils.AnitailClock
 import platform.Foundation.NSUUID
 
 actual object DiscordTokenStore {
@@ -17,7 +17,7 @@ actual object DiscordTokenStore {
     ) {
         s.discordAccessToken = accessToken
         s.discordRefreshToken = refreshToken
-        val expiresAt = (MetrolistClock.nowMs() / 1000L) + expiresInSec
+        val expiresAt = (AnitailClock.nowMs() / 1000L) + expiresInSec
         s.discordExpiresAt = expiresAt
         Logger.d(TAG, "tokenStore: stored (accessToken length=${accessToken.length})")
     }

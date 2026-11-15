@@ -177,7 +177,7 @@ import com.anitail.shared.ui.components.images.AsyncImage
 import com.anitail.shared.ui.components.loadingShimmer
 import com.anitail.shared.ui.components.rememberCurrentSongArtworkRotation
 import com.anitail.shared.ui.components.squareArtworkSlot
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.icons.SongStatusIcons
 import com.anitail.shared.ui.menu.artworkMenuActions
 import com.anitail.shared.ui.menu.onSecondaryClick
@@ -331,7 +331,7 @@ private fun ArtistScreenLayout(
         if (!hasContent && !isLoading && onBackClick != null) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBackClick, shapes = IconButtonDefaults.shapes()) {
-                    Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
+                    Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
                 }
             }
         }
@@ -609,14 +609,14 @@ private fun ArtistScreenContent(
                 navigationIcon = {
                     if (onBackClick != null) {
                         IconButton(onClick = onBackClick, modifier = buttonModifier, shapes = IconButtonDefaults.shapes()) {
-                            Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back), tint = iconColor)
+                            Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back), tint = iconColor)
                         }
                     }
                 },
                 actions = {
                     if (onRefreshClick != null) {
                         IconButton(onClick = onRefreshClick, modifier = buttonModifier, shapes = IconButtonDefaults.shapes()) {
-                            Icon(MetrolistIcons.Outlined.Refresh, stringResource(Res.string.artist_refresh), tint = iconColor)
+                            Icon(AnitailIcons.Outlined.Refresh, stringResource(Res.string.artist_refresh), tint = iconColor)
                         }
                     }
                     if (barMenuClick != null) {
@@ -625,7 +625,7 @@ private fun ArtistScreenContent(
                             modifier = buttonModifier.navigationPopupSource(),
                             shapes = IconButtonDefaults.shapes(),
                         ) {
-                            Icon(MetrolistIcons.Default.MoreVert, stringResource(Res.string.artist_actions), tint = iconColor)
+                            Icon(AnitailIcons.Default.MoreVert, stringResource(Res.string.artist_actions), tint = iconColor)
                         }
                     }
                 },
@@ -1209,7 +1209,7 @@ private fun ArtistActionRow(
                                         contentPadding = PaddingValues(horizontal = if (showLabel) 12.dp else 0.dp),
                                     ) {
                                         Icon(
-                                            if (index == 0) MetrolistIcons.Outlined.Sensors else MetrolistIcons.Rounded.Shuffle,
+                                            if (index == 0) AnitailIcons.Outlined.Sensors else AnitailIcons.Rounded.Shuffle,
                                             if (showLabel) null else label,
                                             Modifier.size(24.dp),
                                         )
@@ -1233,7 +1233,7 @@ private fun ArtistActionRow(
                                     shapes = ButtonDefaults.shapes(shape = shapes.shape, pressedShape = shapes.pressedShape),
                                     contentPadding = PaddingValues(0.dp),
                                 ) {
-                                    Icon(MetrolistIcons.Default.PlayArrow, stringResource(Res.string.artist_play_all), Modifier.size(32.dp))
+                                    Icon(AnitailIcons.Default.PlayArrow, stringResource(Res.string.artist_play_all), Modifier.size(32.dp))
                                 }
                             },
                             menuContent = {
@@ -1249,7 +1249,7 @@ private fun ArtistActionRow(
                     modifier = Modifier.size(rowHeight).navigationPopupSource(),
                     shapes = IconButtonDefaults.shapes(),
                 ) {
-                    Icon(MetrolistIcons.Default.MoreVert, stringResource(Res.string.artist_actions), modifier = Modifier.size(24.dp))
+                    Icon(AnitailIcons.Default.MoreVert, stringResource(Res.string.artist_actions), modifier = Modifier.size(24.dp))
                 }
             }
         }
@@ -1270,7 +1270,7 @@ private fun ArtistUnblockButton(
         contentPadding = PaddingValues(horizontal = horizontalPadding),
         shapes = ButtonDefaults.shapes(),
     ) {
-        Icon(MetrolistIcons.Filled.Remove, null, modifier = Modifier.size(20.dp))
+        Icon(AnitailIcons.Filled.Remove, null, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(8.dp))
         Text(stringResource(Res.string.unblock), fontWeight = FontWeight.Bold, maxLines = 1)
     }
@@ -1368,7 +1368,7 @@ private fun ArtistSectionContent(
                     ) {
                         if (onPlayItem != null) {
                             Button(onClick = { onPlayItem(release) }, shapes = ButtonDefaults.shapes()) {
-                                Icon(MetrolistIcons.Filled.PlayArrow, null, modifier = Modifier.size(20.dp))
+                                Icon(AnitailIcons.Filled.PlayArrow, null, modifier = Modifier.size(20.dp))
                                 Spacer(Modifier.width(6.dp))
                                 Text(stringResource(Res.string.play))
                             }
@@ -1706,7 +1706,7 @@ private fun ArtistSongListItem(
         if (onLikeClick != null) {
             IconButton(onClick = onLikeClick, modifier = Modifier.size(48.dp), shapes = IconButtonDefaults.shapes()) {
                 Icon(
-                    imageVector = if (isLiked) MetrolistIcons.Filled.Favorite else MetrolistIcons.Outlined.FavoriteBorder,
+                    imageVector = if (isLiked) AnitailIcons.Filled.Favorite else AnitailIcons.Outlined.FavoriteBorder,
                     contentDescription = stringResource(if (isLiked) Res.string.unlike else Res.string.action_like),
                     tint =
                         if (isCurrent) {
@@ -1722,7 +1722,7 @@ private fun ArtistSongListItem(
         }
         IconButton(onClick = onMenuClick, modifier = Modifier.size(48.dp).navigationPopupSource(), shapes = IconButtonDefaults.shapes()) {
             Icon(
-                MetrolistIcons.Default.MoreVert,
+                AnitailIcons.Default.MoreVert,
                 stringResource(Res.string.artist_actions),
                 tint = subtitleColor,
             )
@@ -1783,7 +1783,7 @@ private fun ArtistAboutCard(
                     ) {
                         ArtistAboutCardText(artist, description, descriptionLines, Modifier.weight(1f))
                         Icon(
-                            MetrolistIcons.AutoMirrored.Filled.ArrowForward,
+                            AnitailIcons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = null,
                             modifier = Modifier.padding(bottom = 2.dp).size(28.dp),
                             tint = MaterialTheme.colorScheme.onSurface,

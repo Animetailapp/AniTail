@@ -52,7 +52,7 @@ import com.anitail.shared.generated.resources.import_status_fetching_tracks
 import com.anitail.shared.generated.resources.import_status_matching_tracks_short
 import com.anitail.shared.generated.resources.import_status_saving_tracks
 import com.anitail.shared.playlistimport.PlaylistImportManager
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.Duration.Companion.milliseconds
@@ -123,7 +123,7 @@ fun PlaylistImportProgressCard(
                 shapes = IconButtonDefaults.shapes(),
             ) {
                 Icon(
-                    MetrolistIcons.Filled.Close,
+                    AnitailIcons.Filled.Close,
                     contentDescription = stringResource(if (terminal) Res.string.dismiss else Res.string.cancel),
                     modifier = Modifier.size(16.dp),
                 )
@@ -176,7 +176,7 @@ fun PlaylistImportProgressIndicator(modifier: Modifier = Modifier) {
                 shapes = IconButtonDefaults.shapes(),
             ) {
                 Icon(
-                    MetrolistIcons.Filled.Close,
+                    AnitailIcons.Filled.Close,
                     contentDescription = stringResource(if (terminal) Res.string.dismiss else Res.string.cancel),
                     modifier = Modifier.size(14.dp),
                 )

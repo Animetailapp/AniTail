@@ -125,7 +125,7 @@ import com.anitail.shared.generated.resources.share
 import com.anitail.shared.ui.components.BlurredArtworkBackground
 import com.anitail.shared.ui.components.ContainedLoadingIndicator
 import com.anitail.shared.ui.components.images.ImageLoadingPlaceholder
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.LocalNavSharedTransitionScope
 import com.anitail.shared.ui.navigation.LocalNavVisibilityScope
 import com.anitail.shared.ui.navigation.LocalNavigationContainerState
@@ -444,14 +444,14 @@ fun SharedTransitionScope.ArtistPhotoViewer(
                 }
                 ViewerPageButton(
                     visible = pageButtons && pagerState.currentPage > 0,
-                    icon = MetrolistIcons.Filled.ChevronLeft,
+                    icon = AnitailIcons.Filled.ChevronLeft,
                     label = stringResource(Res.string.previous),
                     modifier = Modifier.align(Alignment.CenterStart).padding(horizontal = 12.dp),
                     onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
                 )
                 ViewerPageButton(
                     visible = pageButtons && pagerState.currentPage < photos.lastIndex,
-                    icon = MetrolistIcons.Filled.ChevronRight,
+                    icon = AnitailIcons.Filled.ChevronRight,
                     label = stringResource(Res.string.next),
                     modifier = Modifier.align(Alignment.CenterEnd).padding(horizontal = 12.dp),
                     onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
@@ -513,7 +513,7 @@ private fun ViewerTopBar(
     val uriHandler = LocalUriHandler.current
     Box(modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)) {
         FilledTonalIconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart), shapes = IconButtonDefaults.shapes()) {
-            Icon(MetrolistIcons.Outlined.Close, stringResource(Res.string.close))
+            Icon(AnitailIcons.Outlined.Close, stringResource(Res.string.close))
         }
         if (count > 1) {
             Text(
@@ -528,7 +528,7 @@ private fun ViewerTopBar(
             modifier = Modifier.align(Alignment.CenterEnd),
             shapes = IconButtonDefaults.shapes(),
         ) {
-            Icon(MetrolistIcons.Outlined.Image, stringResource(Res.string.artist_photo_open_original))
+            Icon(AnitailIcons.Outlined.Image, stringResource(Res.string.artist_photo_open_original))
         }
     }
 }
@@ -637,7 +637,7 @@ private fun PhotoDetailsSheet(
                     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(40.dp)) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                if (details?.authorName != null) MetrolistIcons.Outlined.Person else MetrolistIcons.Outlined.Image,
+                                if (details?.authorName != null) AnitailIcons.Outlined.Person else AnitailIcons.Outlined.Image,
                                 null,
                                 Modifier.size(24.dp),
                             )
@@ -670,7 +670,7 @@ private fun PhotoDetailsSheet(
                 if (loading) ContainedLoadingIndicator(Modifier.size(24.dp))
                 photo.pageUrl?.let { pageUrl ->
                     IconButton(onClick = { runCatching { uriHandler.openUri(pageUrl) } }, shapes = IconButtonDefaults.shapes()) {
-                        Icon(MetrolistIcons.AutoMirrored.Filled.OpenInNew, stringResource(Res.string.artist_photo_view_on_lastfm))
+                        Icon(AnitailIcons.AutoMirrored.Filled.OpenInNew, stringResource(Res.string.artist_photo_view_on_lastfm))
                     }
                 }
             }
@@ -708,7 +708,7 @@ private fun PhotoDetailsSheet(
                     onClick = { actions.share(photo.pageUrl ?: photo.url) },
                     modifier = Modifier.size(56.dp),
                     shapes = IconButtonDefaults.shapes(),
-                ) { Icon(MetrolistIcons.Outlined.Share, stringResource(Res.string.share)) }
+                ) { Icon(AnitailIcons.Outlined.Share, stringResource(Res.string.share)) }
                 FilledTonalButton(
                     onClick = onSave,
                     enabled = !saving,
@@ -724,7 +724,7 @@ private fun PhotoDetailsSheet(
                     if (saving) {
                         ContainedLoadingIndicator(Modifier.size(ButtonDefaults.IconSize))
                     } else {
-                        Icon(MetrolistIcons.Outlined.Download, null, Modifier.size(ButtonDefaults.IconSize))
+                        Icon(AnitailIcons.Outlined.Download, null, Modifier.size(ButtonDefaults.IconSize))
                     }
                     Spacer(Modifier.size(ButtonDefaults.IconSpacing))
                     Text(stringResource(Res.string.action_download), style = MaterialTheme.typography.titleMedium)

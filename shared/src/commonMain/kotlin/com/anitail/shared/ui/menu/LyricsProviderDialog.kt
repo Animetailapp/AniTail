@@ -74,7 +74,7 @@ import com.anitail.shared.repository.LyricsProviderSearch
 import com.anitail.shared.ui.components.AlertDialog
 import com.anitail.shared.ui.components.GroupedListItem
 import com.anitail.shared.ui.components.loadingShimmer
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import com.anitail.shared.ui.utils.verticalScrollWithDrag
 import com.anitail.shared.utils.formatDuration
@@ -104,7 +104,7 @@ fun LyricsProviderDialog(
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = dismiss, shapes = IconButtonDefaults.shapes()) {
-                    Icon(MetrolistIcons.Default.Close, stringResource(Res.string.close))
+                    Icon(AnitailIcons.Default.Close, stringResource(Res.string.close))
                 }
             }
         },
@@ -253,7 +253,7 @@ private fun ExpandButton(
         modifier = Modifier.tvFocusHighlight().semantics { stateDescription = state },
     ) {
         Icon(
-            if (expanded) MetrolistIcons.Outlined.KeyboardArrowUp else MetrolistIcons.Outlined.KeyboardArrowDown,
+            if (expanded) AnitailIcons.Outlined.KeyboardArrowUp else AnitailIcons.Outlined.KeyboardArrowDown,
             stringResource(if (expanded) Res.string.collapse else Res.string.expand),
         )
     }

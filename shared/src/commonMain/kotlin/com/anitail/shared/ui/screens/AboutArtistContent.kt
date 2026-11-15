@@ -114,7 +114,7 @@ import com.anitail.shared.model.ArtistItem
 import com.anitail.shared.ui.components.ExpandableText
 import com.anitail.shared.ui.components.images.AsyncImage
 import com.anitail.shared.ui.components.loadingShimmer
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.utils.carouselScroll
 import com.anitail.shared.utils.Logger
 import com.anitail.shared.utils.monthlyListenersCount
@@ -520,7 +520,7 @@ fun AboutArtistContent(
                         title = { Text(artistName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         navigationIcon = {
                             IconButton(onClick = onBackClick, shapes = IconButtonDefaults.shapes()) {
-                                Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back))
+                                Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back))
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),

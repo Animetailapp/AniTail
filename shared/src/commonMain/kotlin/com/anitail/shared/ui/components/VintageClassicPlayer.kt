@@ -60,8 +60,8 @@ import androidx.compose.ui.unit.dp
 import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.loading
 import com.anitail.shared.ui.LocalIsTv
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import org.jetbrains.compose.resources.stringResource
@@ -99,7 +99,7 @@ fun VintageClassicControls(
     buttonSize: Dp = 72.dp,
     playPauseFocusRequester: FocusRequester? = null,
 ) {
-    val haptics = rememberMetrolistHaptics()
+    val haptics = rememberAnitailHaptics()
     val playPauseRoundness by animateDpAsState(
         targetValue = if (isPlaying) buttonSize / 3 else buttonSize / 2,
         animationSpec = tween(durationMillis = 90, easing = LinearEasing),
@@ -123,7 +123,7 @@ fun VintageClassicControls(
                 shapes = IconButtonDefaults.shapes(),
             ) {
                 Icon(
-                    imageVector = if (repeatMode == 1) MetrolistIcons.Rounded.RepeatOne else MetrolistIcons.Rounded.Repeat,
+                    imageVector = if (repeatMode == 1) AnitailIcons.Rounded.RepeatOne else AnitailIcons.Rounded.Repeat,
                     contentDescription = text.repeat,
                     modifier = Modifier.size(24.dp),
                 )
@@ -139,7 +139,7 @@ fun VintageClassicControls(
                 shapes = IconButtonDefaults.shapes(),
             ) {
                 Icon(
-                    imageVector = MetrolistIcons.Rounded.SkipPrevious,
+                    imageVector = AnitailIcons.Rounded.SkipPrevious,
                     contentDescription = text.previous,
                     modifier = Modifier.size(32.dp),
                 )
@@ -173,7 +173,7 @@ fun VintageClassicControls(
                 )
             } else {
                 Icon(
-                    imageVector = if (isPlaying) MetrolistIcons.Rounded.Pause else MetrolistIcons.Rounded.PlayArrow,
+                    imageVector = if (isPlaying) AnitailIcons.Rounded.Pause else AnitailIcons.Rounded.PlayArrow,
                     contentDescription = null,
                     tint = onButtonColor,
                     modifier = Modifier.size(IconButtonDefaults.extraLargeIconSize.coerceAtMost(buttonSize)),
@@ -192,7 +192,7 @@ fun VintageClassicControls(
                 shapes = IconButtonDefaults.shapes(),
             ) {
                 Icon(
-                    imageVector = MetrolistIcons.Rounded.SkipNext,
+                    imageVector = AnitailIcons.Rounded.SkipNext,
                     contentDescription = text.next,
                     modifier = Modifier.size(32.dp),
                 )
@@ -210,7 +210,7 @@ fun VintageClassicControls(
                 shapes = IconButtonDefaults.shapes(),
             ) {
                 Icon(
-                    imageVector = if (isLiked) MetrolistIcons.Rounded.Favorite else MetrolistIcons.Rounded.FavoriteBorder,
+                    imageVector = if (isLiked) AnitailIcons.Rounded.Favorite else AnitailIcons.Rounded.FavoriteBorder,
                     contentDescription = if (isLiked) text.unlike else text.like,
                     modifier = Modifier.size(24.dp),
                 )
@@ -247,7 +247,7 @@ fun VintageClassicActionButtons(
             if (showLyrics) {
                 if (showExpandButton) {
                     VintageCircleButton(
-                        icon = if (isLyricsExpanded) MetrolistIcons.Default.FullscreenExit else MetrolistIcons.Default.Fullscreen,
+                        icon = if (isLyricsExpanded) AnitailIcons.Default.FullscreenExit else AnitailIcons.Default.Fullscreen,
                         description = if (isLyricsExpanded) collapseDescription else expandDescription,
                         onClick = onToggleLyricsExpanded,
                         buttonColor = buttonColor,
@@ -256,7 +256,7 @@ fun VintageClassicActionButtons(
                 }
             } else if (!isTv) {
                 VintageCircleButton(
-                    icon = MetrolistIcons.Default.Share,
+                    icon = AnitailIcons.Default.Share,
                     description = shareDescription,
                     onClick = onShareClick,
                     buttonColor = buttonColor,
@@ -267,7 +267,7 @@ fun VintageClassicActionButtons(
 
         AnimatedContent(targetState = isLyricsVisible, label = "VintageSecondAction") { showLyrics ->
             VintageCircleButton(
-                icon = MetrolistIcons.Default.MoreHoriz,
+                icon = AnitailIcons.Default.MoreHoriz,
                 description = if (showLyrics) moreLyricsDescription else moreDescription,
                 onClick = if (showLyrics) onShowLyricsMenu else onShowPlayerMenu,
                 buttonColor = buttonColor,
@@ -380,7 +380,7 @@ fun VintageClassicBottomBar(
                     .padding(horizontal = spec.outerPadding, vertical = verticalPadding),
         ) {
             VintageBottomBarItem(
-                icon = MetrolistIcons.AutoMirrored.Filled.QueueMusic,
+                icon = AnitailIcons.AutoMirrored.Filled.QueueMusic,
                 label = queueText,
                 showLabel = spec.showLabels,
                 spec = spec,
@@ -389,7 +389,7 @@ fun VintageClassicBottomBar(
             )
             if (onSleepTimerClick != null) {
                 VintageBottomBarItem(
-                    icon = MetrolistIcons.Default.Bedtime,
+                    icon = AnitailIcons.Default.Bedtime,
                     label = sleepLabel,
                     showLabel = spec.showLabels || sleepTimerActive,
                     spec = spec,
@@ -399,7 +399,7 @@ fun VintageClassicBottomBar(
                 )
             }
             VintageBottomBarItem(
-                icon = MetrolistIcons.Default.Lyrics,
+                icon = AnitailIcons.Default.Lyrics,
                 label = lyricsText,
                 showLabel = spec.showLabels,
                 spec = spec,
@@ -492,7 +492,7 @@ fun VintageAudioVideoModeSwitcher(
             selected = !isVideoActive,
             enabled = !isResolving,
             description = songDescription,
-            icon = if (isVideoActive) MetrolistIcons.Outlined.Headphones else MetrolistIcons.Filled.Headphones,
+            icon = if (isVideoActive) AnitailIcons.Outlined.Headphones else AnitailIcons.Filled.Headphones,
             showProgress = isResolving && isVideoActive,
             contentColor = contentColor,
             selectedContentColor = selectedIconColor,
@@ -504,7 +504,7 @@ fun VintageAudioVideoModeSwitcher(
             selected = isVideoActive,
             enabled = !isResolving,
             description = videoDescription,
-            icon = if (isVideoActive) MetrolistIcons.Filled.SmartDisplay else MetrolistIcons.Outlined.SmartDisplay,
+            icon = if (isVideoActive) AnitailIcons.Filled.SmartDisplay else AnitailIcons.Outlined.SmartDisplay,
             showProgress = isResolving && !isVideoActive,
             contentColor = contentColor,
             selectedContentColor = selectedIconColor,

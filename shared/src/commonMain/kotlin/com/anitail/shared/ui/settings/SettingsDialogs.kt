@@ -47,7 +47,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import com.anitail.shared.generated.resources.*
 import com.anitail.shared.ui.components.BasicAlertDialog
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.playback.retainPlaybackKeyFocus
 import kotlinx.coroutines.cancel
 import org.jetbrains.compose.resources.stringResource
@@ -142,7 +142,7 @@ internal fun SettingsTextDialog(
                     trailingIcon = {
                         IconButton(onClick = { secretVisible = !secretVisible }, shapes = IconButtonDefaults.shapes()) {
                             Icon(
-                                imageVector = if (secretVisible) MetrolistIcons.Filled.VisibilityOff else MetrolistIcons.Filled.Visibility,
+                                imageVector = if (secretVisible) AnitailIcons.Filled.VisibilityOff else AnitailIcons.Filled.Visibility,
                                 contentDescription =
                                     stringResource(
                                         if (secretVisible) Res.string.settings_hide_secret else Res.string.settings_show_secret,

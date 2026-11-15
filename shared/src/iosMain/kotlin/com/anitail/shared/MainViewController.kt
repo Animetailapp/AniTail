@@ -94,7 +94,7 @@ import com.anitail.shared.ui.settings.LocalSettingsPageBottomPadding
 import com.anitail.shared.ui.settings.PlaylistImportFile
 import com.anitail.shared.ui.settings.SettingsChoice
 import com.anitail.shared.ui.settings.SettingsPageId
-import com.anitail.shared.ui.theme.MetrolistTheme
+import com.anitail.shared.ui.theme.AnitailTheme
 import com.anitail.shared.ui.theme.parseThemeSeedColor
 import com.anitail.shared.update.IosUpdateNotice
 import com.anitail.shared.utils.ArtworkSizingInterceptor
@@ -161,7 +161,7 @@ fun handleOpenUrl(url: String) {
 
 @OptIn(ExperimentalForeignApi::class)
 @Composable
-fun MetrolistIOSApp() {
+fun AnitailIOSApp() {
     val scope = rememberCoroutineScope()
     val presenter = LocalUIViewController.current
     DisposableEffect(Unit) {
@@ -301,7 +301,7 @@ fun MetrolistIOSApp() {
     }
 
     suspend fun reopenDatabaseAfterRestore() {
-        MetrolistPlatform.reopenDatabaseAfterRestore()
+        AnitailPlatform.reopenDatabaseAfterRestore()
         databaseGeneration++
         sessionClosed = false
         pendingMobileDispose = null
@@ -373,7 +373,7 @@ fun MetrolistIOSApp() {
                         )
                     if (sessionClosed) reopenDatabaseAfterRestore()
                     if (databaseGeneration == generationBeforeRestore && result.isSuccess) {
-                        MetrolistPlatform.refreshRestoredSettings()
+                        AnitailPlatform.refreshRestoredSettings()
                         appGeneration++
                     }
                     backupFailure = result.exceptionOrNull()
@@ -412,7 +412,7 @@ fun MetrolistIOSApp() {
     Box(Modifier.fillMaxSize()) {
         if (showOnboarding) {
             Settings.shared.systemInDarkTheme = isSystemInDarkTheme()
-            MetrolistTheme(
+            AnitailTheme(
                 seedColor = parseThemeSeedColor(Settings.shared.selectedThemeColor),
                 darkTheme = Settings.shared.getCurrentThemeIsDark(),
                 pureBlack = Settings.shared.isPureBlackTheme(),
@@ -421,7 +421,7 @@ fun MetrolistIOSApp() {
                     Settings.shared.sentryEnabled = consent
                     Settings.shared.iosOnboardingComplete = true
                     showOnboarding = false
-                    if (login) handleOpenUrl("metrolist://login")
+                    if (login) handleOpenUrl("anitail://login")
                     if (restore) initialSettingsPage = SettingsPageId.BACKUP_RESTORE
                 }
             }
@@ -579,18 +579,18 @@ fun MainViewController(): UIViewController {
                 MaterialTheme {
                     CrashLogsScreen(IosCrashRecovery, onClose = {
                         IosCrashRecovery.acknowledge()
-                        MetrolistPlatform.initialize()
+                        AnitailPlatform.initialize()
                         configureIosImageLoader()
                         showingReport = false
                     }, onShare = { IosNativeFiles.shareText(presenter, it) })
                 }
             } else {
-                MetrolistIOSApp()
+                AnitailIOSApp()
             }
         }
     }
     configureIosImageLoader()
-    return ComposeUIViewController { MetrolistIOSApp() }
+    return ComposeUIViewController { AnitailIOSApp() }
 }
 
 private var imageMemoryWarningObserver: NSObjectProtocol? = null

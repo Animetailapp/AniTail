@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.add_to_favorites
 import com.anitail.shared.generated.resources.remove_from_favorites
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import org.jetbrains.compose.resources.stringResource
 
@@ -68,7 +68,7 @@ fun PlaylistHeaderActions(
                 contentPadding = PaddingValues(0.dp),
             ) {
                 Icon(
-                    if (isFavorite) MetrolistIcons.Filled.Favorite else MetrolistIcons.Default.FavoriteBorder,
+                    if (isFavorite) AnitailIcons.Filled.Favorite else AnitailIcons.Default.FavoriteBorder,
                     stringResource(if (isFavorite) Res.string.remove_from_favorites else Res.string.add_to_favorites),
                     Modifier.size(20.dp),
                 )
@@ -93,11 +93,11 @@ internal fun HeaderPlaybackButtons(
     val icons =
         if (playFirst) {
             listOf(
-                MetrolistIcons.Default.PlayArrow,
-                MetrolistIcons.Rounded.Shuffle,
+                AnitailIcons.Default.PlayArrow,
+                AnitailIcons.Rounded.Shuffle,
             )
         } else {
-            listOf(MetrolistIcons.Rounded.Shuffle, MetrolistIcons.Default.PlayArrow)
+            listOf(AnitailIcons.Rounded.Shuffle, AnitailIcons.Default.PlayArrow)
         }
     val callbacks = if (playFirst) listOf(onPlayAll, onShuffle) else listOf(onShuffle, onPlayAll)
     ButtonGroup(

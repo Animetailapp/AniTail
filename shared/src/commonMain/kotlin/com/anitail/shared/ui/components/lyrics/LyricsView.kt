@@ -132,7 +132,7 @@ import com.anitail.shared.ui.components.expressiveEntrance
 import com.anitail.shared.ui.components.lyrics.words.FixedMotionDurationScale
 import com.anitail.shared.ui.components.lyrics.words.LocalLyricsAnimationVisible
 import com.anitail.shared.ui.components.lyrics.words.LyricsAnimationStyle
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.NavigationBackHandler
 import com.anitail.shared.ui.utils.DragScrollableColumn
 import com.anitail.shared.ui.utils.artworkVerticalProgressiveBlur
@@ -1666,7 +1666,7 @@ fun LyricsView(
                 shapes = ButtonDefaults.shapes(shape = RoundedCornerShape(24.dp)),
             ) {
                 Icon(
-                    imageVector = MetrolistIcons.Default.Sync,
+                    imageVector = AnitailIcons.Default.Sync,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
                 )

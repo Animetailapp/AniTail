@@ -173,7 +173,7 @@ fun PlaybackProgressSlider(
                 }
 
                 SliderStyle.WAVY, SliderStyle.LINEAR_WAVY -> {
-                    // Ported from Metrolist's WavySlider: spring amplitude and 8dp round thumb.
+                    // Ported from Anitail's WavySlider: spring amplitude and 8dp round thumb.
                     val amplitude by animateFloatAsState(
                         targetValue = if (isPlaying) 1f else 0f,
                         animationSpec = if (animate) ProgressIndicatorDefaults.ProgressAnimationSpec else snap(),

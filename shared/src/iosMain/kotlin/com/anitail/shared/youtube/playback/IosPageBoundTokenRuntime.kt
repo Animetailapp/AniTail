@@ -79,10 +79,10 @@ internal object IosPageBoundTokenRuntime : PageBoundPoTokenJavaScriptRuntime {
             """
             globalThis.bgVmFunctions = null;
             globalThis.poTokenMinter = null;
-            delete globalThis.__metrolistWebPoSignalOutput;
-            delete globalThis.__metrolistPoSnapshot;
-            delete globalThis.__metrolistPoMinter;
-            delete globalThis.__metrolistPoToken;
+            delete globalThis.__anitailWebPoSignalOutput;
+            delete globalThis.__anitailPoSnapshot;
+            delete globalThis.__anitailPoMinter;
+            delete globalThis.__anitailPoToken;
             "reset";
             """.trimIndent(),
         )

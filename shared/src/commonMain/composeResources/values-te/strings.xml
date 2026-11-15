@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Imported from the official Metrolist Android translations. --><!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
+<!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
     <string name="home">ఇల్లు</string>
     <string name="offline_mode">ఆఫ్‌లైన్ పాషకం</string>
     <string name="songs">పాటలు</string>
@@ -254,7 +254,7 @@
     <string name="credits_license_desc">GPL-3.0 AniTail ని అనుమతించింది.</string>
     <string name="devmode_already_active" translatable="true">డెవలపర్ మోడ్ ఇప్పటికే పని చేస్తోంది</string>
     <string name="discord_enable_rich_presence">Discord Rich Presence</string>
-    <string name="discord_listen_to_metrolist">AniTail ని వినండీ</string>
+    <string name="discord_listen_to_anitail">AniTail ని వినండీ</string>
     <string name="discord_login_description">మీ Discord Account ను చేర్చండి</string>
     <string name="discord_rich_presence">Rich Presence</string>
     <string name="discord_state">స్థితి</string>

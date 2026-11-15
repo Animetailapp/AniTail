@@ -11,5 +11,5 @@ version="${BASH_REMATCH[1]}"
 if [[ $# -eq 0 ]]; then
   printf '%s\n' "$version"
 else
-  printf '#define METROLIST_VERSION %s\n' "$version" > "$1"
+  printf '#define ANITAIL_VERSION %s\n' "$version" > "$1"
 fi

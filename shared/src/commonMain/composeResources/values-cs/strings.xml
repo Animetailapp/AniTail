@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Imported from the official Metrolist Android translations. --><!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
+<!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
     <string name="home">Domů</string>
     <string name="offline_mode">Offline režim</string>
     <string name="songs">Skladby</string>
@@ -272,7 +272,7 @@
     <string name="credits_collaborators_section">Tým AniTail hrdinů</string>
     <string name="devmode_already_active" translatable="true">Vývojářský režim je již aktivní</string>
     <string name="discord_enable_rich_presence">Discord Rich Presence</string>
-    <string name="discord_listen_to_metrolist">Poslouchej AniTail</string>
+    <string name="discord_listen_to_anitail">Poslouchej AniTail</string>
     <string name="discord_login_description">Připoj svůj Discord účet</string>
     <string name="discord_rich_presence">Rich presence</string>
     <string name="discord_state">Stav</string>
@@ -1419,7 +1419,7 @@
     <string name="menu_keyboard_shortcuts">Klávesové zkratky</string>
     <string name="menu_application_logs">Záznamy aplikace</string>
     <string name="menu_report_issue">Nahlásit problém…</string>
-    <string name="menu_about_metrolist">O aplikaci AniTail</string>
+    <string name="menu_about_anitail">O aplikaci AniTail</string>
     <string name="menu_song">Skladba</string>
     <string name="menu_stop">Zastavit</string>
     <string name="menu_go_to_current_song">Přejít na současnou skladbu</string>
@@ -1721,7 +1721,7 @@
     <string name="tray_show_window">Zobrazit okno</string>
     <string name="tray_show_miniplayer">Zobrazit mini přehrávač</string>
     <string name="tray_settings">Nastavení</string>
-    <string name="tray_quit_metrolist">Ukončit AniTail</string>
+    <string name="tray_quit_anitail">Ukončit AniTail</string>
     <string name="sign_in_discord">Přihlásit se - Discord</string>
     <string name="discord_sign_in_unavailable">Přihlášení přes Discord není dostupné</string>
     <string name="sign_in_youtube_music">Přihlásit se - YouTube Music</string>

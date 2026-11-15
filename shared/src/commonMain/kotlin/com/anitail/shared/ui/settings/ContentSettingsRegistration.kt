@@ -25,7 +25,7 @@ import com.anitail.shared.generated.resources.*
 import com.anitail.shared.settings.AiSlopBlocklist
 import com.anitail.shared.settings.BlockedContent
 import com.anitail.shared.settings.Settings
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
@@ -55,7 +55,7 @@ internal fun SettingsUiRegistryBuilder.registerContentSettings(host: SharedSetti
         id = SettingsPageId.CONTENT,
         title = stringResource(Res.string.settings_content_title),
         subtitle = stringResource(Res.string.settings_content_description),
-        icon = MetrolistIcons.Outlined.Language,
+        icon = AnitailIcons.Outlined.Language,
         tone = SettingsTone.ROSE,
     ) {
         host.onSwitchYouTubeChannel?.let { switchChannel ->

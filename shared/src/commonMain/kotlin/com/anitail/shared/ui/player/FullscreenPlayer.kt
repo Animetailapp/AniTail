@@ -123,7 +123,7 @@ import com.anitail.shared.ui.components.lyrics.ActiveLyricsLineContent
 import com.anitail.shared.ui.components.lyrics.rememberCaptionLyricsPositionState
 import com.anitail.shared.ui.components.rememberSheetBackProgress
 import com.anitail.shared.ui.components.sliders.collectPlaybackDisplayState
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.blockInput
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.theme.uiEnhanced
@@ -472,7 +472,7 @@ private fun FullscreenControlsOverlay(
                         shapes = IconButtonDefaults.shapes(),
                     ) {
                         Icon(
-                            imageVector = MetrolistIcons.Rounded.KeyboardArrowDown,
+                            imageVector = AnitailIcons.Rounded.KeyboardArrowDown,
                             contentDescription = stringResource(Res.string.close),
                             tint = Color.White,
                             modifier = Modifier.size(32.dp),
@@ -549,7 +549,7 @@ private fun FullscreenControlsOverlay(
                                     shapes = IconButtonDefaults.shapes(),
                                 ) {
                                     Icon(
-                                        imageVector = MetrolistIcons.Filled.PictureInPicture,
+                                        imageVector = AnitailIcons.Filled.PictureInPicture,
                                         contentDescription = stringResource(Res.string.enter_pip),
                                         tint = Color.White,
                                         modifier = Modifier.size(18.dp),
@@ -563,7 +563,7 @@ private fun FullscreenControlsOverlay(
                                 shapes = IconButtonDefaults.shapes(),
                             ) {
                                 Icon(
-                                    imageVector = MetrolistIcons.Default.FullscreenExit,
+                                    imageVector = AnitailIcons.Default.FullscreenExit,
                                     contentDescription = stringResource(Res.string.exit_fullscreen),
                                     tint = Color.White,
                                     modifier = Modifier.size(20.dp),
@@ -640,7 +640,7 @@ private fun FullscreenControlsOverlay(
                             shapes = IconButtonDefaults.shapes(),
                         ) {
                             Icon(
-                                MetrolistIcons.Default.MoreVert,
+                                AnitailIcons.Default.MoreVert,
                                 contentDescription = stringResource(Res.string.more_options),
                                 tint = Color.White,
                                 modifier = Modifier.size(24.dp),

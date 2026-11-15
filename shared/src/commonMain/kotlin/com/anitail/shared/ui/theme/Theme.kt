@@ -9,7 +9,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import com.anitail.shared.ui.haptics.MetrolistHapticsProvider
+import com.anitail.shared.ui.haptics.AnitailHapticsProvider
 
 private val LightColors =
     lightColorScheme(
@@ -41,7 +41,7 @@ private val DarkColors =
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun MetrolistTheme(
+fun AnitailTheme(
     useDarkTheme: Boolean = false,
     content: @Composable () -> Unit,
 ) {
@@ -52,6 +52,6 @@ fun MetrolistTheme(
         colorScheme = animateColorScheme(colors, motionScheme),
         motionScheme = motionScheme,
         typography = Typography(),
-        content = { MetrolistHapticsProvider(content) },
+        content = { AnitailHapticsProvider(content) },
     )
 }

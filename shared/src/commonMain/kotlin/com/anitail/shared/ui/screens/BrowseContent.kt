@@ -76,7 +76,7 @@ import com.anitail.shared.ui.components.YTGridItem
 import com.anitail.shared.ui.components.YTListItem
 import com.anitail.shared.ui.components.images.ImageLoadingPlaceholder
 import com.anitail.shared.ui.components.rememberItemPlayback
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import com.anitail.shared.ui.utils.DragScrollableGrid
 import com.anitail.shared.ui.utils.desktopArrowScroll
@@ -144,7 +144,7 @@ fun BrowseContent(
                 navigationIcon = {
                     if (onBackClick != null) {
                         IconButton(onClick = onBackClick, shapes = IconButtonDefaults.shapes()) {
-                            Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
+                            Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
                         }
                     }
                 },

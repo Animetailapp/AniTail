@@ -166,7 +166,7 @@ class DiscordAuth(
         private const val DISCORD_APP_ID = 1447278780795064401L
         private const val DISCORD_OAUTH_AUTHORIZE = "https://discord.com/oauth2/authorize"
         private const val DISCORD_OAUTH_TOKEN = "https://discord.com/api/v10/oauth2/token"
-        private const val DISCORD_REDIRECT_URI = "metrolist-auth://discord/callback"
+        private const val DISCORD_REDIRECT_URI = "anitail-auth://discord/callback"
         private const val DISCORD_SCOPES = "openid sdk.social_layer_presence"
 
         fun generatePkcePair(): PkcePair {

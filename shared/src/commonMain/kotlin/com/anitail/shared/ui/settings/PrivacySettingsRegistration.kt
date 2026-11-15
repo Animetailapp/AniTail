@@ -43,7 +43,7 @@ import com.anitail.shared.settings.HiddenLibraryItemType
 import com.anitail.shared.settings.HiddenLibraryItems
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.ui.components.CollectionPreviews
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
@@ -55,7 +55,7 @@ internal fun SettingsUiRegistryBuilder.registerPrivacySettings(host: SharedSetti
         id = SettingsPageId.PRIVACY,
         title = stringResource(Res.string.privacy_settings_title),
         subtitle = stringResource(Res.string.settings_privacy_description),
-        icon = MetrolistIcons.Outlined.Security,
+        icon = AnitailIcons.Outlined.Security,
         tone = SettingsTone.CYAN,
     ) {
         group("history", stringResource(Res.string.history)) {
@@ -196,7 +196,7 @@ internal fun SettingsUiRegistryBuilder.registerPrivacySettings(host: SharedSetti
             id = SettingsPageId.HIDDEN_HOME_ITEMS,
             title = stringResource(Res.string.hidden_home_items),
             subtitle = stringResource(Res.string.hidden_home_items_desc),
-            icon = MetrolistIcons.Filled.VisibilityOff,
+            icon = AnitailIcons.Filled.VisibilityOff,
             tone = SettingsTone.CYAN,
         ) {
             group("hiddenHomeItems", stringResource(Res.string.hidden_home_items)) {
@@ -235,7 +235,7 @@ internal fun SettingsUiRegistryBuilder.registerPrivacySettings(host: SharedSetti
             id = SettingsPageId.HIDDEN_LIBRARY_ITEMS,
             title = stringResource(Res.string.hidden_playlists),
             subtitle = stringResource(Res.string.hidden_playlists_desc),
-            icon = MetrolistIcons.Filled.Visibility,
+            icon = AnitailIcons.Filled.Visibility,
             tone = SettingsTone.CYAN,
         ) {
             group("hiddenItems", stringResource(Res.string.hidden_playlists)) {
@@ -290,7 +290,7 @@ internal fun SettingsUiRegistryBuilder.registerPrivacySettings(host: SharedSetti
             id = SettingsPageId.BLOCKED_ARTISTS,
             title = stringResource(Res.string.blocked_artists),
             subtitle = stringResource(Res.string.blocked_artists_desc),
-            icon = MetrolistIcons.Outlined.Block,
+            icon = AnitailIcons.Outlined.Block,
             tone = SettingsTone.CYAN,
         ) {
             group("blockedArtists", stringResource(Res.string.blocked_artists)) {
@@ -331,7 +331,7 @@ internal fun SettingsUiRegistryBuilder.registerPrivacySettings(host: SharedSetti
                                                 },
                                                 shapes = IconButtonDefaults.shapes(),
                                             ) {
-                                                Icon(MetrolistIcons.Filled.Remove, stringResource(Res.string.unblock))
+                                                Icon(AnitailIcons.Filled.Remove, stringResource(Res.string.unblock))
                                             }
                                         }
                                     },
@@ -399,7 +399,7 @@ private fun HiddenItemRow(
             onClick = onRemove,
             shapes = IconButtonDefaults.shapes(),
         ) {
-            Icon(MetrolistIcons.Filled.Remove, stringResource(Res.string.show_again))
+            Icon(AnitailIcons.Filled.Remove, stringResource(Res.string.show_again))
         }
     }
 }

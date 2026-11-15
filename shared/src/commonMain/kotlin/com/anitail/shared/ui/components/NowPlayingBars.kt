@@ -26,7 +26,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 import com.anitail.shared.ui.components.lyrics.words.FixedMotionDurationScale
 import com.anitail.shared.ui.components.sliders.rememberWavePhase
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.LocalContentObscured
 import com.anitail.shared.ui.navigation.LocalRootContentActive
 import kotlinx.coroutines.launch
@@ -42,7 +42,7 @@ fun NowPlayingBars(
 ) {
     if (!isPlaying) {
         Icon(
-            MetrolistIcons.Default.Pause,
+            AnitailIcons.Default.Pause,
             contentDescription = playbackStateDescription,
             tint = color,
             modifier = modifier.size(20.dp),

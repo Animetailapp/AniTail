@@ -21,11 +21,11 @@ import com.anitail.shared.api.lyrics.YouTubeLyricsApi
 import com.anitail.shared.api.musicvideo.MusicVideoResolver
 import com.anitail.shared.repository.LyricsRepository
 import com.anitail.shared.state.GlobalYouTube
-import com.anitail.shared.youtube.logging.MetrolistInnerTubeLogger
+import com.anitail.shared.youtube.logging.AnitailInnerTubeLogger
 import com.anitail.shared.youtube.lyrics.InnerTubeLyricsApi
 import com.anitail.shared.youtube.playback.DefaultStreamResolver
 import com.anitail.shared.youtube.playback.LocalAudioSource
-import com.anitail.shared.youtube.playback.MetrolistPlayerConfigRepository
+import com.anitail.shared.youtube.playback.AnitailPlayerConfigRepository
 import com.anitail.shared.youtube.playback.PlatformTokenProvider
 import com.anitail.shared.youtube.playback.StreamResolver
 import com.anitail.shared.youtube.strategy.ClientHealthTracker
@@ -40,13 +40,13 @@ val sharedModule =
                 encodeDefaults = true
             }
         }
-        single { RemotePlayerConfigStore(get(), MetrolistPlayerConfigRepository, MetrolistInnerTubeLogger) }
+        single { RemotePlayerConfigStore(get(), AnitailPlayerConfigRepository, AnitailInnerTubeLogger) }
         single<YtConfigParser> {
             YtConfigParserImpl(
                 get(),
                 get(),
                 get(),
-                MetrolistInnerTubeLogger,
+                AnitailInnerTubeLogger,
                 cipherService = get<YouTubeCipherService>(),
             )
         }
@@ -55,7 +55,7 @@ val sharedModule =
         single<ClientHealthMonitor> { get<ClientHealthTracker>() }
         single<ClientFallbackStrategy> { ContentAwareFallbackStrategy(get()) }
 
-        single { YouTubeCipherService(get(), get(), MetrolistInnerTubeLogger) }
+        single { YouTubeCipherService(get(), get(), AnitailInnerTubeLogger) }
 
         single<TokenProvider> { PlatformTokenProvider() }
 
@@ -67,7 +67,7 @@ val sharedModule =
                 fallbackStrategy = get(),
                 tokenProvider = get<TokenProvider>(),
                 clientHealthMonitor = get(),
-                logger = MetrolistInnerTubeLogger,
+                logger = AnitailInnerTubeLogger,
             )
         }
 

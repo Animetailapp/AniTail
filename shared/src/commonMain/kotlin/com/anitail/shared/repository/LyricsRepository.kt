@@ -117,7 +117,7 @@ internal fun prefersLyrics(
 
 const val USER_LYRICS_PROVIDER = "User"
 
-const val LOCAL_LYRICS_PROVIDER = "METROLIST_LOCAL"
+const val LOCAL_LYRICS_PROVIDER = "ANITAIL_LOCAL"
 
 fun isLocalLyricsProvider(provider: String?): Boolean =
     provider == USER_LYRICS_PROVIDER || provider == LOCAL_LYRICS_PROVIDER || provider == "Local"
@@ -1509,7 +1509,7 @@ class LyricsRepository(
     private companion object {
         const val AI_TRANSLATION_CACHE_VERSION = "v5"
         val LEGACY_AI_TRANSLATION_CACHE_VERSIONS = listOf("v2", "v3", "v4")
-        const val SYNCED_TRANSLATION_PREFIX = "METROLIST_TRANSLATION_V2:"
+        const val SYNCED_TRANSLATION_PREFIX = "ANITAIL_TRANSLATION_V2:"
         const val PROVIDER_TIMEOUT_MS = 10_000L
         const val PROVIDER_RESULTS_CONCURRENCY = 12
         const val NEGATIVE_CACHE_TTL_MS = 7 * 24 * 60 * 60_000L

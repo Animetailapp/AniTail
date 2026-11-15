@@ -11,7 +11,7 @@ import com.anitail.shared.db.OfflineSongAvailability
 import com.anitail.shared.network.createHttpClient
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.utils.Logger
-import com.anitail.shared.youtube.logging.MetrolistInnerTubeLogger
+import com.anitail.shared.youtube.logging.AnitailInnerTubeLogger
 import com.anitail.shared.youtube.playback.StreamResolver
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.channels.BufferOverflow
@@ -46,7 +46,7 @@ val coreModule =
 
 object GlobalYouTube {
     val client = createHttpClient()
-    val innerTube: InnerTube = InnerTube(client, logger = MetrolistInnerTubeLogger)
+    val innerTube: InnerTube = InnerTube(client, logger = AnitailInnerTubeLogger)
     val repository: YouTubeRepository =
         YouTubeRepository(
             innerTube,

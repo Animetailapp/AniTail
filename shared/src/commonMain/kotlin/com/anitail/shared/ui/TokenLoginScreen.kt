@@ -82,7 +82,7 @@ import com.anitail.shared.settings.Settings
 import com.anitail.shared.state.GlobalInnerTube
 import com.anitail.shared.state.SongLikeState
 import com.anitail.shared.ui.components.ExpressiveSwitch
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.tv.RequestTvFocus
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import com.anitail.shared.ui.utils.verticalScrollWithDrag
@@ -406,7 +406,7 @@ fun TokenLoginScreen(
                 title = { Text(stringResource(Res.string.token_login_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack, enabled = !isSaving, shapes = IconButtonDefaults.shapes()) {
-                        Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
+                        Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
                     }
                 },
             )
@@ -429,7 +429,7 @@ fun TokenLoginScreen(
                         contentColor = MaterialTheme.colorScheme.onErrorContainer,
                     ) {
                         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Icon(MetrolistIcons.Outlined.Warning, null)
+                            Icon(AnitailIcons.Outlined.Warning, null)
                             Column {
                                 Text(
                                     stringResource(Res.string.token_login_sensitive_warning_title),
@@ -457,7 +457,7 @@ fun TokenLoginScreen(
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Icon(MetrolistIcons.Outlined.Info, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(AnitailIcons.Outlined.Info, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         stringResource(Res.string.token_adv_login_description),
                         style = MaterialTheme.typography.bodySmall,

@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.next
 import com.anitail.shared.generated.resources.previous
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.utils.isDesktop
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -67,7 +67,7 @@ fun DesktopHorizontalScrollControls(
             exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
         ) {
             FilledTonalIconButton(onClick = { scroll(false) }, shapes = IconButtonDefaults.shapes()) {
-                Icon(MetrolistIcons.AutoMirrored.Filled.KeyboardArrowLeft, stringResource(Res.string.previous))
+                Icon(AnitailIcons.AutoMirrored.Filled.KeyboardArrowLeft, stringResource(Res.string.previous))
             }
         }
         AnimatedVisibility(
@@ -77,7 +77,7 @@ fun DesktopHorizontalScrollControls(
             exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
         ) {
             FilledTonalIconButton(onClick = { scroll(true) }, shapes = IconButtonDefaults.shapes()) {
-                Icon(MetrolistIcons.AutoMirrored.Filled.KeyboardArrowRight, stringResource(Res.string.next))
+                Icon(AnitailIcons.AutoMirrored.Filled.KeyboardArrowRight, stringResource(Res.string.next))
             }
         }
     }

@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.anitail.shared.ui.settings.SettingsItemGroup
 import com.anitail.shared.ui.settings.SettingsPageId
 import com.anitail.shared.ui.settings.SharedSettingsHost
-import com.anitail.shared.ui.settings.rememberMetrolistSettingsRegistry
+import com.anitail.shared.ui.settings.rememberAnitailSettingsRegistry
 
 @Composable
 fun OnboardingPreferences(
@@ -22,7 +22,7 @@ fun OnboardingPreferences(
     host: SharedSettingsHost,
 ) {
     var settingsRevision by remember { mutableIntStateOf(0) }
-    val registry = rememberMetrolistSettingsRegistry(host, settingsRevision)
+    val registry = rememberAnitailSettingsRegistry(host, settingsRevision)
     val entries =
         when (page) {
             OnboardingPage.LANGUAGE_LYRICS -> {

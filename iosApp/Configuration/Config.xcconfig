@@ -1,13 +1,13 @@
 //
 // Config.xcconfig
-// Metrolist iOS App Scaffold Configuration
+// AniTail iOS App Scaffold Configuration
 //
 
 PRODUCT_NAME = AniTail
 PRODUCT_BUNDLE_IDENTIFIER = com.anitail.ios
 CODE_SIGN_ENTITLEMENTS = Configuration/iosApp.entitlements
 INFOPLIST_PREPROCESS = YES
-INFOPLIST_PREFIX_HEADER = $(DERIVED_FILE_DIR)/MetrolistVersion.h
+INFOPLIST_PREFIX_HEADER = $(DERIVED_FILE_DIR)/AnitailVersion.h
 SWIFT_VERSION = 5.9
 SWIFT_STRICT_CONCURRENCY = complete
 IPHONEOS_DEPLOYMENT_TARGET = 17.0

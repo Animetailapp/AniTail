@@ -55,7 +55,7 @@ import com.anitail.shared.model.SearchFilter
 import com.anitail.shared.model.SongItem
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.state.GlobalYouTubeRepository
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -154,7 +154,7 @@ fun AddSongSheetContent(
                         placeholder = { Text(stringResource(Res.string.search_songs)) },
                         leadingIcon = {
                             Icon(
-                                imageVector = MetrolistIcons.Default.Search,
+                                imageVector = AnitailIcons.Default.Search,
                                 contentDescription = null,
                             )
                         },
@@ -162,7 +162,7 @@ fun AddSongSheetContent(
                             if (query.isNotEmpty()) {
                                 IconButton(onClick = { query = "" }, shapes = IconButtonDefaults.shapes()) {
                                     Icon(
-                                        imageVector = MetrolistIcons.Default.Clear,
+                                        imageVector = AnitailIcons.Default.Clear,
                                         contentDescription = stringResource(Res.string.clear_search),
                                     )
                                 }

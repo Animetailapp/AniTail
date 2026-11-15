@@ -127,8 +127,8 @@ import com.anitail.shared.ui.components.libraryCover
 import com.anitail.shared.ui.components.menuAnchorSemantics
 import com.anitail.shared.ui.components.rememberItemPlayback
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.icons.SongStatusIcons
 import com.anitail.shared.ui.menu.ExpressiveSelectionMenu
 import com.anitail.shared.ui.menu.trackPressPosition
@@ -368,7 +368,7 @@ fun LibraryContent(
                 if (reorderEnabled) orderLibraryItems(prepared, reorderOrder) else prepared
             }
 
-        val haptics = rememberMetrolistHaptics()
+        val haptics = rememberAnitailHaptics()
 
         fun moveItem(
             from: YTItem,
@@ -729,7 +729,7 @@ private fun LibraryHeader(
                                     },
                                 )
                                 Icon(
-                                    MetrolistIcons.Outlined.KeyboardArrowDown,
+                                    AnitailIcons.Outlined.KeyboardArrowDown,
                                     contentDescription =
                                         stringResource(
                                             if (ascending) {
@@ -779,7 +779,7 @@ private fun LibraryHeader(
                     shapes = IconButtonDefaults.shapes(),
                 ) {
                     Icon(
-                        if (isSearchOpen) MetrolistIcons.Default.Close else MetrolistIcons.Default.Search,
+                        if (isSearchOpen) AnitailIcons.Default.Close else AnitailIcons.Default.Search,
                         contentDescription = text.search,
                     )
                 }
@@ -791,7 +791,7 @@ private fun LibraryHeader(
                         modifier = Modifier.size(40.dp).tvFocusHighlight(CircleShape).menuAnchorSemantics(gridSizeExpanded),
                         shapes = IconButtonDefaults.shapes(),
                     ) {
-                        Icon(MetrolistIcons.Outlined.Tune, contentDescription = stringResource(Res.string.display_density))
+                        Icon(AnitailIcons.Outlined.Tune, contentDescription = stringResource(Res.string.display_density))
                     }
                     ExpressiveSelectionMenu(
                         expanded = gridSizeExpanded,
@@ -809,7 +809,7 @@ private fun LibraryHeader(
                 horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
             ) {
                 listOf(false, true).forEachIndexed { index, grid ->
-                    val icon = if (grid) MetrolistIcons.Default.GridView else MetrolistIcons.AutoMirrored.Outlined.List
+                    val icon = if (grid) AnitailIcons.Default.GridView else AnitailIcons.AutoMirrored.Outlined.List
                     val label = if (grid) text.grid else text.list
                     customItem(
                         buttonGroupContent = {

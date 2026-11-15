@@ -47,7 +47,7 @@ import com.anitail.shared.generated.resources.search_lyrics
 import com.anitail.shared.generated.resources.song_title
 import com.anitail.shared.ui.LocalIsTv
 import com.anitail.shared.ui.components.AlertDialog
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import com.anitail.shared.ui.utils.verticalScrollWithDrag
 import org.jetbrains.compose.resources.stringResource
@@ -73,7 +73,7 @@ fun LyricsSearchDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(MetrolistIcons.Default.Search, contentDescription = null) },
+        icon = { Icon(AnitailIcons.Default.Search, contentDescription = null) },
         title = { Text(stringResource(Res.string.search_lyrics)) },
         text = {
             Column(
@@ -123,7 +123,7 @@ private fun LyricsSearchTextField(
         label = { Text(label) },
         trailingIcon = {
             IconButton(onClick = state::clearText, shapes = IconButtonDefaults.shapes()) {
-                Icon(MetrolistIcons.Default.Clear, stringResource(Res.string.clear))
+                Icon(AnitailIcons.Default.Clear, stringResource(Res.string.clear))
             }
         },
         lineLimits = TextFieldLineLimits.SingleLine,

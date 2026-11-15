@@ -66,7 +66,7 @@ internal class IosPlaybackCache(
     private val files = NSFileManager.defaultManager
     val directory: String by lazy {
         val caches = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true).first() as String
-        "$caches/metrolist/playback"
+        "$caches/anitail/playback"
     }
     private val initializedDirectory: String by lazy {
         directory.also { path ->
@@ -277,7 +277,7 @@ internal class IosPlaybackCapture(
     }
 
     val asset =
-        AVURLAsset(uRL = checkNotNull(NSURL.URLWithString("metrolist-audio://${NSUUID.UUID().UUIDString}/audio")), options = null).also {
+        AVURLAsset(uRL = checkNotNull(NSURL.URLWithString("anitail-audio://${NSUUID.UUID().UUIDString}/audio")), options = null).also {
             it.resourceLoader.setDelegate(this, dispatch_get_main_queue())
         }
 

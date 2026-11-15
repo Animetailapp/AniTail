@@ -41,7 +41,7 @@ import com.anitail.shared.generated.resources.devtools_playback_log_title
 import com.anitail.shared.generated.resources.playback_event_log_raw_description
 import com.anitail.shared.generated.resources.playback_event_log_raw_empty
 import com.anitail.shared.generated.resources.share
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.utils.DragScrollableColumn
 import com.anitail.shared.youtube.playback.PlaybackEventLog
 import com.anitail.shared.youtube.playback.previewText
@@ -101,7 +101,7 @@ fun PlaybackEventLogSection(
                 SplitButtonLayout(
                     leadingButton = {
                         SplitButtonDefaults.TonalLeadingButton(onClick = onExport, enabled = events.isNotEmpty()) {
-                            Icon(MetrolistIcons.Default.Share, null, Modifier.size(20.dp))
+                            Icon(AnitailIcons.Default.Share, null, Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(Res.string.share))
                         }
@@ -112,13 +112,13 @@ fun PlaybackEventLogSection(
                             enabled = events.isNotEmpty(),
                             shapes = SplitButtonDefaults.trailingButtonShapesFor(SplitButtonDefaults.MediumContainerHeight),
                         ) {
-                            Icon(MetrolistIcons.Default.ContentCopy, null, Modifier.size(20.dp))
+                            Icon(AnitailIcons.Default.ContentCopy, null, Modifier.size(20.dp))
                         }
                     },
                 )
             } else {
                 SplitButtonDefaults.TonalLeadingButton(onClick = onCopy, enabled = events.isNotEmpty()) {
-                    Icon(MetrolistIcons.Default.ContentCopy, null, Modifier.size(20.dp))
+                    Icon(AnitailIcons.Default.ContentCopy, null, Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(Res.string.copy))
                 }
@@ -133,7 +133,7 @@ fun PlaybackEventLogSection(
                     ),
                 shapes = IconButtonDefaults.shapes(),
             ) {
-                Icon(MetrolistIcons.Default.Delete, contentDescription = stringResource(Res.string.clear))
+                Icon(AnitailIcons.Default.Delete, contentDescription = stringResource(Res.string.clear))
             }
         }
         statusMessage?.let { Text(it, modifier = Modifier.padding(horizontal = 16.dp)) }

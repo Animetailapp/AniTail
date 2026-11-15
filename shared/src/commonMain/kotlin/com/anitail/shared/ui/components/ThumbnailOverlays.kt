@@ -55,7 +55,7 @@ import com.anitail.shared.generated.resources.play
 import com.anitail.shared.generated.resources.queue_current_paused
 import com.anitail.shared.generated.resources.queue_current_playing
 import com.anitail.shared.settings.Settings
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.theme.rememberReducedMotion
 import com.anitail.shared.ui.utils.toPolygonShape
 import kotlinx.coroutines.flow.collectLatest
@@ -193,7 +193,7 @@ fun BoxScope.SongThumbnailPlayOverlay(
                 NowPlayingBars(isPlaying = true, color = Color.White)
             } else {
                 Icon(
-                    MetrolistIcons.Rounded.PlayArrow,
+                    AnitailIcons.Rounded.PlayArrow,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(20.dp),
@@ -229,7 +229,7 @@ fun BoxScope.SongThumbnailPlayingIndicator(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = if (isPlaying) MetrolistIcons.Rounded.PlayArrow else MetrolistIcons.Default.Pause,
+                    imageVector = if (isPlaying) AnitailIcons.Rounded.PlayArrow else AnitailIcons.Default.Pause,
                     contentDescription =
                         stringResource(
                             if (isPlaying) Res.string.queue_current_playing else Res.string.queue_current_paused,
@@ -287,7 +287,7 @@ private fun OverlayPlayBadge(
                 .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier),
     ) {
         Icon(
-            MetrolistIcons.Rounded.PlayArrow,
+            AnitailIcons.Rounded.PlayArrow,
             contentDescription = if (onClick != null) stringResource(Res.string.play) else null,
             tint = Color.White,
             modifier = Modifier.size(iconSize),

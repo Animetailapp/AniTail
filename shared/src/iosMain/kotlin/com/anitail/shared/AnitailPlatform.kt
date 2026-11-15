@@ -25,7 +25,7 @@ import org.koin.core.context.startKoin
 import org.koin.dsl.module
 import org.koin.mp.KoinPlatform
 
-object MetrolistPlatform {
+object AnitailPlatform {
     private var isInitialized = false
 
     fun initialize() {

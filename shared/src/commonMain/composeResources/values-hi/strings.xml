@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Imported from the official Metrolist Android translations. --><!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
+<!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
     <string name="home">मुख्य</string>
     <string name="offline_mode">ऑफलाइन मोड</string>
     <string name="songs">गाने</string>
@@ -255,7 +255,7 @@
     <string name="credits_license_desc">AniTail पर GPL-3.0 लाइसेंस लागू है</string>
     <string name="devmode_already_active" translatable="true">Devmode पहले से ही सक्रिय है</string>
     <string name="discord_enable_rich_presence">Discord Rich Presence सक्षम करें</string>
-    <string name="discord_listen_to_metrolist">AniTail सुनें</string>
+    <string name="discord_listen_to_anitail">AniTail सुनें</string>
     <string name="discord_login_description">अपना Discord अकाउंट कनेक्ट करें</string>
     <string name="discord_rich_presence">Rich presence</string>
     <string name="discord_state">स्थिति</string>

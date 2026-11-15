@@ -31,7 +31,7 @@ import com.anitail.shared.generated.resources.devtools_capability_normal
 import com.anitail.shared.generated.resources.devtools_capability_passed
 import com.anitail.shared.generated.resources.devtools_capability_unavailable
 import com.anitail.shared.generated.resources.devtools_capability_untested
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -78,9 +78,9 @@ fun ClientAccessLabel(
 ) {
     val (icon, label) =
         when (policy) {
-            AuthenticationPolicy.OPTIONAL -> MetrolistIcons.Filled.Person to stringResource(Res.string.devtools_access_any)
-            AuthenticationPolicy.UNSUPPORTED -> MetrolistIcons.Filled.VisibilityOff to stringResource(Res.string.devtools_access_anonymous)
-            AuthenticationPolicy.REQUIRED -> MetrolistIcons.Filled.AccountCircle to stringResource(Res.string.devtools_access_logged_in)
+            AuthenticationPolicy.OPTIONAL -> AnitailIcons.Filled.Person to stringResource(Res.string.devtools_access_any)
+            AuthenticationPolicy.UNSUPPORTED -> AnitailIcons.Filled.VisibilityOff to stringResource(Res.string.devtools_access_anonymous)
+            AuthenticationPolicy.REQUIRED -> AnitailIcons.Filled.AccountCircle to stringResource(Res.string.devtools_access_logged_in)
         }
     Row(
         modifier = modifier,
@@ -134,8 +134,8 @@ private fun CapabilitySupport.chipColors(): Pair<Color, Color> {
 
 private fun CapabilitySupport.icon(): ImageVector =
     when (this) {
-        CapabilitySupport.SUPPORTED -> MetrolistIcons.Filled.Check
-        CapabilitySupport.LIMITED -> MetrolistIcons.Filled.Warning
-        CapabilitySupport.UNKNOWN -> MetrolistIcons.Filled.QuestionMark
-        CapabilitySupport.UNSUPPORTED -> MetrolistIcons.Filled.Close
+        CapabilitySupport.SUPPORTED -> AnitailIcons.Filled.Check
+        CapabilitySupport.LIMITED -> AnitailIcons.Filled.Warning
+        CapabilitySupport.UNKNOWN -> AnitailIcons.Filled.QuestionMark
+        CapabilitySupport.UNSUPPORTED -> AnitailIcons.Filled.Close
     }

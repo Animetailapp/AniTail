@@ -1,6 +1,6 @@
 package com.anitail.shared.utils
 
-fun getCurrentTimeMillis(): Long = MetrolistClock.nowMs()
+fun getCurrentTimeMillis(): Long = AnitailClock.nowMs()
 
 fun formatDuration(
     durationMs: Long,

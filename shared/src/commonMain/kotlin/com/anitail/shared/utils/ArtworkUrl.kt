@@ -124,7 +124,7 @@ fun rememberCachedArtworkPreview(
 
 fun highResolutionArtworkUrl(url: String): String = sizedArtworkUrl(url, MAX_ARTWORK_SIZE_PX)
 
-fun String?.withArtworkCacheRevision(revision: Long): String? = this?.substringBefore('#')?.let { "$it#metrolist-refresh=$revision" }
+fun String?.withArtworkCacheRevision(revision: Long): String? = this?.substringBefore('#')?.let { "$it#anitail-refresh=$revision" }
 
 fun ImageLoader.evictArtworkCache(url: String?) {
     if (url.isNullOrBlank()) return

@@ -77,7 +77,7 @@ import com.anitail.shared.generated.resources.*
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.ui.LocalIsTv
 import com.anitail.shared.ui.components.focusOutline
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.utils.DragScrollableColumn
 import com.anitail.shared.ui.utils.desktopArrowScroll
 import org.jetbrains.compose.resources.stringResource
@@ -123,7 +123,7 @@ internal fun SettingsSearchField(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(MetrolistIcons.Outlined.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(AnitailIcons.Outlined.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 if (query.isEmpty()) {
                     Text(
@@ -163,7 +163,7 @@ internal fun SettingsSearchField(
             }
             if (query.isNotEmpty()) {
                 IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(36.dp), shapes = IconButtonDefaults.shapes()) {
-                    Icon(MetrolistIcons.Default.Close, stringResource(Res.string.close), modifier = Modifier.size(20.dp))
+                    Icon(AnitailIcons.Default.Close, stringResource(Res.string.close), modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -192,7 +192,7 @@ internal fun SettingsSearchResults(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(MetrolistIcons.Outlined.Search, null, modifier = Modifier.size(36.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(AnitailIcons.Outlined.Search, null, modifier = Modifier.size(36.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(Res.string.settings_search_no_results), style = MaterialTheme.typography.titleMedium)
             Text(
                 stringResource(Res.string.settings_search_no_results_desc, query),
@@ -284,7 +284,7 @@ internal fun SearchResultRow(
                     )
                 }
             }
-            Icon(MetrolistIcons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(AnitailIcons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

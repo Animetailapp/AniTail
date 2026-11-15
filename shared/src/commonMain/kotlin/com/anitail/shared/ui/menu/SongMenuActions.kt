@@ -19,7 +19,7 @@ import com.anitail.shared.generated.resources.view_album
 import com.anitail.shared.generated.resources.view_podcast
 import com.anitail.shared.ui.LocalIsTv
 import com.anitail.shared.ui.components.PlayerMenuAction
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -34,13 +34,13 @@ fun songPrimaryActions(
 ): List<PlayerMenuAction> =
     listOfNotNull(
         onStartRadio?.takeUnless { isGuest }?.let {
-            action(MetrolistIcons.Outlined.Sensors, stringResource(Res.string.start_radio), onDismiss, it).copy(enabled = playbackEnabled)
+            action(AnitailIcons.Outlined.Sensors, stringResource(Res.string.start_radio), onDismiss, it).copy(enabled = playbackEnabled)
         },
         onAddToPlaylist?.let {
-            PlayerMenuAction(MetrolistIcons.AutoMirrored.Outlined.PlaylistAdd, stringResource(Res.string.add_to_playlist), onClick = it)
+            PlayerMenuAction(AnitailIcons.AutoMirrored.Outlined.PlaylistAdd, stringResource(Res.string.add_to_playlist), onClick = it)
         },
         onShare?.takeUnless { LocalIsTv.current }?.let {
-            action(MetrolistIcons.Outlined.Share, stringResource(Res.string.share), onDismiss, it, onLongClick = onAltShare)
+            action(AnitailIcons.Outlined.Share, stringResource(Res.string.share), onDismiss, it, onLongClick = onAltShare)
         },
     )
 
@@ -53,7 +53,7 @@ fun dislikeMenuAction(
 ): PlayerMenuAction? =
     onDislike?.let {
         action(
-            if (isDisliked) MetrolistIcons.Filled.ThumbDown else MetrolistIcons.Outlined.ThumbDown,
+            if (isDisliked) AnitailIcons.Filled.ThumbDown else AnitailIcons.Outlined.ThumbDown,
             stringResource(if (isDisliked) Res.string.remove_dislike else Res.string.dislike_song),
             onDismiss,
             it,
@@ -75,7 +75,7 @@ fun blockArtistMenuAction(
     description: String? = null,
 ): PlayerMenuAction? =
     onBlockArtist?.let {
-        action(MetrolistIcons.Outlined.Block, stringResource(Res.string.block_artist), onDismiss, it, description)
+        action(AnitailIcons.Outlined.Block, stringResource(Res.string.block_artist), onDismiss, it, description)
     }
 
 @Composable
@@ -87,7 +87,7 @@ fun albumNavigationMenuAction(
 ): PlayerMenuAction? =
     onGoToAlbum?.let {
         action(
-            MetrolistIcons.Outlined.Album,
+            AnitailIcons.Outlined.Album,
             stringResource(if (isPodcast) Res.string.view_podcast else Res.string.view_album),
             onDismiss,
             it,
@@ -100,7 +100,7 @@ fun suggestToHostMenuAction(
     onDismiss: () -> Unit,
     onSuggest: () -> Unit,
 ): PlayerMenuAction =
-    action(MetrolistIcons.AutoMirrored.Outlined.QueueMusic, stringResource(Res.string.suggest_to_host), onDismiss, onSuggest)
+    action(AnitailIcons.AutoMirrored.Outlined.QueueMusic, stringResource(Res.string.suggest_to_host), onDismiss, onSuggest)
 
 @Composable
 fun equalizerMenuAction(
@@ -108,7 +108,7 @@ fun equalizerMenuAction(
     showDescription: Boolean = true,
 ): PlayerMenuAction =
     PlayerMenuAction(
-        MetrolistIcons.Outlined.BarChart,
+        AnitailIcons.Outlined.BarChart,
         stringResource(Res.string.equalizer),
         if (showDescription) stringResource(Res.string.adjust_audio_equalizer) else null,
         onClick = onOpen,
@@ -120,7 +120,7 @@ fun tempoPitchMenuAction(
     onOpen: () -> Unit,
 ): PlayerMenuAction =
     PlayerMenuAction(
-        MetrolistIcons.Outlined.Tune,
+        AnitailIcons.Outlined.Tune,
         stringResource(if (varispeed) Res.string.playback_speed else Res.string.tempo_and_pitch),
         onClick = onOpen,
     )

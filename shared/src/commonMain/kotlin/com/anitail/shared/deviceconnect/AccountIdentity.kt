@@ -86,5 +86,5 @@ data class AccountIdentitySnapshot(
 )
 
 private const val UNRESOLVED_SENTINEL = "device-connect-account-unresolved"
-private const val ACCOUNT_PROOF_LABEL = "metrolist-device-connect-v2/account-proof"
-private const val ACCOUNT_SCOPE_LABEL = "metrolist-device-connect-v2/account-scope"
+private const val ACCOUNT_PROOF_LABEL = "anitail-device-connect-v2/account-proof"
+private const val ACCOUNT_SCOPE_LABEL = "anitail-device-connect-v2/account-scope"

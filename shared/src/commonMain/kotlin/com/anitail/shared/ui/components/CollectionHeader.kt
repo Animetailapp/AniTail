@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.go_back
 import com.anitail.shared.generated.resources.more_options
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.theme.uiEnhanced
 import com.anitail.shared.ui.tv.tvFocusHighlight
@@ -115,7 +115,7 @@ fun DetailBackButton(
         shapes = IconButtonDefaults.shapes(),
     ) {
         Icon(
-            MetrolistIcons.AutoMirrored.Filled.ArrowBack,
+            AnitailIcons.AutoMirrored.Filled.ArrowBack,
             contentDescription = stringResource(Res.string.go_back),
             tint = MaterialTheme.colorScheme.onSurface,
         )
@@ -156,7 +156,7 @@ fun CollectionHeaderNavigation(
                                 .navigationPopupSource(),
                         shapes = IconButtonDefaults.shapes(),
                     ) {
-                        Icon(MetrolistIcons.Default.MoreVert, stringResource(Res.string.more_options))
+                        Icon(AnitailIcons.Default.MoreVert, stringResource(Res.string.more_options))
                     }
                 }
             }

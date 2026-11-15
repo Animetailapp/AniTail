@@ -12,8 +12,8 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 
 @Composable
 fun ExpressiveSwitch(
@@ -22,7 +22,7 @@ fun ExpressiveSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val haptics = rememberMetrolistHaptics()
+    val haptics = rememberAnitailHaptics()
     Switch(
         checked = checked,
         onCheckedChange =
@@ -37,13 +37,13 @@ fun ExpressiveSwitch(
         thumbContent = {
             if (checked) {
                 Icon(
-                    imageVector = MetrolistIcons.Filled.Check,
+                    imageVector = AnitailIcons.Filled.Check,
                     contentDescription = null,
                     modifier = Modifier.size(SwitchDefaults.IconSize),
                 )
             } else {
                 Icon(
-                    imageVector = MetrolistIcons.Filled.Close,
+                    imageVector = AnitailIcons.Filled.Close,
                     contentDescription = null,
                     modifier = Modifier.size(SwitchDefaults.IconSize),
                 )

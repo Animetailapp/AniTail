@@ -97,8 +97,8 @@ import com.anitail.shared.settings.Settings
 import com.anitail.shared.settings.displayName
 import com.anitail.shared.ui.components.images.AsyncImage
 import com.anitail.shared.ui.design.expressive.components.ExpressiveMiniPlayer
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.theme.getGradientColors
 import com.anitail.shared.ui.theme.rememberArtworkSeedColor
 import com.anitail.shared.ui.utils.artworkBlur
@@ -133,7 +133,7 @@ fun MiniPlayer(
     isActive: Boolean = true,
     playbackEnabled: Boolean = true,
 ) {
-    val haptics = rememberMetrolistHaptics()
+    val haptics = rememberAnitailHaptics()
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     val active = isActive && lifecycleState == Lifecycle.State.RESUMED
     val marqueeModifier = rememberTrackMarquee(song.id, active, 3_000L)
@@ -380,7 +380,7 @@ fun MiniPlayer(
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
-                                    imageVector = MetrolistIcons.Outlined.PlayArrow,
+                                    imageVector = AnitailIcons.Outlined.PlayArrow,
                                     contentDescription = null,
                                     tint = Color.White,
                                     modifier = Modifier.size(20.dp),
@@ -489,7 +489,7 @@ fun MiniPlayer(
                                 )
                             } else {
                                 Icon(
-                                    imageVector = if (isPlaying) MetrolistIcons.Rounded.Pause else MetrolistIcons.Rounded.PlayArrow,
+                                    imageVector = if (isPlaying) AnitailIcons.Rounded.Pause else AnitailIcons.Rounded.PlayArrow,
                                     contentDescription = stringResource(if (isPlaying) Res.string.pause else Res.string.play),
                                     tint = contentColor,
                                 )
@@ -507,7 +507,7 @@ fun MiniPlayer(
                             shapes = IconButtonDefaults.shapes(),
                         ) {
                             Icon(
-                                imageVector = MetrolistIcons.Rounded.SkipNext,
+                                imageVector = AnitailIcons.Rounded.SkipNext,
                                 contentDescription = stringResource(Res.string.next),
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
                             )

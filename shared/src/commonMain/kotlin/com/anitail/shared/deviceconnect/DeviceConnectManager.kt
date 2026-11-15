@@ -2737,7 +2737,7 @@ class DeviceConnectManager
         }
 
         companion object {
-            const val SERVICE_TYPE = "_metrolist-connect._tcp."
+            const val SERVICE_TYPE = "_anitail-connect._tcp."
             private const val PING_INTERVAL = 5_000L
             private const val AUTO_CONNECT_YIELD = 2_000L
             private const val HEARTBEAT_TIMEOUT = 20_000L
@@ -2779,7 +2779,7 @@ internal fun sanitizeDeviceName(value: String): String =
 internal fun deviceConnectAad(
     type: String,
     seq: Long,
-): ByteArray = "metrolist-device-connect-v2:$type:$seq".encodeToByteArray()
+): ByteArray = "anitail-device-connect-v2:$type:$seq".encodeToByteArray()
 
 internal fun isHeartbeatExpired(
     lastReceivedAt: Long,

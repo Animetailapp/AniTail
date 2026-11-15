@@ -52,7 +52,7 @@ import com.anitail.shared.api.lyrics.AiProviderPreset
 import com.anitail.shared.api.lyrics.AiProviderPresets
 import com.anitail.shared.generated.resources.*
 import com.anitail.shared.ui.components.BasicAlertDialog
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.ExpressiveSelectionMenu
 import com.anitail.shared.ui.menu.trackPressPosition
 import com.anitail.shared.ui.utils.DragScrollableColumn
@@ -93,7 +93,7 @@ internal fun AiPickerRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Icon(MetrolistIcons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(AnitailIcons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -130,7 +130,7 @@ private fun AiChoiceRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(Modifier.weight(1f)) { content() }
-        if (selected) Icon(MetrolistIcons.Filled.Check, null, tint = MaterialTheme.colorScheme.primary)
+        if (selected) Icon(AnitailIcons.Filled.Check, null, tint = MaterialTheme.colorScheme.primary)
     }
 }
 

@@ -51,8 +51,8 @@ import com.anitail.shared.generated.resources.repeat
 import com.anitail.shared.generated.resources.shuffle
 import com.anitail.shared.model.RepeatMode
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import org.jetbrains.compose.resources.stringResource
 
@@ -91,7 +91,7 @@ fun VintagePlayerControls(
     playPauseFocusRequester: FocusRequester? = null,
 ) {
     val hasSecondaryControls = onShuffleClick != null || onRepeatClick != null
-    val haptic = rememberMetrolistHaptics()
+    val haptic = rememberAnitailHaptics()
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale = remember { Animatable(1f) }
@@ -154,7 +154,7 @@ fun VintagePlayerControls(
                     shapes = IconButtonDefaults.toggleableShapes(),
                 ) {
                     Icon(
-                        imageVector = MetrolistIcons.Rounded.Shuffle,
+                        imageVector = AnitailIcons.Rounded.Shuffle,
                         contentDescription = stringResource(Res.string.shuffle),
                         modifier = Modifier.size(24.dp),
                     )
@@ -169,7 +169,7 @@ fun VintagePlayerControls(
                 shapes = IconButtonDefaults.shapes(),
             ) {
                 Icon(
-                    imageVector = MetrolistIcons.Rounded.SkipPrevious,
+                    imageVector = AnitailIcons.Rounded.SkipPrevious,
                     contentDescription = text.previous,
                     modifier = Modifier.size(iconSize),
                 )
@@ -204,7 +204,7 @@ fun VintagePlayerControls(
                     )
                 } else {
                     Icon(
-                        imageVector = if (isPlaying) MetrolistIcons.Rounded.Pause else MetrolistIcons.Rounded.PlayArrow,
+                        imageVector = if (isPlaying) AnitailIcons.Rounded.Pause else AnitailIcons.Rounded.PlayArrow,
                         contentDescription = if (isPlaying) text.pause else text.play,
                         modifier = Modifier.size((playIconSize + 8.dp).coerceAtMost(playButtonSize)),
                         tint = sideButtonColor,
@@ -220,7 +220,7 @@ fun VintagePlayerControls(
                 shapes = IconButtonDefaults.shapes(),
             ) {
                 Icon(
-                    imageVector = MetrolistIcons.Rounded.SkipNext,
+                    imageVector = AnitailIcons.Rounded.SkipNext,
                     contentDescription = text.next,
                     modifier = Modifier.size(iconSize),
                 )
@@ -245,7 +245,7 @@ fun VintagePlayerControls(
                 ) {
                     Icon(
                         imageVector =
-                            if (repeatMode == RepeatMode.ONE) MetrolistIcons.Rounded.RepeatOne else MetrolistIcons.Rounded.Repeat,
+                            if (repeatMode == RepeatMode.ONE) AnitailIcons.Rounded.RepeatOne else AnitailIcons.Rounded.Repeat,
                         contentDescription = stringResource(Res.string.repeat),
                         modifier = Modifier.size(24.dp),
                     )

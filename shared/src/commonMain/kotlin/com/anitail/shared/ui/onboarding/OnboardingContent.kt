@@ -89,7 +89,7 @@ import com.anitail.shared.generated.resources.onboarding_step_of
 import com.anitail.shared.generated.resources.pause
 import com.anitail.shared.generated.resources.play
 import com.anitail.shared.ui.components.GroupedListItem
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.PredictiveNavigationContent
 import com.anitail.shared.ui.utils.verticalScrollWithDrag
 import org.jetbrains.compose.resources.stringResource
@@ -211,7 +211,7 @@ private fun OnboardingPageLayout(
                                 Spacer(Modifier.weight(1f))
                                 IconButton(onClick = { onPausedChange(!paused) }, shapes = IconButtonDefaults.shapes()) {
                                     Icon(
-                                        if (paused) MetrolistIcons.Filled.PlayArrow else MetrolistIcons.Filled.Pause,
+                                        if (paused) AnitailIcons.Filled.PlayArrow else AnitailIcons.Filled.Pause,
                                         contentDescription = stringResource(if (paused) Res.string.play else Res.string.pause),
                                     )
                                 }
@@ -260,17 +260,17 @@ private fun OnboardingPageLayout(
                                     when (pageContent.page) {
                                         OnboardingPage.CRASH_REPORTS -> {
                                             listOf(
-                                                MetrolistIcons.Outlined.Tune to stringResource(Res.string.onboarding_sentry_opt_in),
-                                                MetrolistIcons.Outlined.Info to stringResource(Res.string.onboarding_sentry_diagnostics),
-                                                MetrolistIcons.Rounded.Lock to stringResource(Res.string.onboarding_sentry_private),
+                                                AnitailIcons.Outlined.Tune to stringResource(Res.string.onboarding_sentry_opt_in),
+                                                AnitailIcons.Outlined.Info to stringResource(Res.string.onboarding_sentry_diagnostics),
+                                                AnitailIcons.Rounded.Lock to stringResource(Res.string.onboarding_sentry_private),
                                             )
                                         }
 
                                         OnboardingPage.NOTIFICATIONS -> {
                                             listOf(
-                                                MetrolistIcons.Outlined.PlayArrow to
+                                                AnitailIcons.Outlined.PlayArrow to
                                                     stringResource(Res.string.onboarding_notification_playback),
-                                                MetrolistIcons.Outlined.Download to
+                                                AnitailIcons.Outlined.Download to
                                                     stringResource(Res.string.onboarding_notification_downloads),
                                             )
                                         }
@@ -328,7 +328,7 @@ private fun OnboardingPageLayout(
 @Composable
 private fun PrivacyLink() {
     val uriHandler = LocalUriHandler.current
-    val privacyUrl = "https://metrolist.cc/privacy"
+    val privacyUrl = "https://anitail.cc/privacy"
     var openFailed by remember { mutableStateOf(false) }
     Column {
         TextButton(
@@ -362,7 +362,7 @@ private fun OnboardingBottomActions(
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         content.onBack?.let { back ->
             IconButton(onClick = back, enabled = !content.isWorking, shapes = IconButtonDefaults.shapes()) {
-                Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, contentDescription = content.backLabel)
+                Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, contentDescription = content.backLabel)
             }
         }
         if (content.page != OnboardingPage.WELCOME) {
@@ -389,7 +389,7 @@ private fun OnboardingBottomActions(
             Text(content.primaryLabel)
             if (content.page == OnboardingPage.WELCOME) {
                 Spacer(Modifier.width(8.dp))
-                Icon(MetrolistIcons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+                Icon(AnitailIcons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
             }
         }
     }

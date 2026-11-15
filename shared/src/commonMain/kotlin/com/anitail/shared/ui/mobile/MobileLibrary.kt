@@ -129,7 +129,7 @@ import com.anitail.shared.ui.components.libraryCover
 import com.anitail.shared.ui.components.rememberDownloadPlaylistFilter
 import com.anitail.shared.ui.components.rememberScrollingFabState
 import com.anitail.shared.ui.components.topPlaylistOrderControlsText
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.SpeedDialPinMenuItem
 import com.anitail.shared.ui.navigation.NavigationBackHandler
 import com.anitail.shared.ui.navigation.navigationPopupSource
@@ -738,14 +738,14 @@ internal fun MobileSongCollectionScreen(
                 }
             val fallbackIcon =
                 when (type) {
-                    "liked" -> MetrolistIcons.Filled.Favorite
-                    "downloaded" -> MetrolistIcons.Outlined.Download
-                    "top100" -> MetrolistIcons.AutoMirrored.Outlined.TrendingUp
-                    "cached" -> MetrolistIcons.Outlined.Cached
-                    "uploaded" -> MetrolistIcons.Outlined.Backup
-                    "podcasts" -> MetrolistIcons.Filled.Podcasts
-                    "SE" -> MetrolistIcons.AutoMirrored.Outlined.QueueMusic
-                    else -> MetrolistIcons.AutoMirrored.Rounded.QueueMusic
+                    "liked" -> AnitailIcons.Filled.Favorite
+                    "downloaded" -> AnitailIcons.Outlined.Download
+                    "top100" -> AnitailIcons.AutoMirrored.Outlined.TrendingUp
+                    "cached" -> AnitailIcons.Outlined.Cached
+                    "uploaded" -> AnitailIcons.Outlined.Backup
+                    "podcasts" -> AnitailIcons.Filled.Podcasts
+                    "SE" -> AnitailIcons.AutoMirrored.Outlined.QueueMusic
+                    else -> AnitailIcons.AutoMirrored.Rounded.QueueMusic
                 }
 
             val metadataRevision by SongMetadataState.revision.collectAsState()
@@ -887,7 +887,7 @@ internal fun MobileSongCollectionScreen(
                                 onClick = { openSongMenu(song) },
                                 shapes = IconButtonDefaults.shapes(),
                             ) {
-                                Icon(MetrolistIcons.Default.MoreVert, stringResource(Res.string.more_options))
+                                Icon(AnitailIcons.Default.MoreVert, stringResource(Res.string.more_options))
                             }
                         }
                     }

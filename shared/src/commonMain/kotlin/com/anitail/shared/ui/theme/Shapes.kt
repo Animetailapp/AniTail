@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import com.anitail.shared.constants.ThumbnailCornerRadius
 import com.anitail.shared.settings.Settings
 
-val MetrolistShapes =
+val AnitailShapes =
     Shapes(
         extraSmall = RoundedCornerShape(16.dp),
         small = RoundedCornerShape(20.dp),

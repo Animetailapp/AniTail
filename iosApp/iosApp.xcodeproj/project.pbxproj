@@ -16,7 +16,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		C2DBF4EF9D605889B54F6416 /* Metrolist.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Metrolist.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C2DBF4EF9D605889B54F6416 /* AniTail.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AniTail.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E06ED7E670B5D21A160DA9E /* iosApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iosApp.swift; sourceTree = "<group>"; };
 		0418C23F19355BB18E625B53 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Configuration/Config.xcconfig; sourceTree = "<group>"; };
 		B0FD6575DF35547EA4A7F264 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Configuration/Info.plist; sourceTree = "<group>"; };
@@ -70,7 +70,7 @@
 		92C43B9FC0E65F6DB2CAB38E /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C2DBF4EF9D605889B54F6416 /* Metrolist.app */,
+				C2DBF4EF9D605889B54F6416 /* AniTail.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -92,8 +92,8 @@
 			dependencies = (
 			);
 			name = iosApp;
-			productName = Metrolist;
-			productReference = C2DBF4EF9D605889B54F6416 /* Metrolist.app */;
+			productName = AniTail;
+			productReference = C2DBF4EF9D605889B54F6416 /* AniTail.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -110,7 +110,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 4D6435FF64F051828AC9E49B /* Build configuration list for PBXProject "Metrolist" */;
+			buildConfigurationList = 4D6435FF64F051828AC9E49B /* Build configuration list for PBXProject "AniTail" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -158,11 +158,11 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(DERIVED_FILE_DIR)/MetrolistVersion.h",
+				"$(DERIVED_FILE_DIR)/AnitailVersion.h",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\ncd \"$SRCROOT/..\"\nbash scripts/ios_version.sh \"$DERIVED_FILE_DIR/MetrolistVersion.h\"\n./gradlew :shared:embedAndSignAppleFrameworkForXcode\n";
+			shellScript = "set -e\ncd \"$SRCROOT/..\"\nbash scripts/ios_version.sh \"$DERIVED_FILE_DIR/AnitailVersion.h\"\n./gradlew :shared:embedAndSignAppleFrameworkForXcode\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -274,7 +274,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		4D6435FF64F051828AC9E49B /* Build configuration list for PBXProject "Metrolist" */ = {
+		4D6435FF64F051828AC9E49B /* Build configuration list for PBXProject "AniTail" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F006DA927BA25D0496E4F476 /* Debug */,

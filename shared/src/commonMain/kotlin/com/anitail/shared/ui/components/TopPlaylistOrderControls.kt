@@ -44,7 +44,7 @@ import com.anitail.shared.generated.resources.top_period_past_week
 import com.anitail.shared.generated.resources.top_period_past_year
 import com.anitail.shared.model.SortDirection
 import com.anitail.shared.model.TopPlaylistPeriod
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.ExpressiveSelectionMenu
 import com.anitail.shared.ui.menu.trackPressPosition
 import com.anitail.shared.ui.tv.tvFocusHighlight
@@ -141,7 +141,7 @@ fun TopPlaylistOrderControls(
                             label = "Top playlist sort direction icon rotation",
                         )
                         Icon(
-                            imageVector = MetrolistIcons.Outlined.KeyboardArrowDown,
+                            imageVector = AnitailIcons.Outlined.KeyboardArrowDown,
                             contentDescription = if (sortDirection == SortDirection.ASCENDING) text.descending else text.ascending,
                             modifier =
                                 Modifier

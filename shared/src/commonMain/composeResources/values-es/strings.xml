@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Imported from the official Metrolist Android translations. --><!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
+<!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
     <string name="home">Inicio</string>
     <string name="offline_mode">Modo sin conexión</string>
     <string name="songs">Canciones</string>
@@ -263,7 +263,7 @@
     <string name="credits_license_desc">AniTail está licenciado bajo GPL-3.0</string>
     <string name="devmode_already_active" translatable="true">Modo desarrollador ya activo</string>
     <string name="discord_enable_rich_presence">Discord Rich Presence</string>
-    <string name="discord_listen_to_metrolist">Escuchar en AniTail</string>
+    <string name="discord_listen_to_anitail">Escuchar en AniTail</string>
     <string name="discord_login_description">Conecta tu cuenta de Discord</string>
     <string name="discord_rich_presence">Rich presence</string>
     <string name="discord_state">Estado</string>
@@ -1386,7 +1386,7 @@
     <string name="menu_keyboard_shortcuts">Atajos de teclado</string>
     <string name="menu_application_logs">Registros de la aplicación</string>
     <string name="menu_report_issue">Reportar un problema…</string>
-    <string name="menu_about_metrolist">Acerca de AniTail</string>
+    <string name="menu_about_anitail">Acerca de AniTail</string>
     <string name="menu_song">Canción</string>
     <string name="menu_stop">Detener</string>
     <string name="menu_go_to_current_song">Ir a la canción actual</string>
@@ -1626,7 +1626,7 @@
     <string name="tray_show_window">Mostrar ventana</string>
     <string name="tray_show_miniplayer">Mostrar minireproductor</string>
     <string name="tray_settings">Ajustes</string>
-    <string name="tray_quit_metrolist">Salir de AniTail</string>
+    <string name="tray_quit_anitail">Salir de AniTail</string>
     <string name="sign_in_discord">Iniciar sesión en Discord</string>
     <string name="discord_sign_in_unavailable">Inicio de sesión en Discord no disponible</string>
     <string name="sign_in_youtube_music">Iniciar sesión en YouTube Music</string>

@@ -42,7 +42,7 @@ import com.anitail.shared.generated.resources.delete
 import com.anitail.shared.generated.resources.edit
 import com.anitail.shared.generated.resources.more_options
 import com.anitail.shared.ui.components.images.AsyncImage
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.onSecondaryClick
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.theme.ComponentShapes
@@ -168,7 +168,7 @@ fun HistoryEntryRow(
                         shapes = IconButtonDefaults.shapes(),
                     ) {
                         Icon(
-                            MetrolistIcons.Outlined.MoreVert,
+                            AnitailIcons.Outlined.MoreVert,
                             contentDescription = stringResource(Res.string.more_options),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -187,7 +187,7 @@ fun HistoryEntryRow(
                                     },
                                     leadingIcon = {
                                         Icon(
-                                            MetrolistIcons.Outlined.Edit,
+                                            AnitailIcons.Outlined.Edit,
                                             contentDescription = null,
                                             modifier = Modifier.size(18.dp),
                                         )
@@ -202,7 +202,7 @@ fun HistoryEntryRow(
                                 },
                                 leadingIcon = {
                                     Icon(
-                                        MetrolistIcons.Outlined.Delete,
+                                        AnitailIcons.Outlined.Delete,
                                         contentDescription = null,
                                         modifier = Modifier.size(18.dp),
                                         tint = MaterialTheme.colorScheme.error,
@@ -215,7 +215,7 @@ fun HistoryEntryRow(
             }
             onSongMenu?.takeUnless { isSelectMode }?.let { open ->
                 IconButton(modifier = Modifier.navigationPopupSource(), onClick = open, shapes = IconButtonDefaults.shapes()) {
-                    Icon(MetrolistIcons.Default.MoreVert, stringResource(Res.string.more_options))
+                    Icon(AnitailIcons.Default.MoreVert, stringResource(Res.string.more_options))
                 }
             }
         }

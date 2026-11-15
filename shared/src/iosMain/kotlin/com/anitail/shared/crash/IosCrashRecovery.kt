@@ -23,7 +23,7 @@ object IosCrashRecovery : CrashStore {
             requireNotNull(
                 NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, true).firstOrNull() as? String,
             ) +
-                "/metrolist/crashes"
+                "/anitail/crashes"
         ).toPath()
     private val pending get() = directory / "pending"
     private val json = Json { ignoreUnknownKeys = true }

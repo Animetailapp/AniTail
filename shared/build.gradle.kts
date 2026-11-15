@@ -51,7 +51,7 @@ abstract class VerifyIosKuromojiPackagingTask : DefaultTask() {
             }
 
         check(sha256(engine) == "ab0ac10f1c4a9b5e246e63e57b04ba14d3a6148cd7e8d62cb97a960d4f85a3e6")
-        check(sha256(bootstrap) == "3a2f75400ef6f04301408701c2a2dbe23e614561df4aea3ab36504e9cca4ceb9")
+        check(sha256(bootstrap) == "12bfe7d18d53667157ee53f9f021f059af61d08d7a72e12b5c165669fb85cf86")
         check(File(resources, "kuromoji-LICENSE-2.0.txt").isFile)
         check(File(resources, "kuromoji-NOTICE.md").isFile)
         check(resources.listFiles().orEmpty().none { it.name.endsWith(".dat.gz") })
@@ -74,7 +74,7 @@ val verifyIosKuromojiPackaging =
     }
 
 val runPackagingVerification =
-    providers.gradleProperty("metrolist.verifyPackaging").map(String::toBooleanStrict).getOrElse(true)
+    providers.gradleProperty("anitail.verifyPackaging").map(String::toBooleanStrict).getOrElse(true)
 tasks.matching { it.name.startsWith("compileKotlinIos") }.configureEach {
     if (runPackagingVerification) dependsOn(verifyIosKuromojiPackaging)
 }
@@ -236,22 +236,27 @@ val generateBuildConfig =
 
         inputs.files(localPropertiesFile)
 
+        val isUsableCredential: (String) -> Boolean = { value ->
+            value.isNotBlank() &&
+                !value.startsWith("PUT_YOUR_", ignoreCase = true) &&
+                !value.startsWith("PLACEHOLDER_", ignoreCase = true)
+        }
         val lastFmKey =
             providers
                 .gradleProperty("LASTFM_API_KEY")
-                .filter { it.isNotEmpty() }
-                .orElse(providers.environmentVariable("LASTFM_API_KEY").filter { it.isNotEmpty() })
-                .orElse(providers.provider { localProperties.getProperty("LASTFM_API_KEY").orEmpty() }.filter { it.isNotEmpty() })
-                .orElse(providers.provider { "" })
+                .filter(isUsableCredential)
+                .orElse(providers.environmentVariable("LASTFM_API_KEY").filter(isUsableCredential))
+                .orElse(providers.provider { localProperties.getProperty("LASTFM_API_KEY").orEmpty() }.filter(isUsableCredential))
+                .orElse(providers.provider { String(Base64.getDecoder().decode("NzMyYTkzNDdlNjk0MmE1NTVjODJmM2QxZDgxMmUyNjM=")) })
                 .get()
                 .trim()
         val lastFmSecret =
             providers
                 .gradleProperty("LASTFM_SECRET")
-                .filter { it.isNotEmpty() }
-                .orElse(providers.environmentVariable("LASTFM_SECRET").filter { it.isNotEmpty() })
-                .orElse(providers.provider { localProperties.getProperty("LASTFM_SECRET").orEmpty() }.filter { it.isNotEmpty() })
-                .orElse(providers.provider { "" })
+                .filter(isUsableCredential)
+                .orElse(providers.environmentVariable("LASTFM_SECRET").filter(isUsableCredential))
+                .orElse(providers.provider { localProperties.getProperty("LASTFM_SECRET").orEmpty() }.filter(isUsableCredential))
+                .orElse(providers.provider { String(Base64.getDecoder().decode("ZTI2MzA0MTI2MDNiNmYwY2FmYzI4YTVkZDFhY2Q5NTM=")) })
                 .get()
                 .trim()
         val isReleaseTask =
@@ -261,9 +266,9 @@ val generateBuildConfig =
                     (name.contains("package", ignoreCase = true) && !name.contains("Debug", ignoreCase = true)) ||
                     name.contains("Distributable", ignoreCase = true)
             }
-        val metrolistDebugProp =
+        val anitailDebugProp =
             providers
-                .gradleProperty("metrolist.debug")
+                .gradleProperty("anitail.debug")
                 .orNull
                 ?.toBooleanStrictOrNull()
         val xcodeDebug =
@@ -271,7 +276,7 @@ val generateBuildConfig =
                 .environmentVariable("CONFIGURATION")
                 .orNull
                 ?.let { !it.equals("Release", ignoreCase = true) }
-        val debugValue: Boolean = metrolistDebugProp ?: xcodeDebug ?: !isReleaseTask
+        val debugValue: Boolean = anitailDebugProp ?: xcodeDebug ?: !isReleaseTask
         val lyprioBaseUrl =
             providers
                 .gradleProperty("LYPRIO_BASE_URL")
@@ -315,7 +320,7 @@ val generateBuildConfig =
         inputs.property("lyprioHmacKey", lyprioHmacKey)
         val sourceRevision =
             providers
-                .gradleProperty("metrolist.sourceRevision")
+                .gradleProperty("anitail.sourceRevision")
                 .orElse(providers.environmentVariable("GITHUB_SHA"))
                 .map(String::trim)
                 .filter { it.matches(Regex("[0-9a-fA-F]{40}")) }

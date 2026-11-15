@@ -74,7 +74,7 @@ import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.clear_search
 import com.anitail.shared.generated.resources.search_songs
 import com.anitail.shared.ui.LocalIsTv
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.playback.retainPlaybackKeyFocus
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import org.jetbrains.compose.resources.stringResource
@@ -131,7 +131,7 @@ fun InlineSearchRow(
                             modifier = Modifier.focusRequester(searchButtonFocus).tvFocusHighlight(CircleShape),
                             shapes = IconButtonDefaults.shapes(),
                         ) {
-                            Icon(MetrolistIcons.Default.Search, stringResource(Res.string.search_songs))
+                            Icon(AnitailIcons.Default.Search, stringResource(Res.string.search_songs))
                         }
                     }
                 }
@@ -259,7 +259,7 @@ fun CompactSearchBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = MetrolistIcons.Default.Search,
+                imageVector = AnitailIcons.Default.Search,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
@@ -307,7 +307,7 @@ fun CompactSearchBar(
                     shapes = IconButtonDefaults.shapes(),
                 ) {
                     Icon(
-                        imageVector = MetrolistIcons.Default.Clear,
+                        imageVector = AnitailIcons.Default.Clear,
                         contentDescription = stringResource(Res.string.clear_search),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp),
@@ -320,7 +320,7 @@ fun CompactSearchBar(
                     shapes = IconButtonDefaults.shapes(),
                 ) {
                     Icon(
-                        imageVector = MetrolistIcons.Default.Close,
+                        imageVector = AnitailIcons.Default.Close,
                         contentDescription = stringResource(Res.string.clear_search),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp),

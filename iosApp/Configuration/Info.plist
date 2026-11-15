@@ -17,9 +17,9 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>METROLIST_VERSION</string>
+    <string>ANITAIL_VERSION</string>
     <key>CFBundleVersion</key>
-    <string>METROLIST_VERSION</string>
+    <string>ANITAIL_VERSION</string>
     <key>CFBundleURLTypes</key>
     <array>
         <dict>
@@ -29,8 +29,6 @@
             <array>
                 <string>anitail-auth</string>
                 <string>anitail</string>
-                <string>metrolist-auth</string>
-                <string>metrolist</string>
             </array>
         </dict>
     </array>

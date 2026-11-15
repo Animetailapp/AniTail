@@ -96,8 +96,8 @@ import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.drag_to_reorder_x
 import com.anitail.shared.generated.resources.expand_sidebar
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.utils.DragScrollableColumn
 import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableItem
@@ -493,7 +493,7 @@ private fun <T> DesktopWideNavigationRail(
                                         shapes = IconButtonDefaults.shapes(),
                                     ) {
                                         Icon(
-                                            MetrolistIcons.Filled.Menu,
+                                            AnitailIcons.Filled.Menu,
                                             contentDescription = stringResource(Res.string.expand_sidebar),
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(24.dp),
@@ -522,7 +522,7 @@ private fun <T> DesktopWideNavigationRail(
                             },
                     ) {
                         if (isEditing && onReorderFinished != null && onToggleVisibility != null) {
-                            val haptics = rememberMetrolistHaptics()
+                            val haptics = rememberAnitailHaptics()
                             val itemKeys = items.map { it.key }
                             var itemOrder by remember(itemKeys) { mutableStateOf(itemKeys) }
                             var pendingReorder by remember { mutableStateOf(false) }
@@ -802,7 +802,7 @@ private fun <T> EditingSidebarNavItem(
         }
 
         Icon(
-            MetrolistIcons.Default.DragIndicator,
+            AnitailIcons.Default.DragIndicator,
             contentDescription = stringResource(Res.string.drag_to_reorder_x, item.label),
             tint = if (isDragging || isHandleHovered) colorScheme.primary else colorScheme.onSurfaceVariant,
             modifier =

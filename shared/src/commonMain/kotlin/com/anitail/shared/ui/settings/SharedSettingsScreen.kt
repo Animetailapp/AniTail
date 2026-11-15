@@ -109,8 +109,8 @@ import com.anitail.shared.ui.components.SwipeBackLayout
 import com.anitail.shared.ui.components.focusOutline
 import com.anitail.shared.ui.components.singleLineMarquee
 import com.anitail.shared.ui.equalizer.MetroEqScreen
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.ExpressiveSelectionMenu
 import com.anitail.shared.ui.menu.trackPressPosition
 import com.anitail.shared.ui.navigation.PredictiveNavigationContent
@@ -146,7 +146,7 @@ fun SharedSettingsScreen(
             },
         )
     SharedSettingsRegistryScreen(settingsHost, modifier) { settingsRevision ->
-        rememberMetrolistSettingsRegistry(settingsHost, settingsRevision)
+        rememberAnitailSettingsRegistry(settingsHost, settingsRevision)
     }
 }
 
@@ -246,7 +246,7 @@ internal fun SharedSettingsRegistryScreen(
                     ) {
                         if (canNavigateBackFromSettings(pageStack, expanded = true)) {
                             IconButton(onClick = ::closePage, shapes = IconButtonDefaults.shapes()) {
-                                Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
+                                Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
                             }
                         }
                         AnimatedContent(
@@ -264,7 +264,7 @@ internal fun SharedSettingsRegistryScreen(
                             )
                         }
                         IconButton(onClick = host.onClose, shapes = IconButtonDefaults.shapes()) {
-                            Icon(MetrolistIcons.Default.Close, stringResource(Res.string.close))
+                            Icon(AnitailIcons.Default.Close, stringResource(Res.string.close))
                         }
                     }
                     Surface(
@@ -394,14 +394,14 @@ private fun CompactSettingsHome(
                                 },
                             shapes = IconButtonDefaults.shapes(),
                         ) {
-                            Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
+                            Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
                         }
                     }
                 },
                 actions = {
                     if (host.platform == SettingsPlatform.DESKTOP) {
                         IconButton(onClick = host.onClose, shapes = IconButtonDefaults.shapes()) {
-                            Icon(MetrolistIcons.Default.Close, stringResource(Res.string.close))
+                            Icon(AnitailIcons.Default.Close, stringResource(Res.string.close))
                         }
                     }
                 },
@@ -479,7 +479,7 @@ private fun CompactSettingsDetail(
                             },
                         shapes = IconButtonDefaults.shapes(),
                     ) {
-                        Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
+                        Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
                     }
                 },
                 colors =
@@ -930,7 +930,7 @@ internal fun SettingsNavigationRow(
     iconTint: Color? = null,
     titleFontSize: TextUnit = TextUnit.Unspecified,
     trailingContent: (@Composable () -> Unit)? = {
-        Icon(MetrolistIcons.Outlined.ChevronRight, null, tint = iconTint ?: MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(AnitailIcons.Outlined.ChevronRight, null, tint = iconTint ?: MaterialTheme.colorScheme.onSurfaceVariant)
     },
     focusModifier: @Composable (Shape) -> Modifier = { Modifier },
 ) {
@@ -1053,7 +1053,7 @@ private fun SettingsItemRow(
     onSettingValueChanged: () -> Unit,
     onClick: () -> Unit,
 ) {
-    val haptics = rememberMetrolistHaptics()
+    val haptics = rememberAnitailHaptics()
     if (item.control == SettingsControl.MAIN_SWITCH) {
         SettingsMainSwitch(
             title = item.title,
@@ -1184,12 +1184,12 @@ private fun SettingsItemRow(
                         imageVector =
                             if (item.control == SettingsControl.CHOICE) {
                                 if (choiceMenuExpanded) {
-                                    MetrolistIcons.Outlined.KeyboardArrowUp
+                                    AnitailIcons.Outlined.KeyboardArrowUp
                                 } else {
-                                    MetrolistIcons.Outlined.KeyboardArrowDown
+                                    AnitailIcons.Outlined.KeyboardArrowDown
                                 }
                             } else {
-                                MetrolistIcons.Outlined.ChevronRight
+                                AnitailIcons.Outlined.ChevronRight
                             },
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (item.enabled) 1f else 0.38f),
@@ -1207,7 +1207,7 @@ private fun SettingsItemRow(
                         )
                         Spacer(Modifier.width(8.dp))
                     }
-                    Icon(MetrolistIcons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(AnitailIcons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 SettingsControl.ACTION -> {

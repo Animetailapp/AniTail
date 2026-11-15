@@ -209,7 +209,7 @@ import com.anitail.shared.ui.components.images.AsyncImage
 import com.anitail.shared.ui.components.lyrics.LyricsTranslationSnackbar
 import com.anitail.shared.ui.components.rememberBottomSheetState
 import com.anitail.shared.ui.design.expressive.components.ExpressiveMiniPlayerHeight
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.listentogether.ListenTogetherGlobalEvents
 import com.anitail.shared.ui.menu.HiddenHomeItemsSnackbar
 import com.anitail.shared.ui.navigation.AdaptiveFormFactor
@@ -260,7 +260,7 @@ import com.anitail.shared.ui.settings.rememberIosAppIconActions
 import com.anitail.shared.ui.settings.rememberIosFontActions
 import com.anitail.shared.ui.settings.rememberIosLogExportAction
 import com.anitail.shared.ui.theme.MdSpacing
-import com.anitail.shared.ui.theme.MetrolistTheme
+import com.anitail.shared.ui.theme.AnitailTheme
 import com.anitail.shared.ui.theme.rememberArtworkSeedColor
 import com.anitail.shared.ui.theme.resolveThemeSeedColor
 import com.anitail.shared.ui.utils.rememberFileSizeFormatter
@@ -731,26 +731,26 @@ fun MobileApp(
             AdaptiveNavigationItem<MobileRoute>(
                 MobileRoute.Home,
                 stringResource(Res.string.home),
-                MetrolistIcons.Outlined.Home,
-                MetrolistIcons.Filled.Home,
+                AnitailIcons.Outlined.Home,
+                AnitailIcons.Filled.Home,
             ),
             AdaptiveNavigationItem<MobileRoute>(
                 MobileRoute.Search,
                 stringResource(Res.string.search),
-                MetrolistIcons.Outlined.Search,
-                MetrolistIcons.Filled.Search,
+                AnitailIcons.Outlined.Search,
+                AnitailIcons.Filled.Search,
             ),
             AdaptiveNavigationItem<MobileRoute>(
                 MobileRoute.Library,
                 stringResource(Res.string.library),
-                MetrolistIcons.Outlined.LibraryMusic,
-                MetrolistIcons.Filled.LibraryMusic,
+                AnitailIcons.Outlined.LibraryMusic,
+                AnitailIcons.Filled.LibraryMusic,
             ),
             AdaptiveNavigationItem<MobileRoute>(
                 MobileRoute.EasterEgg,
                 stringResource(Res.string.mysterious_fourth_tab),
-                MetrolistIcons.Filled.QuestionMark,
-                MetrolistIcons.Filled.QuestionMark,
+                AnitailIcons.Filled.QuestionMark,
+                AnitailIcons.Filled.QuestionMark,
             ),
         ).filter { it.key in visibleTabRoutes }
 
@@ -772,7 +772,7 @@ fun MobileApp(
                 ?.thumbnail
                 ?.takeIf { Settings.shared.materialYouEnabled && Settings.shared.dynamicTheme },
         )
-    MetrolistTheme(
+    AnitailTheme(
         seedColor =
             resolveThemeSeedColor(
                 materialYouEnabled = Settings.shared.materialYouEnabled,
@@ -857,7 +857,7 @@ fun MobileApp(
                                             shapes = IconButtonDefaults.shapes(),
                                         ) {
                                             Icon(
-                                                MetrolistIcons.Outlined.Settings,
+                                                AnitailIcons.Outlined.Settings,
                                                 contentDescription = stringResource(Res.string.devtools_title),
                                                 modifier = Modifier.size(24.dp),
                                             )
@@ -866,7 +866,7 @@ fun MobileApp(
                                     if (Settings.shared.listenTogetherEnabled) {
                                         IconButton(onClick = { open(MobileRoute.ListenTogether()) }, shapes = IconButtonDefaults.shapes()) {
                                             Icon(
-                                                MetrolistIcons.Outlined.Group,
+                                                AnitailIcons.Outlined.Group,
                                                 contentDescription = stringResource(Res.string.listen_together),
                                                 modifier = Modifier.size(24.dp),
                                             )
@@ -886,7 +886,7 @@ fun MobileApp(
                                                 )
                                             } else {
                                                 Icon(
-                                                    MetrolistIcons.Outlined.AccountCircle,
+                                                    AnitailIcons.Outlined.AccountCircle,
                                                     contentDescription = stringResource(Res.string.account),
                                                     modifier = Modifier.size(24.dp),
                                                 )
@@ -1130,7 +1130,7 @@ fun MobileApp(
                                                 shape = RoundedCornerShape(16.dp),
                                             ) {
                                                 Icon(
-                                                    MetrolistIcons.Rounded.Shuffle,
+                                                    AnitailIcons.Rounded.Shuffle,
                                                     contentDescription = stringResource(Res.string.shuffle),
                                                 )
                                             }

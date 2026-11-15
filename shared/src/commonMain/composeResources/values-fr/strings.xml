@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Imported from the official Metrolist Android translations. --><!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
+<!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
     <string name="home">Accueil</string>
     <string name="offline_mode">Mode hors ligne</string>
     <string name="songs">Titres</string>
@@ -263,7 +263,7 @@
     <string name="credits_license_desc">AniTail est distribué sous licence GPL-3.0</string>
     <string name="devmode_already_active" translatable="true">Mode développeur déjà actif</string>
     <string name="discord_enable_rich_presence">Discord Rich Presence</string>
-    <string name="discord_listen_to_metrolist">Écoute AniTail</string>
+    <string name="discord_listen_to_anitail">Écoute AniTail</string>
     <string name="discord_login_description">Connectez votre compte Discord</string>
     <string name="discord_rich_presence">Rich Presence</string>
     <string name="discord_state">État</string>
@@ -1595,7 +1595,7 @@
     <string name="menu_application_logs">Journaux de l'application</string>
     <string name="app_logs">Journaux de l'application</string>
     <string name="menu_report_issue">Signaler un problème…</string>
-    <string name="menu_about_metrolist">À propos de AniTail</string>
+    <string name="menu_about_anitail">À propos de AniTail</string>
     <string name="menu_song">Titre</string>
     <string name="song_type">Titre</string>
     <string name="menu_stop">Arrêter</string>
@@ -1840,7 +1840,7 @@
     <string name="tray_show_window">Afficher la fenêtre</string>
     <string name="tray_show_miniplayer">Afficher le mini-lecteur</string>
     <string name="tray_settings">Paramètres</string>
-    <string name="tray_quit_metrolist">Quitter AniTail</string>
+    <string name="tray_quit_anitail">Quitter AniTail</string>
     <string name="webview_cleanup_failed">Le profil d\u0027authentification WebView n\u0027a pas pu être supprimé.</string>
     <string name="clearing_signin_session">Fermeture de la session de connexion non terminée…</string>
     <string name="signin_cleanup_failed">Fermeture de la session de connexion échouée.</string>

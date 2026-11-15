@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.round
 import com.anitail.shared.model.PlaylistSongSort
 import com.anitail.shared.model.SortDirection
 import com.anitail.shared.model.allowsReordering
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.ExpressiveSelectionMenu
 import com.anitail.shared.ui.menu.trackPressPosition
 import com.anitail.shared.ui.tv.tvFocusHighlight
@@ -136,7 +136,7 @@ fun PlaylistOrderControls(
                             label = "Playlist sort direction icon rotation",
                         )
                         Icon(
-                            imageVector = MetrolistIcons.Outlined.KeyboardArrowDown,
+                            imageVector = AnitailIcons.Outlined.KeyboardArrowDown,
                             contentDescription = if (sortDirection == SortDirection.ASCENDING) text.descending else text.ascending,
                             modifier =
                                 Modifier

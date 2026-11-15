@@ -42,7 +42,7 @@ internal class PageBoundPoTokenMinter private constructor(
             """
             (function() {
                 const result = { state: "running" };
-                globalThis.__metrolistPoToken = result;
+                globalThis.__anitailPoToken = result;
                 obtainPoToken(${stringToU8(identifier)}).then(function(token) {
                     result.value = Array.from(token).join(",");
                     result.state = "ready";
@@ -54,7 +54,7 @@ internal class PageBoundPoTokenMinter private constructor(
             "started";
             """.trimIndent(),
         )
-        val result = awaitJavaScriptResult(runtime, "__metrolistPoToken")
+        val result = awaitJavaScriptResult(runtime, "__anitailPoToken")
         return u8ToBase64(result)
     }
 
@@ -107,19 +107,19 @@ internal class PageBoundPoTokenMinter private constructor(
                 val eventId = Json.encodeToString(attestation.eventId)
                 runtime.evaluate(
                     """
-                    globalThis.__metrolistPoSnapshot = { state: "running" };
+                    globalThis.__anitailPoSnapshot = { state: "running" };
                     globalThis.yt = { config_: { EVENT_ID: $eventId } };
                     globalThis.window.yt = globalThis.yt;
                     runBotGuard($challengeData).then(function(result) {
-                        globalThis.__metrolistWebPoSignalOutput = result.webPoSignalOutput;
-                        globalThis.__metrolistPoSnapshot = { state: "ready", value: result.botguardResponse };
+                        globalThis.__anitailWebPoSignalOutput = result.webPoSignalOutput;
+                        globalThis.__anitailPoSnapshot = { state: "ready", value: result.botguardResponse };
                     }).catch(function(error) {
-                        globalThis.__metrolistPoSnapshot = { state: "error", value: String(error) };
+                        globalThis.__anitailPoSnapshot = { state: "error", value: String(error) };
                     });
                     "started";
                     """.trimIndent(),
                 )
-                val botguardResponse = awaitJavaScriptResult(runtime, "__metrolistPoSnapshot")
+                val botguardResponse = awaitJavaScriptResult(runtime, "__anitailPoSnapshot")
                 val integrityResponse =
                     directClient.post("https://www.youtube.com/api/jnn/v1/GenerateIT") {
                         contentType(ContentType.parse("application/json+protobuf"))
@@ -136,16 +136,16 @@ internal class PageBoundPoTokenMinter private constructor(
                 val integrity = parseIntegrityTokenData(integrityResponse.bodyAsTextLimited(INTEGRITY_BODY_LIMIT_BYTES))
                 runtime.evaluate(
                     """
-                    globalThis.__metrolistPoMinter = { state: "running" };
-                    createPoTokenMinter(globalThis.__metrolistWebPoSignalOutput, ${integrity.tokenJavaScript}).then(function() {
-                        globalThis.__metrolistPoMinter = { state: "ready", value: "ready" };
+                    globalThis.__anitailPoMinter = { state: "running" };
+                    createPoTokenMinter(globalThis.__anitailWebPoSignalOutput, ${integrity.tokenJavaScript}).then(function() {
+                        globalThis.__anitailPoMinter = { state: "ready", value: "ready" };
                     }).catch(function(error) {
-                        globalThis.__metrolistPoMinter = { state: "error", value: String(error) };
+                        globalThis.__anitailPoMinter = { state: "error", value: String(error) };
                     });
                     "started";
                     """.trimIndent(),
                 )
-                awaitJavaScriptResult(runtime, "__metrolistPoMinter")
+                awaitJavaScriptResult(runtime, "__anitailPoMinter")
                 val expiresAtMs =
                     Clock.System.now().toEpochMilliseconds() +
                         (integrity.lifetimeSeconds - EXPIRY_MARGIN_SECONDS).coerceAtLeast(60L) * 1_000L

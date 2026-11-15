@@ -6,7 +6,7 @@ import androidx.compose.runtime.snapshotFlow
 import com.anitail.shared.network.hasHttpTransportFailureInCauseChain
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.utils.Logger
-import com.anitail.shared.utils.MetrolistClock
+import com.anitail.shared.utils.AnitailClock
 import com.anitail.shared.youtube.playback.PlaybackEventKind
 import com.anitail.shared.youtube.playback.PlaybackEventLog
 import com.anitail.shared.youtube.playback.PlaybackNetworkStateStore
@@ -499,7 +499,7 @@ object DiscordRpcManager {
                 refreshRetryJob?.cancel()
                 refreshRetryJob = null
                 val expiresAt = DiscordTokenStore.getExpiresAt()
-                val nowSec = MetrolistClock.nowMs() / 1000
+                val nowSec = AnitailClock.nowMs() / 1000
                 if (rejectedToken != null || (expiresAt > 0 && (expiresAt - nowSec) < 3600)) {
                     try {
                         val refreshToken = DiscordTokenStore.getRefreshToken()

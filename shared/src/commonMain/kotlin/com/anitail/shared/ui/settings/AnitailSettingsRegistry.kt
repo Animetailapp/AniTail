@@ -17,11 +17,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.anitail.shared.generated.resources.*
 import com.anitail.shared.settings.Settings
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-fun rememberMetrolistSettingsRegistry(
+fun rememberAnitailSettingsRegistry(
     host: SharedSettingsHost,
     @Suppress("UNUSED_PARAMETER") settingsRevision: Int,
 ): SettingsUiRegistry {
@@ -163,70 +163,70 @@ fun rememberMetrolistSettingsRegistry(
         SettingsPageId.EQUALIZER,
         stringResource(Res.string.metroeq),
         stringResource(Res.string.settings_equalizer_overview),
-        MetrolistIcons.Outlined.BarChart,
+        AnitailIcons.Outlined.BarChart,
         SettingsTone.PURPLE,
     )
     customPage(
         SettingsPageId.ANDROID_AUTO,
         stringResource(Res.string.android_auto_title),
         stringResource(Res.string.settings_android_auto_overview),
-        MetrolistIcons.Outlined.Settings,
+        AnitailIcons.Outlined.Settings,
         SettingsTone.ORANGE,
     )
     customPage(
         SettingsPageId.STORAGE,
         stringResource(Res.string.storage),
         host.storageSummary,
-        MetrolistIcons.Outlined.Storage,
+        AnitailIcons.Outlined.Storage,
         SettingsTone.GOLD,
     )
     customPage(
         SettingsPageId.BACKUP_RESTORE,
         stringResource(Res.string.backup_restore_title),
         stringResource(Res.string.settings_backup_restore_description),
-        MetrolistIcons.Outlined.SettingsBackupRestore,
+        AnitailIcons.Outlined.SettingsBackupRestore,
         SettingsTone.GOLD,
     )
     customPage(
         SettingsPageId.UPDATES,
         stringResource(Res.string.settings_updates_title),
         settingsPageSubtitle(stringResource(Res.string.settings_updates_overview), host.updateSummary),
-        MetrolistIcons.Outlined.Update,
+        AnitailIcons.Outlined.Update,
         SettingsTone.NEUTRAL,
     )
     customPage(
         SettingsPageId.DEVTOOLS,
         stringResource(Res.string.devtools_title),
         stringResource(Res.string.settings_devtools_overview),
-        MetrolistIcons.Outlined.Settings,
+        AnitailIcons.Outlined.Settings,
         SettingsTone.NEUTRAL,
     )
     customPage(
         SettingsPageId.ABOUT,
         stringResource(Res.string.settings_about_title),
         stringResource(Res.string.settings_about_overview),
-        MetrolistIcons.Outlined.Info,
+        AnitailIcons.Outlined.Info,
         SettingsTone.NEUTRAL,
     )
     customPage(
         SettingsPageId.UPDATE_DETAILS,
         stringResource(Res.string.updates_title),
         stringResource(Res.string.settings_release_overview),
-        MetrolistIcons.Outlined.Update,
+        AnitailIcons.Outlined.Update,
         SettingsTone.NEUTRAL,
     )
     customPage(
         SettingsPageId.PLAYBACK_BENCHMARK,
         stringResource(Res.string.devtools_playback_benchmark_title),
         stringResource(Res.string.devtools_playback_benchmark_description),
-        MetrolistIcons.Outlined.Settings,
+        AnitailIcons.Outlined.Settings,
         SettingsTone.NEUTRAL,
     )
     customPage(
         SettingsPageId.SUPPORTED_LINKS,
         stringResource(Res.string.settings_open_supported_links_title),
         stringResource(Res.string.settings_supported_links_overview),
-        MetrolistIcons.Outlined.AddLink,
+        AnitailIcons.Outlined.AddLink,
         SettingsTone.BLUE,
     )
 

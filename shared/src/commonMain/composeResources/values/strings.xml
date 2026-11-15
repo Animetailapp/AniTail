@@ -3,7 +3,7 @@
 <!-- Upstream InnerTune strings -->
 <!-- Do not add new features here -->
 <!-- Try to re-use strings here, but be careful on its usage e.g. verb vs noun -->
-<!-- "InnerTune" is replaced with "Metrolist" -->
+<!-- "InnerTune" is replaced with "AniTail" -->
 
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Bottom navigation -->
@@ -774,8 +774,8 @@
     <!-- Discord Settings -->
     <!-- Translators: Imperative action label for enable rich presence in the Discord integration. -->
     <string name="discord_enable_rich_presence">Discord Rich Presence</string>
-    <!-- Translators: Label for listen to metrolist in the Discord integration. -->
-    <string name="discord_listen_to_metrolist">Listen to AniTail</string>
+    <!-- Translators: Label for listen to AniTail in the Discord integration. -->
+    <string name="discord_listen_to_anitail">Listen to AniTail</string>
     <!-- Translators: Supporting text beneath the login option in the Discord integration. -->
     <string name="discord_login_description">Connect your Discord account</string>
     <!-- Translators: Label for rich presence in the Discord integration. -->
@@ -2869,7 +2869,7 @@
 
     <!-- Translators: Label for general in the multiple app screens. -->
     <string name="general">General</string>
-    <!-- Translators: Player setting for the original Metrolist shuffle behavior. -->
+    <!-- Translators: Player setting for the original AniTail shuffle behavior. -->
     <string name="legacy_shuffle">Legacy shuffle</string>
     <!-- Translators: Turning this setting off selects the KMP shuffle behavior. -->
     <string name="legacy_shuffle_desc">Shuffle all songs, including played songs, with the current song first. Turn off for KMP shuffle. KMP keeps played songs in place and shuffles upcoming songs.</string>
@@ -3677,8 +3677,8 @@
     <string name="menu_application_logs">Application logs</string>
     <!-- Translators: Progress or status message for report issue in the desktop application menu. -->
     <string name="menu_report_issue">Report an issue…</string>
-    <!-- Translators: Label for about metrolist in the desktop application menu. -->
-    <string name="menu_about_metrolist">About AniTail</string>
+    <!-- Translators: Label for about AniTail in the desktop application menu. -->
+    <string name="menu_about_anitail">About AniTail</string>
     <!-- Translators: Label for song in the desktop application menu. -->
     <string name="menu_song">Song</string>
     <!-- Translators: Imperative action label for stop in the desktop application menu. -->
@@ -4430,8 +4430,8 @@
     <string name="tray_show_miniplayer">Show miniplayer</string>
     <!-- Translators: Label for tray settings in the desktop system tray. -->
     <string name="tray_settings">Settings</string>
-    <!-- Translators: Label for quit metrolist in the desktop system tray. -->
-    <string name="tray_quit_metrolist">Quit AniTail</string>
+    <!-- Translators: Label for quit AniTail in the desktop system tray. -->
+    <string name="tray_quit_anitail">Quit AniTail</string>
 
     <!-- Desktop: Discord login -->
     <!-- Translators: Imperative action label for sign in discord in the sign-in flow. -->

@@ -32,7 +32,7 @@ import coil3.compose.rememberConstraintsSizeResolver
 import coil3.decode.DataSource
 import coil3.request.ImageRequest
 import coil3.size.Scale
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.player.LocalPlayerTrackArtwork
 import com.anitail.shared.ui.player.ShareMiniPlayerArtwork
 
@@ -90,7 +90,7 @@ private fun LoadingArtwork(
                 )
             } else {
                 Icon(
-                    imageVector = MetrolistIcons.Outlined.MusicNote,
+                    imageVector = AnitailIcons.Outlined.MusicNote,
                     contentDescription = contentDescription,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(28.dp),
@@ -151,7 +151,7 @@ private fun LoadingArtwork(
         )
         if (state is AsyncImagePainter.State.Error) {
             Icon(
-                imageVector = MetrolistIcons.Outlined.MusicNote,
+                imageVector = AnitailIcons.Outlined.MusicNote,
                 contentDescription = contentDescription,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(28.dp),

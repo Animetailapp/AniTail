@@ -36,8 +36,8 @@ import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.settings_reset_to_default
 import com.anitail.shared.ui.haptics.HapticEvent
 import com.anitail.shared.ui.haptics.SliderDetents
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.playback.retainPlaybackKeyFocus
 import org.jetbrains.compose.resources.stringResource
 
@@ -73,7 +73,7 @@ internal fun SettingsGroupRegistryBuilder.inlineSlider(
                     modifier = Modifier.padding(end = 8.dp),
                 )
             }
-            val haptics = rememberMetrolistHaptics()
+            val haptics = rememberAnitailHaptics()
             val detents = remember(range, steps) { SliderDetents(range, steps, value) }
             detents.reset(value)
             val sliderState = remember(range, steps) { SliderState(value = value, trackRange = range, steps = steps) }
@@ -110,7 +110,7 @@ internal fun SettingsResetButton(
     onClick: () -> Unit,
 ) {
     IconButton(onClick = onClick, enabled = enabled, shapes = IconButtonDefaults.shapes()) {
-        Icon(MetrolistIcons.Outlined.Replay, contentDescription = stringResource(Res.string.settings_reset_to_default))
+        Icon(AnitailIcons.Outlined.Replay, contentDescription = stringResource(Res.string.settings_reset_to_default))
     }
 }
 

@@ -70,7 +70,7 @@ import com.anitail.shared.generated.resources.lyrics_offset_later
 import com.anitail.shared.generated.resources.milliseconds_unit
 import com.anitail.shared.generated.resources.settings_reset_to_default
 import com.anitail.shared.ui.LocalIsTv
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.playback.retainPlaybackKeyFocus
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import org.jetbrains.compose.resources.stringResource
@@ -136,7 +136,7 @@ fun LyricsOffsetEditor(
             )
             IconButton(onClick = { setOffset(0) }, enabled = offsetMs != 0, shapes = IconButtonDefaults.shapes()) {
                 Icon(
-                    MetrolistIcons.Outlined.Replay,
+                    AnitailIcons.Outlined.Replay,
                     contentDescription = stringResource(Res.string.settings_reset_to_default),
                     tint = contentColor.copy(alpha = if (offsetMs != 0) 1f else 0.38f),
                 )
@@ -151,7 +151,7 @@ fun LyricsOffsetEditor(
                     colors = buttonColors,
                     shapes = IconButtonDefaults.shapes(),
                 ) {
-                    Icon(MetrolistIcons.Filled.Check, contentDescription = stringResource(Res.string.done))
+                    Icon(AnitailIcons.Filled.Check, contentDescription = stringResource(Res.string.done))
                 }
             }
         }
@@ -166,7 +166,7 @@ fun LyricsOffsetEditor(
                 shapes = IconButtonDefaults.shapes(),
                 modifier = Modifier.size(56.dp),
             ) {
-                Icon(MetrolistIcons.Filled.Remove, contentDescription = stringResource(Res.string.lyrics_offset_decrease, OFFSET_STEP_MS))
+                Icon(AnitailIcons.Filled.Remove, contentDescription = stringResource(Res.string.lyrics_offset_decrease, OFFSET_STEP_MS))
             }
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(verticalAlignment = Alignment.Bottom) {
@@ -266,7 +266,7 @@ fun LyricsOffsetEditor(
                 shapes = IconButtonDefaults.shapes(),
                 modifier = Modifier.size(56.dp),
             ) {
-                Icon(MetrolistIcons.Filled.Add, contentDescription = stringResource(Res.string.lyrics_offset_increase, OFFSET_STEP_MS))
+                Icon(AnitailIcons.Filled.Add, contentDescription = stringResource(Res.string.lyrics_offset_increase, OFFSET_STEP_MS))
             }
         }
         val range = -OFFSET_SLIDER_LIMIT_MS.toFloat()..OFFSET_SLIDER_LIMIT_MS.toFloat()

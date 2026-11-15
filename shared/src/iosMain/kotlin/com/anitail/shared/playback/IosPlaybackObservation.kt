@@ -1,6 +1,6 @@
 package com.anitail.shared.playback
 
-import com.anitail.shared.playback.observation.MetrolistKeyValueObserverProtocol
+import com.anitail.shared.playback.observation.AnitailKeyValueObserverProtocol
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.CoroutineScope
@@ -25,7 +25,7 @@ internal class IosKeyValueObservation(
     private val scope: CoroutineScope,
     private val onChange: (String) -> Unit,
 ) : NSObject(),
-    MetrolistKeyValueObserverProtocol {
+    AnitailKeyValueObserverProtocol {
     private var active = true
 
     init {

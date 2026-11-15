@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.see_all
 import com.anitail.shared.ui.components.images.AsyncImage
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.utils.artistArtworkShape
 import org.jetbrains.compose.resources.stringResource
 
@@ -155,21 +155,21 @@ fun SectionTitle(
                     )
                 }
                 SectionActionButton(
-                    icon = MetrolistIcons.Outlined.ChevronRight,
+                    icon = AnitailIcons.Outlined.ChevronRight,
                     contentDescription = null,
                     isWide = isWide,
                 )
             }
         } else if (onShuffleClick != null) {
             SectionActionButton(
-                icon = MetrolistIcons.Rounded.Shuffle,
+                icon = AnitailIcons.Rounded.Shuffle,
                 contentDescription = shuffleLabel,
                 onClick = onShuffleClick,
                 isWide = isWide,
             )
         } else if (onPlayAllClick != null) {
             SectionActionButton(
-                icon = MetrolistIcons.Default.PlayArrow,
+                icon = AnitailIcons.Default.PlayArrow,
                 contentDescription = playAllLabel,
                 onClick = onPlayAllClick,
                 isWide = isWide,

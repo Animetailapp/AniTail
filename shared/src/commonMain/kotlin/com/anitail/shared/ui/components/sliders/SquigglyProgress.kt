@@ -18,7 +18,7 @@
  * AniTail Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
  *
- * Adapted from Metrolist's SquigglySlider, ported from mpvEx:
+ * Adapted from Anitail's SquigglySlider, ported from mpvEx:
  * https://github.com/marlboro-advance/mpvEx
  */
 

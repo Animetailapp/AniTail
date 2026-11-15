@@ -11,7 +11,7 @@ import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.filter_library
 import com.anitail.shared.generated.resources.home
 import com.anitail.shared.generated.resources.search
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import org.jetbrains.compose.resources.stringResource
 
 @Preview(
@@ -83,20 +83,20 @@ private fun AdaptiveNavigationPreview(formFactor: AdaptiveFormFactor) {
                 AdaptiveNavigationItem(
                     key = "home",
                     label = stringResource(Res.string.home),
-                    icon = MetrolistIcons.Outlined.Home,
-                    selectedIcon = MetrolistIcons.Filled.Home,
+                    icon = AnitailIcons.Outlined.Home,
+                    selectedIcon = AnitailIcons.Filled.Home,
                 ),
                 AdaptiveNavigationItem(
                     key = "search",
                     label = stringResource(Res.string.search),
-                    icon = MetrolistIcons.Outlined.Search,
-                    selectedIcon = MetrolistIcons.Filled.Search,
+                    icon = AnitailIcons.Outlined.Search,
+                    selectedIcon = AnitailIcons.Filled.Search,
                 ),
                 AdaptiveNavigationItem(
                     key = "library",
                     label = stringResource(Res.string.filter_library),
-                    icon = MetrolistIcons.Outlined.LibraryMusic,
-                    selectedIcon = MetrolistIcons.Filled.LibraryMusic,
+                    icon = AnitailIcons.Outlined.LibraryMusic,
+                    selectedIcon = AnitailIcons.Filled.LibraryMusic,
                 ),
             )
         AdaptiveNavigationScaffold(

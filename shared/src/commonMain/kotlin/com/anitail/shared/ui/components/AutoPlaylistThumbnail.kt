@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import org.jetbrains.compose.resources.painterResource
 
 const val AUTO_PLAYLIST_ICON_PREFIX = "auto_playlist_icon_"
@@ -61,23 +61,23 @@ private fun autoPlaylistIconStyle(iconIdentifier: String?): Triple<ImageVector, 
     return when (iconIdentifier) {
         AUTO_PLAYLIST_ICON_LIKED -> {
             Triple(
-                MetrolistIcons.Outlined.FavoriteBorder,
+                AnitailIcons.Outlined.FavoriteBorder,
                 colorScheme.onSecondaryContainer,
                 colorScheme.secondaryContainer,
             )
         }
 
         "auto_playlist_icon_history" -> {
-            Triple(MetrolistIcons.Outlined.History, colorScheme.onSurfaceVariant, colorScheme.surfaceVariant)
+            Triple(AnitailIcons.Outlined.History, colorScheme.onSurfaceVariant, colorScheme.surfaceVariant)
         }
 
         "auto_playlist_icon_podcasts" -> {
-            Triple(MetrolistIcons.Outlined.Podcasts, colorScheme.onTertiaryContainer, colorScheme.tertiaryContainer)
+            Triple(AnitailIcons.Outlined.Podcasts, colorScheme.onTertiaryContainer, colorScheme.tertiaryContainer)
         }
 
         AUTO_PLAYLIST_ICON_DOWNLOADED -> {
             Triple(
-                MetrolistIcons.Outlined.Download,
+                AnitailIcons.Outlined.Download,
                 colorScheme.onSecondaryContainer,
                 colorScheme.secondaryContainer,
             )
@@ -85,7 +85,7 @@ private fun autoPlaylistIconStyle(iconIdentifier: String?): Triple<ImageVector, 
 
         AUTO_PLAYLIST_ICON_TOP100 -> {
             Triple(
-                MetrolistIcons.AutoMirrored.Outlined.TrendingUp,
+                AnitailIcons.AutoMirrored.Outlined.TrendingUp,
                 colorScheme.onPrimaryContainer,
                 colorScheme.primaryContainer,
             )
@@ -93,7 +93,7 @@ private fun autoPlaylistIconStyle(iconIdentifier: String?): Triple<ImageVector, 
 
         AUTO_PLAYLIST_ICON_UPLOADED -> {
             Triple(
-                MetrolistIcons.Outlined.Backup,
+                AnitailIcons.Outlined.Backup,
                 colorScheme.onTertiaryContainer,
                 colorScheme.tertiaryContainer,
             )
@@ -101,7 +101,7 @@ private fun autoPlaylistIconStyle(iconIdentifier: String?): Triple<ImageVector, 
 
         AUTO_PLAYLIST_ICON_CACHED -> {
             Triple(
-                MetrolistIcons.Outlined.Storage,
+                AnitailIcons.Outlined.Storage,
                 colorScheme.onSurfaceVariant,
                 colorScheme.surfaceVariant,
             )
@@ -109,7 +109,7 @@ private fun autoPlaylistIconStyle(iconIdentifier: String?): Triple<ImageVector, 
 
         else -> {
             Triple(
-                MetrolistIcons.AutoMirrored.Outlined.QueueMusic,
+                AnitailIcons.AutoMirrored.Outlined.QueueMusic,
                 colorScheme.onSurfaceVariant,
                 colorScheme.surfaceVariant,
             )

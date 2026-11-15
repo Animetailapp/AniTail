@@ -87,7 +87,7 @@ import com.anitail.shared.ui.components.PlaylistOrderControls
 import com.anitail.shared.ui.components.PopupVisibility
 import com.anitail.shared.ui.components.SongSelectionControls
 import com.anitail.shared.ui.components.SongSwipeActions
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.playback.PlaybackController
 import com.anitail.shared.ui.playback.listState
@@ -227,7 +227,7 @@ internal fun MobileAlbumScreen(
                                 onClick = { onSongMenu(song) },
                                 shapes = IconButtonDefaults.shapes(),
                             ) {
-                                Icon(MetrolistIcons.Default.MoreVert, stringResource(Res.string.more_options))
+                                Icon(AnitailIcons.Default.MoreVert, stringResource(Res.string.more_options))
                             }
                         }
                     }
@@ -841,7 +841,7 @@ internal fun MobilePlaylistScreen(
                                 enabled = !reorderMode,
                                 shapes = IconButtonDefaults.shapes(),
                             ) {
-                                Icon(MetrolistIcons.Default.MoreVert, stringResource(Res.string.more_options))
+                                Icon(AnitailIcons.Default.MoreVert, stringResource(Res.string.more_options))
                             }
                         }
                     }

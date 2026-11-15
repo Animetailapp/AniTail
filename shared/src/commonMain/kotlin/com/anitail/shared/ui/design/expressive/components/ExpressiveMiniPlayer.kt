@@ -90,8 +90,8 @@ import com.anitail.shared.ui.components.images.AsyncImage
 import com.anitail.shared.ui.components.rememberArtworkShapeRotation
 import com.anitail.shared.ui.components.rememberTrackMarquee
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.theme.rememberReducedMotion
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import kotlinx.coroutines.launch
@@ -133,7 +133,7 @@ fun ExpressiveMiniPlayer(
 ) {
     val settings = Settings.shared
     val buttons = settings.expressiveMiniPlayerButtons
-    val haptics = rememberMetrolistHaptics()
+    val haptics = rememberAnitailHaptics()
     val scheme = MaterialTheme.colorScheme
     val containerColor = scheme.primaryContainer
     val onContainer = scheme.onPrimaryContainer
@@ -321,7 +321,7 @@ fun ExpressiveMiniPlayer(
                             when (button) {
                                 ExpressiveMiniPlayerButton.PREVIOUS -> {
                                     ExpressiveMiniButton(
-                                        icon = MetrolistIcons.Rounded.SkipPrevious,
+                                        icon = AnitailIcons.Rounded.SkipPrevious,
                                         description = stringResource(Res.string.previous),
                                         background = scheme.onPrimary,
                                         tint = scheme.primary,
@@ -334,7 +334,7 @@ fun ExpressiveMiniPlayer(
                                     ExpressiveMiniButton(
                                         icon =
                                             playbackActionIcon
-                                                ?: if (isPlaying) MetrolistIcons.Rounded.Pause else MetrolistIcons.Rounded.PlayArrow,
+                                                ?: if (isPlaying) AnitailIcons.Rounded.Pause else AnitailIcons.Rounded.PlayArrow,
                                         description = playLabel,
                                         background = scheme.primary,
                                         tint = scheme.onPrimary,
@@ -345,7 +345,7 @@ fun ExpressiveMiniPlayer(
 
                                 ExpressiveMiniPlayerButton.NEXT -> {
                                     ExpressiveMiniButton(
-                                        icon = MetrolistIcons.Rounded.SkipNext,
+                                        icon = AnitailIcons.Rounded.SkipNext,
                                         description = stringResource(Res.string.next),
                                         background = scheme.onPrimary,
                                         tint = scheme.primary,
@@ -356,7 +356,7 @@ fun ExpressiveMiniPlayer(
 
                                 ExpressiveMiniPlayerButton.PLAYLIST -> {
                                     ExpressiveMiniButton(
-                                        icon = MetrolistIcons.AutoMirrored.Outlined.PlaylistAdd,
+                                        icon = AnitailIcons.AutoMirrored.Outlined.PlaylistAdd,
                                         description = stringResource(Res.string.add_to_playlist),
                                         background = scheme.onPrimary,
                                         tint = scheme.primary,
@@ -372,9 +372,9 @@ fun ExpressiveMiniPlayer(
                                     ExpressiveMiniButton(
                                         icon =
                                             if (isArtistSubscribed) {
-                                                MetrolistIcons.Filled.PersonRemove
+                                                AnitailIcons.Filled.PersonRemove
                                             } else {
-                                                MetrolistIcons.Filled.PersonAdd
+                                                AnitailIcons.Filled.PersonAdd
                                             },
                                         description =
                                             stringResource(
@@ -396,7 +396,7 @@ fun ExpressiveMiniPlayer(
 
                                 ExpressiveMiniPlayerButton.LIKE -> {
                                     ExpressiveMiniButton(
-                                        icon = if (isLiked) MetrolistIcons.Filled.Favorite else MetrolistIcons.Outlined.FavoriteBorder,
+                                        icon = if (isLiked) AnitailIcons.Filled.Favorite else AnitailIcons.Outlined.FavoriteBorder,
                                         description =
                                             stringResource(
                                                 if (isLiked) Res.string.remove_from_favorites else Res.string.add_to_favorites,

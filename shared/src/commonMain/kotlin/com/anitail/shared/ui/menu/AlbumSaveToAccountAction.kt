@@ -23,7 +23,7 @@ import com.anitail.shared.state.saveBookmarkedAlbum
 import com.anitail.shared.ui.components.AlertDialog
 import com.anitail.shared.ui.components.PlayerMenuAction
 import com.anitail.shared.ui.components.PopupContent
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -52,7 +52,7 @@ internal fun rememberAlbumSaveToAccountAction(albumId: String): PlayerMenuAction
     }
     if (!bookmarked || !repository.canManagePlaylists()) return null
     return PlayerMenuAction(
-        icon = MetrolistIcons.Outlined.CloudUpload,
+        icon = AnitailIcons.Outlined.CloudUpload,
         title = label,
         isLoading = saving,
         enabled = !saving,

@@ -2,7 +2,7 @@ package com.anitail.shared.discord
 
 import com.anitail.shared.network.hasHttpTransportFailureInCauseChain
 import com.anitail.shared.utils.Logger
-import com.anitail.shared.utils.MetrolistClock
+import com.anitail.shared.utils.AnitailClock
 import com.anitail.shared.youtube.playback.PlaybackEventKind
 import com.anitail.shared.youtube.playback.PlaybackEventLog
 import io.ktor.client.HttpClient
@@ -123,7 +123,7 @@ class DiscordGateway(
                         }
                         session = this
                         isOpen = true
-                        lastAckAtMs = MetrolistClock.nowMs()
+                        lastAckAtMs = AnitailClock.nowMs()
                         connectedDeferred.complete(Unit)
 
                         try {
@@ -356,7 +356,7 @@ class DiscordGateway(
             }
 
             OP_HEARTBEAT_ACK -> {
-                lastAckAtMs = MetrolistClock.nowMs()
+                lastAckAtMs = AnitailClock.nowMs()
             }
 
             OP_DISPATCH -> {
@@ -449,13 +449,13 @@ class DiscordGateway(
     private fun startHeartbeat(intervalMs: Long) {
         heartbeatJob?.cancel()
         val jittered = (intervalMs * 0.9).toLong()
-        lastAckAtMs = MetrolistClock.nowMs()
+        lastAckAtMs = AnitailClock.nowMs()
         heartbeatJob =
             externalScope.launch {
                 while (isActive && isOpen) {
                     delay(jittered.milliseconds)
                     if (!isActive || !isOpen) break
-                    if (MetrolistClock.nowMs() - lastAckAtMs > intervalMs + 15000L) {
+                    if (AnitailClock.nowMs() - lastAckAtMs > intervalMs + 15000L) {
                         Logger.w(TAG, "Heartbeat timeout")
                         close(4000, "heartbeat timeout")
                         break

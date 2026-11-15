@@ -50,7 +50,7 @@ import com.anitail.shared.ui.components.TempoPitchControls
 import com.anitail.shared.ui.components.rememberModalSheetState
 import com.anitail.shared.ui.equalizer.EqualizerDialog
 import com.anitail.shared.ui.equalizer.MetroEqSheet
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.LyricsMenu
 import com.anitail.shared.ui.menu.MediaDownloadState
 import com.anitail.shared.ui.menu.MediaMenuSheetContent
@@ -292,13 +292,13 @@ internal class MobilePlayerPlatform(
                             tempoPitchMenuAction(varispeed = Settings.shared.varispeed) { showTempoPitch = true },
                             playerSession?.takeUnless { isGuest }?.let {
                                 PlayerMenuAction(
-                                    icon = MetrolistIcons.Outlined.Bedtime,
+                                    icon = AnitailIcons.Outlined.Bedtime,
                                     title = stringResource(Res.string.sleep_timer),
                                     onClick = { showSleepTimer = true },
                                 )
                             },
                             PlayerMenuAction(
-                                icon = MetrolistIcons.Outlined.Group,
+                                icon = AnitailIcons.Outlined.Group,
                                 title = stringResource(Res.string.listen_together),
                                 onClick = {
                                     onDismiss()

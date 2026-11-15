@@ -84,7 +84,7 @@ import com.anitail.shared.generated.resources.statistics
 import com.anitail.shared.generated.resources.switch_youtube_channel
 import com.anitail.shared.ui.components.AlertDialog
 import com.anitail.shared.ui.components.images.AsyncImage
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.settings.SettingsNavigationRow
 import com.anitail.shared.ui.utils.segmentedGroupShape
@@ -278,7 +278,7 @@ internal fun AccountMenuContent(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    MetrolistIcons.Outlined.Token,
+                    AnitailIcons.Outlined.Token,
                     contentDescription = null,
                     tint = colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(20.dp),
@@ -298,7 +298,7 @@ internal fun AccountMenuContent(
                 if (showHistory) {
                     SettingsNavigationRow(
                         title = stringResource(Res.string.menu_history),
-                        icon = MetrolistIcons.Filled.MusicHistory,
+                        icon = AnitailIcons.Filled.MusicHistory,
                         iconSize = 28.dp,
                         iconTint = colorScheme.primary,
                         trailingContent = null,
@@ -313,7 +313,7 @@ internal fun AccountMenuContent(
                 if (statisticsVisible) {
                     SettingsNavigationRow(
                         title = stringResource(Res.string.statistics),
-                        icon = MetrolistIcons.Filled.SsidChart,
+                        icon = AnitailIcons.Filled.SsidChart,
                         iconSize = 28.dp,
                         iconTint = colorScheme.primary,
                         trailingContent = null,
@@ -332,7 +332,7 @@ internal fun AccountMenuContent(
             if (showIntegrations) {
                 SettingsNavigationRow(
                     title = stringResource(Res.string.integrations),
-                    icon = MetrolistIcons.Outlined.Api,
+                    icon = AnitailIcons.Outlined.Api,
                     iconSize = 28.dp,
                     iconTint = colorScheme.primary,
                     trailingContent = null,
@@ -346,7 +346,7 @@ internal fun AccountMenuContent(
             }
             SettingsNavigationRow(
                 title = stringResource(Res.string.settings),
-                icon = MetrolistIcons.Outlined.Settings,
+                icon = AnitailIcons.Outlined.Settings,
                 iconSize = 28.dp,
                 iconTint = colorScheme.primary,
                 trailingContent = null,
@@ -522,7 +522,7 @@ private fun AccountMenuHero(
                 )
             } else {
                 Icon(
-                    MetrolistIcons.Outlined.AccountCircle,
+                    AnitailIcons.Outlined.AccountCircle,
                     contentDescription = null,
                     tint = colorScheme.onPrimary,
                     modifier = Modifier.size(32.dp),
@@ -558,7 +558,7 @@ private fun AccountMenuHero(
                 shapes = IconButtonDefaults.shapes(),
             ) {
                 Icon(
-                    MetrolistIcons.AutoMirrored.Outlined.Logout,
+                    AnitailIcons.AutoMirrored.Outlined.Logout,
                     contentDescription = stringResource(Res.string.action_logout),
                 )
             }

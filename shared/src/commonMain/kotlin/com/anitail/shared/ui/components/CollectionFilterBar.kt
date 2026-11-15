@@ -54,7 +54,7 @@ import com.anitail.shared.generated.resources.playlist_direction_ascending
 import com.anitail.shared.generated.resources.playlist_direction_descending
 import com.anitail.shared.model.CollectionSort
 import com.anitail.shared.model.SortDirection
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.ExpressiveSelectionMenu
 import com.anitail.shared.ui.menu.trackPressPosition
 import com.anitail.shared.ui.tv.tvFocusHighlight
@@ -126,7 +126,7 @@ fun CollectionFilterBar(
                         placeholder = { Text(text.searchLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         leadingIcon = {
                             Icon(
-                                imageVector = MetrolistIcons.Default.Search,
+                                imageVector = AnitailIcons.Default.Search,
                                 contentDescription = null,
                             )
                         },
@@ -134,7 +134,7 @@ fun CollectionFilterBar(
                             if (query.isNotEmpty()) {
                                 IconButton(onClick = { onQueryChange("") }, shapes = IconButtonDefaults.shapes()) {
                                     Icon(
-                                        imageVector = MetrolistIcons.Default.Clear,
+                                        imageVector = AnitailIcons.Default.Clear,
                                         contentDescription = stringResource(Res.string.clear_search),
                                     )
                                 }
@@ -221,7 +221,7 @@ fun CollectionFilterBar(
                                 label = "Collection sort arrow",
                             )
                             Icon(
-                                imageVector = MetrolistIcons.Outlined.KeyboardArrowDown,
+                                imageVector = AnitailIcons.Outlined.KeyboardArrowDown,
                                 contentDescription =
                                     stringResource(
                                         if (sortDirection ==

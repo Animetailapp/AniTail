@@ -25,7 +25,7 @@ import com.anitail.shared.state.SongLikeState
 import com.anitail.shared.ui.components.ModalBottomSheet
 import com.anitail.shared.ui.components.PlayerMenuAction
 import com.anitail.shared.ui.components.rememberModalSheetState
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.theme.ComponentShapes
 import com.anitail.shared.ui.utils.verticalScrollWithDrag
 import org.jetbrains.compose.resources.pluralStringResource
@@ -66,24 +66,24 @@ fun songSelectionMenuModel(
         listOfNotNull(
             onLikeAll?.let {
                 PlayerMenuAction(
-                    icon = if (allLiked) MetrolistIcons.Filled.Favorite else MetrolistIcons.Outlined.FavoriteBorder,
+                    icon = if (allLiked) AnitailIcons.Filled.Favorite else AnitailIcons.Outlined.FavoriteBorder,
                     title = if (allLiked) dislikeAllLabel else likeAllLabel,
                     selected = allLiked,
                     onClick = it,
                 )
             },
             onPlay?.takeUnless { isGuest }?.let {
-                action(MetrolistIcons.Rounded.PlayArrow, playLabel, onDismiss, it, prominent = true)
+                action(AnitailIcons.Rounded.PlayArrow, playLabel, onDismiss, it, prominent = true)
             },
         )
 
     val primaryActions =
         listOfNotNull(
             onShuffle?.takeUnless { isGuest }?.let {
-                action(MetrolistIcons.Outlined.Shuffle, shuffleLabel, onDismiss, it)
+                action(AnitailIcons.Outlined.Shuffle, shuffleLabel, onDismiss, it)
             },
             onAddToPlaylist?.let {
-                PlayerMenuAction(MetrolistIcons.AutoMirrored.Outlined.PlaylistAdd, addToPlaylistLabel, onClick = it)
+                PlayerMenuAction(AnitailIcons.AutoMirrored.Outlined.PlaylistAdd, addToPlaylistLabel, onClick = it)
             },
         )
 
@@ -93,7 +93,7 @@ fun songSelectionMenuModel(
             listOfNotNull(
                 downloadAction(downloadState, 0, false, onDismiss, onDownload),
                 onRemove?.let {
-                    action(MetrolistIcons.Outlined.Delete, removeLabel ?: removeFromPlaylistLabel, onDismiss, it)
+                    action(AnitailIcons.Outlined.Delete, removeLabel ?: removeFromPlaylistLabel, onDismiss, it)
                 },
             ),
             additionalActions,
@@ -103,7 +103,7 @@ fun songSelectionMenuModel(
         title = title,
         subtitle = null,
         thumbnail = songs.firstOrNull()?.previewThumbnailUrlOrNull(),
-        fallbackIcon = MetrolistIcons.AutoMirrored.Outlined.QueueMusic,
+        fallbackIcon = AnitailIcons.AutoMirrored.Outlined.QueueMusic,
         headerActions = headerActions,
         primaryActions = primaryActions,
         actionGroups = actionGroups,
@@ -151,18 +151,18 @@ fun historySelectionMenuModel(
         title = pluralStringResource(Res.plurals.n_selected, count, count),
         subtitle = null,
         thumbnail = null,
-        fallbackIcon = MetrolistIcons.Outlined.Delete,
+        fallbackIcon = AnitailIcons.Outlined.Delete,
         actionGroups =
             listOf(
                 listOfNotNull(
                     action(
-                        if (allDisplayedSelected) MetrolistIcons.Outlined.Close else MetrolistIcons.Filled.Check,
+                        if (allDisplayedSelected) AnitailIcons.Outlined.Close else AnitailIcons.Filled.Check,
                         toggleSelectionLabel,
                         onDismiss,
                         onToggleDisplayedSelection,
                     ),
-                    action(MetrolistIcons.Outlined.Close, cancelLabel, onDismiss, onCancel),
-                    if (count > 0) action(MetrolistIcons.Outlined.Delete, deleteLabel, onDismiss, onDelete) else null,
+                    action(AnitailIcons.Outlined.Close, cancelLabel, onDismiss, onCancel),
+                    if (count > 0) action(AnitailIcons.Outlined.Delete, deleteLabel, onDismiss, onDelete) else null,
                 ),
             ),
     )

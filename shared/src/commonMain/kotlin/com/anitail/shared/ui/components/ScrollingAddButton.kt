@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.anitail.shared.ui.LocalIsTv
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.tv.tvFocusHighlight
 
@@ -169,7 +169,7 @@ fun ScrollingAddButton(
                     modifier = Modifier.padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(MetrolistIcons.Default.Add, contentDescription = label.takeUnless { expanded })
+                    Icon(AnitailIcons.Default.Add, contentDescription = label.takeUnless { expanded })
                     AnimatedVisibility(
                         visible = expanded,
                         enter = expandHorizontally(labelSpatial, expandFrom = Alignment.Start) + fadeIn(effects),

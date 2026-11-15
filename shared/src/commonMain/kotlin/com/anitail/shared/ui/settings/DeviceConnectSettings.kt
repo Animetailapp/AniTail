@@ -24,7 +24,7 @@ import com.anitail.shared.deviceconnect.deviceConnectDeviceMetadata
 import com.anitail.shared.deviceconnect.deviceConnectPeerStatus
 import com.anitail.shared.generated.resources.*
 import com.anitail.shared.settings.Settings
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.compose.resources.stringResource
 
@@ -57,7 +57,7 @@ internal fun SettingsUiRegistryBuilder.deviceConnectPage(host: DeviceConnectSett
         id = SettingsPageId.DEVICE_CONNECT,
         title = stringResource(Res.string.device_connect_title),
         subtitle = settingsPageSubtitle(stringResource(Res.string.settings_device_connect_overview), integrationStatus(enabled)),
-        icon = MetrolistIcons.Outlined.AccountTree,
+        icon = AnitailIcons.Outlined.AccountTree,
         tone = SettingsTone.BLUE,
     ) {
         group("deviceConnectMaster", "") {

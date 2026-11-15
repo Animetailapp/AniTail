@@ -51,7 +51,7 @@ import com.anitail.shared.generated.resources.playlist_direction_ascending
 import com.anitail.shared.generated.resources.playlist_direction_descending
 import com.anitail.shared.model.HistorySortMode
 import com.anitail.shared.model.SortDirection
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.ExpressiveSelectionMenu
 import com.anitail.shared.ui.menu.trackPressPosition
 import com.anitail.shared.ui.theme.MdSpacing
@@ -121,7 +121,7 @@ fun HistoryFilterBar(
                         placeholder = { Text(text.searchLabel) },
                         leadingIcon = {
                             Icon(
-                                imageVector = MetrolistIcons.Default.Search,
+                                imageVector = AnitailIcons.Default.Search,
                                 contentDescription = null,
                             )
                         },
@@ -129,7 +129,7 @@ fun HistoryFilterBar(
                             if (query.isNotEmpty()) {
                                 IconButton(onClick = { onQueryChange("") }, shapes = IconButtonDefaults.shapes()) {
                                     Icon(
-                                        imageVector = MetrolistIcons.Default.Clear,
+                                        imageVector = AnitailIcons.Default.Clear,
                                         contentDescription = stringResource(Res.string.clear_search),
                                     )
                                 }
@@ -217,7 +217,7 @@ fun HistoryFilterBar(
                                     label = "History sort arrow",
                                 )
                                 Icon(
-                                    imageVector = MetrolistIcons.Outlined.KeyboardArrowDown,
+                                    imageVector = AnitailIcons.Outlined.KeyboardArrowDown,
                                     contentDescription =
                                         stringResource(
                                             if (sortDirection ==

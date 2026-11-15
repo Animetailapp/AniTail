@@ -38,7 +38,7 @@ import com.anitail.shared.generated.resources.device_connect_unshareable_queue
 import com.anitail.shared.generated.resources.listen_together_blocked_by_host
 import com.anitail.shared.generated.resources.listen_together_error
 import com.anitail.shared.generated.resources.unavailable
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -50,12 +50,12 @@ fun DeviceConnectDeviceTypeIcon(
 ) {
     val icon =
         when (deviceType) {
-            DeviceConnectDeviceType.ANDROID_PHONE -> MetrolistIcons.Outlined.PhoneAndroid
-            DeviceConnectDeviceType.DESKTOP -> MetrolistIcons.Outlined.Computer
-            DeviceConnectDeviceType.ANDROID_AUTO -> MetrolistIcons.Outlined.DirectionsCar
-            DeviceConnectDeviceType.WEAR_OS -> MetrolistIcons.Outlined.Watch
-            DeviceConnectDeviceType.IOS -> MetrolistIcons.Outlined.PhoneIphone
-            DeviceConnectDeviceType.UNKNOWN -> MetrolistIcons.Outlined.DeviceUnknown
+            DeviceConnectDeviceType.ANDROID_PHONE -> AnitailIcons.Outlined.PhoneAndroid
+            DeviceConnectDeviceType.DESKTOP -> AnitailIcons.Outlined.Computer
+            DeviceConnectDeviceType.ANDROID_AUTO -> AnitailIcons.Outlined.DirectionsCar
+            DeviceConnectDeviceType.WEAR_OS -> AnitailIcons.Outlined.Watch
+            DeviceConnectDeviceType.IOS -> AnitailIcons.Outlined.PhoneIphone
+            DeviceConnectDeviceType.UNKNOWN -> AnitailIcons.Outlined.DeviceUnknown
         }
     Surface(
         modifier = modifier.size(40.dp),

@@ -3,7 +3,7 @@ package com.anitail.shared.youtube.playback
 import com.metrolist.innertubex.cipher.PlayerConfigRepository
 import com.anitail.shared.settings.Settings
 
-object MetrolistPlayerConfigRepository : PlayerConfigRepository {
+object AnitailPlayerConfigRepository : PlayerConfigRepository {
     override val enabled: Boolean = false
 
     override val sourceUrl: String

@@ -44,7 +44,7 @@ import com.anitail.shared.ui.components.sliders.collectPlaybackDisplayState
 import com.anitail.shared.ui.components.sliders.progressAtPixel
 import com.anitail.shared.ui.components.sliders.rememberPendingSeekPosition
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
 import com.anitail.shared.utils.Logger
 import com.anitail.shared.utils.formatDuration
 import com.anitail.shared.viewmodels.PlayerViewModel
@@ -132,7 +132,7 @@ internal fun PlayerProgressSlider(
         position = { currentPosition },
         renderedPosition = { displayedPosition },
     )
-    val hapticManager = rememberMetrolistHaptics()
+    val hapticManager = rememberAnitailHaptics()
     val displayedSecond =
         when {
             isDraggingSlider -> (sliderValue.toDouble() * duration).toLong() / 1_000L

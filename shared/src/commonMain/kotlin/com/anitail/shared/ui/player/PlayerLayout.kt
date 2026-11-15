@@ -164,8 +164,8 @@ import com.anitail.shared.ui.components.playerControlBlend
 import com.anitail.shared.ui.components.rememberTrackMarquee
 import com.anitail.shared.ui.components.vintageOnButtonColor
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.theme.ComponentShapes
 import com.anitail.shared.ui.tv.tvFocusHighlight
@@ -230,7 +230,7 @@ internal fun TabletPlayerContent(
     val repeatMode = uiState.repeatMode
     val isShuffleOn = uiState.isShuffleOn
     val isTv = LocalIsTv.current
-    val hapticManager = rememberMetrolistHaptics()
+    val hapticManager = rememberAnitailHaptics()
     val platform = LocalPlayerPlatform.current
     val playerConnection = LocalPlayerSession.current
     val isPlaybackLoading by viewModel.isPlaybackLoading.collectWhilePlayerActive()
@@ -723,7 +723,7 @@ private fun LandscapePlayerModeSwitcher(
                 )
             } else {
                 Icon(
-                    imageVector = if (songSelected) MetrolistIcons.Filled.Headphones else MetrolistIcons.Outlined.Headphones,
+                    imageVector = if (songSelected) AnitailIcons.Filled.Headphones else AnitailIcons.Outlined.Headphones,
                     contentDescription = songText,
                     modifier = Modifier.size(20.dp),
                 )
@@ -750,7 +750,7 @@ private fun LandscapePlayerModeSwitcher(
             } else {
                 Icon(
                     imageVector =
-                        if (isVideoActive) MetrolistIcons.Filled.SmartDisplay else MetrolistIcons.Outlined.SmartDisplay,
+                        if (isVideoActive) AnitailIcons.Filled.SmartDisplay else AnitailIcons.Outlined.SmartDisplay,
                     contentDescription = videoText,
                     modifier = Modifier.size(20.dp),
                 )
@@ -777,7 +777,7 @@ private fun LandscapePlayerCollapseButton(
         modifier = modifier.size(buttonSize).tvFocusHighlight(CircleShape).playerControlBlend(),
     ) {
         Icon(
-            imageVector = MetrolistIcons.Default.Close,
+            imageVector = AnitailIcons.Default.Close,
             contentDescription = stringResource(Res.string.close),
             modifier = Modifier.size(24.dp),
         )
@@ -819,7 +819,7 @@ private fun LandscapePlayerCastButton(
                 ).playerControlBlend(),
     ) {
         Icon(
-            imageVector = if (isCasting) MetrolistIcons.Filled.Cast else MetrolistIcons.Outlined.Cast,
+            imageVector = if (isCasting) AnitailIcons.Filled.Cast else AnitailIcons.Outlined.Cast,
             contentDescription = stringResource(Res.string.cast),
             modifier = Modifier.size(20.dp),
         )
@@ -895,7 +895,7 @@ internal fun LandscapePlayerContent(
         if (artworkBehindControls) Color.Black.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceContainer,
         MaterialTheme.motionScheme.defaultEffectsSpec(),
     )
-    val hapticManager = rememberMetrolistHaptics()
+    val hapticManager = rememberAnitailHaptics()
     val platform = LocalPlayerPlatform.current
     val controlsVisible = !uiState.isLyricsExpanded || !Settings.shared.lyricsHideStatusBarInFullscreen
     val playerConnection = LocalPlayerSession.current
@@ -945,7 +945,7 @@ internal fun LandscapePlayerContent(
                         .playerControlBlend(),
             ) {
                 Icon(
-                    MetrolistIcons.Default.MoreVert,
+                    AnitailIcons.Default.MoreVert,
                     contentDescription = stringResource(Res.string.more_options),
                     modifier = Modifier.size(20.dp),
                 )
@@ -1612,7 +1612,7 @@ private fun PlayerActionButtons(
     onShowLyricsMenu: () -> Unit,
     onAltShareSong: (() -> Unit)? = null,
 ) {
-    val hapticManager = rememberMetrolistHaptics()
+    val hapticManager = rememberAnitailHaptics()
 
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (uiState.isLyricsVisible) {
@@ -1624,7 +1624,7 @@ private fun PlayerActionButtons(
                 shape = CircleShape,
             ) {
                 Icon(
-                    MetrolistIcons.Default.MoreHoriz,
+                    AnitailIcons.Default.MoreHoriz,
                     contentDescription = stringResource(Res.string.more_lyrics_options),
                     modifier = Modifier.size(24.dp),
                 )
@@ -1734,7 +1734,7 @@ internal fun PlayerActionRow(
                                 },
                     ) {
                         Icon(
-                            if (isLyricsExpanded) MetrolistIcons.Default.FullscreenExit else MetrolistIcons.Default.Fullscreen,
+                            if (isLyricsExpanded) AnitailIcons.Default.FullscreenExit else AnitailIcons.Default.Fullscreen,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
                         )
@@ -1744,7 +1744,7 @@ internal fun PlayerActionRow(
                     DropdownMenuItem(
                         leadingIcon = {
                             Icon(
-                                if (isLyricsExpanded) MetrolistIcons.Default.FullscreenExit else MetrolistIcons.Default.Fullscreen,
+                                if (isLyricsExpanded) AnitailIcons.Default.FullscreenExit else AnitailIcons.Default.Fullscreen,
                                 contentDescription = null,
                             )
                         },
@@ -1773,7 +1773,7 @@ internal fun PlayerActionRow(
                                 .navigationPopupSource(),
                     ) {
                         Icon(
-                            MetrolistIcons.Default.MoreHoriz,
+                            AnitailIcons.Default.MoreHoriz,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
                         )
@@ -1782,7 +1782,7 @@ internal fun PlayerActionRow(
                 menuContent = { menuState ->
                     DropdownMenuItem(
                         modifier = Modifier.navigationPopupSource(),
-                        leadingIcon = { Icon(MetrolistIcons.Default.MoreHoriz, contentDescription = null) },
+                        leadingIcon = { Icon(AnitailIcons.Default.MoreHoriz, contentDescription = null) },
                         text = { Text(moreLyricsOptionsDescription) },
                         onClick = {
                             onShowLyricsMenu()

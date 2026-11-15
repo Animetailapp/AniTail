@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Imported from the official Metrolist Android translations. --><!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
+<!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
     <string name="home">होम</string>
     <string name="offline_mode">अफलाइन मोड</string>
     <string name="songs">गीतहरू</string>
@@ -255,7 +255,7 @@
     <string name="credits_license_desc">मेट्रोलिस्ट GPL-3.0 लाइसेन्स अन्तर्गत लाइसेन्स गरिएको छ</string>
     <string name="devmode_already_active" translatable="true">डेभलपर मोड पहिले नै सक्रिय छ</string>
     <string name="discord_enable_rich_presence">डिस्कर्ड रिच प्रेजेन्स</string>
-    <string name="discord_listen_to_metrolist">AniTail सुन्नुहोस</string>
+    <string name="discord_listen_to_anitail">AniTail सुन्नुहोस</string>
     <string name="discord_login_description">आफ्नो Discord खाता जोड्नुहोस्</string>
     <string name="discord_rich_presence">रिच प्रेजेन्स</string>
     <string name="discord_state">स्थिति</string>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Imported from the official Metrolist Android translations. --><!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
+<!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
     <string name="home">صفحه اصلی</string>
     <string name="offline_mode">حالت آفلاین</string>
     <string name="songs">آهنگ‌ها</string>
@@ -264,7 +264,7 @@
     <string name="preview">پیش‌نمایش</string>
     <string name="credits_android_lead">ارشد برنامه‌نویسی اندروید</string>
     <string name="credits_desktop_lead">ارشد برنامه‌نویسی کامپیوتر</string>
-    <string name="credits_creator">سازنده مترولیست</string>
+    <string name="credits_creator">سازنده AniTail</string>
     <string name="credits_android_developer">برنامه‌نویس اندروید</string>
     <string name="credits_desktop_developer">برنامه‌نویس کامپیوتر</string>
     <string name="credits_macos_developer">برنامه‎‌نویس مَک</string>
@@ -275,18 +275,18 @@
     <string name="open_website">ورود به وبسایت</string>
     <string name="open_github_profile">ورود به صفحه گیت‌هاب</string>
     <string name="credits_license_name">مجوز</string>
-    <string name="credits_license_desc">مترولیست با مجوز GPL-3.0 منتشر می‌شود.</string>
+    <string name="credits_license_desc">AniTail با مجوز GPL-3.0 منتشر می‌شود.</string>
     <string name="devmode_already_active" translatable="true">حالت برنامه‌نویسی از قبل فعال شده است</string>
-    <string name="discord_listen_to_metrolist">شنیدن مترولیست</string>
+    <string name="discord_listen_to_anitail">شنیدن AniTail</string>
     <string name="discord_login_description">اتصال به حساب دیسکورد</string>
     <string name="discord_state">حالت</string>
     <string name="discord_button1_text_default">گوش دادن در YouTube Music</string>
-    <string name="discord_button2_text_default">دیدار از مترولیست</string>
+    <string name="discord_button2_text_default">دیدار از AniTail</string>
     <string name="discord_status_authorizing">درحال تایید اعتبار…</string>
     <string name="discord_status_not_initialized">انجام نشده</string>
     <string name="discord_status_authorized">متصل شده</string>
     <string name="discord_error_denied">دیسکورد اجازه اتصال رو ردکرد.</string>
-    <string name="discord_error_connection_failed">اتصال به دیسکورد شکست خورد. مترولیست به صورت خودکار دوباره تلاش میکند.</string>
+    <string name="discord_error_connection_failed">اتصال به دیسکورد شکست خورد. AniTail به صورت خودکار دوباره تلاش میکند.</string>
     <string name="discord_error_no_browser">برنامه‌ای برای باز کردن تأییدیه دیسکورد وجود ندارد.</string>
     <string name="discord_error_invalid_scope">خطای دسترسی. لطفاً مجدداً وارد حساب کاربری خود شوید.</string>
     <string name="discord_error_timeout">مهلت زمان اتصال به دیسکورد به پایان رسید. دوباره تلاش کنید.</string>

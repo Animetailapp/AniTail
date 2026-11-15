@@ -175,13 +175,13 @@ private fun partyInvitation(code: String?): MobileDeepLink? =
 
 internal fun resolveMobileDeepLink(callback: String): MobileDeepLink? {
     parseListenTogetherInvitation(callback)?.let { return MobileDeepLink.Destination(MobileRoute.ListenTogether(it)) }
-    val uri = runCatching { Url(callback.replace("metrolist://", "https://app.metrolist/")) }.getOrNull()
-    val path = uri?.encodedPath?.trim('/') ?: callback.removePrefix("metrolist://").substringBefore('?').trim('/')
-    if (!callback.startsWith("metrolist://")) {
+    val uri = runCatching { Url(callback.replace("anitail://", "https://app.anitail/")) }.getOrNull()
+    val path = uri?.encodedPath?.trim('/') ?: callback.removePrefix("anitail://").substringBefore('?').trim('/')
+    if (!callback.startsWith("anitail://")) {
         val host = uri?.host?.lowercase()?.removeSuffix(".")
-        val isMetrolistHost =
-            uri?.protocol == URLProtocol.HTTPS && (host == "metrolist.cc" || host?.endsWith(".metrolist.cc") == true)
-        return if (isMetrolistHost) {
+        val isAnitailHost =
+            uri?.protocol == URLProtocol.HTTPS && (host == "anitail.cc" || host?.endsWith(".anitail.cc") == true)
+        return if (isAnitailHost) {
             when (path) {
                 "listen" -> listenTogetherInvitation(uri.parameters["code"])
                 "party" -> partyInvitation(uri.parameters["r"] ?: uri.parameters["code"])

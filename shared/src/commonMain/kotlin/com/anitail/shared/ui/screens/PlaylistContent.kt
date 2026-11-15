@@ -79,7 +79,7 @@ import com.anitail.shared.ui.components.mediumCollectionArtworkSize
 import com.anitail.shared.ui.components.rememberItemPlayback
 import com.anitail.shared.ui.components.rememberScrollingFabState
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
 import com.anitail.shared.ui.menu.artworkMenuActions
 import com.anitail.shared.ui.menu.onSecondaryClick
 import com.anitail.shared.ui.navigation.NavigationBackHandler
@@ -339,7 +339,7 @@ fun PlaylistContent(
                     remember(songKeys, reorderMode) {
                         if (reorderMode) songKeys.withIndex().associate { (index, key) -> key to index } else emptyMap()
                     }
-                val haptics = rememberMetrolistHaptics()
+                val haptics = rememberAnitailHaptics()
                 val reorderableState =
                     if (reorderMode) {
                         rememberReorderableLazyListState(activeListState) { from, to ->
@@ -779,7 +779,7 @@ private fun LazyItemScope.PlaylistSongItem(
     onMoveToBottom: (() -> Unit)? = null,
 ) {
     val playback by rememberItemPlayback(song.id, currentSongId, isPlaying)
-    val haptics = rememberMetrolistHaptics()
+    val haptics = rememberAnitailHaptics()
     if (reorderableState == null) {
         container {
             SongListItem(

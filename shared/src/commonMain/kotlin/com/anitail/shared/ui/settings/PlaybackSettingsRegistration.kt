@@ -18,7 +18,7 @@ import com.anitail.shared.generated.resources.*
 import com.anitail.shared.settings.KeepScreenOnMode
 import com.anitail.shared.settings.LoudnessLevel
 import com.anitail.shared.settings.Settings
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.utils.formatPlaybackPitch
 import com.anitail.shared.utils.formatPlaybackSpeed
 import com.anitail.shared.utils.playbackPitchToSemitones
@@ -54,7 +54,7 @@ internal fun SettingsUiRegistryBuilder.registerPlaybackSettings(host: SharedSett
         id = SettingsPageId.PLAYER,
         title = stringResource(Res.string.player_settings_title),
         subtitle = stringResource(Res.string.settings_player_audio_description),
-        icon = MetrolistIcons.Outlined.PlayArrow,
+        icon = AnitailIcons.Outlined.PlayArrow,
         tone = SettingsTone.ROSE,
     ) {
         if (host.platform != SettingsPlatform.IOS) {

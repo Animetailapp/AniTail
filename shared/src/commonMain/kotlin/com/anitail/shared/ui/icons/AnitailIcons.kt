@@ -5,11 +5,11 @@ package com.anitail.shared.ui.icons
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /** Material Symbols used throughout the Android, shared, and desktop UI. */
-object MetrolistIcons {
-    val Filled: MetrolistIconsFilled = MetrolistIconsFilled
-    val Default: MetrolistIconsFilled = MetrolistIconsFilled
-    val Outlined: MetrolistIconsOutlined = MetrolistIconsOutlined
-    val Rounded: MetrolistIconsRounded = MetrolistIconsRounded
+object AnitailIcons {
+    val Filled: AnitailIconsFilled = AnitailIconsFilled
+    val Default: AnitailIconsFilled = AnitailIconsFilled
+    val Outlined: AnitailIconsOutlined = AnitailIconsOutlined
+    val Rounded: AnitailIconsRounded = AnitailIconsRounded
 
     object AutoMirrored {
         object Filled {

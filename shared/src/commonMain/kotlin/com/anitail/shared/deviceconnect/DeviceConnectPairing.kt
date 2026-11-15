@@ -568,7 +568,7 @@ private fun Int.toByteArray(): ByteArray =
         toByte(),
     )
 
-private const val DEVICE_CONNECT_TRANSCRIPT_LABEL = "metrolist-device-connect-v2"
+private const val DEVICE_CONNECT_TRANSCRIPT_LABEL = "anitail-device-connect-v2"
 private const val DEVICE_CONNECT_HELLO_COMMITMENT_LABEL = "$DEVICE_CONNECT_TRANSCRIPT_LABEL/hello-commit"
 internal const val DEVICE_CONNECT_HELLO_COMMITMENT_BYTES = 32
 internal const val DEVICE_CONNECT_HELLO_NONCE_BYTES = 16

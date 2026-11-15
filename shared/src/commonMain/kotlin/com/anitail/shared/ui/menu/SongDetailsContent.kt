@@ -93,7 +93,7 @@ import com.anitail.shared.settings.displayName
 import com.anitail.shared.state.GlobalYouTubeRepository
 import com.anitail.shared.ui.components.images.AsyncImage
 import com.anitail.shared.ui.components.loadingShimmer
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.screens.statisticsDuration
 import com.anitail.shared.ui.statistics.StatisticsFormatter
 import com.anitail.shared.ui.theme.currentAppLocaleList
@@ -283,9 +283,9 @@ fun SongDetailsContent(
             }
         val sections =
             listOf(
-                Triple(stringResource(Res.string.statistics), MetrolistIcons.Outlined.BarChart, statistics),
-                Triple(stringResource(Res.string.details), MetrolistIcons.Outlined.Info, details),
-                Triple(stringResource(Res.string.about), MetrolistIcons.Outlined.Description, information),
+                Triple(stringResource(Res.string.statistics), AnitailIcons.Outlined.BarChart, statistics),
+                Triple(stringResource(Res.string.details), AnitailIcons.Outlined.Info, details),
+                Triple(stringResource(Res.string.about), AnitailIcons.Outlined.Description, information),
             ).filter { it.third.isNotEmpty() }
         SelectionContainer {
             Column(modifier = modifier.fillMaxWidth().verticalScrollWithDrag(rememberScrollState()).padding(16.dp)) {

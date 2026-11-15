@@ -20,7 +20,7 @@ import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.devtools_switch_description
 import com.anitail.shared.generated.resources.devtools_title
 import com.anitail.shared.ui.components.ExpressiveSwitch
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
 import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -30,7 +30,7 @@ fun DevtoolsEnabledSwitch(
     onEnabledChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val haptics = rememberMetrolistHaptics()
+    val haptics = rememberAnitailHaptics()
     Surface(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(20.dp),

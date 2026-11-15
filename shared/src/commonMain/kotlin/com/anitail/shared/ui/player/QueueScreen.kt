@@ -167,8 +167,8 @@ import com.anitail.shared.ui.components.images.AsyncImage
 import com.anitail.shared.ui.components.rememberArtworkShapeRotation
 import com.anitail.shared.ui.components.squareArtworkSlot
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.icons.SongStatusIcons
 import com.anitail.shared.ui.menu.ExpressiveSelectionMenu
 import com.anitail.shared.ui.menu.cursorContextMenu
@@ -376,7 +376,7 @@ fun QueueScreen(
     headerActions: @Composable RowScope.() -> Unit = {},
 ) {
     val lazyListState = session?.listState ?: rememberLazyListState()
-    val hapticManager = rememberMetrolistHaptics()
+    val hapticManager = rememberAnitailHaptics()
     val hasSelection = state.selectedEntryKeys.isNotEmpty()
     var draggingEntryKey by remember { mutableStateOf<Long?>(null) }
     val isUnlocked = !Settings.shared.isQueueLocked
@@ -416,22 +416,22 @@ fun QueueScreen(
                     .firstOrNull { it.entryKey in state.selectedEntryKeys }
                     ?.takeIf { canControlPlayback }
                     ?.let { track ->
-                        PlayerMenuAction(MetrolistIcons.Rounded.PlayArrow, stringResource(Res.string.play)) {
+                        PlayerMenuAction(AnitailIcons.Rounded.PlayArrow, stringResource(Res.string.play)) {
                             onEvent(QueueEvent.PlayTrack(track.entryKey))
                         }
                     },
-                PlayerMenuAction(MetrolistIcons.AutoMirrored.Outlined.PlaylistAdd, stringResource(Res.string.add_to_playlist)) {
+                PlayerMenuAction(AnitailIcons.AutoMirrored.Outlined.PlaylistAdd, stringResource(Res.string.add_to_playlist)) {
                     onEvent(QueueEvent.AddSelectedToPlaylist)
                 },
-                PlayerMenuAction(MetrolistIcons.Outlined.Download, stringResource(Res.string.action_download)) {
+                PlayerMenuAction(AnitailIcons.Outlined.Download, stringResource(Res.string.action_download)) {
                     onEvent(QueueEvent.DownloadSelected)
                 },
                 PlayerMenuAction(
-                    MetrolistIcons.Outlined.Delete,
+                    AnitailIcons.Outlined.Delete,
                     stringResource(Res.string.delete),
                     enabled = canControlPlayback && allTracks.any { it.canRemove && it.entryKey in state.selectedEntryKeys },
                 ) { onEvent(QueueEvent.DeleteSelected) },
-                PlayerMenuAction(MetrolistIcons.Rounded.FavoriteBorder, stringResource(Res.string.action_like)) {
+                PlayerMenuAction(AnitailIcons.Rounded.FavoriteBorder, stringResource(Res.string.action_like)) {
                     onEvent(QueueEvent.LikeSelected)
                 },
             )
@@ -550,7 +550,7 @@ fun QueueScreen(
                                 modifier = Modifier.tvFocusHighlight(CircleShape).navigationPopupSource(),
                                 shapes = IconButtonDefaults.shapes(),
                             ) {
-                                Icon(MetrolistIcons.Rounded.MoreVert, stringResource(Res.string.more_options))
+                                Icon(AnitailIcons.Rounded.MoreVert, stringResource(Res.string.more_options))
                             }
                         }
                     },
@@ -893,7 +893,7 @@ fun QueueScreen(
                 isShuffleOn = state.isShuffleOn,
                 repeatMode = state.repeatMode,
                 collapseIcon =
-                    if (isDesktopPanel) MetrolistIcons.AutoMirrored.Filled.KeyboardArrowRight else MetrolistIcons.Rounded.KeyboardArrowDown,
+                    if (isDesktopPanel) AnitailIcons.AutoMirrored.Filled.KeyboardArrowRight else AnitailIcons.Rounded.KeyboardArrowDown,
                 selectionActions = queueSelectionActions.takeIf { hasSelection },
                 onEvent = onEvent,
                 modifier =
@@ -939,7 +939,7 @@ private fun QueueBottomToolbar(
 ) {
     val sleepTimerState by LocalPlayerSession.current?.sleepTimerState?.collectWhilePlayerActive()
         ?: remember { mutableStateOf(SleepTimerState()) }
-    val hapticManager = rememberMetrolistHaptics()
+    val hapticManager = rememberAnitailHaptics()
     Row(
         modifier = modifier.width(240.dp).height(72.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -978,7 +978,7 @@ private fun QueueBottomToolbar(
                         shapes = IconButtonDefaults.shapes(),
                     ) {
                         Icon(
-                            imageVector = MetrolistIcons.Outlined.Bedtime,
+                            imageVector = AnitailIcons.Outlined.Bedtime,
                             contentDescription = sleepTimerContentDescription(sleepTimerState),
                             tint = MaterialTheme.colorScheme.onSurface,
                         )
@@ -992,7 +992,7 @@ private fun QueueBottomToolbar(
                         shapes = IconButtonDefaults.shapes(),
                     ) {
                         Icon(
-                            imageVector = MetrolistIcons.Rounded.Shuffle,
+                            imageVector = AnitailIcons.Rounded.Shuffle,
                             contentDescription = stringResource(Res.string.shuffle),
                             tint = if (isShuffleOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                         )
@@ -1006,7 +1006,7 @@ private fun QueueBottomToolbar(
                         shapes = IconButtonDefaults.shapes(),
                     ) {
                         Icon(
-                            imageVector = if (repeatMode == 1) MetrolistIcons.Rounded.RepeatOne else MetrolistIcons.Rounded.Repeat,
+                            imageVector = if (repeatMode == 1) AnitailIcons.Rounded.RepeatOne else AnitailIcons.Rounded.Repeat,
                             contentDescription =
                                 stringResource(
                                     when (repeatMode) {
@@ -1034,7 +1034,7 @@ private fun QueueBottomToolbar(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = MetrolistIcons.Default.MoreVert,
+                            imageVector = AnitailIcons.Default.MoreVert,
                             contentDescription = stringResource(Res.string.more_options),
                             modifier = Modifier.size(24.dp),
                         )
@@ -1170,7 +1170,7 @@ private fun PlaylistHeader(
                             shapes = IconButtonDefaults.shapes(),
                         ) {
                             Icon(
-                                imageVector = MetrolistIcons.Filled.Close,
+                                imageVector = AnitailIcons.Filled.Close,
                                 contentDescription = stringResource(Res.string.clear_selection),
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
                                 modifier = Modifier.size(24.dp),
@@ -1188,7 +1188,7 @@ private fun PlaylistHeader(
                         shapes = IconButtonDefaults.toggleableShapes(),
                     ) {
                         Icon(
-                            imageVector = if (isUnlocked) MetrolistIcons.Rounded.LockOpen else MetrolistIcons.Rounded.Lock,
+                            imageVector = if (isUnlocked) AnitailIcons.Rounded.LockOpen else AnitailIcons.Rounded.Lock,
                             contentDescription = stringResource(if (isUnlocked) Res.string.lock_queue else Res.string.unlock_queue),
                             modifier = Modifier.size(22.dp),
                         )
@@ -1208,7 +1208,7 @@ private fun QueueTrackSwipeToDismissBox(
     modifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val hapticManager = rememberMetrolistHaptics()
+    val hapticManager = rememberAnitailHaptics()
     val positionalThreshold = SwipeToDismissBoxDefaults.positionalThreshold
     val dismissState =
         remember(trackKey) {
@@ -1272,7 +1272,7 @@ private fun QueueTrackSwipeToDismissBox(
             ) {
                 if (direction != SwipeToDismissBoxValue.Settled) {
                     Icon(
-                        imageVector = MetrolistIcons.Outlined.Delete,
+                        imageVector = AnitailIcons.Outlined.Delete,
                         contentDescription = stringResource(Res.string.delete),
                         tint = iconColor,
                         modifier =
@@ -1317,7 +1317,7 @@ private fun TrackItem(
     onMoveToTop: (() -> Unit)? = null,
     onMoveToBottom: (() -> Unit)? = null,
 ) {
-    val hapticManager = rememberMetrolistHaptics()
+    val hapticManager = rememberAnitailHaptics()
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val isHovered by interactionSource.collectIsHoveredAsState()
@@ -1462,7 +1462,7 @@ private fun TrackItem(
                         )
                     } else {
                         Icon(
-                            imageVector = MetrolistIcons.Rounded.MusicNote,
+                            imageVector = AnitailIcons.Rounded.MusicNote,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(24.dp),
@@ -1540,7 +1540,7 @@ private fun TrackItem(
                     shapes = IconButtonDefaults.shapes(),
                 ) {
                     Icon(
-                        imageVector = MetrolistIcons.Rounded.MoreVert,
+                        imageVector = AnitailIcons.Rounded.MoreVert,
                         contentDescription = stringResource(Res.string.more_options),
                         tint = if (isActive || isSelected || isMoving) contentColor else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp),

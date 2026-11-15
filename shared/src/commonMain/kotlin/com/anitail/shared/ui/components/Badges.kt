@@ -42,7 +42,7 @@ import com.anitail.shared.model.SongItem
 import com.anitail.shared.model.YTItem
 import com.anitail.shared.model.isLive
 import com.anitail.shared.state.SongLikeState
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.icons.SongStatusIcons
 import org.jetbrains.compose.resources.stringResource
 
@@ -221,7 +221,7 @@ fun SpeedDialPinBadge(modifier: Modifier = Modifier) {
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
-                MetrolistIcons.Filled.PushPin,
+                AnitailIcons.Filled.PushPin,
                 contentDescription = stringResource(Res.string.pinned),
                 modifier = Modifier.size(14.dp),
             )

@@ -23,7 +23,7 @@ import com.anitail.shared.generated.resources.other_apps
 import com.anitail.shared.generated.resources.other_apps_info
 import com.anitail.shared.generated.resources.patreon
 import com.anitail.shared.generated.resources.patreon_info
-import com.anitail.shared.ui.icons.MetrolistIconsBrand
+import com.anitail.shared.ui.icons.AnitailIconsBrand
 import org.jetbrains.compose.resources.stringResource
 
 sealed interface AboutItem {
@@ -173,7 +173,7 @@ fun createDefaultAboutItems(buildInfo: BuildInfo): List<AboutItem> =
                     CardItem(
                         title = stringResource(Res.string.my_channel),
                         subtitle = stringResource(Res.string.my_channel_info),
-                        icon = MetrolistIconsBrand.Discord,
+                        icon = AnitailIconsBrand.Discord,
                         url = "https://discord.gg/fvskrQZb9j",
                     ),
                     CardItem(

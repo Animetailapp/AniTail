@@ -36,7 +36,7 @@ import com.anitail.shared.generated.resources.refresh
 import com.anitail.shared.generated.resources.retry
 import com.anitail.shared.state.GlobalYouTubeRepository
 import com.anitail.shared.ui.components.ExpressiveFilterChip
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.ExpressiveSelectionMenu
 import com.anitail.shared.ui.utils.carouselScroll
 import com.anitail.shared.viewmodels.DownloadPlaylistFilter
@@ -115,7 +115,7 @@ fun DownloadPlaylistFilterBar(
                     label = { Text(stringResource(Res.string.download_filter_not_in_playlist)) },
                 )
                 IconButton(onClick = filter::refresh, enabled = !state.loading, shapes = IconButtonDefaults.shapes()) {
-                    Icon(MetrolistIcons.Outlined.Refresh, stringResource(if (state.failed) Res.string.retry else Res.string.refresh))
+                    Icon(AnitailIcons.Outlined.Refresh, stringResource(if (state.failed) Res.string.retry else Res.string.refresh))
                 }
             }
         }

@@ -121,7 +121,7 @@ private class IosDictionaryInstaller {
     private val storagePath: String by lazy {
         val paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, true)
         val appSupport = requireNotNull(paths.firstOrNull() as? String)
-        "$appSupport/metrolist/japanese-dictionary"
+        "$appSupport/anitail/japanese-dictionary"
     }
     private val targetPath by lazy { "$storagePath/kuromoji-$KUROMOJI_VERSION-${KUROMOJI_COMMIT.take(12)}" }
 
@@ -264,28 +264,28 @@ private class IosKuromojiEngine {
                     check(bytes != null && bytes.size in 1..spec.maxBytes && sha256(bytes) == spec.sha256)
                     addDictionary(js, spec.name, Base64.Default.encode(bytes))
                 }
-                js.call("__metrolistStartBuild")
+                js.call("__anitailStartBuild")
                 repeat(100) {
-                    js.call("__metrolistDrainTimers")
-                    if (js.call("__metrolistIsBuilt").toBool()) {
-                        js.call("__metrolistReleaseDictionaryData")
+                    js.call("__anitailDrainTimers")
+                    if (js.call("__anitailIsBuilt").toBool()) {
+                        js.call("__anitailReleaseDictionaryData")
                         context = js
                         initialized = true
                         return true
                     }
-                    val buildErrorValue = js.call("__metrolistBuildError")
+                    val buildErrorValue = js.call("__anitailBuildError")
                     if (!buildErrorValue.isNull) error(requireNotNull(buildErrorValue.toString_()))
                 }
                 false
             } finally {
-                if (!initialized) runCatching { js.call("__metrolistReleaseDictionaryData") }
+                if (!initialized) runCatching { js.call("__anitailReleaseDictionaryData") }
             }
         }
 
     fun romanize(text: String): String? =
         lock.withLock {
             val js = context ?: return null
-            val json = requireNotNull(js.call("__metrolistTokenize", text).toString_())
+            val json = requireNotNull(js.call("__anitailTokenize", text).toString_())
             val tokens = Json.parseToJsonElement(json).jsonArray
             val words =
                 tokens.mapNotNull { token ->
@@ -318,7 +318,7 @@ private class IosKuromojiEngine {
         name: String,
         base64: String,
     ) {
-        js.call("__metrolistAddDictionary", name, base64)
+        js.call("__anitailAddDictionary", name, base64)
     }
 
     private fun JSContext.evaluate(script: String) {

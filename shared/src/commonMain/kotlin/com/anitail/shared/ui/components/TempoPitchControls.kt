@@ -65,8 +65,8 @@ import com.anitail.shared.generated.resources.tempo_pitch_save_preset
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.ui.haptics.HapticEvent
 import com.anitail.shared.ui.haptics.SliderDetents
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.playback.retainPlaybackKeyFocus
 import com.anitail.shared.utils.formatPlaybackPitch
@@ -224,7 +224,7 @@ private fun TempoPitchSlider(
     enabled: Boolean = true,
     onValueChange: (Float) -> Unit,
 ) {
-    val haptics = rememberMetrolistHaptics()
+    val haptics = rememberAnitailHaptics()
     val detents = remember(range, steps) { SliderDetents(range, steps, value) }
     detents.reset(value)
     var editing by rememberSaveable { mutableStateOf(false) }
@@ -246,7 +246,7 @@ private fun TempoPitchSlider(
             enabled = enabled && value > range.start,
             shapes = IconButtonDefaults.shapes(),
         ) {
-            Icon(MetrolistIcons.Filled.Remove, stringResource(Res.string.tempo_pitch_decrease, label))
+            Icon(AnitailIcons.Filled.Remove, stringResource(Res.string.tempo_pitch_decrease, label))
         }
         val sliderState = rememberSliderState(value = value.coerceIn(range), trackRange = range, steps = steps)
         sliderState.shouldAutoSnap = false
@@ -272,7 +272,7 @@ private fun TempoPitchSlider(
             enabled = enabled && value < range.endInclusive,
             shapes = IconButtonDefaults.shapes(),
         ) {
-            Icon(MetrolistIcons.Filled.Add, stringResource(Res.string.tempo_pitch_increase, label))
+            Icon(AnitailIcons.Filled.Add, stringResource(Res.string.tempo_pitch_increase, label))
         }
     }
     if (editing && enabled) {

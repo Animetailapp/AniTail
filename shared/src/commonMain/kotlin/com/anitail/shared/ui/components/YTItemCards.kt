@@ -113,7 +113,7 @@ import com.anitail.shared.settings.displayName
 import com.anitail.shared.settings.displayTitle
 import com.anitail.shared.state.SongMetadataState
 import com.anitail.shared.ui.components.images.AsyncImage
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.artworkMenuActions
 import com.anitail.shared.ui.menu.onSecondaryClick
 import com.anitail.shared.ui.navigation.AlbumArtworkSource
@@ -305,7 +305,7 @@ fun SongListItem(
             ) {
                 if (isCurrent && !hasArtwork) {
                     Icon(
-                        imageVector = if (isPlaying) MetrolistIcons.Rounded.PlayArrow else MetrolistIcons.Default.Pause,
+                        imageVector = if (isPlaying) AnitailIcons.Rounded.PlayArrow else AnitailIcons.Default.Pause,
                         contentDescription = null,
                         tint = contentColor,
                         modifier = Modifier.size(20.dp),
@@ -406,7 +406,7 @@ fun SongListItem(
         } else {
             IconButton(modifier = Modifier.navigationPopupSource(), onClick = onShowMenu, shapes = IconButtonDefaults.shapes()) {
                 Icon(
-                    MetrolistIcons.Default.MoreVert,
+                    AnitailIcons.Default.MoreVert,
                     contentDescription = stringResource(Res.string.more_options),
                     tint = if (isCurrent) contentColor else LocalContentColor.current,
                 )
@@ -561,24 +561,24 @@ fun YTGridItem(
                         imageVector =
                             when (item) {
                                 is ArtistItem -> {
-                                    MetrolistIcons.Outlined.AccountCircle
+                                    AnitailIcons.Outlined.AccountCircle
                                 }
 
                                 is PlaylistItem -> {
-                                    MetrolistIcons.Outlined.LibraryMusic
+                                    AnitailIcons.Outlined.LibraryMusic
                                 }
 
                                 is BrowseItem -> {
                                     when {
-                                        item.id.startsWith("FEmusic_new_releases") -> MetrolistIcons.Outlined.NewReleases
-                                        item.id.startsWith("FEmusic_charts") -> MetrolistIcons.Outlined.BarChart4Bars
-                                        item.id.startsWith("FEmusic_moods_and_genres") -> MetrolistIcons.Outlined.Palette
-                                        else -> MetrolistIcons.Outlined.MusicNote
+                                        item.id.startsWith("FEmusic_new_releases") -> AnitailIcons.Outlined.NewReleases
+                                        item.id.startsWith("FEmusic_charts") -> AnitailIcons.Outlined.BarChart4Bars
+                                        item.id.startsWith("FEmusic_moods_and_genres") -> AnitailIcons.Outlined.Palette
+                                        else -> AnitailIcons.Outlined.MusicNote
                                     }
                                 }
 
                                 else -> {
-                                    MetrolistIcons.Outlined.MusicNote
+                                    AnitailIcons.Outlined.MusicNote
                                 }
                             },
                         contentDescription = null,
@@ -951,7 +951,7 @@ fun YTListItem(
         } else if (onShowMenu != null) {
             IconButton(modifier = Modifier.navigationPopupSource(), onClick = onShowMenu, shapes = IconButtonDefaults.shapes()) {
                 Icon(
-                    MetrolistIcons.Default.MoreVert,
+                    AnitailIcons.Default.MoreVert,
                     contentDescription = stringResource(Res.string.more_options),
                     tint = if (currentSong) contentColor else LocalContentColor.current,
                 )

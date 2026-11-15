@@ -11,7 +11,7 @@ import com.anitail.shared.generated.resources.shuffle
 import com.anitail.shared.model.SongItem
 import com.anitail.shared.state.SongLikeState
 import com.anitail.shared.ui.components.PlayerMenuAction
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.selection.SelectionActions
 import org.jetbrains.compose.resources.stringResource
 
@@ -42,7 +42,7 @@ internal fun songSelectionActions(
 
     val playback =
         onPlay?.takeUnless { isGuest }?.let {
-            PlayerMenuAction(MetrolistIcons.Rounded.PlayArrow, playLabel, prominent = true, onClick = it)
+            PlayerMenuAction(AnitailIcons.Rounded.PlayArrow, playLabel, prominent = true, onClick = it)
         }
     val queue = if (isGuest) emptyList() else queueActions(onDismiss, onPlayNext, onAddToQueue)
     return SelectionActions(
@@ -50,22 +50,22 @@ internal fun songSelectionActions(
             listOfNotNull(playback) + queue.take(1) +
                 listOfNotNull(
                     onAddToPlaylist?.let {
-                        PlayerMenuAction(MetrolistIcons.AutoMirrored.Outlined.PlaylistAdd, addToPlaylistLabel, onClick = it)
+                        PlayerMenuAction(AnitailIcons.AutoMirrored.Outlined.PlaylistAdd, addToPlaylistLabel, onClick = it)
                     },
                     downloadAction(downloadState, 0, false, onDismiss, onDownload),
                     onRemove?.let {
-                        PlayerMenuAction(MetrolistIcons.Outlined.Delete, removeLabel ?: removeFromPlaylistLabel, onClick = it)
+                        PlayerMenuAction(AnitailIcons.Outlined.Delete, removeLabel ?: removeFromPlaylistLabel, onClick = it)
                     },
                 ),
         overflow =
             queue.drop(1) +
                 listOfNotNull(
                     onShuffle?.takeUnless { isGuest }?.let {
-                        PlayerMenuAction(MetrolistIcons.Rounded.Shuffle, shuffleLabel, onClick = it)
+                        PlayerMenuAction(AnitailIcons.Rounded.Shuffle, shuffleLabel, onClick = it)
                     },
                     onLikeAll?.let {
                         PlayerMenuAction(
-                            icon = if (allLiked) MetrolistIcons.Filled.Favorite else MetrolistIcons.Outlined.FavoriteBorder,
+                            icon = if (allLiked) AnitailIcons.Filled.Favorite else AnitailIcons.Outlined.FavoriteBorder,
                             title = if (allLiked) dislikeAllLabel else likeAllLabel,
                             selected = allLiked,
                             onClick = it,

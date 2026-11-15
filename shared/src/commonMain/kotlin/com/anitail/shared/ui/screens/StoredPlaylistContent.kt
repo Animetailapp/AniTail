@@ -69,7 +69,7 @@ import com.anitail.shared.ui.components.PopupVisibility
 import com.anitail.shared.ui.components.SongSelectionControls
 import com.anitail.shared.ui.components.libraryCover
 import com.anitail.shared.ui.components.rememberDownloadPlaylistFilter
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.playback.LocalPlaybackController
 import com.anitail.shared.ui.playback.listState
@@ -427,12 +427,12 @@ fun StoredPlaylistContent(
                                 onClick = { onTrackMenu(song) },
                                 shapes = IconButtonDefaults.shapes(),
                             ) {
-                                Icon(MetrolistIcons.Default.MoreVert, stringResource(Res.string.menu))
+                                Icon(AnitailIcons.Default.MoreVert, stringResource(Res.string.menu))
                             }
                             if (selectionEnabled) {
                                 IconButton(onClick = { onRemoveSongs(setOf(song.id)) }, shapes = IconButtonDefaults.shapes()) {
                                     Icon(
-                                        MetrolistIcons.Outlined.Delete,
+                                        AnitailIcons.Outlined.Delete,
                                         contentDescription = stringResource(Res.string.remove_from_device_desc),
                                         tint = MaterialTheme.colorScheme.error,
                                     )

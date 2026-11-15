@@ -56,8 +56,8 @@ import com.anitail.shared.generated.resources.size_used
 import com.anitail.shared.generated.resources.storage_in_total
 import com.anitail.shared.storage.storageUsageFraction
 import com.anitail.shared.ui.components.AlertDialog
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.playback.retainPlaybackKeyFocus
 import com.anitail.shared.ui.utils.rememberFileSizeFormatter
 import org.jetbrains.compose.resources.stringResource
@@ -160,7 +160,7 @@ private fun StorageTile(
     onClickLabel: String? = null,
     content: @Composable () -> Unit,
 ) {
-    val haptics = rememberMetrolistHaptics()
+    val haptics = rememberAnitailHaptics()
     val shape =
         RoundedCornerShape(
             topStart = if (isFirst) 24.dp else 4.dp,
@@ -222,7 +222,7 @@ fun StorageUsageRow(
             if (onClick != null && onClickLabel != null) {
                 IconButton(onClick = onClick, shapes = IconButtonDefaults.shapes()) {
                     Icon(
-                        MetrolistIcons.Outlined.Delete,
+                        AnitailIcons.Outlined.Delete,
                         contentDescription = onClickLabel,
                         modifier = Modifier.size(20.dp),
                     )

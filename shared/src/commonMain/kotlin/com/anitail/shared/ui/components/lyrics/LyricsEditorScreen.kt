@@ -90,7 +90,7 @@ import com.anitail.shared.repository.LyricsRepository
 import com.anitail.shared.ui.components.AlertDialog
 import com.anitail.shared.ui.components.BasicAlertDialog
 import com.anitail.shared.ui.components.PopupVisibility
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.playback.LocalPlaybackController
 import com.anitail.shared.ui.utils.setText
 import kotlinx.coroutines.CoroutineScope
@@ -237,7 +237,7 @@ fun LyricsEditorScreen(
                         IconButton(
                             onClick = ::close,
                             enabled = !busy,
-                        ) { Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back)) }
+                        ) { Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back)) }
                     },
                 )
             },
@@ -256,7 +256,7 @@ fun LyricsEditorScreen(
                         }
                     }, enabled = ready && !busy) {
                         Icon(
-                            MetrolistIcons.Outlined.Delete,
+                            AnitailIcons.Outlined.Delete,
                             stringResource(Res.string.lyrics_editor_delete_line),
                         )
                     }
@@ -266,13 +266,13 @@ fun LyricsEditorScreen(
                         }
                     }, enabled = ready && !busy && editor.canUndo) {
                         Icon(
-                            MetrolistIcons.Outlined.Replay,
+                            AnitailIcons.Outlined.Replay,
                             stringResource(Res.string.lyrics_editor_undo),
                         )
                     }
                     IconButton(onClick = { update { editor.redo() } }, enabled = ready && !busy && editor.canRedo) {
                         Icon(
-                            MetrolistIcons.Outlined.Replay,
+                            AnitailIcons.Outlined.Replay,
                             stringResource(Res.string.lyrics_editor_redo),
                             Modifier.graphicsLayer {
                                 scaleX =
@@ -285,7 +285,7 @@ fun LyricsEditorScreen(
                             more = true
                         }, enabled = ready && !busy) {
                             Icon(
-                                MetrolistIcons.Outlined.MoreVert,
+                                AnitailIcons.Outlined.MoreVert,
                                 stringResource(Res.string.lyrics_editor_more),
                             )
                         }

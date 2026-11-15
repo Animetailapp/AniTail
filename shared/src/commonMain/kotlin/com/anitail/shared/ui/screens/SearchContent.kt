@@ -139,7 +139,7 @@ import com.anitail.shared.ui.components.YTListItem
 import com.anitail.shared.ui.components.focusOutline
 import com.anitail.shared.ui.components.images.AsyncImage
 import com.anitail.shared.ui.components.squareArtworkSlot
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.icons.SongStatusIcons
 import com.anitail.shared.ui.menu.onSecondaryClick
 import com.anitail.shared.ui.navigation.acceptsInput
@@ -503,7 +503,7 @@ private fun SearchEmptyState(
                                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 ) {
                                     Icon(
-                                        MetrolistIcons.Outlined.History,
+                                        AnitailIcons.Outlined.History,
                                         contentDescription = null,
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(24.dp),
@@ -521,7 +521,7 @@ private fun SearchEmptyState(
                                         shapes = IconButtonDefaults.shapes(),
                                     ) {
                                         Icon(
-                                            imageVector = MetrolistIcons.AutoMirrored.Filled.ArrowBack,
+                                            imageVector = AnitailIcons.AutoMirrored.Filled.ArrowBack,
                                             contentDescription = text.useSearchText,
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(22.dp).rotate(45f),
@@ -569,7 +569,7 @@ private fun RecentSectionTitle(
         )
         IconButton(onClick = onClearClick, shapes = IconButtonDefaults.shapes()) {
             Icon(
-                imageVector = MetrolistIcons.Default.Close,
+                imageVector = AnitailIcons.Default.Close,
                 contentDescription = text.clearSection(title),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -807,7 +807,7 @@ private fun SearchSuggestionRow(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        MetrolistIcons.Outlined.Search,
+                        AnitailIcons.Outlined.Search,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.size(18.dp),
@@ -827,7 +827,7 @@ private fun SearchSuggestionRow(
                 shapes = IconButtonDefaults.shapes(),
             ) {
                 Icon(
-                    imageVector = MetrolistIcons.AutoMirrored.Filled.ArrowBack,
+                    imageVector = AnitailIcons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = text.useSuggestion,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(22.dp).rotate(45f),
@@ -1319,7 +1319,7 @@ private fun TopResultCard(
                                             horizontalArrangement = Arrangement.Center,
                                         ) {
                                             Icon(
-                                                MetrolistIcons.Rounded.Shuffle,
+                                                AnitailIcons.Rounded.Shuffle,
                                                 contentDescription = null,
                                                 modifier = Modifier.size(20.dp),
                                             )
@@ -1352,7 +1352,7 @@ private fun TopResultCard(
                                             horizontalArrangement = Arrangement.Center,
                                         ) {
                                             Icon(
-                                                MetrolistIcons.Outlined.Sensors,
+                                                AnitailIcons.Outlined.Sensors,
                                                 contentDescription = null,
                                                 modifier = Modifier.size(20.dp),
                                             )
@@ -1458,7 +1458,7 @@ private fun TopResultCard(
                                     onClick = { onItemLongClick(mainItem) },
                                     shapes = IconButtonDefaults.shapes(),
                                 ) {
-                                    Icon(MetrolistIcons.Default.MoreVert, contentDescription = stringResource(Res.string.more_options))
+                                    Icon(AnitailIcons.Default.MoreVert, contentDescription = stringResource(Res.string.more_options))
                                 }
                             }
                             if (relatedItems.isNotEmpty()) {
@@ -1617,7 +1617,7 @@ private fun TopResultCard(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.Center,
                                                 ) {
-                                                    Icon(MetrolistIcons.Default.PlayArrow, null, modifier = Modifier.size(20.dp))
+                                                    Icon(AnitailIcons.Default.PlayArrow, null, modifier = Modifier.size(20.dp))
                                                     Spacer(Modifier.width(8.dp))
                                                     Text(
                                                         text.play,
@@ -1646,7 +1646,7 @@ private fun TopResultCard(
                                                     horizontalArrangement = Arrangement.Center,
                                                 ) {
                                                     Icon(
-                                                        MetrolistIcons.AutoMirrored.Outlined.PlaylistAdd,
+                                                        AnitailIcons.AutoMirrored.Outlined.PlaylistAdd,
                                                         null,
                                                         modifier = Modifier.size(20.dp),
                                                     )
@@ -1666,7 +1666,7 @@ private fun TopResultCard(
                                         onClick = { onItemLongClick(mainItem) },
                                         shapes = IconButtonDefaults.shapes(),
                                     ) {
-                                        Icon(MetrolistIcons.Default.MoreVert, contentDescription = stringResource(Res.string.more_options))
+                                        Icon(AnitailIcons.Default.MoreVert, contentDescription = stringResource(Res.string.more_options))
                                     }
                                 }
                             }
@@ -1690,7 +1690,7 @@ private fun TopResultCard(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.Center,
                                         ) {
-                                            Icon(MetrolistIcons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
+                                            Icon(AnitailIcons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
                                             Spacer(Modifier.width(8.dp))
                                             Text(text.play, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                                         }
@@ -1713,7 +1713,7 @@ private fun TopResultCard(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.Center,
                                         ) {
-                                            Icon(MetrolistIcons.AutoMirrored.Outlined.PlaylistAdd, null, modifier = Modifier.size(18.dp))
+                                            Icon(AnitailIcons.AutoMirrored.Outlined.PlaylistAdd, null, modifier = Modifier.size(18.dp))
                                             Spacer(Modifier.width(8.dp))
                                             Text(saveLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                                         }
@@ -1849,7 +1849,7 @@ private fun TopResultItem(
 
         IconButton(modifier = Modifier.navigationPopupSource(), onClick = onMenuClick, shapes = IconButtonDefaults.shapes()) {
             Icon(
-                imageVector = MetrolistIcons.Default.MoreVert,
+                imageVector = AnitailIcons.Default.MoreVert,
                 contentDescription = stringResource(Res.string.more_options),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -2215,7 +2215,7 @@ private fun NoResultsFound(
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        MetrolistIcons.Outlined.Search,
+                        AnitailIcons.Outlined.Search,
                         contentDescription = null,
                         modifier = Modifier.size(48.dp).rotate(45f),
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,

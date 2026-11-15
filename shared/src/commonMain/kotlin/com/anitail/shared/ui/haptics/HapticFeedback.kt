@@ -21,7 +21,7 @@ enum class HapticEvent {
     DICE_ROLL,
 }
 
-class MetrolistHaptics(
+class AnitailHaptics(
     private val enabled: () -> Boolean,
     private val platformFeedback: (HapticEvent) -> Unit,
 ) {
@@ -33,17 +33,17 @@ class MetrolistHaptics(
 }
 
 @Composable
-fun rememberMetrolistHaptics(): MetrolistHaptics {
+fun rememberAnitailHaptics(): AnitailHaptics {
     val platformFeedback = rememberPlatformHaptics()
-    return remember(platformFeedback) { MetrolistHaptics({ Settings.shared.enableHapticFeedback }, platformFeedback) }
+    return remember(platformFeedback) { AnitailHaptics({ Settings.shared.enableHapticFeedback }, platformFeedback) }
 }
 
 @Composable
 internal expect fun rememberPlatformHaptics(): (HapticEvent) -> Unit
 
 @Composable
-fun MetrolistHapticsProvider(content: @Composable () -> Unit) {
-    val haptics = rememberMetrolistHaptics()
+fun AnitailHapticsProvider(content: @Composable () -> Unit) {
+    val haptics = rememberAnitailHaptics()
     val feedback =
         remember(haptics) {
             object : HapticFeedback {

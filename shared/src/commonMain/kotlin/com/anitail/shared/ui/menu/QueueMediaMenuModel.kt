@@ -16,7 +16,7 @@ import com.anitail.shared.generated.resources.remove_from_queue
 import com.anitail.shared.model.ArtistTiny
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.ui.components.PlayerMenuAction
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -67,13 +67,13 @@ fun queueMediaMenuModel(
                 listOfNotNull(
                     dislikeMenuAction(isDisliked, onDismiss, onDislike),
                     onRemoveFromQueue?.let {
-                        action(MetrolistIcons.Outlined.Delete, stringResource(Res.string.remove_from_queue), onDismiss, it)
+                        action(AnitailIcons.Outlined.Delete, stringResource(Res.string.remove_from_queue), onDismiss, it)
                     },
                 ) + queueActions(onDismiss, onPlayNext, onAddToQueue),
                 listOfNotNull(downloadAction(MediaDownloadState.NOT_DOWNLOADED, 0, false, onDismiss, onDownload), deleteUploadAction),
                 listOfNotNull(
                     onNavigateToListenTogether?.takeIf { Settings.shared.listenTogetherEnabled }?.let {
-                        action(MetrolistIcons.Outlined.Group, stringResource(Res.string.listen_together), onDismiss, it)
+                        action(AnitailIcons.Outlined.Group, stringResource(Res.string.listen_together), onDismiss, it)
                     },
                 ),
                 listOfNotNull(
@@ -83,7 +83,7 @@ fun queueMediaMenuModel(
                 listOfNotNull(
                     onRefetch?.let {
                         action(
-                            MetrolistIcons.Outlined.Refresh,
+                            AnitailIcons.Outlined.Refresh,
                             stringResource(Res.string.refetch),
                             onDismiss,
                             it,
@@ -92,7 +92,7 @@ fun queueMediaMenuModel(
                     },
                     onShowInfo?.let {
                         PlayerMenuAction(
-                            MetrolistIcons.Outlined.Info,
+                            AnitailIcons.Outlined.Info,
                             stringResource(Res.string.details),
                             stringResource(Res.string.details_desc),
                             onClick = it,

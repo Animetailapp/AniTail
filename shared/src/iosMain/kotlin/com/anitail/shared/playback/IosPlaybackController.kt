@@ -386,7 +386,7 @@ internal class IosPlaybackController(
                             task = UIBackgroundTaskInvalid
                         }
                     }
-                    task = UIApplication.sharedApplication.beginBackgroundTaskWithName("MetrolistPlaybackCheckpoint") { finish() }
+                    task = UIApplication.sharedApplication.beginBackgroundTaskWithName("AnitailPlaybackCheckpoint") { finish() }
                     val checkpoint = savePlaybackState()
                     val podcastWrite = podcastProgress.flush()
                     scope.launch {
@@ -1588,7 +1588,7 @@ internal class IosPlaybackController(
                 var bgTaskId: UIBackgroundTaskIdentifier = UIBackgroundTaskInvalid
                 try {
                     bgTaskId =
-                        UIApplication.sharedApplication.beginBackgroundTaskWithName("MetrolistPlaybackResolution") {
+                        UIApplication.sharedApplication.beginBackgroundTaskWithName("AnitailPlaybackResolution") {
                             if (bgTaskId != UIBackgroundTaskInvalid) {
                                 UIApplication.sharedApplication.endBackgroundTask(bgTaskId)
                                 bgTaskId = UIBackgroundTaskInvalid

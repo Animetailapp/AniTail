@@ -53,7 +53,7 @@ import com.anitail.shared.generated.resources.more_actions
 import com.anitail.shared.generated.resources.n_selected
 import com.anitail.shared.generated.resources.select_all
 import com.anitail.shared.ui.components.PlayerMenuAction
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.ExpressiveSelectionMenu
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import org.jetbrains.compose.resources.pluralStringResource
@@ -113,7 +113,7 @@ fun SelectionToolbar(
         Column {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose, shapes = IconButtonDefaults.shapes()) {
-                    Icon(MetrolistIcons.Filled.Close, stringResource(Res.string.close))
+                    Icon(AnitailIcons.Filled.Close, stringResource(Res.string.close))
                 }
                 Text(
                     pluralStringResource(Res.plurals.n_selected, count, count),
@@ -151,7 +151,7 @@ fun SelectionToolbar(
                                 enabled = count > 0,
                                 modifier = Modifier.size(48.dp).navigationPopupSource(),
                                 shapes = IconButtonDefaults.shapes(),
-                            ) { Icon(MetrolistIcons.Default.MoreVert, stringResource(Res.string.more_actions)) }
+                            ) { Icon(AnitailIcons.Default.MoreVert, stringResource(Res.string.more_actions)) }
                             ExpressiveSelectionMenu(
                                 expanded = menuOpen,
                                 onDismissRequest = { menuOpen = false },

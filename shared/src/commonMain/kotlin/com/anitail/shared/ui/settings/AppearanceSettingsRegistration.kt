@@ -36,7 +36,7 @@ import com.anitail.shared.settings.desktopDefaultOpenTab
 import com.anitail.shared.settings.desktopDefaultOpenTabs
 import com.anitail.shared.settings.normalizeDefaultOpenTab
 import com.anitail.shared.settings.updateDefaultOpenTab
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
@@ -82,7 +82,7 @@ internal fun SettingsUiRegistryBuilder.registerAppearanceSettings(host: SharedSe
     page(
         id = SettingsPageId.APPEARANCE,
         title = stringResource(Res.string.appearance_title),
-        icon = MetrolistIcons.Outlined.Palette,
+        icon = AnitailIcons.Outlined.Palette,
         tone = SettingsTone.ORANGE,
         subtitle = stringResource(Res.string.settings_appearance_overview),
     ) {
@@ -515,7 +515,7 @@ internal fun SettingsUiRegistryBuilder.registerAppearanceSettings(host: SharedSe
             id = SettingsPageId.FONTS,
             title = stringResource(Res.string.fonts),
             subtitle = stringResource(Res.string.settings_fonts_overview),
-            icon = MetrolistIcons.Outlined.Tune,
+            icon = AnitailIcons.Outlined.Tune,
             tone = SettingsTone.ORANGE,
         ) {
             if (host.fontPrimaryActions.isNotEmpty()) {
@@ -597,7 +597,7 @@ internal fun SettingsUiRegistryBuilder.registerAppearanceSettings(host: SharedSe
             id = SettingsPageId.PLAYER_STYLE,
             title = stringResource(Res.string.appearance_player_style),
             subtitle = stringResource(Res.string.appearance_player_style_description),
-            icon = MetrolistIcons.Outlined.Tune,
+            icon = AnitailIcons.Outlined.Tune,
             tone = SettingsTone.ROSE,
         ) {
             group("layout", stringResource(Res.string.layout)) {
@@ -727,7 +727,7 @@ internal fun SettingsUiRegistryBuilder.registerAppearanceSettings(host: SharedSe
             id = SettingsPageId.PLAYER_ARTWORK,
             title = stringResource(Res.string.artwork),
             subtitle = stringResource(Res.string.settings_artwork_overview),
-            icon = MetrolistIcons.Outlined.Palette,
+            icon = AnitailIcons.Outlined.Palette,
             tone = SettingsTone.ROSE,
         ) {
             val isAndroid = host.platform == SettingsPlatform.ANDROID
@@ -865,7 +865,7 @@ internal fun SettingsUiRegistryBuilder.registerAppearanceSettings(host: SharedSe
             id = SettingsPageId.MINI_PLAYER_STYLE,
             title = stringResource(Res.string.appearance_mini_player),
             subtitle = stringResource(Res.string.settings_mini_player_overview),
-            icon = MetrolistIcons.Outlined.PlayArrow,
+            icon = AnitailIcons.Outlined.PlayArrow,
             tone = SettingsTone.ROSE,
         ) {
             group("style", stringResource(Res.string.appearance_style)) {

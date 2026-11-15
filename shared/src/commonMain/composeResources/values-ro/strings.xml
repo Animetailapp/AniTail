@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Imported from the official Metrolist Android translations. --><!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
+<!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
     <string name="home">Acasă</string>
     <string name="offline_mode">Mod offline</string>
     <string name="songs">Melodii</string>
@@ -263,7 +263,7 @@
     <string name="credits_license_desc">AniTail este licențiat sub GPL-3.0</string>
     <string name="devmode_already_active" translatable="true">Modul dezvoltator este deja activat</string>
     <string name="discord_enable_rich_presence">Discord Rich Presence</string>
-    <string name="discord_listen_to_metrolist">Ascultă pe AniTail</string>
+    <string name="discord_listen_to_anitail">Ascultă pe AniTail</string>
     <string name="discord_login_description">Conectează-ți contul de Discord</string>
     <string name="discord_rich_presence">Rich presence</string>
     <string name="discord_state">Stare</string>
@@ -1383,7 +1383,7 @@
     <string name="menu_keyboard_shortcuts">Comenzi rapide la tastatură</string>
     <string name="menu_application_logs">Jurnalele aplicației</string>
     <string name="menu_report_issue">Raportează o problemă…</string>
-    <string name="menu_about_metrolist">Despre AniTail</string>
+    <string name="menu_about_anitail">Despre AniTail</string>
     <string name="menu_song">Melodie</string>
     <string name="menu_stop">Oprire</string>
     <string name="menu_go_to_current_song">Mergi la melodia curentă</string>
@@ -1625,7 +1625,7 @@
     <string name="tray_show_window">Arată fereastra</string>
     <string name="tray_show_miniplayer">Afișează miniplayerul</string>
     <string name="tray_settings">Setări</string>
-    <string name="tray_quit_metrolist">Ieșire din AniTail</string>
+    <string name="tray_quit_anitail">Ieșire din AniTail</string>
     <string name="sign_in_discord">Autentifică-te la Discord</string>
     <string name="discord_sign_in_unavailable">Conectarea prin Discord nu este disponibilă</string>
     <string name="sign_in_youtube_music">Autentifică-te la YouTube Music</string>

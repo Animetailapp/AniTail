@@ -27,7 +27,7 @@ import com.anitail.shared.settings.LyricsTextSizeRange
 import com.anitail.shared.settings.PlayerBackgroundStyle
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.ui.components.lyrics.LyricsOffsetEditor
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
@@ -54,7 +54,7 @@ internal fun SettingsUiRegistryBuilder.registerLyricsSettings(host: SharedSettin
         id = SettingsPageId.LYRICS,
         title = stringResource(Res.string.lyrics_settings_title),
         subtitle = stringResource(Res.string.settings_lyrics_description),
-        icon = MetrolistIcons.Outlined.Lyrics,
+        icon = AnitailIcons.Outlined.Lyrics,
         tone = SettingsTone.ROSE,
     ) {
         group("alignment", stringResource(Res.string.lyrics_alignment)) {
@@ -238,7 +238,7 @@ internal fun SettingsUiRegistryBuilder.registerLyricsSettings(host: SharedSettin
             id = SettingsPageId.LYRICS_SOURCES,
             title = stringResource(Res.string.lyrics_source_preference),
             subtitle = stringResource(Res.string.settings_lyrics_sources_overview),
-            icon = MetrolistIcons.Outlined.Lyrics,
+            icon = AnitailIcons.Outlined.Lyrics,
             tone = SettingsTone.ROSE,
         ) {
             group(
@@ -282,14 +282,14 @@ internal fun SettingsUiRegistryBuilder.registerLyricsSettings(host: SharedSettin
             id = SettingsPageId.LYRICS_AI_SETUP,
             title = stringResource(Res.string.ai_setup_title),
             subtitle = stringResource(Res.string.ai_setup_description),
-            icon = MetrolistIcons.Outlined.Translate,
+            icon = AnitailIcons.Outlined.Translate,
             tone = SettingsTone.ROSE,
         )
         page(
             id = SettingsPageId.LYRICS_AI_TRANSLATION,
             title = stringResource(Res.string.settings_ai_lyrics_translation),
             subtitle = stringResource(Res.string.settings_lyrics_translation_overview),
-            icon = MetrolistIcons.Outlined.Translate,
+            icon = AnitailIcons.Outlined.Translate,
             tone = SettingsTone.ROSE,
         ) {
             group("setup", stringResource(Res.string.ai_setup_title)) {
@@ -481,7 +481,7 @@ internal fun SettingsUiRegistryBuilder.registerLyricsSettings(host: SharedSettin
             id = SettingsPageId.LYRICS_ROMANIZATION,
             title = stringResource(Res.string.lyrics_romanize_title),
             subtitle = stringResource(Res.string.settings_lyrics_romanization_overview),
-            icon = MetrolistIcons.Outlined.Translate,
+            icon = AnitailIcons.Outlined.Translate,
             tone = SettingsTone.ROSE,
         ) {
             group("display", stringResource(Res.string.lyrics_romanization_display)) {

@@ -81,7 +81,7 @@ import com.anitail.shared.model.SearchFilter
 import com.anitail.shared.model.SongItem
 import com.anitail.shared.model.YTItem
 import com.anitail.shared.ui.LocalIsTv
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import com.anitail.shared.viewmodels.SearchViewModel
 import org.jetbrains.compose.resources.stringResource
@@ -292,14 +292,14 @@ fun SearchBar(
                             if (isQuerySubmitted) {
                                 IconButton(onClick = onBack, modifier = Modifier.size(48.dp), shapes = IconButtonDefaults.shapes()) {
                                     Icon(
-                                        imageVector = MetrolistIcons.AutoMirrored.Filled.ArrowBack,
+                                        imageVector = AnitailIcons.AutoMirrored.Filled.ArrowBack,
                                         contentDescription = backLabel,
                                         modifier = Modifier.size(24.dp),
                                     )
                                 }
                             } else {
                                 Icon(
-                                    imageVector = MetrolistIcons.Default.Search,
+                                    imageVector = AnitailIcons.Default.Search,
                                     contentDescription = null,
                                     modifier = Modifier.size(24.dp),
                                 )
@@ -308,7 +308,7 @@ fun SearchBar(
                         trailingIcon = {
                             if (query.isNotEmpty()) {
                                 IconButton(onClick = onClear, modifier = Modifier.size(48.dp), shapes = IconButtonDefaults.shapes()) {
-                                    Icon(imageVector = MetrolistIcons.Default.Clear, contentDescription = clearLabel)
+                                    Icon(imageVector = AnitailIcons.Default.Clear, contentDescription = clearLabel)
                                 }
                             } else if (onMicrophoneClick != null) {
                                 IconButton(
@@ -317,7 +317,7 @@ fun SearchBar(
                                     shapes = IconButtonDefaults.shapes(),
                                 ) {
                                     Icon(
-                                        imageVector = MetrolistIcons.Rounded.Mic,
+                                        imageVector = AnitailIcons.Rounded.Mic,
                                         contentDescription = microphoneContentDescription,
                                         modifier = Modifier.size(24.dp),
                                     )
@@ -357,7 +357,7 @@ fun SearchBar(
                             shapes = IconButtonDefaults.shapes(),
                         ) {
                             Icon(
-                                imageVector = MetrolistIcons.AutoMirrored.Filled.ArrowBack,
+                                imageVector = AnitailIcons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = backLabel,
                                 modifier = Modifier.size(iconSize),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -365,7 +365,7 @@ fun SearchBar(
                         }
                     } else {
                         Icon(
-                            imageVector = MetrolistIcons.Default.Search,
+                            imageVector = AnitailIcons.Default.Search,
                             contentDescription = null,
                             modifier = Modifier.size(iconSize),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -452,7 +452,7 @@ fun SearchBar(
                             shapes = IconButtonDefaults.shapes(),
                         ) {
                             Icon(
-                                imageVector = MetrolistIcons.Default.Clear,
+                                imageVector = AnitailIcons.Default.Clear,
                                 contentDescription = clearLabel,
                                 modifier = Modifier.size(iconSize),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -465,7 +465,7 @@ fun SearchBar(
                             shapes = IconButtonDefaults.shapes(),
                         ) {
                             Icon(
-                                imageVector = MetrolistIcons.Rounded.Mic,
+                                imageVector = AnitailIcons.Rounded.Mic,
                                 contentDescription = microphoneContentDescription,
                                 modifier = Modifier.size(iconSize),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -500,7 +500,7 @@ fun SearchBar(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Icon(
-                            MetrolistIcons.Outlined.History,
+                            AnitailIcons.Outlined.History,
                             contentDescription = null,
                             modifier = Modifier.size(20.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -519,7 +519,7 @@ fun SearchBar(
                             shapes = IconButtonDefaults.shapes(),
                         ) {
                             Icon(
-                                MetrolistIcons.Default.Close,
+                                AnitailIcons.Default.Close,
                                 contentDescription = stringResource(Res.string.remove_recent_search_action),
                                 modifier = Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),

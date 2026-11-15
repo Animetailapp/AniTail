@@ -22,8 +22,8 @@ import com.anitail.shared.generated.resources.remove_from_playlist
 import com.anitail.shared.model.SongItem
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.playback.LocalPlaybackController
 import com.anitail.shared.ui.theme.ComponentShapes
 import me.saket.swipe.SwipeAction
@@ -47,7 +47,7 @@ fun SwipeGestureHandler(
     }
 
     val inheritedFeedback = LocalHapticFeedback.current
-    val haptics = rememberMetrolistHaptics()
+    val haptics = rememberAnitailHaptics()
     val thresholdHaptics =
         remember(haptics) {
             object : HapticFeedback {
@@ -80,7 +80,7 @@ fun SwipeGestureHandler(
                 onSwipe = { commit(currentOnSwipeRight, playNext) },
                 icon = {
                     Icon(
-                        MetrolistIcons.AutoMirrored.Filled.PlaylistPlay,
+                        AnitailIcons.AutoMirrored.Filled.PlaylistPlay,
                         contentDescription = playNext,
                         modifier = Modifier.padding(16.dp),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -95,7 +95,7 @@ fun SwipeGestureHandler(
                 onSwipe = { commit(currentOnSwipeLeft, leftAction) },
                 icon = {
                     Icon(
-                        if (removeOnSwipeLeft) MetrolistIcons.Outlined.Delete else MetrolistIcons.AutoMirrored.Filled.QueueMusic,
+                        if (removeOnSwipeLeft) AnitailIcons.Outlined.Delete else AnitailIcons.AutoMirrored.Filled.QueueMusic,
                         contentDescription = leftAction,
                         modifier = Modifier.padding(16.dp),
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,

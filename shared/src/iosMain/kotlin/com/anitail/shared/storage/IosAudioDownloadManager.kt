@@ -127,13 +127,13 @@ class IosAudioDownloadManager(
         val support =
             NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, true)
                 .firstOrNull() as? String ?: error("Application Support directory unavailable")
-        "$support/metrolist/downloads"
+        "$support/anitail/downloads"
     }
     private val cacheDirectory: String by lazy {
         val caches =
             NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true)
                 .firstOrNull() as? String ?: error("Caches directory unavailable")
-        "$caches/metrolist/audio"
+        "$caches/anitail/audio"
     }
 
     init {

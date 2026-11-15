@@ -53,7 +53,7 @@ import com.anitail.shared.generated.resources.song_count
 import com.anitail.shared.model.sortedForPlaylistPicker
 import com.anitail.shared.settings.LibraryFilterType
 import com.anitail.shared.settings.Settings
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.theme.ComponentShapes
 import com.anitail.shared.ui.utils.DragScrollableColumn
 import org.jetbrains.compose.resources.pluralStringResource
@@ -174,7 +174,7 @@ fun PlaylistChooserContent(
                     shapes = IconButtonDefaults.shapes(),
                 ) {
                     Icon(
-                        imageVector = MetrolistIcons.Outlined.Close,
+                        imageVector = AnitailIcons.Outlined.Close,
                         contentDescription = stringResource(Res.string.close),
                     )
                 }
@@ -218,7 +218,7 @@ fun PlaylistChooserContent(
                                     title = { Text(stringResource(Res.string.create_playlist)) },
                                     icon = {
                                         Icon(
-                                            imageVector = MetrolistIcons.AutoMirrored.Outlined.PlaylistAdd,
+                                            imageVector = AnitailIcons.AutoMirrored.Outlined.PlaylistAdd,
                                             contentDescription = null,
                                         )
                                     },

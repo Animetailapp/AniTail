@@ -116,7 +116,7 @@ import com.anitail.shared.model.PlaylistSongSort
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.ui.components.CollectionFilterBarText
 import com.anitail.shared.ui.components.PlaylistOrderControlsText
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -198,7 +198,7 @@ fun libraryAutoPlaylists(hasNewUploads: Boolean = false): List<LibraryAutoPlayli
                         "liked",
                         stringResource(Res.string.liked),
                         stringResource(Res.string.library_favorite_songs),
-                        MetrolistIcons.Rounded.FavoriteBorder,
+                        AnitailIcons.Rounded.FavoriteBorder,
                     ),
                 )
             }
@@ -208,7 +208,7 @@ fun libraryAutoPlaylists(hasNewUploads: Boolean = false): List<LibraryAutoPlayli
                         "downloaded",
                         stringResource(Res.string.filter_downloaded),
                         stringResource(Res.string.library_offline_songs),
-                        MetrolistIcons.Outlined.Download,
+                        AnitailIcons.Outlined.Download,
                     ),
                 )
             }
@@ -218,7 +218,7 @@ fun libraryAutoPlaylists(hasNewUploads: Boolean = false): List<LibraryAutoPlayli
                         "top100",
                         stringResource(Res.string.my_top_100),
                         stringResource(Res.string.library_top_songs),
-                        MetrolistIcons.AutoMirrored.Outlined.TrendingUp,
+                        AnitailIcons.AutoMirrored.Outlined.TrendingUp,
                     ),
                 )
             }
@@ -228,7 +228,7 @@ fun libraryAutoPlaylists(hasNewUploads: Boolean = false): List<LibraryAutoPlayli
                         "cached",
                         stringResource(Res.string.cached_playlist),
                         stringResource(Res.string.library_cached_songs),
-                        MetrolistIcons.Outlined.Cached,
+                        AnitailIcons.Outlined.Cached,
                     ),
                 )
             }
@@ -238,7 +238,7 @@ fun libraryAutoPlaylists(hasNewUploads: Boolean = false): List<LibraryAutoPlayli
                         "uploaded",
                         stringResource(Res.string.uploaded_playlist_name),
                         stringResource(Res.string.library_uploaded_songs),
-                        MetrolistIcons.Outlined.CloudUpload,
+                        AnitailIcons.Outlined.CloudUpload,
                         badge = newLabel.takeIf { hasNewUploads },
                     ),
                 )

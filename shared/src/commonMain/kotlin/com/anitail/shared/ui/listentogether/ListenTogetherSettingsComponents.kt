@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.dp
 import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.back
 import com.anitail.shared.ui.components.focusOutline
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.utils.segmentedGroupShape
 import com.anitail.shared.ui.utils.verticalScrollWithDrag
 import org.jetbrains.compose.resources.stringResource
@@ -70,7 +70,7 @@ fun SettingsSubScreen(
                     if (onNavigateBack != null) {
                         IconButton(onClick = onNavigateBack, shapes = IconButtonDefaults.shapes()) {
                             Icon(
-                                MetrolistIcons.AutoMirrored.Filled.ArrowBack,
+                                AnitailIcons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = stringResource(Res.string.back),
                             )
                         }

@@ -103,7 +103,7 @@ import com.anitail.shared.playback.SleepTimerState
 import com.anitail.shared.playback.sleepTimerDurationMs
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.ui.LocalIsTv
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.playback.retainPlaybackKeyFocus
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import com.anitail.shared.ui.utils.segmentedGroupShape
@@ -139,7 +139,7 @@ fun SleepTimerDialog(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                Icon(MetrolistIcons.Outlined.Bedtime, contentDescription = null, tint = AlertDialogDefaults.iconContentColor)
+                Icon(AnitailIcons.Outlined.Bedtime, contentDescription = null, tint = AlertDialogDefaults.iconContentColor)
                 Text(stringResource(Res.string.sleep_timer), style = MaterialTheme.typography.headlineSmall)
                 Column(
                     modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
@@ -212,7 +212,7 @@ fun SleepTimerDialog(
                                         shapes = IconButtonDefaults.shapes(),
                                     ) {
                                         Icon(
-                                            MetrolistIcons.Outlined.KeyboardArrowDown,
+                                            AnitailIcons.Outlined.KeyboardArrowDown,
                                             stringResource(if (expanded) Res.string.collapse else Res.string.expand),
                                             Modifier.rotate(rotation),
                                         )

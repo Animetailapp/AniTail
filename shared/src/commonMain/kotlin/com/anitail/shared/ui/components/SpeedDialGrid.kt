@@ -113,8 +113,8 @@ import com.anitail.shared.state.GlobalYouTubeRepository
 import com.anitail.shared.state.SongMetadataState
 import com.anitail.shared.ui.components.images.AsyncImage
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.onSecondaryClick
 import com.anitail.shared.ui.navigation.LocalRootContentActive
 import com.anitail.shared.ui.navigation.navigationPopupSource
@@ -149,7 +149,7 @@ fun SpeedDialGrid(
     isPlaying: State<Boolean>,
     isItemEnabled: (YTItem) -> Boolean = { true },
 ) {
-    val haptics = rememberMetrolistHaptics()
+    val haptics = rememberAnitailHaptics()
     val enabledItems = items.filter(isItemEnabled)
     val showSurprise =
         showSurprise && enabledItems.isNotEmpty() && shouldShowSpeedDialSurprise(items.size, surprisePinned)
@@ -492,7 +492,7 @@ fun SpeedDialGridItem(
             )
             profileContentDescription?.let {
                 Icon(
-                    MetrolistIcons.AutoMirrored.Filled.KeyboardArrowRight,
+                    AnitailIcons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = stringResource(it),
                     tint = Color.White,
                     modifier = Modifier.size(16.dp),

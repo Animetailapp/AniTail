@@ -36,7 +36,7 @@ internal fun resolveAppLocaleList(
 expect fun localeAwareSystemFontFamily(languageTag: String): FontFamily
 
 @Composable
-fun MetrolistTypography(localeList: LocaleList = currentAppLocaleList()): Typography {
+fun AnitailTypography(localeList: LocaleList = currentAppLocaleList()): Typography {
     val font = localeAwareSystemFontFamily(localeList[0].toLanguageTag())
 
     return Typography(

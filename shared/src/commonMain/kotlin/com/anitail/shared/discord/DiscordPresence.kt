@@ -1,6 +1,6 @@
 package com.anitail.shared.discord
 
-import com.anitail.shared.utils.MetrolistClock
+import com.anitail.shared.utils.AnitailClock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -161,7 +161,7 @@ object DiscordPresence {
             put("name", activity.name.truncateDiscordField(MAX_ACTIVITY_TEXT_CODE_UNITS))
             put("type", activity.type)
             activity.applicationId?.let { put("application_id", it) }
-            put("created_at", MetrolistClock.nowMs())
+            put("created_at", AnitailClock.nowMs())
             activity.details?.let { put("details", it.truncateDiscordField(MAX_ACTIVITY_TEXT_CODE_UNITS)) }
             activity.state?.let { put("state", it.truncateDiscordField(MAX_ACTIVITY_TEXT_CODE_UNITS)) }
             activityUrl?.let { put("url", it) }

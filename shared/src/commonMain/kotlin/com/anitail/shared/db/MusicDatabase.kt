@@ -55,7 +55,7 @@ internal val MIGRATION_63_64_SQL =
     listOf(
         "ALTER TABLE lyrics ADD COLUMN userLyrics TEXT",
         "ALTER TABLE lyrics ADD COLUMN userLyricsDraft TEXT",
-        "UPDATE lyrics SET userLyrics = lyrics, lyrics = '', provider = 'Unknown', isUserSelected = 0 WHERE provider IN ('METROLIST_LOCAL', 'Local')",
+        "UPDATE lyrics SET userLyrics = lyrics, lyrics = '', provider = 'Unknown', isUserSelected = 0 WHERE provider IN ('ANITAIL_LOCAL', 'Local')",
     )
 
 internal val MIGRATION_62_63_SQL =
@@ -89,7 +89,7 @@ internal val MIGRATION_57_58_SQL =
 internal val MIGRATION_56_57_SQL =
     listOf(
         "ALTER TABLE lyrics ADD COLUMN isUserSelected INTEGER NOT NULL DEFAULT 0",
-        "UPDATE lyrics SET isUserSelected = 1 WHERE provider IN ('METROLIST_LOCAL', 'Local')",
+        "UPDATE lyrics SET isUserSelected = 1 WHERE provider IN ('ANITAIL_LOCAL', 'Local')",
     )
 
 // Add indexes in place: Room's table rebuild would cascade-delete playlist membership.

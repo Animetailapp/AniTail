@@ -27,7 +27,7 @@ import com.anitail.shared.generated.resources.move_to_bottom
 import com.anitail.shared.generated.resources.move_to_top
 import com.anitail.shared.generated.resources.move_up
 import com.anitail.shared.generated.resources.playlist_reorder
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import org.jetbrains.compose.resources.stringResource
 
@@ -59,7 +59,7 @@ internal fun ReorderMenu(
                 },
         ) {
             Icon(
-                MetrolistIcons.Outlined.DragIndicator,
+                AnitailIcons.Outlined.DragIndicator,
                 stringResource(Res.string.playlist_reorder),
             )
         }

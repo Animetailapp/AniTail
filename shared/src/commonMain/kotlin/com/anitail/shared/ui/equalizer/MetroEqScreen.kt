@@ -151,7 +151,7 @@ import com.anitail.shared.ui.components.ContainedLoadingIndicator
 import com.anitail.shared.ui.components.ExpressiveSwitch
 import com.anitail.shared.ui.components.PopupContent
 import com.anitail.shared.ui.components.PopupVisibility
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.ExpressiveSelectionMenu
 import com.anitail.shared.ui.menu.trackPressPosition
 import com.anitail.shared.ui.navigation.NavigationBackHandler
@@ -292,7 +292,7 @@ private fun ProfilesPage(
                     var selectingProfile by remember { mutableStateOf(false) }
                     ListItem(
                         modifier = Modifier.clip(MaterialTheme.shapes.large).clickable { selectingProfile = true },
-                        trailingContent = { Icon(MetrolistIcons.Outlined.ChevronRight, contentDescription = null) },
+                        trailingContent = { Icon(AnitailIcons.Outlined.ChevronRight, contentDescription = null) },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     ) {
                         Text(
@@ -346,7 +346,7 @@ private fun ProfilesPage(
                 if (savedProfile) {
                     IconButton(onClick = { confirmingProfileDelete = true }, shapes = IconButtonDefaults.shapes()) {
                         Icon(
-                            MetrolistIcons.Outlined.Delete,
+                            AnitailIcons.Outlined.Delete,
                             contentDescription = stringResource(Res.string.delete),
                             tint = MaterialTheme.colorScheme.error,
                         )
@@ -401,7 +401,7 @@ private fun ProfilesPage(
                         onClick = { actionsExpanded = true },
                         shapes = IconButtonDefaults.shapes(),
                     ) {
-                        Icon(MetrolistIcons.Default.MoreVert, contentDescription = stringResource(Res.string.more_options))
+                        Icon(AnitailIcons.Default.MoreVert, contentDescription = stringResource(Res.string.more_options))
                     }
                     DropdownMenu(expanded = actionsExpanded, onDismissRequest = { actionsExpanded = false }) {
                         DropdownMenuItem(
@@ -882,7 +882,7 @@ private fun EqualizerGraph(
                     var choosingBand by remember { mutableStateOf(false) }
                     ListItem(
                         modifier = Modifier.clip(MaterialTheme.shapes.medium).clickable { choosingBand = true },
-                        trailingContent = { Icon(MetrolistIcons.Outlined.ChevronRight, contentDescription = null) },
+                        trailingContent = { Icon(AnitailIcons.Outlined.ChevronRight, contentDescription = null) },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     ) {
                         Text(
@@ -1137,14 +1137,14 @@ private fun AutoEqPage(
                 singleLine = true,
                 enabled = models != null,
                 placeholder = { Text(stringResource(Res.string.search)) },
-                leadingIcon = { Icon(MetrolistIcons.Outlined.Search, contentDescription = null) },
+                leadingIcon = { Icon(AnitailIcons.Outlined.Search, contentDescription = null) },
                 trailingIcon =
                     if (query.isEmpty()) {
                         null
                     } else {
                         {
                             IconButton(onClick = { query = "" }, shapes = IconButtonDefaults.shapes()) {
-                                Icon(MetrolistIcons.Outlined.Close, contentDescription = stringResource(Res.string.close))
+                                Icon(AnitailIcons.Outlined.Close, contentDescription = stringResource(Res.string.close))
                             }
                         }
                     },
@@ -1243,7 +1243,7 @@ private fun AutoEqRow(
                 }
 
                 showChevron -> {
-                    { Icon(MetrolistIcons.Outlined.ChevronRight, contentDescription = null) }
+                    { Icon(AnitailIcons.Outlined.ChevronRight, contentDescription = null) }
                 }
 
                 else -> {
@@ -1297,7 +1297,7 @@ private fun DialogHeader(
     ) {
         onBack?.let {
             IconButton(onClick = it, shapes = IconButtonDefaults.shapes()) {
-                Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back))
+                Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back))
             }
         }
         Column(Modifier.weight(1f).padding(start = if (onBack == null) 0.dp else 4.dp)) {
@@ -1307,7 +1307,7 @@ private fun DialogHeader(
             }
         }
         IconButton(onClick = onDismiss, shapes = IconButtonDefaults.shapes()) {
-            Icon(MetrolistIcons.Outlined.Close, contentDescription = stringResource(Res.string.close))
+            Icon(AnitailIcons.Outlined.Close, contentDescription = stringResource(Res.string.close))
         }
     }
 }

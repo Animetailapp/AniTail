@@ -7,19 +7,19 @@ private val youtubeVideoId = Regex("^[A-Za-z0-9_-]+$")
 private val listenTogetherRoomCode = Regex("^[A-Za-z0-9]{8}$")
 private val partyCodePattern = Regex("^[A-Za-z0-9_-]{1,64}$")
 
-fun normalizeMetrolistShareUrl(text: String): String {
+fun normalizeAnitailShareUrl(text: String): String {
     val trimmed = text.trim()
-    if (trimmed.startsWith("metrolist://", ignoreCase = true)) {
-        val afterScheme = trimmed.substring("metrolist://".length).trimStart('/')
+    if (trimmed.startsWith("anitail://", ignoreCase = true)) {
+        val afterScheme = trimmed.substring("anitail://".length).trimStart('/')
         if (afterScheme.startsWith("open?", ignoreCase = true)) {
             val decoded =
                 runCatching {
-                    Url("https://metrolist.internal/?$afterScheme").parameters["url"]
+                    Url("https://anitail.internal/?$afterScheme").parameters["url"]
                 }.getOrNull() ?: afterScheme.substringAfter("url=")
-            return normalizeMetrolistShareUrl(decoded)
+            return normalizeAnitailShareUrl(decoded)
         }
         if (afterScheme.startsWith("http://", ignoreCase = true) || afterScheme.startsWith("https://", ignoreCase = true)) {
-            return normalizeMetrolistShareUrl(afterScheme)
+            return normalizeAnitailShareUrl(afterScheme)
         }
         if (afterScheme.startsWith("artist/", ignoreCase = true)) {
             return "https://music.youtube.com/channel/${afterScheme.substring("artist/".length)}"
@@ -36,15 +36,15 @@ fun normalizeMetrolistShareUrl(text: String): String {
         }.getOrNull() ?: return trimmed
 
     val host = url.host.lowercase().removeSuffix(".")
-    val isMetrolistHost =
-        host == "metrolist.cc" || host.endsWith(".metrolist.cc")
+    val isAnitailHost =
+        host == "anitail.cc" || host.endsWith(".anitail.cc")
 
-    if (isMetrolistHost) {
+    if (isAnitailHost) {
         val path = url.encodedPath
         when {
             path == "/open" -> {
                 val target = url.parameters["url"]
-                if (target != null) return normalizeMetrolistShareUrl(target)
+                if (target != null) return normalizeAnitailShareUrl(target)
             }
 
             path == "/watch" -> {
@@ -87,7 +87,7 @@ fun extractListenTogetherRoomCode(value: String?): String? {
     if (trimmed.isEmpty()) return null
 
     val target =
-        if (trimmed.startsWith("metrolist://open?", ignoreCase = true)) {
+        if (trimmed.startsWith("anitail://open?", ignoreCase = true)) {
             val query = trimmed.substringAfter('?')
             val encoded = query.substringAfter("url=", "")
             runCatching { Url("https://internal/?$query").parameters["url"] }.getOrNull()
@@ -99,8 +99,8 @@ fun extractListenTogetherRoomCode(value: String?): String? {
     val url =
         runCatching {
             Url(
-                if (target.startsWith("metrolist://", ignoreCase = true)) {
-                    target.replaceFirst(Regex("^metrolist://", RegexOption.IGNORE_CASE), "https://metrolist.cc/")
+                if (target.startsWith("anitail://", ignoreCase = true)) {
+                    target.replaceFirst(Regex("^anitail://", RegexOption.IGNORE_CASE), "https://anitail.cc/")
                 } else if (!target.contains("://")) {
                     "https://$target"
                 } else {
@@ -111,10 +111,10 @@ fun extractListenTogetherRoomCode(value: String?): String? {
 
     if (url != null) {
         val host = url.host.lowercase().removeSuffix(".")
-        val isMetrolistHost =
-            host == "metrolist.cc" || host.endsWith(".metrolist.cc")
+        val isAnitailHost =
+            host == "anitail.cc" || host.endsWith(".anitail.cc")
 
-        if (isMetrolistHost) {
+        if (isAnitailHost) {
             val path = url.encodedPath.trim('/')
             val rParam = url.parameters["r"] ?: url.parameters["code"]
             if (path == "party" || path.startsWith("party/")) {
@@ -128,8 +128,8 @@ fun extractListenTogetherRoomCode(value: String?): String? {
         }
     }
 
-    if (target.startsWith("metrolist://", ignoreCase = true)) {
-        val afterScheme = target.substring("metrolist://".length).trimStart('/')
+    if (target.startsWith("anitail://", ignoreCase = true)) {
+        val afterScheme = target.substring("anitail://".length).trimStart('/')
         val path = afterScheme.substringBefore('?')
         val query = afterScheme.substringAfter('?', "")
         val rParam =
@@ -150,7 +150,7 @@ fun extractListenTogetherRoomCode(value: String?): String? {
 fun isListenTogetherUrl(value: String?): Boolean = extractListenTogetherRoomCode(value) != null
 
 fun parseYouTubePodcastId(value: String): String? {
-    val normalized = normalizeMetrolistShareUrl(value)
+    val normalized = normalizeAnitailShareUrl(value)
     val url = runCatching { Url(if (normalized.contains("://")) normalized else "https://$normalized") }.getOrNull() ?: return null
     val host = url.host.lowercase().removeSuffix(".")
     if (url.protocol.name !in setOf("http", "https") || (host != "youtube.com" && !host.endsWith(".youtube.com"))) return null
@@ -161,7 +161,7 @@ fun parseYouTubePodcastId(value: String): String? {
 
 fun parseYouTubeUrl(value: String): YouTubeUrlParser.ParsedUrl? {
     val text = value.trim()
-    val normalized = normalizeMetrolistShareUrl(text)
+    val normalized = normalizeAnitailShareUrl(text)
     YouTubeUrlParser.parse(normalized)?.let { return it }
 
     val url =

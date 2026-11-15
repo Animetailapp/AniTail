@@ -31,7 +31,7 @@ import com.materialkolor.quantize.QuantizerCelebi
 import com.materialkolor.score.Score
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.settings.ThemePaletteStyle
-import com.anitail.shared.ui.haptics.MetrolistHapticsProvider
+import com.anitail.shared.ui.haptics.AnitailHapticsProvider
 import com.anitail.shared.ui.settings.IosAppearanceProvider
 import com.anitail.shared.utils.Logger
 import com.anitail.shared.utils.artworkColors
@@ -85,7 +85,7 @@ fun resolveThemeSeedColor(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun MetrolistTheme(
+fun AnitailTheme(
     seedColor: Color = DefaultThemeColor,
     darkTheme: Boolean = false,
     pureBlack: Boolean = false,
@@ -108,10 +108,10 @@ fun MetrolistTheme(
     IosAppearanceProvider {
         MaterialExpressiveTheme(
             colorScheme = animatedColorScheme,
-            typography = MetrolistTypography(),
-            shapes = MetrolistShapes,
+            typography = AnitailTypography(),
+            shapes = AnitailShapes,
             motionScheme = motionScheme,
-            content = { MetrolistHapticsProvider(content) },
+            content = { AnitailHapticsProvider(content) },
         )
     }
 }

@@ -907,7 +907,7 @@ internal class LatestCallGate {
     fun isCurrent(candidate: Long): Boolean = generation.value == candidate
 }
 
-private const val LIKED_ORDER_ACCOUNT_LABEL = "metrolist-liked-order-v1/account"
+private const val LIKED_ORDER_ACCOUNT_LABEL = "anitail-liked-order-v1/account"
 
 private fun List<SongItem>.applyCustomOrder(order: List<String>?): List<SongItem> {
     if (order == null) return distinctBy(SongItem::id)

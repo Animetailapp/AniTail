@@ -85,12 +85,12 @@ import com.anitail.shared.state.GlobalYouTube
 import com.anitail.shared.ui.components.AlertDialog
 import com.anitail.shared.ui.components.PopupContent
 import com.anitail.shared.ui.components.images.AsyncImage
-import com.anitail.shared.ui.icons.MetrolistIcons
-import com.anitail.shared.ui.icons.MetrolistIconsBrand
+import com.anitail.shared.ui.icons.AnitailIcons
+import com.anitail.shared.ui.icons.AnitailIconsBrand
 import com.anitail.shared.ui.mobile.MobileListenTogetherScreen
 import com.anitail.shared.ui.navigation.NavigationBackHandler
 import com.anitail.shared.ui.playback.wholeSecondPosition
-import com.anitail.shared.utils.MetrolistClock
+import com.anitail.shared.utils.AnitailClock
 import com.anitail.shared.utils.formatDuration
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -295,7 +295,7 @@ private fun buildIntegrationsRegistry(
                     requiresAccount = true,
                 ),
             ),
-        icon = MetrolistIconsBrand.Discord,
+        icon = AnitailIconsBrand.Discord,
         tone = SettingsTone.ORANGE,
     ) {
         group("discordMaster", "") {
@@ -439,7 +439,7 @@ private fun buildIntegrationsRegistry(
                     id = "discordActivityName",
                     title = stringResource(Res.string.discord_activity_name),
                     value = settings.discordActivityName,
-                    placeholder = stringResource(Res.string.discord_listen_to_metrolist),
+                    placeholder = stringResource(Res.string.discord_listen_to_anitail),
                     description = stringResource(Res.string.settings_discord_activity_name_summary),
                 ) {
                     settings.discordActivityName = it
@@ -524,7 +524,7 @@ private fun buildIntegrationsRegistry(
                 stringResource(Res.string.settings_lastfm_overview),
                 integrationStatus(settings.lastFmEnabled, lastFmAccount?.account, requiresAccount = true),
             ),
-        icon = MetrolistIconsBrand.LastFm,
+        icon = AnitailIconsBrand.LastFm,
         tone = SettingsTone.ROSE,
     ) {
         group("lastFmMaster", "") {
@@ -626,7 +626,7 @@ private fun buildIntegrationsRegistry(
                 stringResource(Res.string.settings_listenbrainz_overview),
                 integrationStatus(settings.listenBrainzEnabled, listenBrainzAccount?.account, requiresAccount = true),
             ),
-        icon = MetrolistIcons.Outlined.MusicNote,
+        icon = AnitailIcons.Outlined.MusicNote,
         tone = SettingsTone.PURPLE,
     ) {
         group("listenBrainzMaster", "") {
@@ -678,7 +678,7 @@ private fun buildIntegrationsRegistry(
                 stringResource(Res.string.settings_listen_together_overview),
                 integrationStatus(settings.listenTogetherEnabled, settings.listenTogetherUsername, requiresAccount = true),
             ),
-            MetrolistIcons.Outlined.Headphones,
+            AnitailIcons.Outlined.Headphones,
             SettingsTone.BLUE,
             searchTerms =
                 listOf(
@@ -727,7 +727,7 @@ internal fun buildMobileDiscordPlaybackUpdate(
     unknownAlbum: String,
     button1Default: String,
     button2Default: String,
-    now: Long = MetrolistClock.nowMs(),
+    now: Long = AnitailClock.nowMs(),
     settingsVisible: Boolean = false,
 ): DiscordPlaybackUpdate =
     DiscordPlaybackUpdate(
@@ -749,7 +749,7 @@ internal fun buildDiscordActivity(
     unknownAlbum: String = "",
     button1Default: String,
     button2Default: String,
-    now: Long = MetrolistClock.nowMs(),
+    now: Long = AnitailClock.nowMs(),
 ): DiscordActivity {
     val song = playback.song
     val artist = song.artists.joinToString { it.name }.ifBlank { unknownArtist }
@@ -800,15 +800,15 @@ private fun DiscordErrorPanel(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(MetrolistIcons.Outlined.Warning, null, tint = MaterialTheme.colorScheme.error)
+            Icon(AnitailIcons.Outlined.Warning, null, tint = MaterialTheme.colorScheme.error)
             Spacer(Modifier.width(12.dp))
             Text(message, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.error)
             IconButton(onClick = DiscordRpcManager::clearLastError, enabled = enabled, shapes = IconButtonDefaults.shapes()) {
-                Icon(MetrolistIcons.Default.Close, stringResource(Res.string.dismiss))
+                Icon(AnitailIcons.Default.Close, stringResource(Res.string.dismiss))
             }
         }
         TextButton(onClick = { host.onCopyText(errorTitle, message) }, enabled = enabled, shapes = ButtonDefaults.shapes()) {
-            Icon(MetrolistIcons.Outlined.ContentCopy, null)
+            Icon(AnitailIcons.Outlined.ContentCopy, null)
             Spacer(Modifier.width(8.dp))
             Text(stringResource(Res.string.copy))
         }
@@ -852,7 +852,7 @@ private fun DiscordPresencePreview(
                     modifier = Modifier.size(96.dp),
                 )
                 Icon(
-                    MetrolistIconsBrand.Discord,
+                    AnitailIconsBrand.Discord,
                     contentDescription = null,
                     tint = Color.White,
                     modifier =
@@ -965,7 +965,7 @@ private fun ScrobbleLoginDialog(
                     TextButton(onClick = { onOpenUrl("https://listenbrainz.org/settings/") }, shapes = ButtonDefaults.shapes()) {
                         Text(stringResource(Res.string.listenbrainz_user_token))
                         Spacer(Modifier.width(8.dp))
-                        Icon(MetrolistIcons.AutoMirrored.Filled.OpenInNew, stringResource(Res.string.open_website))
+                        Icon(AnitailIcons.AutoMirrored.Filled.OpenInNew, stringResource(Res.string.open_website))
                     }
                 }
                 TextButton(
@@ -982,7 +982,7 @@ private fun ScrobbleLoginDialog(
                 ) {
                     Text(stringResource(Res.string.scrobble_create_account))
                     Spacer(Modifier.width(8.dp))
-                    Icon(MetrolistIcons.AutoMirrored.Filled.OpenInNew, stringResource(Res.string.open_website))
+                    Icon(AnitailIcons.AutoMirrored.Filled.OpenInNew, stringResource(Res.string.open_website))
                 }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }

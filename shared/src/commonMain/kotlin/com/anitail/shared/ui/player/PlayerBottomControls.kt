@@ -76,8 +76,8 @@ import com.anitail.shared.ui.components.formatSleepTimerRemaining
 import com.anitail.shared.ui.components.playerControlBlend
 import com.anitail.shared.ui.components.playerInactiveControlContainerColor
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.playback.retainPlaybackKeyFocus
 import com.anitail.shared.utils.Logger
@@ -117,7 +117,7 @@ internal fun PlayerBottomControls(
     touchTarget: Dp = 40.dp,
     showQueueHandle: Boolean = true,
 ) {
-    val hapticManager = rememberMetrolistHaptics()
+    val hapticManager = rememberAnitailHaptics()
     val playerConnection = LocalPlayerSession.current
     val volume by playerConnection?.volume?.collectAsState() ?: remember { mutableFloatStateOf(1f) }
     var lastAudibleVolume by remember { mutableFloatStateOf(1f) }
@@ -245,9 +245,9 @@ internal fun PlayerBottomControls(
                         Icon(
                             imageVector =
                                 if (volume > 0.01f) {
-                                    MetrolistIcons.AutoMirrored.Filled.VolumeOff
+                                    AnitailIcons.AutoMirrored.Filled.VolumeOff
                                 } else {
-                                    MetrolistIcons.AutoMirrored.Filled.VolumeUp
+                                    AnitailIcons.AutoMirrored.Filled.VolumeUp
                                 },
                             contentDescription = stringResource(if (volume > 0.01f) Res.string.mute else Res.string.unmute),
                             modifier = Modifier.size(22.dp),
@@ -275,7 +275,7 @@ internal fun PlayerBottomControls(
                         ),
                 ) {
                     Icon(
-                        MetrolistIcons.Default.MoreVert,
+                        AnitailIcons.Default.MoreVert,
                         contentDescription = stringResource(Res.string.more_options),
                         modifier = Modifier.size(24.dp),
                     )
@@ -298,7 +298,7 @@ internal fun PlayerVolumeControl() {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(MetrolistIcons.AutoMirrored.Filled.VolumeUp, contentDescription = null)
+        Icon(AnitailIcons.AutoMirrored.Filled.VolumeUp, contentDescription = null)
         Slider(
             state = sliderState,
             onValueChange = playerConnection::setVolume,

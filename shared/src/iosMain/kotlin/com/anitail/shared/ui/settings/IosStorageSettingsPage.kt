@@ -50,7 +50,7 @@ import com.anitail.shared.storage.SongCacheLimitsMb
 import com.anitail.shared.storage.cacheAllocationBytes
 import com.anitail.shared.storage.songCacheLimitIndex
 import com.anitail.shared.storage.storageUsageFraction
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.utils.rememberFileSizeFormatter
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.CancellationException
@@ -214,7 +214,7 @@ fun IosStorageSettingsPage(
         )
         StorageSection {
             StorageUsageRow(
-                MetrolistIcons.Outlined.Download,
+                AnitailIcons.Outlined.Download,
                 downloadsTitle,
                 sizeLabel(usage?.downloadBytes ?: 0L),
                 storageUsageFraction(usage?.downloadBytes ?: 0L, capacity),
@@ -228,7 +228,7 @@ fun IosStorageSettingsPage(
                 onClickLabel = clearDownloads,
             )
             StorageUsageRow(
-                MetrolistIcons.Outlined.MusicNote,
+                AnitailIcons.Outlined.MusicNote,
                 songTitle,
                 sizeLabel(usage?.cacheBytes ?: 0L),
                 storageUsageFraction(usage?.cacheBytes ?: 0L, if (maxCacheMb < 0) capacity else maxCacheMb * 1024L * 1024L),
@@ -236,7 +236,7 @@ fun IosStorageSettingsPage(
                 onClickLabel = clearSongs,
             )
             StorageUsageRow(
-                MetrolistIcons.Outlined.Image,
+                AnitailIcons.Outlined.Image,
                 imageTitle,
                 sizeLabel(imageBytes),
                 storageUsageFraction(imageBytes, maxImageMb * 1024L * 1024L),

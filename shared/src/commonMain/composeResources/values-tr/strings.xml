@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Imported from the official Metrolist Android translations. --><!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources>
+<!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources>
     <string name="home">Ana sayfa</string>
     <string name="offline_mode">Çevrimdışı mod</string>
     <string name="songs">Şarkılar</string>
@@ -259,7 +259,7 @@
     <string name="credits_license_desc">AniTail, GPL-3.0 ile lisanslanmıştır.</string>
     <string name="devmode_already_active">Geliştirici modu zaten etkin</string>
     <string name="discord_enable_rich_presence">Discord Rich Presence’ı etkinleştir</string>
-    <string name="discord_listen_to_metrolist">AniTail dinliyor</string>
+    <string name="discord_listen_to_anitail">AniTail dinliyor</string>
     <string name="discord_login_description">Discord hesabınızı bağlayın</string>
     <string name="discord_rich_presence">Rich presence</string>
     <string name="discord_state">Durum</string>
@@ -1353,7 +1353,7 @@
     <string name="menu_keyboard_shortcuts">Klavye kısayolları</string>
     <string name="menu_application_logs">Uygulama günlükleri</string>
     <string name="menu_report_issue">Sorun bildir…</string>
-    <string name="menu_about_metrolist">AniTail hakkında</string>
+    <string name="menu_about_anitail">AniTail hakkında</string>
     <string name="menu_song">Şarkı</string>
     <string name="menu_stop">Durdur</string>
     <string name="menu_go_to_current_song">Çalan şarkıya git</string>
@@ -1593,7 +1593,7 @@
     <string name="tray_show_window">Pencereyi göster</string>
     <string name="tray_show_miniplayer">Mini oynatıcıyı göster</string>
     <string name="tray_settings">Ayarlar</string>
-    <string name="tray_quit_metrolist">AniTail’ten çık</string>
+    <string name="tray_quit_anitail">AniTail’ten çık</string>
     <string name="sign_in_discord">Discord ile giriş yap</string>
     <string name="discord_sign_in_unavailable">Discord girişi kullanılamıyor</string>
     <string name="sign_in_youtube_music">YouTube Music ile giriş yap</string>

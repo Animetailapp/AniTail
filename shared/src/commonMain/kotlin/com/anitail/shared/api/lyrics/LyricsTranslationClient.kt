@@ -918,7 +918,7 @@ class LyricsTranslationClient(
             var allTranslated = mutableListOf<String>()
             var allRomanized = mutableListOf<String>()
             translateInBatches(lines, maxBatchCharacters = 1_200) { batch ->
-                val markers = List((batch.size - 1).coerceAtLeast(0)) { "__METROLIST_LINE_${it + 1}__" }
+                val markers = List((batch.size - 1).coerceAtLeast(0)) { "__ANITAIL_LINE_${it + 1}__" }
                 val input =
                     batch
                         .mapIndexed { index, line ->

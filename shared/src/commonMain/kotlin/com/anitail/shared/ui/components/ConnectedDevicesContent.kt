@@ -69,7 +69,7 @@ import com.anitail.shared.generated.resources.no_other_devices_nearby
 import com.anitail.shared.generated.resources.none
 import com.anitail.shared.generated.resources.scrobble_connecting
 import com.anitail.shared.settings.Settings
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.utils.toPolygonShape
 import com.anitail.shared.ui.utils.verticalScrollWithDrag
 import org.jetbrains.compose.resources.stringResource
@@ -113,7 +113,7 @@ fun ConnectedDevicesContent(
                     },
             )
             FilledTonalIconButton(onClick = onClose, modifier = closeButtonModifier, shapes = IconButtonDefaults.shapes()) {
-                Icon(MetrolistIcons.Outlined.Close, stringResource(Res.string.close))
+                Icon(AnitailIcons.Outlined.Close, stringResource(Res.string.close))
             }
         }
         if (empty) {
@@ -152,7 +152,7 @@ fun ConnectedDevicesContent(
                                 } else {
                                     protocolName(device.protocol)
                                 },
-                            icon = MetrolistIcons.Outlined.Cast,
+                            icon = AnitailIcons.Outlined.Cast,
                             index = 0,
                             count = count,
                             onClick = onDisconnectCast,
@@ -164,7 +164,7 @@ fun ConnectedDevicesContent(
                         ConnectedDeviceRow(
                             name = peer.name,
                             subtitle = stringResource(Res.string.app_name),
-                            icon = MetrolistIcons.Outlined.Devices,
+                            icon = AnitailIcons.Outlined.Devices,
                             index = count - 1,
                             count = count,
                             connected = true,
@@ -188,7 +188,7 @@ fun ConnectedDevicesContent(
                         ConnectedDeviceRow(
                             device.name,
                             protocolName(device.protocol),
-                            MetrolistIcons.Outlined.Cast,
+                            AnitailIcons.Outlined.Cast,
                             index,
                             count,
                             enabled = castState.status != CastConnectionStatus.CONNECTING,
@@ -199,7 +199,7 @@ fun ConnectedDevicesContent(
                         ConnectedDeviceRow(
                             peer.name,
                             stringResource(Res.string.app_name),
-                            MetrolistIcons.Outlined.Devices,
+                            AnitailIcons.Outlined.Devices,
                             index + availableCast.size,
                             count,
                             enabled = !castState.isConnected && castState.status != CastConnectionStatus.CONNECTING,
@@ -298,7 +298,7 @@ private fun DeviceEmblem(large: Boolean = false) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            MetrolistIcons.Outlined.Devices,
+            AnitailIcons.Outlined.Devices,
             null,
             Modifier.size(if (large) 40.dp else 20.dp),
             tint = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -360,7 +360,7 @@ private fun ConnectedDeviceRow(
             if (connecting) LoadingIndicator(Modifier.size(20.dp))
             if (connected) {
                 IconButton(onClick = onClick, shapes = IconButtonDefaults.shapes()) {
-                    Icon(MetrolistIcons.Outlined.Close, stringResource(Res.string.disconnect_cast))
+                    Icon(AnitailIcons.Outlined.Close, stringResource(Res.string.disconnect_cast))
                 }
             }
         }

@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.dp
  * These are custom icons sourced from drawable XML resources and Simple Icons,
  * converted to ImageVector format.
  */
-object MetrolistIconsBrand {
+object AnitailIconsBrand {
     val Discord: ImageVector
         get() =
             cachedDiscord ?: ImageVector

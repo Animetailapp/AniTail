@@ -33,7 +33,7 @@ import com.anitail.shared.generated.resources.tempo_and_pitch
 import com.anitail.shared.ui.components.ModalBottomSheet
 import com.anitail.shared.ui.components.PlayerMenuActionGroup
 import com.anitail.shared.ui.components.rememberModalSheetState
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.tempoPitchMenuAction
 import com.anitail.shared.ui.navigation.PredictiveNavigationContent
 import org.jetbrains.compose.resources.stringResource
@@ -66,7 +66,7 @@ fun MetroEqSheet(
                 ) {
                     if (tempoPitch) {
                         IconButton(onClick = { showTempoPitch = false }, shapes = IconButtonDefaults.shapes()) {
-                            Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
+                            Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
                         }
                     }
                     Text(
@@ -81,7 +81,7 @@ fun MetroEqSheet(
                         modifier = Modifier.weight(1f),
                     )
                     IconButton(onClick = onDismiss, shapes = IconButtonDefaults.shapes()) {
-                        Icon(MetrolistIcons.Default.Close, stringResource(Res.string.close))
+                        Icon(AnitailIcons.Default.Close, stringResource(Res.string.close))
                     }
                 }
                 if (tempoPitch) {

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Imported from the official Metrolist Android translations. --><!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
+<!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
     <string name="home">Home</string>
     <string name="songs">Mga kanta</string>
     <string name="artists">Mga artista</string>
@@ -246,7 +246,7 @@
     <string name="credits_license_desc">Lisensyado ang AniTail sa ilalim ng GPL-3.0</string>
     <string name="devmode_already_active" translatable="true">Devmode ay aktibo na</string>
     <string name="discord_enable_rich_presence">I-enable ang Discord Rich Presence</string>
-    <string name="discord_listen_to_metrolist">Makinig san AniTail</string>
+    <string name="discord_listen_to_anitail">Makinig san AniTail</string>
     <string name="discord_login_description">Ikonekta ang iyong Discord account</string>
     <string name="discord_rich_presence">Rich Presence</string>
     <string name="discord_state">Status</string>
@@ -1345,7 +1345,7 @@
     <string name="menu_miniplayer">Miniplayer</string>
     <string name="menu_application_logs">Logs ng aplikasyon</string>
     <string name="menu_report_issue">Mag-report ng problema…</string>
-    <string name="menu_about_metrolist">Tungkol san AniTail</string>
+    <string name="menu_about_anitail">Tungkol san AniTail</string>
     <string name="menu_song">Kanta</string>
     <string name="menu_stop">Hinto</string>
     <string name="menu_go_to_current_song">Pumunta sa kasalukuyang kanta</string>
@@ -1586,7 +1586,7 @@
     <string name="tray_show_window">Ipakita ang window</string>
     <string name="tray_show_miniplayer">Ipakita ang miniplayer</string>
     <string name="tray_settings">Mga setting</string>
-    <string name="tray_quit_metrolist">I-quit ang AniTail</string>
+    <string name="tray_quit_anitail">I-quit ang AniTail</string>
     <string name="sign_in_discord">Mag-sign in sa Discord</string>
     <string name="discord_sign_in_unavailable">Hindi available ang sign-in sa Discord</string>
     <string name="sign_in_youtube_music">Mag-sign in sa YouTube Music</string>

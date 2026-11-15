@@ -24,7 +24,7 @@ import com.anitail.shared.generated.resources.mini_player_subscribe_artist
 import com.anitail.shared.generated.resources.mini_player_unsubscribe_artist
 import com.anitail.shared.generated.resources.remove_from_favorites
 import com.anitail.shared.settings.Settings
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import org.jetbrains.compose.resources.stringResource
 
@@ -42,7 +42,7 @@ fun MiniPlayerActions(
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         if (settings.showMiniPlayerPlaylistButton && onAddToPlaylist != null) {
             MiniPlayerActionButton(
-                icon = MetrolistIcons.AutoMirrored.Outlined.PlaylistAdd,
+                icon = AnitailIcons.AutoMirrored.Outlined.PlaylistAdd,
                 label = stringResource(Res.string.add_to_playlist),
                 onClick = onAddToPlaylist,
                 borderColor = borderColor,
@@ -52,7 +52,7 @@ fun MiniPlayerActions(
         if (settings.showMiniPlayerSubscribeButton && onSubscribeToggle != null) {
             val activeColor = MaterialTheme.colorScheme.primary
             MiniPlayerActionButton(
-                icon = if (isArtistSubscribed) MetrolistIcons.Filled.PersonRemove else MetrolistIcons.Filled.PersonAdd,
+                icon = if (isArtistSubscribed) AnitailIcons.Filled.PersonRemove else AnitailIcons.Filled.PersonAdd,
                 label =
                     stringResource(
                         if (isArtistSubscribed) Res.string.mini_player_unsubscribe_artist else Res.string.mini_player_subscribe_artist,
@@ -64,7 +64,7 @@ fun MiniPlayerActions(
         }
         if (settings.showMiniPlayerLikeButton && onLike != null) {
             MiniPlayerActionButton(
-                icon = if (isLiked) MetrolistIcons.Filled.Favorite else MetrolistIcons.Outlined.FavoriteBorder,
+                icon = if (isLiked) AnitailIcons.Filled.Favorite else AnitailIcons.Outlined.FavoriteBorder,
                 label = stringResource(if (isLiked) Res.string.remove_from_favorites else Res.string.add_to_favorites),
                 onClick = onLike,
                 borderColor = borderColor,

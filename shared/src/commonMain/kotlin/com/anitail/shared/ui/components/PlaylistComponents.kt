@@ -49,7 +49,7 @@ import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.edit_playlist
 import com.anitail.shared.model.PlaylistItem
 import com.anitail.shared.ui.components.images.AsyncImage
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.playback.retainPlaybackKeyFocus
 import com.anitail.shared.utils.highResolutionArtworkUrl
 import org.jetbrains.compose.resources.DrawableResource
@@ -164,7 +164,7 @@ private fun PlaylistTitleAndDescription(
             )
             if (onEdit != null) {
                 IconButton(onClick = onEdit, shapes = IconButtonDefaults.shapes()) {
-                    Icon(MetrolistIcons.Default.Edit, contentDescription = stringResource(Res.string.edit_playlist))
+                    Icon(AnitailIcons.Default.Edit, contentDescription = stringResource(Res.string.edit_playlist))
                 }
             }
         }

@@ -13,9 +13,9 @@ object ShareUrls {
         usePartyParam: Boolean = true,
     ): String =
         if (usePartyParam) {
-            "https://metrolist.cc/party?r=$roomCode"
+            "https://anitail.cc/party?r=$roomCode"
         } else {
-            "https://metrolist.cc/listen?code=$roomCode"
+            "https://anitail.cc/listen?code=$roomCode"
         }
 
     fun playlist(playlistId: String): String = "$MUSIC_DOMAIN/playlist?list=${playlistId.removePrefix("VL")}"

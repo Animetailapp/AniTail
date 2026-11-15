@@ -42,7 +42,7 @@ import com.anitail.shared.generated.resources.subtitles
 import com.anitail.shared.generated.resources.video_viewer
 import com.anitail.shared.model.RepeatMode
 import com.anitail.shared.settings.Settings
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import org.jetbrains.compose.resources.stringResource
 
@@ -85,14 +85,14 @@ actual fun PlayerConnectedButtonGroup(
     val actions =
         listOfNotNull(
             PlayerControlAction(
-                icon = MetrolistIcons.AutoMirrored.Rounded.QueueMusic,
+                icon = AnitailIcons.AutoMirrored.Rounded.QueueMusic,
                 contentDescription = stringResource(Res.string.queue),
                 onClick = onQueueClick,
                 checked = isQueueActive,
             ),
             onSleepTimerClick?.let {
                 PlayerControlAction(
-                    icon = MetrolistIcons.Default.Bedtime,
+                    icon = AnitailIcons.Default.Bedtime,
                     contentDescription = sleepTimerContentDescription ?: stringResource(Res.string.sleep_timer),
                     onClick = it,
                     checked = isSleepTimerActive,
@@ -101,7 +101,7 @@ actual fun PlayerConnectedButtonGroup(
             },
             onShuffleClick?.let {
                 PlayerControlAction(
-                    icon = MetrolistIcons.Rounded.Shuffle,
+                    icon = AnitailIcons.Rounded.Shuffle,
                     contentDescription = stringResource(Res.string.shuffle),
                     onClick = it,
                     checked = isShuffled,
@@ -109,7 +109,7 @@ actual fun PlayerConnectedButtonGroup(
             },
             onLyricsClick?.let {
                 PlayerControlAction(
-                    icon = MetrolistIcons.Default.Lyrics,
+                    icon = AnitailIcons.Default.Lyrics,
                     contentDescription = stringResource(Res.string.lyrics),
                     onClick = it,
                     checked = isLyricsActive,
@@ -117,7 +117,7 @@ actual fun PlayerConnectedButtonGroup(
             },
             onRepeatClick?.let {
                 PlayerControlAction(
-                    icon = if (repeatMode == RepeatMode.ONE) MetrolistIcons.Rounded.RepeatOne else MetrolistIcons.Rounded.Repeat,
+                    icon = if (repeatMode == RepeatMode.ONE) AnitailIcons.Rounded.RepeatOne else AnitailIcons.Rounded.Repeat,
                     contentDescription = repeatContentDescription(repeatMode),
                     onClick = it,
                     checked = repeatMode != RepeatMode.OFF,
@@ -125,7 +125,7 @@ actual fun PlayerConnectedButtonGroup(
             },
             onCastClick?.let {
                 PlayerControlAction(
-                    icon = MetrolistIcons.Outlined.Cast,
+                    icon = AnitailIcons.Outlined.Cast,
                     contentDescription = stringResource(Res.string.cast),
                     onClick = it,
                     checked = isCasting,
@@ -133,7 +133,7 @@ actual fun PlayerConnectedButtonGroup(
             },
             onVideoClick?.let {
                 PlayerControlAction(
-                    icon = MetrolistIcons.Filled.Movie,
+                    icon = AnitailIcons.Filled.Movie,
                     contentDescription = stringResource(Res.string.video_viewer),
                     onClick = it,
                     checked = isVideoActive,
@@ -141,7 +141,7 @@ actual fun PlayerConnectedButtonGroup(
             },
             onSubtitleClick?.let {
                 PlayerControlAction(
-                    icon = MetrolistIcons.Default.ClosedCaption,
+                    icon = AnitailIcons.Default.ClosedCaption,
                     contentDescription = stringResource(Res.string.subtitles),
                     onClick = it,
                     checked = isSubtitleActive,
@@ -149,7 +149,7 @@ actual fun PlayerConnectedButtonGroup(
             },
             onFullscreenClick?.let {
                 PlayerControlAction(
-                    icon = if (isFullscreen) MetrolistIcons.Default.FullscreenExit else MetrolistIcons.Default.Fullscreen,
+                    icon = if (isFullscreen) AnitailIcons.Default.FullscreenExit else AnitailIcons.Default.Fullscreen,
                     contentDescription = stringResource(Res.string.fullscreen),
                     onClick = it,
                     checked = isFullscreen,
@@ -264,7 +264,7 @@ actual fun PlayerConnectedButtonGroup(
                                         }
                                         if (isChecked) {
                                             Icon(
-                                                MetrolistIcons.Default.Check,
+                                                AnitailIcons.Default.Check,
                                                 contentDescription = stringResource(Res.string.active),
                                                 tint = activeColor,
                                                 modifier = Modifier.size(18.dp),

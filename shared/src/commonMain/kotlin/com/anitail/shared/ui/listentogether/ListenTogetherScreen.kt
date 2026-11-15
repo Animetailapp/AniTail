@@ -254,7 +254,7 @@ import com.anitail.shared.settings.Settings
 import com.anitail.shared.ui.components.AlertDialog
 import com.anitail.shared.ui.components.Dialog
 import com.anitail.shared.ui.components.PopupVisibility
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.settings.SettingsChoice
 import com.anitail.shared.ui.settings.SettingsPageId
@@ -515,7 +515,7 @@ internal fun listenTogetherSettingsPage(
         id = SettingsPageId.LISTEN_TOGETHER,
         title = stringResource(Res.string.listen_together),
         subtitle = settingsPageSubtitle(stringResource(Res.string.settings_listen_together_overview), integrationStatus(enabled, username)),
-        icon = MetrolistIcons.Outlined.Headphones,
+        icon = AnitailIcons.Outlined.Headphones,
         tone = SettingsTone.BLUE,
     ) {
         group("listenTogetherMaster", "") {
@@ -638,7 +638,7 @@ fun ListenTogetherServerScreen(
                 modifier = Modifier.navigationPopupSource(),
                 onClick = { showCustomServerDialog = true },
                 shape = ButtonRadius,
-                icon = { Icon(MetrolistIcons.Default.Add, contentDescription = null) },
+                icon = { Icon(AnitailIcons.Default.Add, contentDescription = null) },
                 text = { Text(stringResource(Res.string.listen_together_add_custom_server)) },
             )
         },
@@ -750,7 +750,7 @@ fun ListenTogetherBlockedUsersScreen(
                 modifier = Modifier.navigationPopupSource(),
                 onClick = { showBlockDialog = true },
                 shape = ButtonRadius,
-                icon = { Icon(MetrolistIcons.Default.Add, contentDescription = null) },
+                icon = { Icon(AnitailIcons.Default.Add, contentDescription = null) },
                 text = { Text(stringResource(Res.string.block)) },
             )
         },
@@ -771,7 +771,7 @@ fun ListenTogetherBlockedUsersScreen(
                             title = username,
                             trailingContent = {
                                 IconButton(onClick = { manager.unblockUser(username) }, shapes = IconButtonDefaults.shapes()) {
-                                    Icon(MetrolistIcons.Rounded.LockOpen, contentDescription = stringResource(Res.string.unblock))
+                                    Icon(AnitailIcons.Rounded.LockOpen, contentDescription = stringResource(Res.string.unblock))
                                 }
                             },
                         )
@@ -825,7 +825,7 @@ fun ListenTogetherLogsScreen(
             ExtendedFloatingActionButton(
                 onClick = { manager.clearLogs() },
                 shape = ButtonRadius,
-                icon = { Icon(MetrolistIcons.Filled.Close, contentDescription = null) },
+                icon = { Icon(AnitailIcons.Filled.Close, contentDescription = null) },
                 text = { Text(stringResource(Res.string.clear)) },
             )
         },
@@ -841,7 +841,7 @@ fun ListenTogetherLogsScreen(
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp),
                     shapes = ButtonDefaults.shapes(),
                 ) {
-                    Icon(MetrolistIcons.Outlined.Share, contentDescription = null)
+                    Icon(AnitailIcons.Outlined.Share, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(Res.string.listen_together_share_logs))
                 }
@@ -852,7 +852,7 @@ fun ListenTogetherLogsScreen(
                 modifier = Modifier.size(48.dp),
                 shapes = IconButtonDefaults.shapes(),
             ) {
-                Icon(MetrolistIcons.Default.ContentCopy, contentDescription = stringResource(Res.string.copy_logs))
+                Icon(AnitailIcons.Default.ContentCopy, contentDescription = stringResource(Res.string.copy_logs))
             }
         }
         Surface(
@@ -1146,7 +1146,7 @@ private fun HeroHeader(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = MetrolistIcons.Outlined.Group,
+                imageVector = AnitailIcons.Outlined.Group,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(if (compact) 32.dp else 40.dp),
@@ -1222,7 +1222,7 @@ private fun UsernameRow(
                     contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                 ) {
                     Icon(
-                        imageVector = MetrolistIcons.Outlined.Edit,
+                        imageVector = AnitailIcons.Outlined.Edit,
                         contentDescription = null,
                         modifier = Modifier.size(ButtonDefaults.IconSize),
                     )
@@ -1553,7 +1553,7 @@ private fun ListenTogetherRoomScreen(
                             )
                         },
             ) {
-                Icon(MetrolistIcons.Outlined.Share, contentDescription = copyLinkLabel)
+                Icon(AnitailIcons.Outlined.Share, contentDescription = copyLinkLabel)
             }
         },
     ) { paddingValues ->
@@ -1804,7 +1804,7 @@ private fun LeaveRoomButton(
                 ),
         ) {
             Icon(
-                imageVector = MetrolistIcons.AutoMirrored.Outlined.Logout,
+                imageVector = AnitailIcons.AutoMirrored.Outlined.Logout,
                 contentDescription = null,
                 modifier = Modifier.size(24.dp),
             )
@@ -1830,7 +1830,7 @@ private fun ListenTogetherScaffold(
     val navigationIcon: @Composable () -> Unit = {
         if (onNavigateBack != null) {
             IconButton(onClick = onNavigateBack, modifier = Modifier.tvFocusHighlight(CircleShape), shapes = IconButtonDefaults.shapes()) {
-                Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back))
+                Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(Res.string.back))
             }
         }
     }
@@ -1866,7 +1866,7 @@ private fun SettingsNavigationCard(onClick: () -> Unit) {
                     description = stringResource(Res.string.listen_together_settings_description),
                     leadingContent = {
                         Icon(
-                            imageVector = MetrolistIcons.Outlined.Settings,
+                            imageVector = AnitailIcons.Outlined.Settings,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(24.dp),
@@ -1874,7 +1874,7 @@ private fun SettingsNavigationCard(onClick: () -> Unit) {
                     },
                     trailingContent = {
                         Icon(
-                            imageVector = MetrolistIcons.AutoMirrored.Filled.KeyboardArrowRight,
+                            imageVector = AnitailIcons.AutoMirrored.Filled.KeyboardArrowRight,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -2051,7 +2051,7 @@ private fun ConnectedUserAvatar(
             if (showKick) {
                 DropdownMenuItem(
                     text = { Text(stringResource(Res.string.kick_user)) },
-                    leadingIcon = { Icon(MetrolistIcons.AutoMirrored.Filled.Logout, contentDescription = null) },
+                    leadingIcon = { Icon(AnitailIcons.AutoMirrored.Filled.Logout, contentDescription = null) },
                     onClick = {
                         menuExpanded = false
                         onKick()
@@ -2061,7 +2061,7 @@ private fun ConnectedUserAvatar(
             if (showBlock) {
                 DropdownMenuItem(
                     text = { Text(stringResource(Res.string.block)) },
-                    leadingIcon = { Icon(MetrolistIcons.Outlined.Block, contentDescription = null) },
+                    leadingIcon = { Icon(AnitailIcons.Outlined.Block, contentDescription = null) },
                     onClick = {
                         menuExpanded = false
                         onBlock()
@@ -2191,7 +2191,7 @@ private fun PendingActionRow(
         PendingActionButton(
             enabled = enabled,
             onClick = onApprove,
-            icon = MetrolistIcons.Filled.Check,
+            icon = AnitailIcons.Filled.Check,
             contentDescription = stringResource(Res.string.approve),
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -2200,7 +2200,7 @@ private fun PendingActionRow(
         PendingActionButton(
             enabled = enabled,
             onClick = onReject,
-            icon = MetrolistIcons.Filled.Close,
+            icon = AnitailIcons.Filled.Close,
             contentDescription = stringResource(Res.string.reject),
             containerColor = MaterialTheme.colorScheme.errorContainer,
             contentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -2309,13 +2309,13 @@ private fun ServerRow(
         }
         onEdit?.let {
             IconButton(onClick = it, shapes = IconButtonDefaults.shapes()) {
-                Icon(MetrolistIcons.Default.Edit, contentDescription = stringResource(Res.string.listen_together_edit_server))
+                Icon(AnitailIcons.Default.Edit, contentDescription = stringResource(Res.string.listen_together_edit_server))
             }
         }
         onRemove?.let {
             IconButton(onClick = it, shapes = IconButtonDefaults.shapes()) {
                 Icon(
-                    MetrolistIcons.Default.Delete,
+                    AnitailIcons.Default.Delete,
                     contentDescription = stringResource(Res.string.remove_server),
                 )
             }

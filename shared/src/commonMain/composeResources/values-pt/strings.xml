@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Imported from the official Metrolist Android translations. --><!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
+<!-- Source revision: 6ee482cbe3a076092436a3cb1b53571ffead3097 --><!-- See docs/translation-attribution.md for credits and licensing. --><resources xmlns:tools="http://schemas.android.com/tools">
     <string name="home">Início</string>
     <string name="offline_mode">Modo offline</string>
     <string name="songs">Músicas</string>
@@ -261,7 +261,7 @@
     <string name="credits_license_desc">O AniTail está licenciado sobre a licença GPL-3.0.</string>
     <string name="devmode_already_active" translatable="true">Devmode já está ativado</string>
     <string name="discord_enable_rich_presence">Ativar Discord Rich Presence</string>
-    <string name="discord_listen_to_metrolist">Ouvir AniTail</string>
+    <string name="discord_listen_to_anitail">Ouvir AniTail</string>
     <string name="discord_login_description">Conecta a tua conta do Discord</string>
     <string name="discord_rich_presence">Rich Presence</string>
     <string name="discord_state">Estado</string>

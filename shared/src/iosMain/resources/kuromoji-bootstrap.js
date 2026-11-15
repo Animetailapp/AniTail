@@ -33,7 +33,7 @@
             if (timer.id === id) timer.cancelled = true;
         });
     };
-    global.__metrolistDrainTimers = function () {
+    global.__anitailDrainTimers = function () {
         var count = 0;
         while (timerQueue.length) {
             if (++count > 100000) throw new Error("Kuromoji timer queue limit exceeded");
@@ -42,7 +42,7 @@
         }
     };
 
-    global.__metrolistAddDictionary = function (name, base64) {
+    global.__anitailAddDictionary = function (name, base64) {
         var byteLimit = dictionaryLimits[name];
         if (!byteLimit || Object.prototype.hasOwnProperty.call(dictionaryData, name)) {
             throw new Error("Unrecognized or duplicate Kuromoji dictionary resource");
@@ -91,7 +91,7 @@
         this.url = url;
     };
     LocalDictionaryRequest.prototype.send = function () {
-        var prefix = "metrolist-dictionary/";
+        var prefix = "anitail-dictionary/";
         var name = typeof this.url === "string" && this.url.indexOf(prefix) === 0 ? this.url.slice(prefix.length) : "";
         var base64 = dictionaryLimits[name] ? dictionaryData[name] : null;
         if (this.method !== "GET" || this.responseType !== "arraybuffer" || !base64) {
@@ -106,27 +106,27 @@
     };
     global.XMLHttpRequest = LocalDictionaryRequest;
 
-    global.__metrolistStartBuild = function () {
+    global.__anitailStartBuild = function () {
         buildError = null;
         tokenizer = null;
-        global.kuromoji.builder({ dicPath: "metrolist-dictionary/" }).build(function (error, result) {
+        global.kuromoji.builder({ dicPath: "anitail-dictionary/" }).build(function (error, result) {
             buildError = error || null;
             tokenizer = result || null;
         });
     };
-    global.__metrolistBuildError = function () {
+    global.__anitailBuildError = function () {
         return buildError ? String(buildError) : null;
     };
-    global.__metrolistIsBuilt = function () {
+    global.__anitailIsBuilt = function () {
         return tokenizer !== null && buildError === null;
     };
-    global.__metrolistTokenize = function (text) {
+    global.__anitailTokenize = function (text) {
         if (!tokenizer) throw new Error("Kuromoji tokenizer is not initialized");
         return JSON.stringify(tokenizer.tokenize(text).map(function (token) {
             return [token.surface_form, token.pronunciation, token.reading];
         }));
     };
-    global.__metrolistReleaseDictionaryData = function () {
+    global.__anitailReleaseDictionaryData = function () {
         dictionaryData = Object.create(null);
         totalDataLength = 0;
         timerQueue = [];

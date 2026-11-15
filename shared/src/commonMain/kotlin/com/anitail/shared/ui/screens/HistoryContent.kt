@@ -111,7 +111,7 @@ import com.anitail.shared.ui.components.HistoryFilterBarText
 import com.anitail.shared.ui.components.PopupContent
 import com.anitail.shared.ui.components.PopupVisibility
 import com.anitail.shared.ui.components.RefreshIndicator
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.SongSelectionMenuSheet
 import com.anitail.shared.ui.menu.historySelectionMenuModel
 import com.anitail.shared.ui.navigation.NavigationBackHandler
@@ -242,7 +242,7 @@ fun HistoryContent(
                     shapes = IconButtonDefaults.shapes(),
                 ) {
                     Icon(
-                        MetrolistIcons.AutoMirrored.Filled.ArrowBack,
+                        AnitailIcons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(Res.string.back),
                     )
                 }
@@ -518,7 +518,7 @@ private fun EmptyHistory(onRefresh: (() -> Unit)?) {
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            MetrolistIcons.Outlined.History,
+            AnitailIcons.Outlined.History,
             null,
             modifier = Modifier.size(MdSpacing.xl),
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
@@ -532,7 +532,7 @@ private fun EmptyHistory(onRefresh: (() -> Unit)?) {
         if (onRefresh != null) {
             Spacer(Modifier.height(MdSpacing.xs))
             FilledTonalIconButton(onClick = onRefresh, shapes = IconButtonDefaults.shapes()) {
-                Icon(MetrolistIcons.Outlined.Refresh, stringResource(Res.string.history_refresh))
+                Icon(AnitailIcons.Outlined.Refresh, stringResource(Res.string.history_refresh))
             }
         }
     }

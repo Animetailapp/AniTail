@@ -85,7 +85,7 @@ import com.anitail.shared.ui.components.Material3MenuGroup
 import com.anitail.shared.ui.components.Material3MenuItemData
 import com.anitail.shared.ui.components.PlayerMenuAction
 import com.anitail.shared.ui.components.PopupVisibility
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.utils.verticalScrollWithDrag
 import com.anitail.shared.utils.monthlyAudienceText
 import org.jetbrains.compose.resources.stringResource
@@ -153,7 +153,7 @@ fun artistNavigationMenuAction(
 
     if (onGoToArtist == null || artists.isEmpty()) return null
     return PlayerMenuAction(
-        MetrolistIcons.Outlined.Person,
+        AnitailIcons.Outlined.Person,
         if (artists.size > 1) artistsLabel else viewArtistLabel,
         description = artists.singleOrNull()?.displayName,
         onClick = {
@@ -224,7 +224,7 @@ fun songMediaMenuModel(
         listOfNotNull(
             onLike?.let {
                 PlayerMenuAction(
-                    icon = if (isLiked) MetrolistIcons.Filled.Favorite else MetrolistIcons.Outlined.FavoriteBorder,
+                    icon = if (isLiked) AnitailIcons.Filled.Favorite else AnitailIcons.Outlined.FavoriteBorder,
                     title = if (isLiked) unlikeLabel else likeLabel,
                     selected = isLiked,
                     onClick = it,
@@ -232,7 +232,7 @@ fun songMediaMenuModel(
             },
             onPlay?.let {
                 action(
-                    MetrolistIcons.Rounded.PlayArrow,
+                    AnitailIcons.Rounded.PlayArrow,
                     playLabel,
                     onDismiss,
                     it,
@@ -256,7 +256,7 @@ fun songMediaMenuModel(
     val detailsAction =
         onShowDetails?.let {
             PlayerMenuAction(
-                MetrolistIcons.Outlined.Info,
+                AnitailIcons.Outlined.Info,
                 stringResource(if (isPlayerMenu) Res.string.song_details else Res.string.details),
                 onClick = it,
             )
@@ -277,14 +277,14 @@ fun songMediaMenuModel(
             removal =
                 listOfNotNull(
                     onMoveUp?.let {
-                        action(MetrolistIcons.Default.ChevronLeft, moveUpLabel, onDismiss, it)
+                        action(AnitailIcons.Default.ChevronLeft, moveUpLabel, onDismiss, it)
                     },
                     onMoveDown?.let {
-                        action(MetrolistIcons.Default.ChevronRight, moveDownLabel, onDismiss, it)
+                        action(AnitailIcons.Default.ChevronRight, moveDownLabel, onDismiss, it)
                     },
                     onRemove?.let {
                         action(
-                            MetrolistIcons.Outlined.Delete,
+                            AnitailIcons.Outlined.Delete,
                             removeLabel ?: removeFromPlaylistLabel,
                             onDismiss,
                             it,
@@ -302,7 +302,7 @@ fun songMediaMenuModel(
                     deleteUploadAction,
                     onEdit?.let {
                         PlayerMenuAction(
-                            MetrolistIcons.Outlined.Edit,
+                            AnitailIcons.Outlined.Edit,
                             editLabel,
                             editDesc,
                             onClick = it,
@@ -411,7 +411,7 @@ fun albumMediaMenuModel(
                 listOfNotNull(
                     onAddToPlaylist?.let {
                         action(
-                            MetrolistIcons.AutoMirrored.Outlined.PlaylistAdd,
+                            AnitailIcons.AutoMirrored.Outlined.PlaylistAdd,
                             addToPlaylistLabel,
                             onDismiss,
                             it,
@@ -420,7 +420,7 @@ fun albumMediaMenuModel(
                 ),
                 listOfNotNull(
                     onExport?.let {
-                        action(MetrolistIcons.Outlined.Share, exportAlbumLabel, onDismiss, it)
+                        action(AnitailIcons.Outlined.Share, exportAlbumLabel, onDismiss, it)
                     },
                 ),
                 if (onGoToArtist == null) {
@@ -429,7 +429,7 @@ fun albumMediaMenuModel(
                     album.artists.mapNotNull { artist ->
                         artist.id?.let { artistId ->
                             action(
-                                MetrolistIcons.Outlined.Person,
+                                AnitailIcons.Outlined.Person,
                                 viewArtistLabel,
                                 onDismiss,
                                 description = artist.displayName,
@@ -480,7 +480,7 @@ fun artistMediaMenuModel(
             monthlyAudienceText(artist.monthlyListeners, stringResource(Res.string.monthly_audience_short))
                 ?: artist.subscribers?.takeIf(String::isNotBlank)?.let { "${stringResource(Res.string.subscribers)}: $it" },
         thumbnail = artist.thumbnail,
-        fallbackIcon = MetrolistIcons.Outlined.AccountCircle,
+        fallbackIcon = AnitailIcons.Outlined.AccountCircle,
         artistId = artist.id,
         description = artist.description,
         primaryActions = primaryActions(onDismiss, onPlay, onShuffle, onShare),
@@ -491,16 +491,16 @@ fun artistMediaMenuModel(
                     pinAction(isPinned, onDismiss, onTogglePin),
                     onBlock?.let {
                         action(
-                            if (isBlocked) MetrolistIcons.Filled.Remove else MetrolistIcons.Outlined.Block,
+                            if (isBlocked) AnitailIcons.Filled.Remove else AnitailIcons.Outlined.Block,
                             if (isBlocked) unblockLabel else blockArtistLabel,
                             onDismiss,
                             it,
                         )
                     },
-                    PlayerMenuAction(MetrolistIcons.Outlined.Edit, editArtistLabel, onClick = { editingAlias = true }),
+                    PlayerMenuAction(AnitailIcons.Outlined.Edit, editArtistLabel, onClick = { editingAlias = true }),
                     onToggleSubscription?.let {
                         action(
-                            if (isSubscribed == true) MetrolistIcons.Outlined.NotificationsNone else MetrolistIcons.Outlined.AddAlert,
+                            if (isSubscribed == true) AnitailIcons.Outlined.NotificationsNone else AnitailIcons.Outlined.AddAlert,
                             if (isSubscribed == true) unsubscribeLabel else subscribeLabel,
                             onDismiss,
                             it,
@@ -573,16 +573,16 @@ fun playlistMediaMenuModel(
             listOf(
                 listOfNotNull(
                     onExport?.let {
-                        action(MetrolistIcons.Outlined.Share, exportPlaylistLabel, onDismiss, it)
+                        action(AnitailIcons.Outlined.Share, exportPlaylistLabel, onDismiss, it)
                     },
                 ),
                 listOfNotNull(
                     onSelect?.let {
-                        action(MetrolistIcons.Outlined.LibraryMusic, selectSongsLabel, onDismiss, it)
+                        action(AnitailIcons.Outlined.LibraryMusic, selectSongsLabel, onDismiss, it)
                     },
                     onRename?.let {
                         action(
-                            MetrolistIcons.Outlined.Edit,
+                            AnitailIcons.Outlined.Edit,
                             renameLabel,
                             onDismiss,
                             it,
@@ -591,7 +591,7 @@ fun playlistMediaMenuModel(
                     },
                     onDelete?.takeIf { onFavorite == null || playlist.isLocal || playlist.isEditable }?.let {
                         action(
-                            MetrolistIcons.Outlined.Delete,
+                            AnitailIcons.Outlined.Delete,
                             if (playlist.isLocal || playlist.isEditable) {
                                 deletePlaylistLabel
                             } else {
@@ -648,11 +648,11 @@ fun podcastMediaMenuModel(
         onDownload = onDownload,
         onHideFromLibrary = onRemoveFromLibrary,
         downloadIsPodcast = true,
-        extraPrimaryAction = onPlayOldestFirst?.let { action(MetrolistIcons.Outlined.History, playOldestFirstLabel, onDismiss, it) },
+        extraPrimaryAction = onPlayOldestFirst?.let { action(AnitailIcons.Outlined.History, playOldestFirstLabel, onDismiss, it) },
         extraLibraryAction =
             onToggleSaved?.let {
                 action(
-                    MetrolistIcons.Outlined.LibraryAdd,
+                    AnitailIcons.Outlined.LibraryAdd,
                     if (isSaved == true) removeFromSavedPodcastsLabel else savePodcastLabel,
                     onDismiss,
                     it,
@@ -706,7 +706,7 @@ private fun collectionMediaMenuModel(
             listOfNotNull(
                 onPlay?.let {
                     action(
-                        MetrolistIcons.Filled.PlayArrow,
+                        AnitailIcons.Filled.PlayArrow,
                         playLabel,
                         onDismiss,
                         it,
@@ -716,9 +716,9 @@ private fun collectionMediaMenuModel(
             ),
         primaryActions =
             listOfNotNull(
-                onShuffle?.let { action(MetrolistIcons.Rounded.Shuffle, shuffleLabel, onDismiss, it) },
+                onShuffle?.let { action(AnitailIcons.Rounded.Shuffle, shuffleLabel, onDismiss, it) },
                 extraPrimaryAction,
-                onShare?.let { action(MetrolistIcons.Outlined.Share, shareLabel, onDismiss, it) },
+                onShare?.let { action(AnitailIcons.Outlined.Share, shareLabel, onDismiss, it) },
             ),
         actionGroups =
             listOf(
@@ -745,11 +745,11 @@ private fun primaryActions(
     val shuffleLabel = stringResource(Res.string.shuffle)
     val shareLabel = stringResource(Res.string.share)
     return listOfNotNull(
-        onPlay?.let { action(MetrolistIcons.Rounded.PlayArrow, playLabel, onDismiss, it) },
-        onShuffle?.let { action(MetrolistIcons.Rounded.Shuffle, shuffleLabel, onDismiss, it) },
+        onPlay?.let { action(AnitailIcons.Rounded.PlayArrow, playLabel, onDismiss, it) },
+        onShuffle?.let { action(AnitailIcons.Rounded.Shuffle, shuffleLabel, onDismiss, it) },
         onShare?.let {
             action(
-                icon = MetrolistIcons.Outlined.Share,
+                icon = AnitailIcons.Outlined.Share,
                 title = shareLabel,
                 onDismiss = onDismiss,
                 onClick = it,
@@ -773,7 +773,7 @@ internal fun queueActions(
     return listOfNotNull(
         onPlayNext?.let {
             action(
-                MetrolistIcons.AutoMirrored.Filled.PlaylistPlay,
+                AnitailIcons.AutoMirrored.Filled.PlaylistPlay,
                 playNextLabel,
                 onDismiss,
                 it,
@@ -782,7 +782,7 @@ internal fun queueActions(
         },
         onAddToQueue?.let {
             action(
-                MetrolistIcons.AutoMirrored.Outlined.QueueMusic,
+                AnitailIcons.AutoMirrored.Outlined.QueueMusic,
                 addToQueueLabel,
                 onDismiss,
                 it,
@@ -802,7 +802,7 @@ internal fun pinAction(
     val pinLabel = stringResource(Res.string.pin_to_speed_dial)
     return onTogglePin?.let {
         action(
-            if (isPinned) MetrolistIcons.Outlined.KeepOff else MetrolistIcons.Filled.PushPin,
+            if (isPinned) AnitailIcons.Outlined.KeepOff else AnitailIcons.Filled.PushPin,
             if (isPinned) unpinLabel else pinLabel,
             onDismiss,
             it,
@@ -818,7 +818,7 @@ private fun hideAction(
 ): PlayerMenuAction? {
     val hideLabel = stringResource(Res.string.hide_from_library)
     return onHide?.let {
-        action(MetrolistIcons.Filled.VisibilityOff, label ?: hideLabel, onDismiss, it)
+        action(AnitailIcons.Filled.VisibilityOff, label ?: hideLabel, onDismiss, it)
     }
 }
 
@@ -846,7 +846,7 @@ internal fun downloadAction(
         when (state) {
             MediaDownloadState.NOT_DOWNLOADED -> {
                 action(
-                    MetrolistIcons.Outlined.Download,
+                    AnitailIcons.Outlined.Download,
                     downloadActionLabel,
                     onDismiss,
                     it,
@@ -856,7 +856,7 @@ internal fun downloadAction(
 
             MediaDownloadState.DOWNLOADING -> {
                 PlayerMenuAction(
-                    MetrolistIcons.Outlined.Download,
+                    AnitailIcons.Outlined.Download,
                     downloadingPercentLabel,
                     enabled = false,
                 ) {}
@@ -864,7 +864,7 @@ internal fun downloadAction(
 
             MediaDownloadState.DOWNLOADED -> {
                 action(
-                    MetrolistIcons.Outlined.OfflinePin,
+                    AnitailIcons.Outlined.OfflinePin,
                     removeLabel,
                     onDismiss,
                     it,
@@ -912,7 +912,7 @@ private fun collectionLibraryAction(
     val label = stringResource(if (isFavorite) Res.string.remove_from_library else Res.string.action_like)
     return onFavorite?.let {
         action(
-            if (isFavorite) MetrolistIcons.Filled.Favorite else MetrolistIcons.Outlined.FavoriteBorder,
+            if (isFavorite) AnitailIcons.Filled.Favorite else AnitailIcons.Outlined.FavoriteBorder,
             label,
             onDismiss,
             it,

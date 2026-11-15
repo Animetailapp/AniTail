@@ -109,7 +109,7 @@ import com.anitail.shared.ui.components.SongThumbnailPlayingIndicator
 import com.anitail.shared.ui.components.episodeProgressFraction
 import com.anitail.shared.ui.components.images.AsyncImage
 import com.anitail.shared.ui.components.loadingShimmer
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.CursorDropdownMenu
 import com.anitail.shared.ui.menu.contextMenuAnchor
 import com.anitail.shared.ui.menu.onSecondaryClick
@@ -194,7 +194,7 @@ fun PodcastContent(
                 navigationIcon = {
                     if (onBackClick != null) {
                         IconButton(onClick = onBackClick, shapes = IconButtonDefaults.shapes()) {
-                            Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
+                            Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
                         }
                     }
                 },
@@ -369,7 +369,7 @@ private fun PodcastHeader(
             itemVerticalAlignment = Alignment.CenterVertically,
         ) {
             Button(onClick = onPlay, enabled = page.episodes.any { !it.isUnavailable }, shapes = ButtonDefaults.shapes()) {
-                Icon(MetrolistIcons.Rounded.PlayArrow, null, Modifier.size(18.dp))
+                Icon(AnitailIcons.Rounded.PlayArrow, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(Res.string.play_latest))
             }
@@ -401,7 +401,7 @@ private fun PodcastHeader(
                 modifier = Modifier.size(36.dp).navigationPopupSource(),
                 shapes = IconButtonDefaults.shapes(),
             ) {
-                Icon(MetrolistIcons.Default.MoreVert, stringResource(Res.string.podcast_actions))
+                Icon(AnitailIcons.Default.MoreVert, stringResource(Res.string.podcast_actions))
             }
         }
     }
@@ -528,7 +528,7 @@ private fun EpisodeRow(
                         modifier = Modifier.size(36.dp).navigationPopupSource(),
                         shapes = IconButtonDefaults.shapes(),
                     ) {
-                        Icon(MetrolistIcons.Default.MoreVert, stringResource(Res.string.episode_actions), Modifier.size(20.dp))
+                        Icon(AnitailIcons.Default.MoreVert, stringResource(Res.string.episode_actions), Modifier.size(20.dp))
                     }
                     val menuContent: @Composable ColumnScope.() -> Unit = {
                         DropdownMenuGroup(shapes = MenuDefaults.groupShape(0, 1)) {
@@ -628,7 +628,7 @@ private fun EpisodeDetailsBody(
                 modifier = Modifier.size(56.dp),
                 shapes = IconButtonDefaults.shapes(),
             ) {
-                Icon(MetrolistIcons.Rounded.PlayArrow, stringResource(Res.string.play), Modifier.size(32.dp))
+                Icon(AnitailIcons.Rounded.PlayArrow, stringResource(Res.string.play), Modifier.size(32.dp))
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

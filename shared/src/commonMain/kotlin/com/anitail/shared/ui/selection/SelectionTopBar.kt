@@ -24,7 +24,7 @@ import com.anitail.shared.generated.resources.deselect_all
 import com.anitail.shared.generated.resources.menu
 import com.anitail.shared.generated.resources.n_selected
 import com.anitail.shared.generated.resources.select_all
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
@@ -61,7 +61,7 @@ fun SelectionTopBar(
             if (showClose) {
                 {
                     IconButton(onClick = onClose, shapes = IconButtonDefaults.shapes()) {
-                        Icon(MetrolistIcons.Filled.Close, contentDescription = stringResource(Res.string.cancel))
+                        Icon(AnitailIcons.Filled.Close, contentDescription = stringResource(Res.string.cancel))
                     }
                 }
             } else {
@@ -84,7 +84,7 @@ fun SelectionTopBar(
                 enabled = moreEnabled,
                 shapes = IconButtonDefaults.shapes(),
             ) {
-                Icon(MetrolistIcons.Default.MoreVert, contentDescription = stringResource(Res.string.menu))
+                Icon(AnitailIcons.Default.MoreVert, contentDescription = stringResource(Res.string.menu))
             }
         },
         colors =

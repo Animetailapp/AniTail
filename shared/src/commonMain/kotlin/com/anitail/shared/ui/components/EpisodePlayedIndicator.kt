@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.episode_played
 import com.anitail.shared.state.EpisodeListeningState
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -45,7 +45,7 @@ fun EpisodePlayedIndicator(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (fraction >= 1f) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Icon(MetrolistIcons.Filled.Check, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
+                Icon(AnitailIcons.Filled.Check, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
                 Text(stringResource(Res.string.episode_played), style = MaterialTheme.typography.labelSmall)
             }
         } else {

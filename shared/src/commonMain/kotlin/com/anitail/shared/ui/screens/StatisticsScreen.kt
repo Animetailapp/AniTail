@@ -136,7 +136,7 @@ import com.anitail.shared.ui.components.ScrollingFabState
 import com.anitail.shared.ui.components.images.AsyncImage
 import com.anitail.shared.ui.components.rememberScrollingFabState
 import com.anitail.shared.ui.components.withStaticCorners
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.artworkMenuActions
 import com.anitail.shared.ui.navigation.NavigationBackHandler
 import com.anitail.shared.ui.navigation.acceptsInput
@@ -373,7 +373,7 @@ fun StatisticsScreen(
                                                         .tvFocusHighlight(CircleShape),
                                                 shapes = ButtonDefaults.shapes(),
                                             ) {
-                                                Icon(MetrolistIcons.Rounded.Shuffle, null)
+                                                Icon(AnitailIcons.Rounded.Shuffle, null)
                                                 Spacer(Modifier.width(8.dp))
                                                 Text(stringResource(Res.string.shuffle), style = MaterialTheme.typography.titleMedium)
                                             }
@@ -451,7 +451,7 @@ fun StatisticsScreen(
                                 expanded = fabState == ScrollingFabState.Expanded,
                                 icon = {
                                     Icon(
-                                        MetrolistIcons.Outlined.Share,
+                                        AnitailIcons.Outlined.Share,
                                         shareLabel.takeUnless { fabState == ScrollingFabState.Expanded },
                                     )
                                 },
@@ -468,7 +468,7 @@ fun StatisticsScreen(
 @Composable
 private fun BackButton(onBack: () -> Unit) {
     IconButton(onClick = onBack, modifier = Modifier.tvFocusHighlight(CircleShape), shapes = IconButtonDefaults.shapes()) {
-        Icon(MetrolistIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
+        Icon(AnitailIcons.AutoMirrored.Filled.ArrowBack, stringResource(Res.string.back))
     }
 }
 
@@ -525,7 +525,7 @@ private fun PeriodButtons(
                         },
                     ),
                 )
-                Icon(MetrolistIcons.Outlined.KeyboardArrowDown, null)
+                Icon(AnitailIcons.Outlined.KeyboardArrowDown, null)
             })
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 StatisticsPeriodMode.entries.forEach { mode ->
@@ -776,7 +776,7 @@ fun StatisticsDetailScreen(
                         }
                         onItemMenu?.let { menu ->
                             IconButton(onClick = { menu(item) }, enabled = !isLoading, shapes = IconButtonDefaults.shapes()) {
-                                Icon(MetrolistIcons.Default.MoreVert, stringResource(Res.string.more_options_for, item.title))
+                                Icon(AnitailIcons.Default.MoreVert, stringResource(Res.string.more_options_for, item.title))
                             }
                         }
                     }
@@ -894,7 +894,7 @@ private fun StatisticsCarousel(
                 color = MaterialTheme.colorScheme.primary,
             )
             FilledIconButton(onClick = onOpenDetail, shapes = IconButtonDefaults.shapes()) {
-                Icon(MetrolistIcons.AutoMirrored.Filled.KeyboardArrowRight, stringResource(Res.string.see_all))
+                Icon(AnitailIcons.AutoMirrored.Filled.KeyboardArrowRight, stringResource(Res.string.see_all))
             }
         }
         if (items.isEmpty()) {

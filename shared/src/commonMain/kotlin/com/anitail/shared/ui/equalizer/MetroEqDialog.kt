@@ -32,7 +32,7 @@ import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.close
 import com.anitail.shared.generated.resources.equalizer
 import com.anitail.shared.ui.components.BasicAlertDialog
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -63,7 +63,7 @@ fun MetroEqDialog(
                         modifier = Modifier.weight(1f),
                     )
                     IconButton(onClick = onDismiss, shapes = IconButtonDefaults.shapes()) {
-                        Icon(MetrolistIcons.Default.Close, stringResource(Res.string.close))
+                        Icon(AnitailIcons.Default.Close, stringResource(Res.string.close))
                     }
                 }
                 Box(Modifier.weight(1f)) {

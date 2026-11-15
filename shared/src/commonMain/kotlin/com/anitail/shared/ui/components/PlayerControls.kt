@@ -90,8 +90,8 @@ import com.anitail.shared.settings.PlayerBackgroundStyle
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.ui.LocalIsTv
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import kotlinx.coroutines.delay
@@ -149,7 +149,7 @@ fun PlayerPrimaryControls(
     nextText: String = stringResource(Res.string.next),
     showLoadingIndicator: Boolean = true,
 ) {
-    val haptics = rememberMetrolistHaptics()
+    val haptics = rememberAnitailHaptics()
     val prevInteractionSource = remember { MutableInteractionSource() }
     val nextInteractionSource = remember { MutableInteractionSource() }
     val playPauseInteractionSource = remember { MutableInteractionSource() }
@@ -250,7 +250,7 @@ fun PlayerPrimaryControls(
                     .tvFocusHighlight(sideShape, scale = 1f)
                     .playerControlBlend(),
         ) {
-            Icon(MetrolistIcons.Rounded.SkipPrevious, previousText, modifier = Modifier.size(iconSize))
+            Icon(AnitailIcons.Rounded.SkipPrevious, previousText, modifier = Modifier.size(iconSize))
         }
 
         Spacer(Modifier.width(if (isCompact) 6.dp else 8.dp))
@@ -298,7 +298,7 @@ fun PlayerPrimaryControls(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        if (isPlaying) MetrolistIcons.Rounded.Pause else MetrolistIcons.Rounded.PlayArrow,
+                        if (isPlaying) AnitailIcons.Rounded.Pause else AnitailIcons.Rounded.PlayArrow,
                         if (showLabels) {
                             null
                         } else if (isPlaying) {
@@ -381,7 +381,7 @@ fun PlayerPrimaryControls(
                     .tvFocusHighlight(sideShape, scale = 1f)
                     .playerControlBlend(),
         ) {
-            Icon(MetrolistIcons.Rounded.SkipNext, nextText, modifier = Modifier.size(iconSize))
+            Icon(AnitailIcons.Rounded.SkipNext, nextText, modifier = Modifier.size(iconSize))
         }
     }
 }
@@ -409,7 +409,7 @@ fun PlayerLikeShareButtons(
 
     val shareInteractionSource = remember { MutableInteractionSource() }
     val likeInteractionSource = remember { MutableInteractionSource() }
-    val hapticFeedback = rememberMetrolistHaptics()
+    val hapticFeedback = rememberAnitailHaptics()
 
     val linkCopiedDesc = stringResource(Res.string.link_copied_to_clipboard)
     val shareDesc = stringResource(Res.string.share)
@@ -516,7 +516,7 @@ fun PlayerLikeShareButtons(
                                 modifier = Modifier.fillMaxSize(),
                             ) {
                                 Icon(
-                                    if (isCopied) MetrolistIcons.Default.Check else MetrolistIcons.Outlined.Share,
+                                    if (isCopied) AnitailIcons.Default.Check else AnitailIcons.Outlined.Share,
                                     contentDescription = null,
                                     modifier = Modifier.size(iconSize),
                                 )
@@ -527,7 +527,7 @@ fun PlayerLikeShareButtons(
                         DropdownMenuItem(
                             leadingIcon = {
                                 Icon(
-                                    if (isCopied) MetrolistIcons.Default.Check else MetrolistIcons.Outlined.Share,
+                                    if (isCopied) AnitailIcons.Default.Check else AnitailIcons.Outlined.Share,
                                     contentDescription = null,
                                 )
                             },
@@ -571,7 +571,7 @@ fun PlayerLikeShareButtons(
                                 ).semantics { contentDescription = likeDesc },
                     ) {
                         Icon(
-                            if (isLiked) MetrolistIcons.Default.Favorite else MetrolistIcons.Outlined.FavoriteBorder,
+                            if (isLiked) AnitailIcons.Default.Favorite else AnitailIcons.Outlined.FavoriteBorder,
                             contentDescription = null,
                             modifier = Modifier.size(iconSize),
                         )
@@ -581,7 +581,7 @@ fun PlayerLikeShareButtons(
                     DropdownMenuItem(
                         leadingIcon = {
                             Icon(
-                                if (isLiked) MetrolistIcons.Default.Favorite else MetrolistIcons.Outlined.FavoriteBorder,
+                                if (isLiked) AnitailIcons.Default.Favorite else AnitailIcons.Outlined.FavoriteBorder,
                                 contentDescription = null,
                             )
                         },
@@ -611,7 +611,7 @@ fun PlayerLikeShareButtons(
                         .navigationPopupSource(),
             ) {
                 Icon(
-                    MetrolistIcons.Default.MoreVert,
+                    AnitailIcons.Default.MoreVert,
                     contentDescription = null,
                     modifier = Modifier.size(iconSize),
                 )

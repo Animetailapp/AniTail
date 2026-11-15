@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.anitail.shared.constants.ThumbnailCornerRadius
 import com.anitail.shared.generated.resources.Res
 import com.anitail.shared.generated.resources.more_options
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.onSecondaryClick
 import com.anitail.shared.ui.theme.gridCellInset
 import com.anitail.shared.ui.theme.gridCellShape
@@ -50,7 +50,7 @@ fun LibraryItemContainer(
                 modifier = Modifier.width(60.dp).height(48.dp),
                 shapes = IconButtonDefaults.shapes(),
             ) {
-                Icon(MetrolistIcons.Default.MoreVert, contentDescription = stringResource(Res.string.more_options))
+                Icon(AnitailIcons.Default.MoreVert, contentDescription = stringResource(Res.string.more_options))
             }
         }
     }

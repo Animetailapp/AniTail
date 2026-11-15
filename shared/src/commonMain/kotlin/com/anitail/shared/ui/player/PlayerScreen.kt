@@ -220,8 +220,8 @@ import com.anitail.shared.ui.components.rememberTrackMarquee
 import com.anitail.shared.ui.components.sheetBackContent
 import com.anitail.shared.ui.components.vintageOnButtonColor
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.NavigationBackHandler
 import com.anitail.shared.ui.navigation.blockInput
 import com.anitail.shared.ui.theme.ComponentShapes
@@ -414,7 +414,7 @@ internal fun SeekFeedbackOverlay(
             Box(modifier = Modifier.size(32.dp)) {
                 if (supportsBlur) {
                     Icon(
-                        imageVector = MetrolistIcons.Outlined.FastForward,
+                        imageVector = AnitailIcons.Outlined.FastForward,
                         contentDescription = null,
                         tint = Color.Black.copy(alpha = 0.45f),
                         modifier =
@@ -429,7 +429,7 @@ internal fun SeekFeedbackOverlay(
                     )
                 }
                 Icon(
-                    imageVector = MetrolistIcons.Outlined.FastForward,
+                    imageVector = AnitailIcons.Outlined.FastForward,
                     contentDescription = null,
                     tint = Color.White,
                     modifier =
@@ -578,7 +578,7 @@ fun PlayerScreen(
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showLyricsMenu by remember { mutableStateOf(false) }
     var showLyricsOffsetEditor by rememberSaveable(currentSong?.id) { mutableStateOf(false) }
-    val hapticManager = rememberMetrolistHaptics()
+    val hapticManager = rememberAnitailHaptics()
     var seekFeedback by remember { mutableStateOf<SeekFeedback?>(null) }
     var seekFeedbackVisible by remember { mutableStateOf(false) }
     val artworkSeekStepMs = Settings.shared.seekDurationSeconds * 1000L
@@ -1446,9 +1446,9 @@ fun PlayerScreen(
                                                                             Icon(
                                                                                 imageVector =
                                                                                     if (songSelected) {
-                                                                                        MetrolistIcons.Filled.Headphones
+                                                                                        AnitailIcons.Filled.Headphones
                                                                                     } else {
-                                                                                        MetrolistIcons.Outlined.Headphones
+                                                                                        AnitailIcons.Outlined.Headphones
                                                                                     },
                                                                                 contentDescription = songText,
                                                                                 modifier = Modifier.size(20.dp),
@@ -1468,9 +1468,9 @@ fun PlayerScreen(
                                                                                 Icon(
                                                                                     imageVector =
                                                                                         if (songSelected) {
-                                                                                            MetrolistIcons.Filled.Headphones
+                                                                                            AnitailIcons.Filled.Headphones
                                                                                         } else {
-                                                                                            MetrolistIcons.Outlined.Headphones
+                                                                                            AnitailIcons.Outlined.Headphones
                                                                                         },
                                                                                     contentDescription = null,
                                                                                 )
@@ -1526,9 +1526,9 @@ fun PlayerScreen(
                                                                             Icon(
                                                                                 imageVector =
                                                                                     if (isVideoActive) {
-                                                                                        MetrolistIcons.Filled.SmartDisplay
+                                                                                        AnitailIcons.Filled.SmartDisplay
                                                                                     } else {
-                                                                                        MetrolistIcons.Outlined.SmartDisplay
+                                                                                        AnitailIcons.Outlined.SmartDisplay
                                                                                     },
                                                                                 contentDescription = videoText,
                                                                                 modifier = Modifier.size(20.dp),
@@ -1548,9 +1548,9 @@ fun PlayerScreen(
                                                                                 Icon(
                                                                                     imageVector =
                                                                                         if (isVideoActive) {
-                                                                                            MetrolistIcons.Filled.SmartDisplay
+                                                                                            AnitailIcons.Filled.SmartDisplay
                                                                                         } else {
-                                                                                            MetrolistIcons.Outlined.SmartDisplay
+                                                                                            AnitailIcons.Outlined.SmartDisplay
                                                                                         },
                                                                                     contentDescription = null,
                                                                                 )
@@ -1614,7 +1614,7 @@ fun PlayerScreen(
                                                                 .playerControlBlend(),
                                                     ) {
                                                         Icon(
-                                                            imageVector = MetrolistIcons.Outlined.KeyboardArrowDown,
+                                                            imageVector = AnitailIcons.Outlined.KeyboardArrowDown,
                                                             contentDescription = stringResource(Res.string.collapse),
                                                             modifier = Modifier.size(24.dp),
                                                         )
@@ -1654,9 +1654,9 @@ fun PlayerScreen(
                                                                 Icon(
                                                                     imageVector =
                                                                         if (castState.isConnected) {
-                                                                            MetrolistIcons.Filled.Cast
+                                                                            AnitailIcons.Filled.Cast
                                                                         } else {
-                                                                            MetrolistIcons.Outlined.Cast
+                                                                            AnitailIcons.Outlined.Cast
                                                                         },
                                                                     contentDescription = stringResource(Res.string.cast),
                                                                     modifier = Modifier.size(20.dp),

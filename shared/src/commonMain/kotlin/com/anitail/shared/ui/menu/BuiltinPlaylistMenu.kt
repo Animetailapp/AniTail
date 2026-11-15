@@ -28,7 +28,7 @@ import com.anitail.shared.model.PlaylistItem
 import com.anitail.shared.ui.components.ModalBottomSheet
 import com.anitail.shared.ui.components.localizedBuiltinPlaylist
 import com.anitail.shared.ui.components.rememberModalSheetState
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.tv.tvFocusHighlight
 import org.jetbrains.compose.resources.stringResource
@@ -61,7 +61,7 @@ fun BuiltinPlaylistMenuButton(
             onClick = { expanded = true },
             shapes = IconButtonDefaults.shapes(),
         ) {
-            Icon(MetrolistIcons.Default.MoreVert, stringResource(Res.string.more_options))
+            Icon(AnitailIcons.Default.MoreVert, stringResource(Res.string.more_options))
         }
         DropdownMenuPopup(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuGroup(shapes = MenuDefaults.groupShape(0, 1)) {

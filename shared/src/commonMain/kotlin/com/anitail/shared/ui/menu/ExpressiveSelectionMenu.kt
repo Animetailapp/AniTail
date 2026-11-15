@@ -30,8 +30,8 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.anitail.shared.ui.haptics.HapticEvent
-import com.anitail.shared.ui.haptics.rememberMetrolistHaptics
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.haptics.rememberAnitailHaptics
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.navigation.navigationPopupSource
 import com.anitail.shared.ui.tv.RequestTvFocus
 import com.anitail.shared.ui.tv.tvFocusHighlight
@@ -51,7 +51,7 @@ fun <T> BoxScope.ExpressiveSelectionMenu(
     optionSupportingText: (@Composable (T) -> String?)? = null,
     optionEnabled: (T) -> Boolean = { true },
 ) {
-    val haptic = rememberMetrolistHaptics()
+    val haptic = rememberAnitailHaptics()
     Box(
         Modifier.matchParentSize().layout { measurable, constraints ->
             val placeable = measurable.measure(Constraints())
@@ -103,7 +103,7 @@ fun <T> BoxScope.ExpressiveSelectionMenu(
                             enabled = optionEnabled(option),
                             selectedLeadingIcon = {
                                 Icon(
-                                    MetrolistIcons.Filled.Check,
+                                    AnitailIcons.Filled.Check,
                                     contentDescription = null,
                                     modifier = Modifier.size(MenuDefaults.LeadingIconSize),
                                 )

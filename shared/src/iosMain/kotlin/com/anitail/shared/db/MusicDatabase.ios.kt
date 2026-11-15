@@ -17,13 +17,13 @@ import platform.Foundation.NSUserDomainMask
 @OptIn(ExperimentalForeignApi::class)
 internal fun iosDatabaseFilePath(): String {
     val paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, true)
-    val metrolistDir = "${requireNotNull(paths.firstOrNull() as? String)}/metrolist"
+    val anitailDir = "${requireNotNull(paths.firstOrNull() as? String)}/anitail"
     val fileManager = NSFileManager.defaultManager
     check(
-        fileManager.fileExistsAtPath(metrolistDir) ||
-            fileManager.createDirectoryAtPath(metrolistDir, withIntermediateDirectories = true, attributes = null, error = null),
+        fileManager.fileExistsAtPath(anitailDir) ||
+            fileManager.createDirectoryAtPath(anitailDir, withIntermediateDirectories = true, attributes = null, error = null),
     )
-    return "$metrolistDir/metrolist.db"
+    return "$anitailDir/anitail.db"
 }
 
 @OptIn(ExperimentalForeignApi::class)

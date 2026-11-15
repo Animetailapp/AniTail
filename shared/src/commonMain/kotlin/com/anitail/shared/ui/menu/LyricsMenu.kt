@@ -60,7 +60,7 @@ import com.anitail.shared.ui.components.PlayerMenuAction
 import com.anitail.shared.ui.components.PlayerMenuPrimaryActions
 import com.anitail.shared.ui.components.PopupVisibility
 import com.anitail.shared.ui.components.lyrics.LyricsEditorScreen
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.theme.ComponentShapes
 import com.anitail.shared.ui.utils.setText
 import com.anitail.shared.ui.utils.verticalScrollWithDrag
@@ -161,7 +161,7 @@ fun LyricsMenu(
                 actions =
                     listOf(
                         PlayerMenuAction(
-                            icon = MetrolistIcons.Outlined.Edit,
+                            icon = AnitailIcons.Outlined.Edit,
                             title = stringResource(Res.string.edit),
                             onClick = {
                                 editText = TextFieldValue(LyricsUtils.lyricsForEditing(lyricsUiState.rawLyrics, lyricsUiState.lyrics))
@@ -170,7 +170,7 @@ fun LyricsMenu(
                             },
                         ),
                         PlayerMenuAction(
-                            icon = MetrolistIcons.Outlined.Cached,
+                            icon = AnitailIcons.Outlined.Cached,
                             title = stringResource(Res.string.refetch),
                             onClick = {
                                 onRefetch(queryTitle, queryArtist)
@@ -178,7 +178,7 @@ fun LyricsMenu(
                             },
                         ),
                         PlayerMenuAction(
-                            icon = MetrolistIcons.Outlined.Search,
+                            icon = AnitailIcons.Outlined.Search,
                             title = stringResource(Res.string.sources),
                             onClick = {
                                 showSearchDialog = true
@@ -195,7 +195,7 @@ fun LyricsMenu(
                                 title = { Text(stringResource(Res.string.ai_translation_for_track)) },
                                 icon = {
                                     Icon(
-                                        imageVector = MetrolistIcons.Outlined.Translate,
+                                        imageVector = AnitailIcons.Outlined.Translate,
                                         contentDescription = null,
                                     )
                                 },
@@ -224,7 +224,7 @@ fun LyricsMenu(
                                 title = { Text(stringResource(Res.string.lyrics_show_translations)) },
                                 icon = {
                                     Icon(
-                                        imageVector = MetrolistIcons.Outlined.Translate,
+                                        imageVector = AnitailIcons.Outlined.Translate,
                                         contentDescription = null,
                                     )
                                 },
@@ -245,7 +245,7 @@ fun LyricsMenu(
                             title = { Text(stringResource(Res.string.lyrics_romanize_title)) },
                             icon = {
                                 Icon(
-                                    imageVector = MetrolistIcons.Outlined.Translate,
+                                    imageVector = AnitailIcons.Outlined.Translate,
                                     contentDescription = null,
                                 )
                             },
@@ -272,7 +272,7 @@ fun LyricsMenu(
                                 },
                                 icon = {
                                     Icon(
-                                        imageVector = MetrolistIcons.Outlined.FastForward,
+                                        imageVector = AnitailIcons.Outlined.FastForward,
                                         contentDescription = null,
                                     )
                                 },
@@ -298,7 +298,7 @@ fun LyricsMenu(
                             },
                             icon = {
                                 Icon(
-                                    imageVector = MetrolistIcons.Outlined.ContentCopy,
+                                    imageVector = AnitailIcons.Outlined.ContentCopy,
                                     contentDescription = null,
                                 )
                             },

@@ -25,7 +25,7 @@ import com.anitail.shared.model.isUploadedType
 import com.anitail.shared.state.GlobalYouTubeRepository
 import com.anitail.shared.ui.components.AlertDialog
 import com.anitail.shared.ui.components.PlayerMenuAction
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -88,7 +88,7 @@ fun rememberDeleteUploadAction(
             },
         )
     }
-    return PlayerMenuAction(MetrolistIcons.Outlined.Delete, stringResource(Res.string.delete_upload)) {
+    return PlayerMenuAction(AnitailIcons.Outlined.Delete, stringResource(Res.string.delete_upload)) {
         failed = false
         confirming = true
     }

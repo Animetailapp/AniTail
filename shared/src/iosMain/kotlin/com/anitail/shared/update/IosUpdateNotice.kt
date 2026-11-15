@@ -17,7 +17,7 @@ import com.anitail.shared.generated.resources.dismiss
 import com.anitail.shared.generated.resources.updates_action
 import com.anitail.shared.generated.resources.updates_available_title
 import com.anitail.shared.settings.Settings
-import com.anitail.shared.ui.theme.MetrolistTheme
+import com.anitail.shared.ui.theme.AnitailTheme
 import com.anitail.shared.ui.theme.parseThemeSeedColor
 import com.anitail.shared.utils.openUrl
 import io.ktor.client.HttpClient
@@ -63,7 +63,7 @@ internal fun IosUpdateNotice() {
         Settings.shared.lastNotifiedUpdateVersion = available.version
         release = null
     }
-    MetrolistTheme(
+    AnitailTheme(
         seedColor = parseThemeSeedColor(Settings.shared.selectedThemeColor),
         darkTheme = Settings.shared.getCurrentThemeIsDark(),
         pureBlack = Settings.shared.isPureBlackTheme(),

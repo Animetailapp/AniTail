@@ -104,7 +104,7 @@ import com.anitail.shared.generated.resources.devmode_already_active
 import com.anitail.shared.generated.resources.devtools_enabled
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.ui.components.images.AsyncImage
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.utils.getAppArchitecture
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -199,7 +199,7 @@ fun AboutScreen(
                             modifier = Modifier.alpha(titleAlpha),
                         ) {
                             Icon(
-                                MetrolistIcons.AutoMirrored.Filled.ArrowBack,
+                                AnitailIcons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = stringResource(Res.string.back),
                             )
                         }

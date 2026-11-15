@@ -47,7 +47,7 @@ import com.anitail.shared.generated.resources.action_like
 import com.anitail.shared.generated.resources.unlike
 import com.anitail.shared.ui.components.PlayerMenuAction
 import com.anitail.shared.ui.components.images.AsyncImage
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.theme.uiEnhanced
 import org.jetbrains.compose.resources.stringResource
 
@@ -158,7 +158,7 @@ private fun QueueMenuHeader(
         onLike?.let { action ->
             IconButton(onClick = action, shapes = IconButtonDefaults.shapes()) {
                 Icon(
-                    imageVector = if (isLiked) MetrolistIcons.Filled.Favorite else MetrolistIcons.Outlined.FavoriteBorder,
+                    imageVector = if (isLiked) AnitailIcons.Filled.Favorite else AnitailIcons.Outlined.FavoriteBorder,
                     contentDescription = stringResource(if (isLiked) Res.string.unlike else Res.string.action_like),
                     tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )

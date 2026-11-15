@@ -52,7 +52,7 @@ import com.anitail.shared.generated.resources.privacy_policy
 import com.anitail.shared.generated.resources.restore_from_backup
 import com.anitail.shared.generated.resources.side_menu_welcome
 import com.anitail.shared.generated.resources.yes
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -86,9 +86,9 @@ internal fun IosOnboarding(onComplete: (sendCrashReports: Boolean, login: Boolea
                         ),
                     icon =
                         when (page) {
-                            OnboardingPage.WELCOME -> MetrolistIcons.Outlined.MusicNote
-                            OnboardingPage.CRASH_REPORTS -> MetrolistIcons.Outlined.Security
-                            else -> MetrolistIcons.Filled.Check
+                            OnboardingPage.WELCOME -> AnitailIcons.Outlined.MusicNote
+                            OnboardingPage.CRASH_REPORTS -> AnitailIcons.Outlined.Security
+                            else -> AnitailIcons.Filled.Check
                         },
                     step = pageIndex + 1,
                     stepCount = pages.size,

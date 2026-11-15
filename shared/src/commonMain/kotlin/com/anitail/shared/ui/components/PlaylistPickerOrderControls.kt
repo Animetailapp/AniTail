@@ -47,7 +47,7 @@ import com.anitail.shared.generated.resources.sort_options
 import com.anitail.shared.model.PlaylistPickerSort
 import com.anitail.shared.model.SortDirection
 import com.anitail.shared.settings.Settings
-import com.anitail.shared.ui.icons.MetrolistIcons
+import com.anitail.shared.ui.icons.AnitailIcons
 import com.anitail.shared.ui.menu.ExpressiveSelectionMenu
 import com.anitail.shared.ui.menu.trackPressPosition
 import com.anitail.shared.ui.tv.tvFocusHighlight
@@ -129,7 +129,7 @@ fun PlaylistPickerOrderControls(modifier: Modifier = Modifier) {
                             label = "Playlist picker sort direction icon rotation",
                         )
                         Icon(
-                            imageVector = MetrolistIcons.Outlined.KeyboardArrowDown,
+                            imageVector = AnitailIcons.Outlined.KeyboardArrowDown,
                             contentDescription =
                                 stringResource(
                                     if (sortDirection ==

@@ -19,12 +19,12 @@ struct AniTailApp: App {
         configureAppAudioSession()
         if UserDefaults.standard.object(forKey: "iosOnboardingComplete") == nil {
             let existingDatabase = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-                .first?.appendingPathComponent("metrolist/metrolist.db")
+                .first?.appendingPathComponent("anitail/anitail.db")
             let isUpgrade = existingDatabase.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
             UserDefaults.standard.set(isUpgrade, forKey: "iosOnboardingComplete")
         }
         if !IosCrashRecovery.shared.hasPendingReport {
-            MetrolistPlatform.shared.initialize()
+            AnitailPlatform.shared.initialize()
         }
     }
 

@@ -7,7 +7,7 @@ import com.anitail.shared.youtube.playback.PlaybackEventKind
 import com.anitail.shared.youtube.playback.PlaybackEventLevel
 import com.anitail.shared.youtube.playback.PlaybackEventLog
 
-object MetrolistInnerTubeLogger : InnerTubeLogger {
+object AnitailInnerTubeLogger : InnerTubeLogger {
     override fun log(event: InnerTubeLogEvent) {
         if (event.tag.contains("Sabr", ignoreCase = true)) {
             when (event.level) {
