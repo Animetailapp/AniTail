@@ -1,0 +1,78 @@
+name: Build iOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'master'
+    paths:
+      - 'iosApp/**'
+      - 'shared/**'
+      - 'scripts/build_ios.sh'
+      - 'scripts/ios_version.sh'
+      - '.github/workflows/build_ios.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_ios:
+    name: iOS App & Unsigned IPA
+    runs-on: blacksmith-6vcpu-macos-15
+    timeout-minutes: 45
+    env:
+      ANITAIL_IOS_ONLY: 'true'
+      GRADLE_OPTS: >-
+        -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC"
+      ORG_GRADLE_PROJECT_org.gradle.workers.max: "2"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          architecture: aarch64
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-cleanup: on-success
+
+      - name: Cache Kotlin Native
+        uses: actions/cache@v6
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties', 'shared/src/iosMain/cinterop/**') }}
+          restore-keys: |
+            konan-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Validate Compose resources and iOS build script
+        run: |
+          chmod +x gradlew scripts/build_ios.sh scripts/ios_version.sh
+          python3 scripts/check_compose_resource_escapes.py
+          bash -n scripts/build_ios.sh
+
+      - name: Compile iOS release framework
+        env:
+          CONFIGURATION: Release
+        run: ./gradlew :shared:linkReleaseFrameworkIosArm64 -PANITAIL_IOS_ONLY=true --no-configuration-cache
+
+      - name: Package unsigned IPA
+        run: ./scripts/build_ios.sh --ipa
+
+      - name: Upload iOS IPA artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: AniTail-iOS-IPA
+          path: dist/AniTail.ipa
+          if-no-files-found: error
+          retention-days: 14
+
