@@ -44,20 +44,34 @@ val desktopOnlyByTask =
     }
 val desktopOnlyByEnv =
     System.getenv("ANITAIL_DESKTOP_ONLY")?.equals("true", ignoreCase = true) == true
-val includeAndroidProject = !(desktopOnlyByTask || desktopOnlyByEnv)
+val iosOnlyByTask =
+    requestedTasks.isNotEmpty() && requestedTasks.all { task ->
+        task.contains("shared", ignoreCase = true) ||
+            task.contains("ios", ignoreCase = true) ||
+            task.contains("embedAndSignAppleFrameworkForXcode", ignoreCase = true)
+    }
+val iosOnlyByEnv =
+    System.getenv("ANITAIL_IOS_ONLY")?.equals("true", ignoreCase = true) == true ||
+        providers.gradleProperty("ANITAIL_IOS_ONLY").orNull?.equals("true", ignoreCase = true) == true
+val includeAndroidProject = !(desktopOnlyByTask || desktopOnlyByEnv || iosOnlyByTask || iosOnlyByEnv)
 
 if (includeAndroidProject) {
     include(":android")
 }
-include(":common")
-include(":desktop")
-include(":innertube")
-include(":kugou")
-include(":lrclib")
-include(":betterlyrics")
-include(":simpmusic")
-include(":shazamkit")
-include(":paxsenix")
+if (!(iosOnlyByTask || iosOnlyByEnv)) {
+    include(":common")
+    include(":desktop")
+    include(":innertube")
+    include(":kugou")
+    include(":lrclib")
+    include(":betterlyrics")
+    include(":simpmusic")
+    include(":shazamkit")
+    include(":paxsenix")
+}
+if (!(desktopOnlyByTask || desktopOnlyByEnv)) {
+    include(":shared")
+}
 
 if (includeAndroidProject) {
     project(":android").projectDir = file("app")

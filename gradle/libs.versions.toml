@@ -30,6 +30,21 @@ workRuntimeKtx = "2.12.0"
 kuromojiIpadic = "0.9.0"
 tinypinyin = "2.0.3"
 innertubex = "0.11.7"
+cmpCompose = "1.13.0-beta02"
+cmpMaterial3 = "1.13.0-beta02"
+cmpMaterial3Adaptive = "1.4.0-alpha01"
+nav3Core = "1.3.0-alpha04"
+navigationEvent = "1.2.0"
+room3 = "3.0.3"
+coil3 = "3.6.3"
+swipe = "1.3.0"
+kotlinxSerialization = "1.12.0"
+kotlinxCoroutines = "1.11.0"
+kotlinxDatetime = "0.8.0"
+koin = "4.3.0-Beta1"
+multiplatformSettings = "1.3.0"
+markdownRenderer = "0.46.0"
+sqliteBundled = "2.8.0-alpha03"
 
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.8.0" }
@@ -128,6 +143,35 @@ compose-multiplatform-media-player = { module = "network.chaintech:compose-multi
 kuromoji-ipadic = { group = "com.atilika.kuromoji", name = "kuromoji-ipadic", version.ref = "kuromojiIpadic" }
 tinypinyin = { group = "com.github.promeG", name = "tinypinyin", version.ref = "tinypinyin" }
 innertubex = { module = "com.github.MetrolistGroup.innertubex:innertubex", version.ref = "innertubex" }
+
+cmp-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "cmpCompose" }
+cmp-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "cmpCompose" }
+cmp-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "cmpCompose" }
+cmp-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "cmpCompose" }
+cmp-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "cmpCompose" }
+cmp-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "cmpMaterial3" }
+cmp-material3-adaptive = { module = "org.jetbrains.compose.material3.adaptive:adaptive", version.ref = "cmpMaterial3Adaptive" }
+cmp-material3-adaptive-navigation-suite = { module = "org.jetbrains.compose.material3:material3-adaptive-navigation-suite", version.ref = "cmpMaterial3" }
+androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "nav3Core" }
+androidx-navigationevent-compose = { module = "androidx.navigationevent:navigationevent-compose", version.ref = "navigationEvent" }
+swipe = { module = "me.saket.swipe:swipe", version.ref = "swipe" }
+room3-runtime = { module = "androidx.room3:room3-runtime", version.ref = "room3" }
+room3-compiler = { module = "androidx.room3:room3-compiler", version.ref = "room3" }
+sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqliteBundled" }
+coil3-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil3" }
+coil3-network-core = { module = "io.coil-kt.coil3:coil-network-core", version.ref = "coil3" }
+coil3-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil3" }
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
+ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
+markdown-renderer = { module = "com.mikepenz:multiplatform-markdown-renderer", version.ref = "markdownRenderer" }
+markdown-renderer-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
+markdown-renderer-coil3 = { module = "com.mikepenz:multiplatform-markdown-renderer-coil3", version.ref = "markdownRenderer" }
+multiplatform-settings = { module = "com.russhwolf:multiplatform-settings", version.ref = "multiplatformSettings" }
+multiplatform-settings-datastore = { module = "com.russhwolf:multiplatform-settings-datastore", version.ref = "multiplatformSettings" }
 
 [plugins]
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
