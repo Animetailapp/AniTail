@@ -4,22 +4,22 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - '**'
+      - "**"
     paths:
-      - 'iosApp/**'
-      - 'shared/**'
-      - 'scripts/build_ios.sh'
-      - 'scripts/ios_version.sh'
-      - '.github/workflows/build_ios.yml'
+      - "iosApp/**"
+      - "shared/**"
+      - "scripts/build_ios.sh"
+      - "scripts/ios_version.sh"
+      - ".github/workflows/build_ios.yml"
   pull_request:
     branches:
-      - '**'
+      - "**"
     paths:
-      - 'iosApp/**'
-      - 'shared/**'
-      - 'scripts/build_ios.sh'
-      - 'scripts/ios_version.sh'
-      - '.github/workflows/build_ios.yml'
+      - "iosApp/**"
+      - "shared/**"
+      - "scripts/build_ios.sh"
+      - "scripts/ios_version.sh"
+      - ".github/workflows/build_ios.yml"
 
 permissions:
   contents: read
@@ -34,10 +34,11 @@ jobs:
     runs-on: blacksmith-6vcpu-macos-15
     timeout-minutes: 45
     env:
-      ANITAIL_IOS_ONLY: 'true'
+      ANITAIL_IOS_ONLY: "true"
       GRADLE_OPTS: >-
-        -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC"
+        -Dorg.gradle.jvmargs="-XX:MaxRAMPercentage=70.0 -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC -Dkotlin.daemon.jvm.options=-XX:MaxRAMPercentage=70.0"
       ORG_GRADLE_PROJECT_org.gradle.workers.max: "2"
+      ORG_GRADLE_PROJECT_kotlin.compiler.execution.strategy: "in-process"
 
     steps:
       - name: Check out repository
@@ -46,8 +47,8 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
-          java-version: '21'
-          distribution: 'temurin'
+          java-version: "21"
+          distribution: "temurin"
           architecture: aarch64
 
       - name: Set up Gradle
@@ -72,7 +73,7 @@ jobs:
       - name: Compile iOS release framework
         env:
           CONFIGURATION: Release
-        run: ./gradlew :shared:linkReleaseFrameworkIosArm64 -PANITAIL_IOS_ONLY=true --no-configuration-cache
+        run: ./gradlew :shared:linkReleaseFrameworkIosArm64 --no-configuration-cache
 
       - name: Package unsigned IPA
         run: ./scripts/build_ios.sh --ipa
@@ -84,4 +85,3 @@ jobs:
           path: dist/AniTail.ipa
           if-no-files-found: error
           retention-days: 14
-

@@ -58,15 +58,17 @@ val includeAndroidProject = !(desktopOnlyByTask || desktopOnlyByEnv || iosOnlyBy
 if (includeAndroidProject) {
     include(":android")
 }
-include(":common")
-include(":desktop")
-include(":innertube")
-include(":kugou")
-include(":lrclib")
-include(":betterlyrics")
-include(":simpmusic")
-include(":shazamkit")
-include(":paxsenix")
+if (!(iosOnlyByTask || iosOnlyByEnv)) {
+    include(":common")
+    include(":desktop")
+    include(":innertube")
+    include(":kugou")
+    include(":lrclib")
+    include(":betterlyrics")
+    include(":simpmusic")
+    include(":shazamkit")
+    include(":paxsenix")
+}
 if (!(desktopOnlyByTask || desktopOnlyByEnv)) {
     include(":shared")
 }
