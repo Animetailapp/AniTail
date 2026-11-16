@@ -452,7 +452,7 @@ private fun ConnectedGroupToggle(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalComposeUiApi::class)
 @Composable
-private fun VolumePopupOverlay(
+internal fun VolumePopupOverlay(
     visible: Boolean,
     volume: Float,
     onVolumeChange: (Float) -> Unit,
