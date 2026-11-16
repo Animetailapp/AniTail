@@ -123,16 +123,11 @@ fun PlayerConnectedButtonGroup(
     }
 
     fun toggleMute() {
-        if (volume > 0.01f) {
-            playerState.updateVolume(0.0)
-        } else {
-            playerState.updateVolume(lastNonZeroVolume.toDouble())
-        }
+        playerState.toggleMute()
     }
 
     fun stepVolume(delta: Float) {
-        val next = (volume + delta).coerceIn(0f, 1f)
-        playerState.updateVolume(next.toDouble())
+        playerState.stepVolume(delta.toDouble())
     }
 
     var isButtonHovered by remember { mutableStateOf(false) }

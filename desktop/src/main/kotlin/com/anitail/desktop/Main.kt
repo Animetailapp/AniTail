@@ -37,13 +37,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
@@ -1560,16 +1564,30 @@ private fun FrameWindowScope.AniTailDesktopApp(
                 }
             }
 
+            val rootFocusRequester = remember { FocusRequester() }
+            LaunchedEffect(Unit) {
+                rootFocusRequester.requestFocus()
+            }
+            LaunchedEffect(showShortcutsOverlay, showFloatingSearch) {
+                if (!showShortcutsOverlay && !showFloatingSearch) {
+                    rootFocusRequester.requestFocus()
+                }
+            }
+
             @OptIn(ExperimentalComposeUiApi::class)
             InterceptPlatformTextInput(interceptor = textInputInterceptor) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .focusRequester(rootFocusRequester)
+                        .focusable()
                         .onPreviewKeyEvent { event ->
                             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                             val ctrlOrMeta = event.isCtrlPressed || event.isMetaPressed
+                            val isAlt = event.isAltPressed
                             when {
-                                ctrlOrMeta && event.key == Key.K -> {
+                                (ctrlOrMeta && event.key == Key.K) ||
+                                    (!ctrlOrMeta && !isAlt && activeTextInputs == 0 && event.key == Key.Slash) -> {
                                     showShortcutsOverlay = false
                                     showFloatingSearch = !showFloatingSearch
                                     true
@@ -1578,6 +1596,14 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                 (ctrlOrMeta && event.key == Key.Slash) || event.key == Key.F1 -> {
                                     showFloatingSearch = false
                                     showShortcutsOverlay = !showShortcutsOverlay
+                                    true
+                                }
+
+                                ctrlOrMeta && event.key == Key.Comma -> {
+                                    if (currentScreen != DesktopScreen.Settings) {
+                                        navigationHistory.add(currentScreen)
+                                        currentScreen = DesktopScreen.Settings
+                                    }
                                     true
                                 }
 
@@ -1591,8 +1617,16 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                             showShortcutsOverlay = false
                                             true
                                         }
+                                        playerState.showCastDialog -> {
+                                            playerState.showCastDialog = false
+                                            true
+                                        }
                                         showMiniPlayerAudioSettings -> {
                                             showMiniPlayerAudioSettings = false
+                                            true
+                                        }
+                                        showSongRecognitionDialog -> {
+                                            showSongRecognitionDialog = false
                                             true
                                         }
                                         !playerBottomSheetState.isCollapsed && !playerBottomSheetState.isDismissed -> {
@@ -1607,23 +1641,11 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                     !showFloatingSearch &&
                                     !showShortcutsOverlay &&
                                     !showSongRecognitionDialog &&
-                                    !showMiniPlayerAudioSettings -> {
+                                    !showMiniPlayerAudioSettings &&
+                                    !playerState.showCastDialog -> {
                                     when {
-                                        ctrlOrMeta && event.key == Key.DirectionRight -> {
-                                            if (playerState.canSkipNext) {
-                                                playerState.skipToNext()
-                                                true
-                                            } else {
-                                                false
-                                            }
-                                        }
-
-                                        ctrlOrMeta && event.key == Key.DirectionLeft -> {
-                                            playerState.skipToPrevious()
-                                            true
-                                        }
-
-                                        !ctrlOrMeta && event.key == Key.Spacebar -> {
+                                        // Play / Pause (Space)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.Spacebar -> {
                                             if (playerState.currentItem != null) {
                                                 playerState.togglePlayPause()
                                                 true
@@ -1632,7 +1654,125 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                             }
                                         }
 
-                                        !ctrlOrMeta && event.key == Key.L -> {
+                                        // Siguiente cancion (Ctrl + -> o N)
+                                        (ctrlOrMeta && event.key == Key.DirectionRight) ||
+                                            (!ctrlOrMeta && !isAlt && event.key == Key.N) -> {
+                                            if (playerState.canSkipNext) {
+                                                playerState.skipToNext()
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+
+                                        // Cancion anterior (Ctrl + <- o P)
+                                        (ctrlOrMeta && event.key == Key.DirectionLeft) ||
+                                            (!ctrlOrMeta && !isAlt && event.key == Key.P) -> {
+                                            playerState.skipToPrevious()
+                                            true
+                                        }
+
+                                        // Avanzar / Retroceder en la pista (<- o ->)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.DirectionRight -> {
+                                            if (playerState.currentItem != null) {
+                                                val target = (playerState.position + 5000L).coerceAtMost(playerState.duration)
+                                                playerState.seekTo(target)
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+
+                                        !ctrlOrMeta && !isAlt && event.key == Key.DirectionLeft -> {
+                                            if (playerState.currentItem != null) {
+                                                val target = (playerState.position - 5000L).coerceAtLeast(0L)
+                                                playerState.seekTo(target)
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+
+                                        // Saltar a porcentaje de la pista (0 - 9)
+                                        !ctrlOrMeta && !isAlt && (
+                                            event.key == Key.Zero || event.key == Key.NumPad0 ||
+                                            event.key == Key.One || event.key == Key.NumPad1 ||
+                                            event.key == Key.Two || event.key == Key.NumPad2 ||
+                                            event.key == Key.Three || event.key == Key.NumPad3 ||
+                                            event.key == Key.Four || event.key == Key.NumPad4 ||
+                                            event.key == Key.Five || event.key == Key.NumPad5 ||
+                                            event.key == Key.Six || event.key == Key.NumPad6 ||
+                                            event.key == Key.Seven || event.key == Key.NumPad7 ||
+                                            event.key == Key.Eight || event.key == Key.NumPad8 ||
+                                            event.key == Key.Nine || event.key == Key.NumPad9
+                                        ) -> {
+                                            if (playerState.currentItem != null) {
+                                                val fraction = when (event.key) {
+                                                    Key.Zero, Key.NumPad0 -> 0.0f
+                                                    Key.One, Key.NumPad1 -> 0.1f
+                                                    Key.Two, Key.NumPad2 -> 0.2f
+                                                    Key.Three, Key.NumPad3 -> 0.3f
+                                                    Key.Four, Key.NumPad4 -> 0.4f
+                                                    Key.Five, Key.NumPad5 -> 0.5f
+                                                    Key.Six, Key.NumPad6 -> 0.6f
+                                                    Key.Seven, Key.NumPad7 -> 0.7f
+                                                    Key.Eight, Key.NumPad8 -> 0.8f
+                                                    Key.Nine, Key.NumPad9 -> 0.9f
+                                                    else -> 0.0f
+                                                }
+                                                playerState.seekToProgress(fraction)
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+
+                                        // Reproduccion aleatoria (S)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.S -> {
+                                            playerState.toggleShuffle()
+                                            true
+                                        }
+
+                                        // Cambiar modo de repeticion (R)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.R -> {
+                                            playerState.toggleRepeat()
+                                            true
+                                        }
+
+                                        // Subir / Bajar volumen (Arriba o Abajo)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.DirectionUp -> {
+                                            playerState.stepVolume(0.05)
+                                            true
+                                        }
+
+                                        !ctrlOrMeta && !isAlt && event.key == Key.DirectionDown -> {
+                                            playerState.stepVolume(-0.05)
+                                            true
+                                        }
+
+                                        // Ajuste fino de volumen (+ o -)
+                                        !ctrlOrMeta && !isAlt && (
+                                            event.key == Key.Plus || event.key == Key.Equals || event.key == Key.NumPadAdd
+                                        ) -> {
+                                            playerState.stepVolume(0.02)
+                                            true
+                                        }
+
+                                        !ctrlOrMeta && !isAlt && (
+                                            event.key == Key.Minus || event.key == Key.NumPadSubtract
+                                        ) -> {
+                                            playerState.stepVolume(-0.02)
+                                            true
+                                        }
+
+                                        // Silenciar / Activar sonido (M)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.M -> {
+                                            playerState.toggleMute()
+                                            true
+                                        }
+
+                                        // Panel de letras (L)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.L -> {
                                             showLyricsSideSheet = !showLyricsSideSheet
                                             if (showLyricsSideSheet && !sideSheetPinned) {
                                                 showQueueSideSheet = false
@@ -1640,7 +1780,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                             true
                                         }
 
-                                        !ctrlOrMeta && event.key == Key.Q -> {
+                                        // Panel de cola (Q)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.Q -> {
                                             showQueueSideSheet = !showQueueSideSheet
                                             if (showQueueSideSheet && !sideSheetPinned) {
                                                 showLyricsSideSheet = false
@@ -1648,7 +1789,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                             true
                                         }
 
-                                        !ctrlOrMeta && event.key == Key.F -> {
+                                        // Reproductor en pantalla completa (F o T)
+                                        !ctrlOrMeta && !isAlt && (event.key == Key.F || event.key == Key.T) -> {
                                             if (playerState.currentItem != null) {
                                                 if (playerBottomSheetState.isExpanded) {
                                                     playerBottomSheetState.collapseSoft()

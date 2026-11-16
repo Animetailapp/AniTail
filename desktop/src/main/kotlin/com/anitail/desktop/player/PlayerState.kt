@@ -537,9 +537,27 @@ class PlayerState {
         }
     }
 
+    private var lastNonZeroVolume: Double = 1.0
+
     fun updateVolume(newVolume: Double) {
-        volume = newVolume.coerceIn(0.0, 1.0)
+        val clamped = newVolume.coerceIn(0.0, 1.0)
+        if (clamped > 0.01) {
+            lastNonZeroVolume = clamped
+        }
+        volume = clamped
         nativePlayer.setVolume(volume)
+    }
+
+    fun stepVolume(delta: Double) {
+        updateVolume(volume + delta)
+    }
+
+    fun toggleMute() {
+        if (volume > 0.01) {
+            updateVolume(0.0)
+        } else {
+            updateVolume(if (lastNonZeroVolume > 0.01) lastNonZeroVolume else 1.0)
+        }
     }
 
     fun updateTempo(newTempo: Float) {
