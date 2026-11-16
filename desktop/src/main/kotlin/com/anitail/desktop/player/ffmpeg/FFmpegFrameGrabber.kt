@@ -316,7 +316,6 @@ class FFmpegFrameGrabber : FrameGrabber {
         get_format_callback = null
         hw_device_ctx?.let {
             av_buffer_unref(it)
-            it.releaseReference()
         }
         hw_device_ctx = null
         isHardwareAccelerated = false

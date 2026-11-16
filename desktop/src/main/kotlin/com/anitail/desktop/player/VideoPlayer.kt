@@ -440,7 +440,6 @@ class VideoPlayer(
                 val useInput = grabberInput != null && (grabberInput !is LoopingVideoInput || grabberInput.prepare())
                 if (useInput) {
                     FFmpegFrameGrabber(grabberInput as InputStream).apply {
-                        options["hwaccel"] = "auto"
                         options["probesize"] = "500000"
                         options["analyzeduration"] = "500000"
                         videoOptions["threads"] = OPTIMAL_VIDEO_THREADS
@@ -465,7 +464,6 @@ class VideoPlayer(
         headers: Map<String, String>,
     ): FFmpegFrameGrabber =
         FFmpegFrameGrabber(url).apply {
-            options["hwaccel"] = "auto"
             videoOptions["threads"] = OPTIMAL_VIDEO_THREADS
             videoOptions["flags"] = "low_delay"
             imageScalingFlags = 1
