@@ -177,6 +177,7 @@ import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.rememberWindowState
 import com.sun.jna.platform.win32.User32
+import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import java.awt.Toolkit
 import java.awt.event.ComponentAdapter
@@ -1398,6 +1399,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
             }
 
             fun updateSnapModeFromBounds() {
+                if (windowState.placement == WindowPlacement.Fullscreen) return
                 if (windowState.isMinimized) return
                 val workArea = getWorkAreaForWindow(window)
                 val resolved = resolveSnapModeFromBounds(getVisualBoundsForSnap(window), workArea)
@@ -1407,33 +1409,40 @@ private fun FrameWindowScope.AniTailDesktopApp(
             }
 
             fun updateWindowShape() {
-                if (snapMode != WindowSnapMode.FLOATING || isWindowAtWorkArea(window)) {
+                val isFullScreen = windowState.placement == WindowPlacement.Fullscreen ||
+                    runCatching { GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.fullScreenWindow == window }.getOrDefault(false)
+                if (isFullScreen) return
+
+                runCatching {
+                    if (snapMode != WindowSnapMode.FLOATING || isWindowAtWorkArea(window)) {
+                        val bounds = window.bounds
+                        val width = bounds.width.coerceAtLeast(1)
+                        val height = bounds.height.coerceAtLeast(1)
+                        window.shape = Rectangle2D.Double(
+                            0.0,
+                            0.0,
+                            width.toDouble(),
+                            height.toDouble(),
+                        )
+                        return
+                    }
+                    val radiusPx = with(density) { windowCornerRadius.toPx() }
                     val bounds = window.bounds
                     val width = bounds.width.coerceAtLeast(1)
                     val height = bounds.height.coerceAtLeast(1)
-                    window.shape = Rectangle2D.Double(
+                    window.shape = RoundRectangle2D.Double(
                         0.0,
                         0.0,
                         width.toDouble(),
                         height.toDouble(),
+                        (radiusPx * 2).toDouble(),
+                        (radiusPx * 2).toDouble(),
                     )
-                    return
                 }
-                val radiusPx = with(density) { windowCornerRadius.toPx() }
-                val bounds = window.bounds
-                val width = bounds.width.coerceAtLeast(1)
-                val height = bounds.height.coerceAtLeast(1)
-                window.shape = RoundRectangle2D.Double(
-                    0.0,
-                    0.0,
-                    width.toDouble(),
-                    height.toDouble(),
-                    (radiusPx * 2).toDouble(),
-                    (radiusPx * 2).toDouble(),
-                )
             }
 
             fun updateLastFloatingBounds() {
+                if (windowState.placement == WindowPlacement.Fullscreen) return
                 if (snapMode != WindowSnapMode.FLOATING) return
                 if (isWindowAtWorkArea(window)) return
                 val bounds = window.bounds
@@ -1443,6 +1452,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
             }
 
             fun applyMaximizedBounds() {
+                if (windowState.placement == WindowPlacement.Fullscreen) return
                 if (snapMode == WindowSnapMode.FLOATING) return
                 if (windowState.isMinimized) return
                 applySnapBounds(window, getWorkAreaForWindow(window), snapMode)
@@ -1517,6 +1527,9 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
             LaunchedEffect(playerState.isFullscreenOverlay) {
                 if (playerState.isFullscreenOverlay) {
+                    runCatching {
+                        window.shape = null
+                    }
                     if (windowState.placement != WindowPlacement.Fullscreen) {
                         windowState.placement = WindowPlacement.Fullscreen
                     }
