@@ -3,6 +3,7 @@ package com.anitail.desktop.cast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +18,9 @@ import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.SocketTimeoutException
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.jmdns.JmDNS
 import javax.jmdns.ServiceEvent
 import javax.jmdns.ServiceListener
@@ -47,9 +51,10 @@ class DesktopCastManager private constructor() {
     private val _isDiscovering = MutableStateFlow(false)
     val isDiscovering: StateFlow<Boolean> = _isDiscovering.asStateFlow()
 
+    private val isDiscoveringAtomic = AtomicBoolean(false)
     private var discoveryJob: Job? = null
-    private var jmDnsInstances = mutableListOf<JmDNS>()
-    private val discoveredMap = mutableMapOf<String, CastDevice>()
+    private val jmDnsInstances = CopyOnWriteArrayList<JmDNS>()
+    private val discoveredMap = ConcurrentHashMap<String, CastDevice>()
 
     companion object {
         val instance by lazy { DesktopCastManager() }
@@ -58,7 +63,7 @@ class DesktopCastManager private constructor() {
     }
 
     fun startDiscovery() {
-        if (_isDiscovering.value) return
+        if (!isDiscoveringAtomic.compareAndSet(false, true)) return
         _isDiscovering.value = true
         discoveredMap.clear()
         _devices.value = emptyList()
@@ -70,11 +75,15 @@ class DesktopCastManager private constructor() {
     }
 
     fun stopDiscovery() {
+        if (!isDiscoveringAtomic.compareAndSet(true, false)) return
         _isDiscovering.value = false
-        discoveryJob?.cancel()
+        val job = discoveryJob
         discoveryJob = null
         scope.launch {
-            stopMdnsDiscovery()
+            withContext(NonCancellable) {
+                job?.cancel()
+                stopMdnsDiscovery()
+            }
         }
     }
 
@@ -87,17 +96,13 @@ class DesktopCastManager private constructor() {
     }
 
     private fun addOrUpdateDevice(device: CastDevice) {
-        synchronized(discoveredMap) {
-            discoveredMap[device.id] = device
-            _devices.value = discoveredMap.values.toList()
-        }
+        discoveredMap[device.id] = device
+        _devices.value = discoveredMap.values.toList()
     }
 
     private fun removeDevice(id: String) {
-        synchronized(discoveredMap) {
-            if (discoveredMap.remove(id) != null) {
-                _devices.value = discoveredMap.values.toList()
-            }
+        if (discoveredMap.remove(id) != null) {
+            _devices.value = discoveredMap.values.toList()
         }
     }
 
@@ -105,16 +110,23 @@ class DesktopCastManager private constructor() {
         try {
             val interfaces = NetworkInterface.getNetworkInterfaces()?.toList() ?: emptyList()
             for (iface in interfaces) {
-                if (!iface.isUp || iface.isLoopback || iface.isVirtual) continue
+                if (!isDiscoveringAtomic.get() || !iface.isUp || iface.isLoopback || iface.isVirtual) continue
                 val addrs = iface.inetAddresses.toList().filterIsInstance<java.net.Inet4Address>()
                 for (addr in addrs) {
+                    if (!isDiscoveringAtomic.get()) return@withContext
                     try {
                         val jmdns = JmDNS.create(addr, "AniTail-Cast")
+                        if (!isDiscoveringAtomic.get()) {
+                            runCatching { jmdns.close() }
+                            return@withContext
+                        }
                         jmDnsInstances.add(jmdns)
 
                         val listener = object : ServiceListener {
                             override fun serviceAdded(event: ServiceEvent) {
-                                jmdns.requestServiceInfo(event.type, event.name, 3000)
+                                if (isDiscoveringAtomic.get()) {
+                                    runCatching { jmdns.requestServiceInfo(event.type, event.name, 3000) }
+                                }
                             }
 
                             override fun serviceRemoved(event: ServiceEvent) {
@@ -153,12 +165,11 @@ class DesktopCastManager private constructor() {
     }
 
     private fun stopMdnsDiscovery() {
-        for (jmdns in jmDnsInstances) {
-            try {
-                jmdns.close()
-            } catch (_: Throwable) {}
-        }
+        val instances = jmDnsInstances.toList()
         jmDnsInstances.clear()
+        for (jmdns in instances) {
+            runCatching { jmdns.close() }
+        }
     }
 
     private suspend fun startDlnaSsdpDiscovery() = withContext(Dispatchers.IO) {
@@ -172,9 +183,9 @@ class DesktopCastManager private constructor() {
         """.trimIndent().replace("\n", "\r\n")
 
         val data = query.toByteArray(StandardCharsets.UTF_8)
-        val group = InetAddress.getByName(SSDP_MULTICAST)
+        val group = runCatching { InetAddress.getByName(SSDP_MULTICAST) }.getOrNull() ?: return@withContext
 
-        while (isActive && _isDiscovering.value) {
+        while (isActive && isDiscoveringAtomic.get()) {
             try {
                 DatagramSocket(null).use { socket ->
                     socket.reuseAddress = true
@@ -188,7 +199,7 @@ class DesktopCastManager private constructor() {
                     val receivePacket = DatagramPacket(buffer, buffer.size)
 
                     val start = System.currentTimeMillis()
-                    while (System.currentTimeMillis() - start < 3000L && isActive) {
+                    while (System.currentTimeMillis() - start < 3000L && isActive && isDiscoveringAtomic.get()) {
                         try {
                             socket.receive(receivePacket)
                             val text = String(receivePacket.data, 0, receivePacket.length, StandardCharsets.UTF_8)
@@ -222,4 +233,3 @@ class DesktopCastManager private constructor() {
         }
     }
 }
-
