@@ -10,6 +10,7 @@ import androidx.compose.material3.Divider
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.i18n.LocalStrings
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.storage.DarkModePreference
 import com.anitail.desktop.storage.DesktopPreferences
@@ -141,8 +142,8 @@ internal fun AppearanceSettingsScreen(
 
         SettingsDropdown(
             title = stringResource("player_background_style"),
-            subtitle = stringResource(playerBackgroundStyle.labelKey),
-            options = PlayerBackgroundStyle.entries.map { stringResource(it.labelKey) },
+            subtitle = playerBackgroundStyleLabel(playerBackgroundStyle),
+            options = PlayerBackgroundStyle.entries.map { playerBackgroundStyleLabel(it) },
             selectedIndex = PlayerBackgroundStyle.entries.indexOf(playerBackgroundStyle),
             onSelect = { index ->
                 preferences.setPlayerBackgroundStyle(PlayerBackgroundStyle.entries[index])
@@ -375,5 +376,22 @@ internal fun AppearanceSettingsScreen(
             checked = showCachedPlaylist,
             onCheckedChange = { preferences.setShowCachedPlaylist(it) },
         )
+    }
+}
+
+@Composable
+internal fun playerBackgroundStyleLabel(style: PlayerBackgroundStyle): String {
+    val resolved = stringResource(style.labelKey)
+    if (resolved != style.labelKey) return resolved
+    return when (style) {
+        PlayerBackgroundStyle.LIQUID ->
+            if (LocalStrings.current.locale.language.equals("es", ignoreCase = true)) {
+                "Líquido"
+            } else {
+                "Liquid"
+            }
+        PlayerBackgroundStyle.DEFAULT -> "Follow theme"
+        PlayerBackgroundStyle.GRADIENT -> "Gradient"
+        PlayerBackgroundStyle.BLUR -> "Blur"
     }
 }

@@ -35,6 +35,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -85,6 +88,7 @@ fun DesktopTopBar(
     showUpdateBadge: Boolean = false,
     onRefreshHome: (() -> Unit)? = null,
     onSongRecognition: (() -> Unit)? = null,
+    onShortcuts: (() -> Unit)? = null,
 ) {
     val logoBitmap = remember { loadBitmapResource("drawable/ic_anitail.png") }
     var rightSideWidthPx by remember { mutableStateOf(0) }
@@ -129,6 +133,7 @@ fun DesktopTopBar(
                 onStats = onStats,
                 onSearch = onSearch,
                 onSongRecognition = onSongRecognition,
+                onShortcuts = onShortcuts,
                 onSettings = onSettings,
                 showUpdateBadge = showUpdateBadge,
                 colors = actionColors,
@@ -252,6 +257,7 @@ private fun ActionButtons(
     onStats: () -> Unit,
     onSearch: () -> Unit,
     onSongRecognition: (() -> Unit)?,
+    onShortcuts: (() -> Unit)?,
     onSettings: () -> Unit,
     showUpdateBadge: Boolean,
     colors: IconButtonColors,
@@ -272,6 +278,11 @@ private fun ActionButtons(
                 Icon(IconAssets.equalizer(), contentDescription = "Identificar canción")
             }
         }
+        if (onShortcuts != null) {
+            IconButton(onClick = onShortcuts, colors = colors) {
+                Icon(keyboardIcon(), contentDescription = "Ctrl+/")
+            }
+        }
         IconButton(onClick = onHistory, colors = colors) {
             Icon(IconAssets.history(), contentDescription = historyLabel)
         }
@@ -288,6 +299,89 @@ private fun ActionButtons(
         }
     }
 }
+
+private fun keyboardIcon(): ImageVector =
+    ImageVector.Builder(
+        name = "KeyboardShortcuts",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f,
+    ).apply {
+        path(fill = SolidColor(Color.Black)) {
+            moveTo(20f, 5f)
+            horizontalLineTo(4f)
+            curveTo(2.9f, 5f, 2f, 5.9f, 2f, 7f)
+            verticalLineTo(17f)
+            curveTo(2f, 18.1f, 2.9f, 19f, 4f, 19f)
+            horizontalLineTo(20f)
+            curveTo(21.1f, 19f, 22f, 18.1f, 22f, 17f)
+            verticalLineTo(7f)
+            curveTo(22f, 5.9f, 21.1f, 5f, 20f, 5f)
+            close()
+            moveTo(20f, 17f)
+            horizontalLineTo(4f)
+            verticalLineTo(7f)
+            horizontalLineTo(20f)
+            verticalLineTo(17f)
+            close()
+            moveTo(11f, 8f)
+            horizontalLineTo(13f)
+            verticalLineTo(10f)
+            horizontalLineTo(11f)
+            close()
+            moveTo(11f, 11f)
+            horizontalLineTo(13f)
+            verticalLineTo(13f)
+            horizontalLineTo(11f)
+            close()
+            moveTo(8f, 8f)
+            horizontalLineTo(10f)
+            verticalLineTo(10f)
+            horizontalLineTo(8f)
+            close()
+            moveTo(8f, 11f)
+            horizontalLineTo(10f)
+            verticalLineTo(13f)
+            horizontalLineTo(8f)
+            close()
+            moveTo(5f, 11f)
+            horizontalLineTo(7f)
+            verticalLineTo(13f)
+            horizontalLineTo(5f)
+            close()
+            moveTo(5f, 8f)
+            horizontalLineTo(7f)
+            verticalLineTo(10f)
+            horizontalLineTo(5f)
+            close()
+            moveTo(8f, 14f)
+            horizontalLineTo(16f)
+            verticalLineTo(16f)
+            horizontalLineTo(8f)
+            close()
+            moveTo(14f, 11f)
+            horizontalLineTo(16f)
+            verticalLineTo(13f)
+            horizontalLineTo(14f)
+            close()
+            moveTo(14f, 8f)
+            horizontalLineTo(16f)
+            verticalLineTo(10f)
+            horizontalLineTo(14f)
+            close()
+            moveTo(17f, 11f)
+            horizontalLineTo(19f)
+            verticalLineTo(13f)
+            horizontalLineTo(17f)
+            close()
+            moveTo(17f, 8f)
+            horizontalLineTo(19f)
+            verticalLineTo(10f)
+            horizontalLineTo(17f)
+            close()
+        }
+    }.build()
 
 @Composable
 private fun WindowControls(

@@ -1797,12 +1797,14 @@ enum class NotificationButtonTypePreference {
 enum class PlayerBackgroundStyle {
     DEFAULT,
     GRADIENT,
-    BLUR;
+    BLUR,
+    LIQUID;
 
     companion object {
         fun fromString(value: String): PlayerBackgroundStyle = when (value.lowercase()) {
             "gradient" -> GRADIENT
             "blur" -> BLUR
+            "liquid" -> LIQUID
             else -> DEFAULT
         }
     }
@@ -1812,6 +1814,7 @@ enum class PlayerBackgroundStyle {
             DEFAULT -> "follow_theme"
             GRADIENT -> "gradient"
             BLUR -> "player_background_blur"
+            LIQUID -> "player_background_liquid"
         }
 }
 

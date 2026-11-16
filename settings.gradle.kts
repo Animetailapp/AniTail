@@ -5,10 +5,10 @@ pluginManagement {
         gradlePluginPortal()
         google()
         mavenCentral()
-        maven { setUrl("https://maven.pkg.jetbrains.space/public/p/compose/dev") }
+        maven { setUrl("https://packages.jetbrains.team/maven/p/cmp/dev") }
     }
     plugins {
-        id("org.jetbrains.compose") version "1.13.10-alpha01+snapshot.v-mazunin-webpack-compilation-error-gradle-plugin-tests"
+        id("org.jetbrains.compose") version "1.13.0-beta02"
         id("org.jetbrains.kotlin.plugin.compose") version "2.5.0-RC"
     }
 }
@@ -19,7 +19,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven { setUrl("https://maven.pkg.jetbrains.space/public/p/compose/dev") }
+        maven { setUrl("https://packages.jetbrains.team/maven/p/cmp/dev") }
         maven { setUrl("https://jitpack.io") }
         maven { setUrl("https://maven.aliyun.com/repository/public") }
         maven {

@@ -42,6 +42,15 @@ val javafxPlatform = when {
     else -> "linux"
 }
 
+val ffmpegVersion = "8.1.2-1.5.14"
+val osArch = System.getProperty("os.arch").lowercase()
+val isArm64 = osArch.contains("aarch64") || osArch.contains("arm64")
+val javacppPlatform = when {
+    OperatingSystem.current().isWindows -> if (isArm64) "windows-arm64" else "windows-x86_64"
+    OperatingSystem.current().isMacOsX -> if (isArm64) "macosx-arm64" else "macosx-x86_64"
+    else -> if (isArm64) "linux-arm64" else "linux-x86_64"
+}
+
 dependencies {
     implementation(project(":common"))
     implementation(project(":innertube"))
@@ -51,7 +60,7 @@ dependencies {
 
 
     implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.compose.material3:material3:1.13.10-alpha01+dev5176")
+    implementation("org.jetbrains.compose.material3:material3:1.13.0-beta02")
     implementation(libs.materialKolor) {
         exclude(group = "org.jetbrains.compose.material3")
         exclude(group = "org.jetbrains.compose.foundation")
@@ -86,8 +95,12 @@ dependencies {
     implementation("org.openjfx:javafx-swing:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-web:$javafxVersion:$javafxPlatform")
 
-    // VLC-based player
+    // VLC-based player (fallback) & Bytedeco FFmpeg native engine
     implementation(libs.vlcj)
+    implementation("org.bytedeco:ffmpeg:$ffmpegVersion")
+    if (javacppPlatform != "windows-arm64") {
+        implementation("org.bytedeco:ffmpeg:$ffmpegVersion:$javacppPlatform")
+    }
 
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")

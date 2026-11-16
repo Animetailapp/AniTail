@@ -881,11 +881,10 @@ internal fun LegacyAppearanceSettingsScreen(
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-        val backgroundStyleOptions = mutableListOf<String>()
-        for (style in PlayerBackgroundStyle.entries) {
-            backgroundStyleOptions.add(stringResource(style.labelKey))
+        val backgroundStyleOptions = PlayerBackgroundStyle.entries.map { style ->
+            playerBackgroundStyleLabel(style)
         }
-        val backgroundStyleSubtitle = stringResource(playerBackgroundStyle.labelKey)
+        val backgroundStyleSubtitle = playerBackgroundStyleLabel(playerBackgroundStyle)
         SettingsDropdown(
             title = stringResource("player_background_style"),
             subtitle = backgroundStyleSubtitle,

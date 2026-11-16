@@ -6,6 +6,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -28,6 +30,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,9 +38,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -90,16 +101,23 @@ import com.anitail.desktop.update.DesktopUpdateInstaller
 import com.anitail.desktop.update.DesktopUpdater
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.PlatformTextInputInterceptor
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.anitail.desktop.ui.AnitailTheme
 import com.anitail.desktop.ui.DefaultThemeColor
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.extractThemeColor
 import com.anitail.desktop.ui.loadBitmapResource
+import com.anitail.desktop.ui.component.AudioSettingsDialog
 import com.anitail.desktop.ui.component.BottomSheet
 import com.anitail.desktop.ui.component.DesktopTopBar
+import com.anitail.desktop.ui.component.FloatingSearchOverlay
+import com.anitail.desktop.ui.component.LyricsSideSheet
 import com.anitail.desktop.ui.component.MiniPlayer
+import com.anitail.desktop.ui.component.QueueSideSheet
+import com.anitail.desktop.ui.component.ShortcutsOverlay
 import com.anitail.desktop.ui.component.SongRecognitionDialog
 import com.anitail.desktop.ui.component.rememberBottomSheetState
 import com.anitail.desktop.ui.screen.AlbumDetailScreen
@@ -1474,8 +1492,134 @@ private fun FrameWindowScope.AniTailDesktopApp(
             }
 
             var showSongRecognitionDialog by remember { mutableStateOf(false) }
+            var showFloatingSearch by remember { mutableStateOf(false) }
+            var showShortcutsOverlay by remember { mutableStateOf(false) }
+            var showLyricsSideSheet by remember { mutableStateOf(false) }
+            var showQueueSideSheet by remember { mutableStateOf(false) }
+            var sideSheetPinned by remember { mutableStateOf(false) }
+            var showMiniPlayerAudioSettings by remember { mutableStateOf(false) }
+            var activeTextInputs by remember { mutableIntStateOf(0) }
+            @OptIn(ExperimentalComposeUiApi::class)
+            val textInputInterceptor = remember {
+                PlatformTextInputInterceptor { request, next ->
+                    activeTextInputs++
+                    try {
+                        next.startInputMethod(request)
+                    } finally {
+                        activeTextInputs = (activeTextInputs - 1).coerceAtLeast(0)
+                    }
+                }
+            }
 
-            Box(modifier = Modifier.fillMaxSize()) {
+            @OptIn(ExperimentalComposeUiApi::class)
+            InterceptPlatformTextInput(interceptor = textInputInterceptor) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .onPreviewKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            val ctrlOrMeta = event.isCtrlPressed || event.isMetaPressed
+                            when {
+                                ctrlOrMeta && event.key == Key.K -> {
+                                    showShortcutsOverlay = false
+                                    showFloatingSearch = !showFloatingSearch
+                                    true
+                                }
+
+                                (ctrlOrMeta && event.key == Key.Slash) || event.key == Key.F1 -> {
+                                    showFloatingSearch = false
+                                    showShortcutsOverlay = !showShortcutsOverlay
+                                    true
+                                }
+
+                                event.key == Key.Escape -> {
+                                    when {
+                                        showFloatingSearch -> {
+                                            showFloatingSearch = false
+                                            true
+                                        }
+                                        showShortcutsOverlay -> {
+                                            showShortcutsOverlay = false
+                                            true
+                                        }
+                                        showMiniPlayerAudioSettings -> {
+                                            showMiniPlayerAudioSettings = false
+                                            true
+                                        }
+                                        !playerBottomSheetState.isCollapsed && !playerBottomSheetState.isDismissed -> {
+                                            playerBottomSheetState.collapseSoft()
+                                            true
+                                        }
+                                        else -> false
+                                    }
+                                }
+
+                                activeTextInputs == 0 &&
+                                    !showFloatingSearch &&
+                                    !showShortcutsOverlay &&
+                                    !showSongRecognitionDialog &&
+                                    !showMiniPlayerAudioSettings -> {
+                                    when {
+                                        ctrlOrMeta && event.key == Key.DirectionRight -> {
+                                            if (playerState.canSkipNext) {
+                                                playerState.skipToNext()
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+
+                                        ctrlOrMeta && event.key == Key.DirectionLeft -> {
+                                            playerState.skipToPrevious()
+                                            true
+                                        }
+
+                                        !ctrlOrMeta && event.key == Key.Spacebar -> {
+                                            if (playerState.currentItem != null) {
+                                                playerState.togglePlayPause()
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+
+                                        !ctrlOrMeta && event.key == Key.L -> {
+                                            showLyricsSideSheet = !showLyricsSideSheet
+                                            if (showLyricsSideSheet && !sideSheetPinned) {
+                                                showQueueSideSheet = false
+                                            }
+                                            true
+                                        }
+
+                                        !ctrlOrMeta && event.key == Key.Q -> {
+                                            showQueueSideSheet = !showQueueSideSheet
+                                            if (showQueueSideSheet && !sideSheetPinned) {
+                                                showLyricsSideSheet = false
+                                            }
+                                            true
+                                        }
+
+                                        !ctrlOrMeta && event.key == Key.F -> {
+                                            if (playerState.currentItem != null) {
+                                                if (playerBottomSheetState.isExpanded) {
+                                                    playerBottomSheetState.collapseSoft()
+                                                } else {
+                                                    playerBottomSheetState.expandSoft()
+                                                }
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+
+                                        else -> false
+                                    }
+                                }
+
+                                else -> false
+                            }
+                        },
+                ) {
                 Scaffold(
                     topBar = {
                         DesktopTopBar(
@@ -1539,6 +1683,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             onWindowClose = onCloseRequest,
                             onRefreshHome = if (currentScreen == DesktopScreen.Home) refreshHome else null,
                             onSongRecognition = { showSongRecognitionDialog = true },
+                            onShortcuts = { showShortcutsOverlay = !showShortcutsOverlay },
                             showUpdateBadge = showUpdateBadge,
                         )
                     },
@@ -1549,10 +1694,15 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             .padding(padding)
                             .fillMaxSize()
                     ) {
-                        Column(
+                        Row(
                             modifier = Modifier
                                 .padding(bottom = contentBottomPadding)
-                                .fillMaxSize()
+                                .fillMaxSize(),
+                        ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
                                 .padding(16.dp),
                         ) {
                             when (currentScreen) {
@@ -2252,6 +2402,28 @@ private fun FrameWindowScope.AniTailDesktopApp(
                 }
                             }
                         }
+                        LyricsSideSheet(
+                            visible = showLyricsSideSheet &&
+                                playerState.currentItem != null &&
+                                !playerBottomSheetState.isExpanded,
+                            playerState = playerState,
+                            database = database,
+                            onClose = { showLyricsSideSheet = false },
+                            pinned = sideSheetPinned,
+                            onTogglePin = { sideSheetPinned = !sideSheetPinned },
+                            modifier = Modifier.padding(top = 12.dp, bottom = 12.dp, end = 12.dp),
+                        )
+                        QueueSideSheet(
+                            visible = showQueueSideSheet &&
+                                playerState.currentItem != null &&
+                                !playerBottomSheetState.isExpanded,
+                            playerState = playerState,
+                            onClose = { showQueueSideSheet = false },
+                            pinned = sideSheetPinned,
+                            onTogglePin = { sideSheetPinned = !sideSheetPinned },
+                            modifier = Modifier.padding(top = 12.dp, bottom = 12.dp, end = 12.dp),
+                        )
+                        }
 
                         BottomSheet(
                             state = playerBottomSheetState,
@@ -2268,6 +2440,21 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                     MiniPlayer(
                                         playerState = playerState,
                                         onOpenFullPlayer = { playerBottomSheetState.expandSoft() },
+                                        onToggleLyricsSideSheet = {
+                                            showLyricsSideSheet = !showLyricsSideSheet
+                                            if (showLyricsSideSheet && !sideSheetPinned) {
+                                                showQueueSideSheet = false
+                                            }
+                                        },
+                                        onToggleQueueSideSheet = {
+                                            showQueueSideSheet = !showQueueSideSheet
+                                            if (showQueueSideSheet && !sideSheetPinned) {
+                                                showLyricsSideSheet = false
+                                            }
+                                        },
+                                        isLyricsSideSheetOpen = showLyricsSideSheet,
+                                        isQueueSideSheetOpen = showQueueSideSheet,
+                                        onOpenAudioSettings = { showMiniPlayerAudioSettings = true },
                                     )
                                 }
                             },
@@ -2376,6 +2563,48 @@ private fun FrameWindowScope.AniTailDesktopApp(
                         }
                     }
                 )
+
+                FloatingSearchOverlay(
+                    visible = showFloatingSearch,
+                    database = database,
+                    onDismiss = { showFloatingSearch = false },
+                    onSubmitSearch = { query ->
+                        showFloatingSearch = false
+                        navigationHistory.add(currentScreen)
+                        detailNavigation = detailNavigation.copy(searchQuery = query)
+                        currentScreen = DesktopScreen.Search
+                    },
+                    onPlayItem = { item ->
+                        showFloatingSearch = false
+                        playerState.play(item)
+                        playerBottomSheetState.collapseSoft()
+                    },
+                    onOpenArtist = { id, name ->
+                        showFloatingSearch = false
+                        openArtist(id, name)
+                    },
+                    onOpenAlbum = { id, name ->
+                        showFloatingSearch = false
+                        openAlbum(id, name)
+                    },
+                    onOpenPlaylist = { id, name ->
+                        showFloatingSearch = false
+                        openPlaylist(id, name)
+                    },
+                )
+
+                ShortcutsOverlay(
+                    visible = showShortcutsOverlay,
+                    onDismiss = { showShortcutsOverlay = false },
+                )
+
+                AudioSettingsDialog(
+                    visible = showMiniPlayerAudioSettings,
+                    volume = playerState.volume,
+                    onVolumeChange = { playerState.updateVolume(it) },
+                    onDismiss = { showMiniPlayerAudioSettings = false },
+                )
+            }
             }
         }
         }
