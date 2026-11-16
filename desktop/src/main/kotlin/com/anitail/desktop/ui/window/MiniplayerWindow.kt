@@ -35,7 +35,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,11 +56,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
+import com.anitail.desktop.i18n.AndroidStringLoader
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.storage.DesktopPreferences
+import com.anitail.desktop.ui.AnitailTheme
 import com.anitail.desktop.ui.component.ExpressiveIcons
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.screen.formatTime
-import com.anitail.desktop.i18n.stringResource
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -67,6 +73,12 @@ fun MiniplayerWindow(
     onCloseRequest: () -> Unit,
     onRestoreMainWindow: () -> Unit,
 ) {
+    val preferences = remember { DesktopPreferences.getInstance() }
+    val appLanguage by preferences.appLanguage.collectAsState()
+    val strings = remember(appLanguage) { AndroidStringLoader.load(appLanguage) }
+    val darkMode by preferences.darkMode.collectAsState()
+    val pureBlackEnabled by preferences.pureBlack.collectAsState()
+
     val isFocusMode = playerState.miniplayerFocusMode
     val windowSize = if (isFocusMode) DpSize(320.dp, 320.dp) else DpSize(440.dp, 160.dp)
     val windowState = rememberWindowState(
@@ -78,38 +90,47 @@ fun MiniplayerWindow(
         windowState.size = windowSize
     }
 
-    Window(
-        onCloseRequest = onCloseRequest,
-        title = stringResource("miniplayer"),
-        resizable = false,
-        state = windowState,
-        alwaysOnTop = true,
-        undecorated = true,
-        transparent = false,
+    CompositionLocalProvider(
+        LocalStrings provides strings,
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-            tonalElevation = 6.dp,
-            shadowElevation = 12.dp,
+        Window(
+            onCloseRequest = onCloseRequest,
+            title = stringResource("miniplayer"),
+            resizable = false,
+            state = windowState,
+            alwaysOnTop = true,
+            undecorated = true,
+            transparent = false,
         ) {
-            WindowDraggableArea {
-                if (isFocusMode) {
-                    FocusModeMiniplayer(
-                        playerState = playerState,
-                        onCloseRequest = onCloseRequest,
-                        onToggleFocusMode = { playerState.miniplayerFocusMode = false },
-                        onRestoreMainWindow = onRestoreMainWindow,
-                    )
-                } else {
-                    StandardMiniplayer(
-                        playerState = playerState,
-                        onCloseRequest = onCloseRequest,
-                        onToggleFocusMode = { playerState.miniplayerFocusMode = true },
-                        onRestoreMainWindow = onRestoreMainWindow,
-                    )
+            AnitailTheme(
+                darkMode = darkMode,
+                pureBlack = pureBlackEnabled,
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                    tonalElevation = 6.dp,
+                    shadowElevation = 12.dp,
+                ) {
+                    WindowDraggableArea {
+                        if (isFocusMode) {
+                            FocusModeMiniplayer(
+                                playerState = playerState,
+                                onCloseRequest = onCloseRequest,
+                                onToggleFocusMode = { playerState.miniplayerFocusMode = false },
+                                onRestoreMainWindow = onRestoreMainWindow,
+                            )
+                        } else {
+                            StandardMiniplayer(
+                                playerState = playerState,
+                                onCloseRequest = onCloseRequest,
+                                onToggleFocusMode = { playerState.miniplayerFocusMode = true },
+                                onRestoreMainWindow = onRestoreMainWindow,
+                            )
+                        }
+                    }
                 }
             }
         }
