@@ -25,57 +25,62 @@ import kotlin.test.assertTrue
 
 class VideoDecodeReproTest {
     @Test
-    fun `repro 1440x1080 h264 yuv420p decode and Skia shader render with restart`() {
-        val tempFile = File.createTempFile("repro_1440x1080_", ".mp4")
+    fun `repro 1920x722 yuv420p decode resize and Skia shader render with restarts`() {
+        val tempFile = File.createTempFile("repro_1920x722_", ".mp4")
         tempFile.deleteOnExit()
-        createSyntheticMp4(tempFile, width = 1440, height = 1080, frameCount = 48)
+        createSyntheticMp4(tempFile, width = 1920, height = 722, frameCount = 48)
 
-        val surface = Surface.makeRasterN32Premul(640, 480)
+        val surface = Surface.makeRasterN32Premul(800, 450)
         val paint = Paint()
         val yuvBuilder = VideoShaderEffects.yuv420pEffect?.let { RuntimeShaderBuilder(it) }
 
-        val firstFrames = CountDownLatch(3)
-        val secondFrames = CountDownLatch(5)
-        var secondPhase = false
-
-        val player = VideoPlayer(
-            onFrame = { frame ->
-                frame.drawSafely {
-                    if (format == VideoPixelFormat.YUV420P && yuvBuilder != null) {
-                        planeY!!.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP, SamplingMode.LINEAR).use { ys ->
-                            planeU!!.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP, SamplingMode.LINEAR).use { us ->
-                                planeV!!.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP, SamplingMode.LINEAR).use { vs ->
-                                    yuvBuilder.child("yTex", ys)
-                                    yuvBuilder.child("uTex", us)
-                                    yuvBuilder.child("vTex", vs)
-                                    yuvBuilder.uniform("colorSpace", 0)
-                                    yuvBuilder.uniform("colorRange", 0)
-                                    yuvBuilder.makeShader().use { shader ->
-                                        paint.shader = shader
-                                        surface.canvas.drawRect(Rect.makeWH(640f, 480f), paint)
-                                        paint.shader = null
+        try {
+            repeat(8) { round ->
+                val framesLatch = CountDownLatch(6)
+                val player = VideoPlayer(
+                    onFrame = { frame ->
+                        frame.drawSafely {
+                            if (format == VideoPixelFormat.YUV420P && yuvBuilder != null) {
+                                planeY!!.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP, SamplingMode.LINEAR).use { ys ->
+                                    planeU!!.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP, SamplingMode.LINEAR).use { us ->
+                                        planeV!!.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP, SamplingMode.LINEAR).use { vs ->
+                                            yuvBuilder.child("yTex", ys)
+                                            yuvBuilder.child("uTex", us)
+                                            yuvBuilder.child("vTex", vs)
+                                            yuvBuilder.uniform("colorSpace", 0)
+                                            yuvBuilder.uniform("colorRange", 0)
+                                            yuvBuilder.makeShader().use { shader ->
+                                                paint.shader = shader
+                                                surface.canvas.drawRect(Rect.makeWH(800f, 450f), paint)
+                                                paint.shader = null
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
+                        // Simulate AnimatedVisibility shrinking left pane when opening Lyrics
+                        framesLatch.countDown()
+                        if (round % 2 == 0) {
+                            surface.canvas.clear(0)
+                        }
+                    },
+                )
+                try {
+                    player.setTargetSize(700, 264)
+                    val t0 = System.currentTimeMillis() - 300L
+                    player.start(tempFile.absolutePath, positionMs = 300L) {
+                        val elapsed = System.currentTimeMillis() - t0
+                        val w = (700 - ((elapsed / 40).toInt() * 20)).coerceIn(320, 700)
+                        player.setTargetSize(w, (w * 722 / 1920).coerceAtLeast(180))
+                        elapsed
                     }
+                    assertTrue(framesLatch.await(15, TimeUnit.SECONDS), "Timed out in round $round")
+                } finally {
+                    kotlinx.coroutines.runBlocking { player.disposeAsync().join() }
                 }
-                if (!secondPhase) firstFrames.countDown() else secondFrames.countDown()
-            },
-        )
-        try {
-            player.setTargetSize(640, 480)
-            var t0 = System.currentTimeMillis() - 500L
-            player.start(tempFile.absolutePath, positionMs = 500L) { System.currentTimeMillis() - t0 }
-            assertTrue(firstFrames.await(15, TimeUnit.SECONDS), "Timed out waiting for phase 1 frames")
-
-            // Simulate user toggling / restarting video multiple times
-            secondPhase = true
-            t0 = System.currentTimeMillis() - 800L
-            player.start(tempFile.absolutePath, positionMs = 800L) { System.currentTimeMillis() - t0 }
-            assertTrue(secondFrames.await(15, TimeUnit.SECONDS), "Timed out waiting for phase 2 frames")
+            }
         } finally {
-            kotlinx.coroutines.runBlocking { player.disposeAsync().join() }
             yuvBuilder?.close()
             paint.close()
             surface.close()

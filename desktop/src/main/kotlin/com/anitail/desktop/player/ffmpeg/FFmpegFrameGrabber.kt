@@ -308,6 +308,9 @@ class FFmpegFrameGrabber : FrameGrabber {
         custom_target_picture = null
         custom_target_ptr = null
 
+        planar_target_picture?.let { av_frame_free(it) }
+        planar_target_picture = null
+
         video_c?.let { avcodec_free_context(it) }
         video_c = null
 
@@ -332,14 +335,6 @@ class FFmpegFrameGrabber : FrameGrabber {
 
         planar_convert_ctx?.let { sws_freeContext(it) }
         planar_convert_ctx = null
-        planar_src_data?.releaseReference()
-        planar_src_data = null
-        planar_src_linesize?.releaseReference()
-        planar_src_linesize = null
-        planar_dst_data?.releaseReference()
-        planar_dst_data = null
-        planar_dst_linesize?.releaseReference()
-        planar_dst_linesize = null
 
         samples_ptr_out?.let {
             for (ptr in it) {
@@ -1184,13 +1179,10 @@ class FFmpegFrameGrabber : FrameGrabber {
     )
 
     private var planar_convert_ctx: SwsContext? = null
+    private var planar_target_picture: AVFrame? = null
     private var planar_dst_ptr_y: CustomAddressPointer? = null
     private var planar_dst_ptr_u: CustomAddressPointer? = null
     private var planar_dst_ptr_v: CustomAddressPointer? = null
-    private var planar_src_data: PointerPointer<BytePointer>? = null
-    private var planar_src_linesize: IntPointer? = null
-    private var planar_dst_data: PointerPointer<BytePointer>? = null
-    private var planar_dst_linesize: IntPointer? = null
 
     fun processPlanarImageToAddresses(
         yAddress: Long,
@@ -1255,40 +1247,29 @@ class FFmpegFrameGrabber : FrameGrabber {
                 planar_dst_ptr_u!!.setDirectAddress(uAddress, (uStride * chromaH).toLong())
                 planar_dst_ptr_v!!.setDirectAddress(vAddress, (vStride * chromaH).toLong())
 
-                if (planar_src_data == null) planar_src_data = PointerPointer<BytePointer>(4).retainReference()
-                if (planar_src_linesize == null) planar_src_linesize = IntPointer(4).retainReference()
-                if (planar_dst_data == null) planar_dst_data = PointerPointer<BytePointer>(4).retainReference()
-                if (planar_dst_linesize == null) planar_dst_linesize = IntPointer(4).retainReference()
-
-                planar_src_data!!.put(0L, srcData0)
-                planar_src_data!!.put(1L, srcData1)
-                planar_src_data!!.put(2L, srcData2)
-                planar_src_data!!.put(3L, null as BytePointer?)
-
-                planar_src_linesize!!.put(0L, srcLinesize0)
-                planar_src_linesize!!.put(1L, srcLinesize1)
-                planar_src_linesize!!.put(2L, srcLinesize2)
-                planar_src_linesize!!.put(3L, 0)
-
-                planar_dst_data!!.put(0L, planar_dst_ptr_y)
-                planar_dst_data!!.put(1L, planar_dst_ptr_u)
-                planar_dst_data!!.put(2L, planar_dst_ptr_v)
-                planar_dst_data!!.put(3L, null as BytePointer?)
-
-                planar_dst_linesize!!.put(0L, yStride)
-                planar_dst_linesize!!.put(1L, uStride)
-                planar_dst_linesize!!.put(2L, vStride)
-                planar_dst_linesize!!.put(3L, 0)
+                if (planar_target_picture == null) {
+                    planar_target_picture = av_frame_alloc()
+                }
+                val targetFrame = planar_target_picture ?: return null
+                targetFrame.format(if (srcFmt == AV_PIX_FMT_YUVJ420P) AV_PIX_FMT_YUVJ420P else AV_PIX_FMT_YUV420P)
+                targetFrame.width(destinationWidth)
+                targetFrame.height(destinationHeight)
+                targetFrame.data(0, planar_dst_ptr_y)
+                targetFrame.data(1, planar_dst_ptr_u)
+                targetFrame.data(2, planar_dst_ptr_v)
+                targetFrame.linesize(0, yStride)
+                targetFrame.linesize(1, uStride)
+                targetFrame.linesize(2, vStride)
 
                 val ret =
                     sws_scale(
                         sws,
-                        planar_src_data,
-                        planar_src_linesize,
+                        sourceFrame.data(),
+                        sourceFrame.linesize(),
                         0,
                         srcH,
-                        planar_dst_data,
-                        planar_dst_linesize,
+                        targetFrame.data(),
+                        targetFrame.linesize(),
                     )
                 if (ret <= 0) return null
             }
