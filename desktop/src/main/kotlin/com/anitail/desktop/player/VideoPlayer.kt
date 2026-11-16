@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
+import com.anitail.desktop.YouTube
 import com.anitail.desktop.player.ffmpeg.FFmpegFrameGrabber
 import com.anitail.desktop.player.ffmpeg.FFmpegLogger
 import com.anitail.desktop.player.ffmpeg.Frame
@@ -13,8 +14,10 @@ import com.anitail.desktop.player.ffmpeg.HttpRangeInputStream
 import com.anitail.desktop.player.ffmpeg.LoopingVideoInput
 import com.anitail.desktop.player.ffmpeg.PlaybackPositionInput
 import com.anitail.desktop.player.ffmpeg.SeekableMediaSource
+import com.anitail.desktop.player.ffmpeg.createDirectMediaHttpClient
 import com.anitail.desktop.player.ffmpeg.isLiveStreamUrl
 import com.anitail.desktop.player.ffmpeg.isTrustedDirectMediaEndpoint
+import com.anitail.desktop.ui.component.VideoShaderEffects
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -228,6 +231,8 @@ class VideoPlayer(
         url: String,
         headers: Map<String, String> = emptyMap(),
         positionMs: Long = 0L,
+        contentLengthBytes: Long? = null,
+        positionProvider: (() -> Long)? = null,
     ) {
         val generation: Long
         val previousStart: Job?
@@ -261,7 +266,8 @@ class VideoPlayer(
                     load(
                         url = url,
                         headers = headers,
-                        positionProvider = { currentSyncedClockMs() },
+                        contentLengthBytes = contentLengthBytes,
+                        positionProvider = positionProvider ?: { currentSyncedClockMs() },
                     )
                 if (!isActive || startGeneration != generation) {
                     if (prepared) closeAsync()
@@ -292,22 +298,11 @@ class VideoPlayer(
         isPlaying: Boolean,
     ) {
         val clamped = positionMs.coerceAtLeast(0L)
-        var shouldTriggerCatchupSeek = false
         synchronized(clockLock) {
             syncedIsPlaying = isPlaying
             syncedPositionMs = clamped
             syncedPositionAtNanos = System.nanoTime()
             pausedPositionMs = clamped
-            if (
-                isRunning &&
-                !isLiveStream &&
-                initialVideoFrameRenderedFlag &&
-                pendingSeekMs == null &&
-                abs(clamped - lastVideoPtsMs) > 4_000L &&
-                (System.nanoTime() - lastAutoSeekNanos) > TimeUnit.MILLISECONDS.toNanos(1_500L)
-            ) {
-                shouldTriggerCatchupSeek = true
-            }
             clockLock.notifyAll()
         }
         if (decodeThread?.isAlive == true) {
@@ -316,9 +311,6 @@ class VideoPlayer(
             } else if (!isPlaying && !isPaused) {
                 pause()
             }
-        }
-        if (shouldTriggerCatchupSeek) {
-            seekTo(clamped)
         }
     }
 
@@ -379,11 +371,12 @@ class VideoPlayer(
 
     private fun normalizeTimelinePts(rawPtsMs: Long): Long {
         if (looping) return loopingTimeline.normalize(rawPtsMs)
+        if (!isLiveStream) return rawPtsMs
         val audioPts = audioPtsProvider?.invoke()
         if (audioPts != null && audioPts > 0L) {
             return liveTimeline.normalizeWithAudioPts(rawPtsMs, audioPts, audioClock())
         }
-        if (isLiveStream || liveTimeline.isTracking || abs(rawPtsMs - audioClock()) > 5000L) {
+        if (liveTimeline.isTracking || abs(rawPtsMs - audioClock()) > 5000L) {
             return liveTimeline.normalize(rawPtsMs, audioClock())
         }
         return rawPtsMs
@@ -402,6 +395,7 @@ class VideoPlayer(
     internal fun load(
         url: String,
         headers: Map<String, String> = emptyMap(),
+        contentLengthBytes: Long? = null,
         positionProvider: () -> Long = { currentSyncedClockMs() },
     ): Boolean {
         if (url.startsWith("sabr-video://", ignoreCase = true)) {
@@ -412,12 +406,14 @@ class VideoPlayer(
         val grabberInput: SeekableMediaSource? =
             if (useRangeStream) {
                 val clen =
-                    Regex("[?&]clen=([0-9]+)")
-                        .find(url)
-                        ?.groupValues
-                        ?.get(1)
-                        ?.toLongOrNull()
+                    contentLengthBytes?.takeIf { it > 0L }
+                        ?: Regex("[?&]clen=([0-9]+)")
+                            .find(url)
+                            ?.groupValues
+                            ?.get(1)
+                            ?.toLongOrNull()
                 HttpRangeInputStream(
+                    httpClient = createDirectMediaHttpClient(YouTube.proxy),
                     url = url,
                     requestHeaders = headers,
                     mediaSize = clen ?: 0L,
@@ -705,7 +701,7 @@ class VideoPlayer(
                                     val framePtsMs = normalizeTimelinePts(rawPtsMs)
                                     if (!initialVideoFrameRendered) {
                                         val clock = audioClock()
-                                        if (clock > 300L && framePtsMs < (clock - 80L)) {
+                                        if (clock > 300L && framePtsMs < (clock - 80L) && (clock - framePtsMs) <= 2_500L) {
                                             continue
                                         }
                                     }
@@ -906,20 +902,23 @@ class VideoPlayer(
 
         val holder = frameHolders[nextFrameHolderIndex]
         holder.prepareForReuse()
-        holder.allocate(cachedW, cachedH)
-        if (holder.yAddr == 0L) return false
-
         val planarInfo =
-            g.processPlanarImageToAddresses(
-                yAddress = holder.yAddr,
-                yStride = holder.yStride,
-                uAddress = holder.uAddr,
-                uStride = holder.uStride,
-                vAddress = holder.vAddr,
-                vStride = holder.vStride,
-                destinationWidth = cachedW,
-                destinationHeight = cachedH,
-            )
+            if (VideoShaderEffects.isYuvShaderAvailable) {
+                holder.allocate(cachedW, cachedH)
+                if (holder.yAddr == 0L) return false
+                g.processPlanarImageToAddresses(
+                    yAddress = holder.yAddr,
+                    yStride = holder.yStride,
+                    uAddress = holder.uAddr,
+                    uStride = holder.uStride,
+                    vAddress = holder.vAddr,
+                    vStride = holder.vStride,
+                    destinationWidth = cachedW,
+                    destinationHeight = cachedH,
+                )
+            } else {
+                null
+            }
 
         val videoFrame: VideoFrame?
         if (planarInfo != null) {
@@ -1128,8 +1127,8 @@ class VideoPlayer(
         val OPTIMAL_VIDEO_THREADS = minOf(8, maxOf(4, Runtime.getRuntime().availableProcessors())).toString()
         const val DROP_THRESHOLD_MS = 200L
         const val MAX_WAIT_MS = 20_000L
-        const val INITIAL_SEEK_MIN_MS = 1_000L
-        const val INITIAL_SEEK_LEAD_MS = 200L
+        const val INITIAL_SEEK_MIN_MS = 3_500L
+        const val INITIAL_SEEK_LEAD_MS = 300L
     }
 }
 

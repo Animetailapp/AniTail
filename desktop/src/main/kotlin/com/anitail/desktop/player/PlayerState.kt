@@ -74,7 +74,9 @@ class PlayerState {
     private var positionTrackerJob: Job? = null
     private var playJob: Job? = null
     private var videoLoadJob: Job? = null
+    private var audioRestoreJob: Job? = null
     private var videoLoadGeneration = 0L
+    private var currentAudioSwitchedForVideo = false
     private var crossfadeTriggeredForCurrentTrack = false
 
     // Cola de reproducción
@@ -236,9 +238,12 @@ class PlayerState {
             reportPlaybackIfNeeded()
         }
         playJob?.cancel()
+        audioRestoreJob?.cancel()
+        audioRestoreJob = null
         videoLoadJob?.cancel()
         videoLoadJob = null
         videoLoadGeneration++
+        currentAudioSwitchedForVideo = false
         videoPlayer.stop()
         crossfadeTriggeredForCurrentTrack = false
 
@@ -434,9 +439,12 @@ class PlayerState {
         reportPlaybackIfNeeded()
         playJob?.cancel()
         playJob = null
+        audioRestoreJob?.cancel()
+        audioRestoreJob = null
         videoLoadJob?.cancel()
         videoLoadJob = null
         videoLoadGeneration++
+        currentAudioSwitchedForVideo = false
         isVideoMode = false
         crossfadeTriggeredForCurrentTrack = false
         isPlaying = false
@@ -545,12 +553,30 @@ class PlayerState {
     }
 
     fun setVideoMode(enabled: Boolean) {
+        audioRestoreJob?.cancel()
+        audioRestoreJob = null
         videoLoadJob?.cancel()
         videoLoadJob = null
         videoLoadGeneration++
         if (!enabled) {
             isVideoMode = false
             videoPlayer.stop()
+            val item = currentItem
+            val videoId = item?.let { extractVideoId(it.playbackUrl) }
+            if (currentAudioSwitchedForVideo && item != null && videoId != null) {
+                currentAudioSwitchedForVideo = false
+                val targetPosition = nativePlayer.getCurrentPosition().takeIf { it > 0L } ?: position
+                val shouldPlay = isPlaying
+                audioRestoreJob = scope.launch {
+                    isBuffering = true
+                    nativePlayer.playAtPosition(videoId, targetPosition, shouldPlay)
+                    if (isActive && currentItem?.id == item.id) {
+                        isBuffering = false
+                    }
+                }
+            } else {
+                currentAudioSwitchedForVideo = false
+            }
             return
         }
         val item = currentItem
@@ -568,14 +594,38 @@ class PlayerState {
         val generation = ++videoLoadGeneration
         videoLoadJob?.cancel()
         videoLoadJob = scope.launch {
-            val result = nativePlayer.extractVideoStream(videoId)
+            val result = nativePlayer.extractVideoStream(videoId, item.title, item.artist)
             if (!isActive || generation != videoLoadGeneration || !isVideoMode || currentItem?.id != item.id) {
                 return@launch
             }
             result.onSuccess { info ->
+                val targetPositionMs = nativePlayer.getCurrentPosition().takeIf { it > 0L } ?: position
+                val shouldPlay = isPlaying
+                if (info.targetVideoId.isNotBlank() && info.targetVideoId != videoId && !info.audioUrl.isNullOrBlank()) {
+                    val switched = nativePlayer.switchAudioStreamPreservingPosition(
+                        url = info.audioUrl,
+                        headers = info.headers,
+                        contentLengthBytes = info.audioContentLengthBytes,
+                        targetPositionMs = targetPositionMs,
+                        playWhenReady = shouldPlay,
+                    )
+                    if (!isActive || generation != videoLoadGeneration || !isVideoMode || currentItem?.id != item.id) {
+                        return@launch
+                    }
+                    if (switched) {
+                        currentAudioSwitchedForVideo = true
+                    }
+                }
+                val startPositionMs = nativePlayer.getCurrentPosition().takeIf { it > 0L } ?: targetPositionMs
                 videoPlayer.setPlaybackSpeed(tempo)
-                videoPlayer.start(info.url, info.headers, position)
-                videoPlayer.syncPosition(position, isPlaying)
+                videoPlayer.start(
+                    url = info.url,
+                    headers = info.headers,
+                    positionMs = startPositionMs,
+                    contentLengthBytes = info.contentLengthBytes,
+                    positionProvider = { nativePlayer.getCurrentPosition() },
+                )
+                videoPlayer.syncPosition(startPositionMs, isPlaying)
             }.onFailure { error ->
                 if (error is CancellationException) throw error
                 println("Anitail ERROR: Video stream extraction failed for $videoId: ${error.message}")

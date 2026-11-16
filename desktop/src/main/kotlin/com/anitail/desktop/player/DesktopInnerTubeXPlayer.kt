@@ -78,6 +78,47 @@ object DesktopInnerTubeXPlayer {
             Result.failure(error)
         }
 
+    suspend fun extractVideoStream(
+        videoId: String,
+        audioQuality: AudioQuality,
+        maxVideoHeight: Int = 1080,
+        allowBoundedRange: Boolean = true,
+    ): Result<ExtractedStream> =
+        try {
+            val hints = ContentHints(
+                wantVideo = true,
+                maxVideoHeight = maxVideoHeight,
+            ).withStreamCapabilities(
+                allowHls = false,
+                allowSabr = false,
+                allowBoundedRange = allowBoundedRange,
+            )
+            val excludedClients = failedStreamClients(videoId)
+            val resolvedQuality = audioQuality.toInnerTubeX()
+            val stream =
+                requireNotNull(
+                    resolveWithClientFallback(excludedClients) { clients, useLowQuality ->
+                        bundle().extractor.extract(
+                            videoId = videoId,
+                            hints = hints,
+                            excludedClients = clients,
+                            audioQuality = if (useLowQuality) InnerTubeXAudioQuality.LOW else resolvedQuality,
+                            clientPlaybackNonce = generateClientPlaybackNonce(),
+                        )
+                    },
+                ) { "InnerTubeX returned no playable video stream" }
+            check(!stream.videoUrl.isNullOrBlank()) { "InnerTubeX stream has no direct video URL" }
+
+            Result.success(stream)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: StreamResolveException) {
+            val cause = error.cause
+            Result.failure(if (error.reason == StreamResolveException.Reason.NETWORK && cause != null) cause else error)
+        } catch (error: Exception) {
+            Result.failure(error)
+        }
+
     fun markStreamClientFailed(
         videoId: String,
         clientName: String,

@@ -17,6 +17,8 @@ import com.anitail.desktop.player.ffmpeg.isTrustedDirectMediaEndpoint
 import com.anitail.desktop.storage.AudioQuality
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.innertube.NewPipeExtractor
+import com.anitail.innertube.YouTube as InnertubeYouTube
+import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.YouTubeClient
 import com.anitail.innertube.models.response.PlayerResponse
 import com.sun.jna.Platform
@@ -42,6 +44,8 @@ import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
 import java.io.File
 import java.net.URI
+import java.text.Normalizer
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.swing.SwingUtilities
 import kotlin.coroutines.resume
@@ -55,6 +59,10 @@ data class VideoStreamInfo(
     val width: Int? = null,
     val height: Int? = null,
     val mimeType: String? = null,
+    val contentLengthBytes: Long? = null,
+    val audioUrl: String? = null,
+    val audioContentLengthBytes: Long? = null,
+    val targetVideoId: String = "",
 )
 
 /**
@@ -77,6 +85,7 @@ class NativeAudioPlayer {
 
     private val preferences = DesktopPreferences.getInstance()
     private val playerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val musicVideoCache = ConcurrentHashMap<String, String>()
 
     private var ffmpegAvailable: Boolean = false
 
@@ -342,7 +351,27 @@ class NativeAudioPlayer {
      * Reproduce un video de YouTube por su ID.
      * Obtiene la URL de streaming de audio y la reproduce con FFmpeg (o fallback VLCJ).
      */
-    suspend fun play(videoId: String): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun play(videoId: String): Result<Unit> =
+        playInternal(videoId, initialPositionMs = 0L, startPlaying = true, allowCrossfade = true)
+
+    suspend fun playAtPosition(
+        videoId: String,
+        positionMs: Long,
+        playWhenReady: Boolean,
+    ): Result<Unit> =
+        playInternal(
+            videoId = videoId,
+            initialPositionMs = positionMs.coerceAtLeast(0L),
+            startPlaying = playWhenReady,
+            allowCrossfade = false,
+        )
+
+    private suspend fun playInternal(
+        videoId: String,
+        initialPositionMs: Long,
+        startPlaying: Boolean,
+        allowCrossfade: Boolean,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
         if (!ffmpegAvailable && !ensureVlcInitialized()) {
             return@withContext Result.failure(IllegalStateException("No hay motor de audio disponible (FFmpeg/VLC)."))
         }
@@ -368,7 +397,19 @@ class NativeAudioPlayer {
             val referer = stream.headers["Referer"]
             println("NativeAudioPlayer: Iniciando reproducción vía InnerTubeX (${stream.clientName}, itag=${stream.itag})")
 
-            if (tryStartPlayback(stream.audioUrl, stream.headers, stream.contentLengthBytes, userAgent, referer, allowProxyForVlc = false)) {
+            if (
+                tryStartPlayback(
+                    url = stream.audioUrl,
+                    headers = stream.headers,
+                    contentLengthBytes = stream.contentLengthBytes,
+                    userAgent = userAgent,
+                    referer = referer,
+                    allowProxyForVlc = false,
+                    initialPositionMs = initialPositionMs,
+                    startPlaying = startPlaying,
+                    allowCrossfade = allowCrossfade,
+                )
+            ) {
                 println("NativeAudioPlayer: ¡Reproducción InnerTubeX iniciada con éxito! (${stream.clientName})")
                 return@withContext Result.success(Unit)
             } else {
@@ -455,6 +496,9 @@ class NativeAudioPlayer {
                     userAgent = candidate.client.userAgent,
                     referer = referer,
                     allowProxyForVlc = true,
+                    initialPositionMs = initialPositionMs,
+                    startPlaying = startPlaying,
+                    allowCrossfade = allowCrossfade,
                 )
             ) {
                 println("NativeAudioPlayer: ¡Reproducción iniciada con éxito! (Cliente: ${candidate.client.clientName})")
@@ -476,6 +520,9 @@ class NativeAudioPlayer {
                         userAgent = null,
                         referer = "https://www.youtube.com/",
                         allowProxyForVlc = true,
+                        initialPositionMs = initialPositionMs,
+                        startPlaying = startPlaying,
+                        allowCrossfade = allowCrossfade,
                     )
                 ) {
                     println("NativeAudioPlayer: ¡Reproducción iniciada con éxito vía NewPipe!")
@@ -514,12 +561,78 @@ class NativeAudioPlayer {
         }
     }
 
+    suspend fun switchAudioStreamPreservingPosition(
+        url: String,
+        headers: Map<String, String>,
+        contentLengthBytes: Long?,
+        targetPositionMs: Long,
+        playWhenReady: Boolean,
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (!ffmpegAvailable && !ensureVlcInitialized()) return@withContext false
+        val userAgent = headers["User-Agent"]
+        val referer = headers["Referer"]
+        tryStartPlayback(
+            url = url,
+            headers = headers,
+            contentLengthBytes = contentLengthBytes,
+            userAgent = userAgent,
+            referer = referer,
+            allowProxyForVlc = false,
+            initialPositionMs = targetPositionMs.coerceAtLeast(0L),
+            startPlaying = playWhenReady,
+            allowCrossfade = false,
+        )
+    }
+
     /**
-     * Resuelve un stream de video MP4/WebM + cabeceras para Video Mode usando YouTube.player / NewPipeExtractor.
+     * Resuelve un stream de video MP4/WebM + cabeceras para Video Mode usando InnerTubeX,
+     * resolución de Music Video (OMV) en YouTube Music y fallback con YouTube.player / NewPipeExtractor.
      */
-    suspend fun extractVideoStream(videoId: String): Result<VideoStreamInfo> = withContext(Dispatchers.IO) {
-        val signatureTimestamp = NewPipeExtractor.getSignatureTimestamp(videoId).getOrNull()
+    suspend fun extractVideoStream(
+        videoId: String,
+        title: String? = null,
+        artist: String? = null,
+    ): Result<VideoStreamInfo> = withContext(Dispatchers.IO) {
+        val audioQuality = preferences.audioQuality.value
+        val candidateIds = listOfNotNull(
+            resolveMusicVideoId(videoId, title, artist),
+            videoId,
+        ).distinct()
+
+        var lastError: String? = null
         val isLoggedIn = YouTube.cookie != null
+
+        for (candidateId in candidateIds) {
+            val innertubexResult = DesktopInnerTubeXPlayer.extractVideoStream(
+                videoId = candidateId,
+                audioQuality = audioQuality,
+                maxVideoHeight = 1080,
+            )
+            if (innertubexResult.isSuccess) {
+                val stream = innertubexResult.getOrThrow()
+                val videoUrl = stream.videoUrl
+                if (!videoUrl.isNullOrBlank() && probeStreamAccessible(videoUrl, stream.headers)) {
+                    return@withContext Result.success(
+                        VideoStreamInfo(
+                            url = videoUrl,
+                            headers = stream.headers,
+                            width = stream.videoWidth,
+                            height = stream.videoHeight,
+                            mimeType = stream.videoMimeType,
+                            contentLengthBytes = stream.videoContentLengthBytes,
+                            audioUrl = stream.audioUrl.takeUnless { it.startsWith("sabr", ignoreCase = true) },
+                            audioContentLengthBytes = stream.contentLengthBytes,
+                            targetVideoId = candidateId,
+                        ),
+                    )
+                } else {
+                    DesktopInnerTubeXPlayer.markStreamClientFailed(candidateId, stream.clientName)
+                }
+            } else {
+                lastError = innertubexResult.exceptionOrNull()?.message
+            }
+        }
+
         val videoClients = listOf(
             YouTubeClient.ANDROID_VR_NO_AUTH,
             YouTubeClient.IOS,
@@ -530,66 +643,171 @@ class NativeAudioPlayer {
             YouTubeClient.WEB_CREATOR,
         )
 
-        var lastError: String? = null
-        for (client in videoClients) {
-            if (client.loginRequired && !isLoggedIn) continue
-            val currentTimestamp = if (client.clientName.contains("TVHTML5")) null else signatureTimestamp
-            try {
-                val response = YouTube.player(videoId, null, client, currentTimestamp).getOrNull() ?: continue
-                val status = response.playabilityStatus.status
-                val streamingData = response.streamingData ?: continue
-                if (status != "OK" && streamingData.adaptiveFormats.isEmpty() && streamingData.formats.isNullOrEmpty()) {
-                    lastError = response.playabilityStatus.reason
-                    continue
-                }
-                val videoFormats = orderVideoFormats(
-                    streamingData.adaptiveFormats + streamingData.formats.orEmpty(),
-                )
-                val referer = refererForClient(client).takeIf { it.isNotBlank() }
-                for (format in videoFormats) {
-                    val resolvedUrl = StreamUrlResolution.resolveStreamUrl(
-                        NewPipeStreamUrlResolver,
-                        format,
-                        videoId,
-                        client,
-                    ).getOrNull() ?: continue
-                    val headers = buildStreamHeaders(resolvedUrl, client.userAgent, referer)
-                    if (probeStreamAccessible(resolvedUrl, headers)) {
-                        return@withContext Result.success(
-                            VideoStreamInfo(
-                                url = resolvedUrl,
-                                headers = headers,
-                                width = format.width,
-                                height = format.height,
-                                mimeType = format.mimeType,
-                            ),
-                        )
+        for (candidateId in candidateIds) {
+            val signatureTimestamp = NewPipeExtractor.getSignatureTimestamp(candidateId).getOrNull()
+            for (client in videoClients) {
+                if (client.loginRequired && !isLoggedIn) continue
+                val currentTimestamp = if (client.clientName.contains("TVHTML5")) null else signatureTimestamp
+                try {
+                    val response = YouTube.player(candidateId, null, client, currentTimestamp).getOrNull() ?: continue
+                    val status = response.playabilityStatus.status
+                    val streamingData = response.streamingData ?: continue
+                    if (status != "OK" && streamingData.adaptiveFormats.isEmpty() && streamingData.formats.isNullOrEmpty()) {
+                        lastError = response.playabilityStatus.reason
+                        continue
                     }
+                    val allFormats = streamingData.adaptiveFormats + streamingData.formats.orEmpty()
+                    val videoFormats = orderVideoFormats(allFormats)
+                    val bestAudioFormat = orderFormatsByQuality(allFormats.filter { it.isAudio }, audioQuality).firstOrNull()
+                    val referer = refererForClient(client).takeIf { it.isNotBlank() }
+                    val resolvedAudioUrl = bestAudioFormat?.let { fmt ->
+                        StreamUrlResolution.resolveStreamUrl(NewPipeStreamUrlResolver, fmt, candidateId, client).getOrNull()
+                    }
+                    for (format in videoFormats) {
+                        val resolvedUrl = StreamUrlResolution.resolveStreamUrl(
+                            NewPipeStreamUrlResolver,
+                            format,
+                            candidateId,
+                            client,
+                        ).getOrNull() ?: continue
+                        val headers = buildStreamHeaders(resolvedUrl, client.userAgent, referer)
+                        if (probeStreamAccessible(resolvedUrl, headers)) {
+                            return@withContext Result.success(
+                                VideoStreamInfo(
+                                    url = resolvedUrl,
+                                    headers = headers,
+                                    width = format.width,
+                                    height = format.height,
+                                    mimeType = format.mimeType,
+                                    contentLengthBytes = format.contentLength,
+                                    audioUrl = resolvedAudioUrl,
+                                    audioContentLengthBytes = bestAudioFormat?.contentLength,
+                                    targetVideoId = candidateId,
+                                ),
+                            )
+                        }
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    lastError = e.message
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                lastError = e.message
             }
-        }
 
-        val newPipeStreams = runCatching { NewPipeExtractor.newPipePlayer(videoId) }.getOrDefault(emptyList())
-        val preferredVideoItags = listOf(137, 299, 248, 303, 136, 298, 22, 247, 302, 135, 244, 134, 18, 243)
-        for (itag in preferredVideoItags) {
-            val streamUrl = newPipeStreams.firstOrNull { it.first == itag }?.second ?: continue
-            val headers = buildStreamHeaders(streamUrl, YouTubeClient.USER_AGENT_WEB, "https://www.youtube.com/")
-            if (probeStreamAccessible(streamUrl, headers)) {
-                return@withContext Result.success(
-                    VideoStreamInfo(
-                        url = streamUrl,
-                        headers = headers,
-                        height = heightForItag(itag),
-                    ),
-                )
+            val newPipeStreams = runCatching { NewPipeExtractor.newPipePlayer(candidateId) }.getOrDefault(emptyList())
+            val preferredVideoItags = listOf(137, 299, 248, 303, 136, 298, 22, 247, 302, 135, 244, 134, 18, 243)
+            for (itag in preferredVideoItags) {
+                val streamUrl = newPipeStreams.firstOrNull { it.first == itag }?.second ?: continue
+                val headers = buildStreamHeaders(streamUrl, YouTubeClient.USER_AGENT_WEB, "https://www.youtube.com/")
+                if (probeStreamAccessible(streamUrl, headers)) {
+                    return@withContext Result.success(
+                        VideoStreamInfo(
+                            url = streamUrl,
+                            headers = headers,
+                            height = heightForItag(itag),
+                            targetVideoId = candidateId,
+                        ),
+                    )
+                }
             }
         }
 
         Result.failure(IllegalStateException(lastError ?: "No se encontró stream de video reproducible para $videoId"))
+    }
+
+    private suspend fun resolveMusicVideoId(
+        videoId: String,
+        title: String?,
+        artist: String?,
+    ): String? {
+        musicVideoCache[videoId]?.let { return it }
+        val cleanTitle = title?.trim().orEmpty()
+        if (cleanTitle.isBlank()) return null
+        val cleanArtist = artist?.trim().orEmpty()
+
+        val queries = listOfNotNull(
+            listOf(cleanTitle, cleanArtist, "official video").filter { it.isNotBlank() }.joinToString(" "),
+            listOf(cleanTitle, cleanArtist).filter { it.isNotBlank() }.joinToString(" ").takeIf { cleanArtist.isNotBlank() },
+        ).distinct()
+
+        for (query in queries) {
+            val page = try {
+                YouTube.search(query, InnertubeYouTube.SearchFilter.FILTER_VIDEO).getOrNull()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                null
+            } ?: continue
+
+            val items = page.items.filterIsInstance<SongItem>()
+            if (items.any { it.id == videoId }) {
+                musicVideoCache[videoId] = videoId
+                return videoId
+            }
+
+            val best = selectBestMusicVideoCandidate(cleanTitle, cleanArtist, items)
+            if (best != null) {
+                musicVideoCache[videoId] = best.id
+                return best.id
+            }
+        }
+        return null
+    }
+
+    private fun selectBestMusicVideoCandidate(
+        trackTitle: String,
+        trackArtist: String,
+        candidates: List<SongItem>,
+    ): SongItem? {
+        val normTrackTitle = normalizeMatchText(trackTitle)
+        if (normTrackTitle.isBlank()) return null
+        val normArtists = trackArtist.split(',', '&', '•')
+            .map { normalizeMatchText(it) }
+            .filter { it.length >= 2 }
+
+        return candidates
+            .mapNotNull { candidate ->
+                val normCandTitle = normalizeMatchText(candidate.title)
+                if (normCandTitle.isBlank()) return@mapNotNull null
+
+                val hasDisqualifiedVariant = MUSIC_VIDEO_VARIANT_DISQUALIFIERS.any { regex ->
+                    regex.containsMatchIn(candidate.title) && !regex.containsMatchIn(trackTitle)
+                }
+                if (hasDisqualifiedVariant) return@mapNotNull null
+
+                val titleScore = when {
+                    normCandTitle == normTrackTitle -> 5
+                    normCandTitle.contains(normTrackTitle) -> 3
+                    normTrackTitle.length >= 4 && normCandTitle.length >= 4 && normTrackTitle.contains(normCandTitle) -> 2
+                    else -> return@mapNotNull null
+                }
+
+                val candArtistText = candidate.artists.joinToString(" ") { normalizeMatchText(it.name) }
+                val artistMatches = normArtists.isEmpty() || normArtists.any { a ->
+                    candArtistText.contains(a) || (a.length >= 3 && normCandTitle.contains(a))
+                }
+                if (!artistMatches) return@mapNotNull null
+
+                var score = titleScore
+                if (normArtists.isNotEmpty()) score += 3
+                if (candidate.isVideoSong) score += 4
+                if (candidate.musicVideoType?.contains("OMV", ignoreCase = true) == true) score += 3
+                if (OFFICIAL_VIDEO_HINT_REGEX.containsMatchIn(candidate.title)) score += 2
+                if (score > 0) candidate to score else null
+            }
+            .maxByOrNull { it.second }
+            ?.first
+    }
+
+    private fun normalizeMatchText(raw: String): String {
+        val withoutBrackets = raw.replace(BRACKETED_TITLE_DECORATOR_REGEX, " ")
+        val decomposed = Normalizer.normalize(withoutBrackets, Normalizer.Form.NFD)
+        return decomposed
+            .replace(DIACRITIC_REGEX, "")
+            .lowercase()
+            .replace(NON_ALNUM_REGEX, " ")
+            .trim()
+            .replace(WHITESPACE_REGEX, " ")
     }
 
     private fun orderVideoFormats(
@@ -658,10 +876,20 @@ class NativeAudioPlayer {
         userAgent: String?,
         referer: String?,
         allowProxyForVlc: Boolean,
+        initialPositionMs: Long = 0L,
+        startPlaying: Boolean = true,
+        allowCrossfade: Boolean = true,
     ): Boolean {
         var httpFailureStatus: Int? = null
         if (ffmpegAvailable) {
-            val (ffmpegOk, statusCode) = prepareAndPlayFfmpeg(url, headers, contentLengthBytes)
+            val (ffmpegOk, statusCode) = prepareAndPlayFfmpeg(
+                url = url,
+                headers = headers,
+                contentLengthBytes = contentLengthBytes,
+                initialPositionMs = initialPositionMs,
+                startPlaying = startPlaying,
+                allowCrossfade = allowCrossfade,
+            )
             if (ffmpegOk) return true
             httpFailureStatus = statusCode
         }
@@ -669,15 +897,22 @@ class NativeAudioPlayer {
         // Si falló con 401/403/404/410 desde el servidor origen sin proxy, solo probar VLC si hubo proxy o no fue 4xx fatal
         val canTryVlc = (httpFailureStatus == null || httpFailureStatus !in setOf(401, 403, 404, 410) || allowProxyForVlc)
         if (canTryVlc && ensureVlcInitialized()) {
-            if (allowProxyForVlc) {
-                val proxyUrl = PlaybackProxy.createProxyUrl(url, userAgent, referer?.takeIf { it.isNotBlank() })
-                if (prepareVlcPlayer(proxyUrl, userAgent, referer)) {
-                    activeEngine = Engine.VLC
-                    return true
-                }
-            }
-            if (prepareVlcPlayer(url, userAgent, referer)) {
+            val vlcStarted = (
+                allowProxyForVlc &&
+                    prepareVlcPlayer(
+                        PlaybackProxy.createProxyUrl(url, userAgent, referer?.takeIf { it.isNotBlank() }),
+                        userAgent,
+                        referer,
+                    )
+                ) || prepareVlcPlayer(url, userAgent, referer)
+            if (vlcStarted) {
                 activeEngine = Engine.VLC
+                if (initialPositionMs > 0L) {
+                    seekTo(initialPositionMs)
+                }
+                if (!startPlaying) {
+                    pause()
+                }
                 return true
             }
         }
@@ -688,13 +923,16 @@ class NativeAudioPlayer {
         url: String,
         headers: Map<String, String>,
         contentLengthBytes: Long?,
+        initialPositionMs: Long = 0L,
+        startPlaying: Boolean = true,
+        allowCrossfade: Boolean = true,
     ): Pair<Boolean, Int?> {
         cancelFadeJobs()
 
         val previousPlayer = activeFfmpegPlayer
         val wasPlayingPrevious = previousPlayer?.isPlaying() == true
-        val fadeDurationMs = (crossfadeDurationSec * 1000L).coerceAtLeast(0L)
-        val shouldCrossfade = fadeDurationMs > 0L && wasPlayingPrevious
+        val fadeDurationMs = if (allowCrossfade) (crossfadeDurationSec * 1000L).coerceAtLeast(0L) else 0L
+        val shouldCrossfade = allowCrossfade && fadeDurationMs > 0L && wasPlayingPrevious
 
         // Detach current active player before closing/fading so stale callbacks never overwrite new state
         activeFfmpegPlayer = null
@@ -792,6 +1030,14 @@ class NativeAudioPlayer {
                 return false to failureStatus
             }
 
+            if (initialPositionMs > 0L) {
+                player.seekToAwait(initialPositionMs, 5_000L)
+                if (player.hasFailed) {
+                    val failureStatus = (player.prepareFailure as? HttpMediaStatusException)?.playbackHttpStatusCode
+                    return false to failureStatus
+                }
+            }
+
             player.prebuffer()
             if (player.hasFailed) {
                 val failureStatus = (player.prepareFailure as? HttpMediaStatusException)?.playbackHttpStatusCode
@@ -825,7 +1071,11 @@ class NativeAudioPlayer {
         activeFfmpegPlayer = newPlayer
         activeEngine = Engine.FFMPEG
 
-        newPlayer.play()
+        if (startPlaying) {
+            newPlayer.play()
+        } else {
+            newPlayer.pause()
+        }
         if (newPlayer.hasFailed) {
             val status = (newPlayer.prepareFailure as? HttpMediaStatusException)?.playbackHttpStatusCode
             activeFfmpegPlayer = null
@@ -836,7 +1086,7 @@ class NativeAudioPlayer {
         }
         committed.set(true)
 
-        if (fadeDurationMs > 0L) {
+        if (startPlaying && fadeDurationMs > 0L) {
             val targetFadeInMs = if (shouldCrossfade) minOf(fadeDurationMs, 3500L) else minOf(fadeDurationMs, 1500L)
             startFadeIn(newPlayer, targetFadeInMs)
         } else {
@@ -845,8 +1095,11 @@ class NativeAudioPlayer {
         }
 
         notifyBuffering(false)
-        notifyStatus(PlaybackStatus.PLAYING)
-        notifyTime(0L, newPlayer.getDuration())
+        notifyStatus(if (startPlaying) PlaybackStatus.PLAYING else PlaybackStatus.PAUSED)
+        notifyTime(
+            newPlayer.getCurrentPosition().takeIf { it > 0L } ?: initialPositionMs.coerceAtLeast(0L),
+            newPlayer.getDuration(),
+        )
         return true to null
     }
 
@@ -1225,5 +1478,34 @@ class NativeAudioPlayer {
         STOPPED,
         ENDED,
         ERROR,
+    }
+
+    private companion object {
+        val MUSIC_VIDEO_VARIANT_DISQUALIFIERS = listOf(
+            Regex("\\bkaraoke\\b", RegexOption.IGNORE_CASE),
+            Regex("\\binstrumental\\b", RegexOption.IGNORE_CASE),
+            Regex("\\blyrics?\\b", RegexOption.IGNORE_CASE),
+            Regex("\\bletra\\b", RegexOption.IGNORE_CASE),
+            Regex("\\bcover\\b", RegexOption.IGNORE_CASE),
+            Regex("\\bslowed\\b", RegexOption.IGNORE_CASE),
+            Regex("\\breverb\\b", RegexOption.IGNORE_CASE),
+            Regex("\\bsped\\s*up\\b", RegexOption.IGNORE_CASE),
+            Regex("\\bnightcore\\b", RegexOption.IGNORE_CASE),
+            Regex("\\b8d\\b", RegexOption.IGNORE_CASE),
+            Regex("\\bremix\\b", RegexOption.IGNORE_CASE),
+            Regex("\\ben\\s+vivo\\b", RegexOption.IGNORE_CASE),
+            Regex("\\blive\\b", RegexOption.IGNORE_CASE),
+            Regex("\\bac[uú]stic[oa]?\\b", RegexOption.IGNORE_CASE),
+            Regex("\\breacti[oó]n\\b", RegexOption.IGNORE_CASE),
+            Regex("\\btutorial\\b", RegexOption.IGNORE_CASE),
+        )
+        val OFFICIAL_VIDEO_HINT_REGEX = Regex(
+            "(official\\s*(music\\s*)?video|video\\s*oficial|\\bm/?v\\b)",
+            RegexOption.IGNORE_CASE,
+        )
+        val BRACKETED_TITLE_DECORATOR_REGEX = Regex("""\s*[\(\[][^)\]]*[\)\]]""")
+        val DIACRITIC_REGEX = Regex("\\p{InCombiningDiacriticalMarks}+")
+        val NON_ALNUM_REGEX = Regex("[^\\p{L}\\p{N}]+")
+        val WHITESPACE_REGEX = Regex("\\s+")
     }
 }

@@ -120,12 +120,13 @@ class FFmpegFrameGrabber : FrameGrabber {
                     return try {
                         val is_ = inputStreams[opaque?.address()] ?: return -1
                         if (is_ is SeekableMediaInput) {
-                            if (whence == AVSEEK_SIZE) return is_.mediaSize ?: -1L
+                            val knownSize = is_.mediaSize?.takeIf { it > 0L }
+                            if (whence == AVSEEK_SIZE) return knownSize ?: -1L
                             val targetPosition =
                                 when (whence) {
                                     0 -> offset
                                     1 -> is_.mediaPosition + offset
-                                    2 -> (is_.mediaSize ?: return -1L) + offset
+                                    2 -> (knownSize ?: return -1L) + offset
                                     else -> return -1L
                                 }
                             return is_.seekToMediaPosition(targetPosition)

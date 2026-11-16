@@ -10,6 +10,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +36,7 @@ fun RemoteImage(
     shape: Shape = RoundedCornerShape(0.dp),
     contentScale: ContentScale = ContentScale.Crop,
     fallbackUrls: List<String> = emptyList(),
+    onImageLoaded: ((width: Int, height: Int) -> Unit)? = null,
 ) {
     val candidates = remember(url, fallbackUrls) {
         buildList {
@@ -49,6 +51,12 @@ fun RemoteImage(
 
     val cached = remember(activeUrl) { ImageCache.get(activeUrl) }
     var image by remember(activeUrl) { mutableStateOf<ImageBitmap?>(cached) }
+    val currentOnImageLoaded by rememberUpdatedState(onImageLoaded)
+
+    LaunchedEffect(image) {
+        val loaded = image ?: return@LaunchedEffect
+        currentOnImageLoaded?.invoke(loaded.width, loaded.height)
+    }
 
     LaunchedEffect(activeUrl, candidateIndex, candidates) {
         if (image != null || activeUrl.isNullOrBlank()) return@LaunchedEffect

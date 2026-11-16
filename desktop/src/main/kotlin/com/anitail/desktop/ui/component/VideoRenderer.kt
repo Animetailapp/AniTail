@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.player.VideoColorRange
@@ -29,7 +31,6 @@ import com.anitail.desktop.player.VideoFrame
 import com.anitail.desktop.player.VideoPixelFormat
 import com.anitail.desktop.player.VideoPlayer
 import org.jetbrains.skia.Bitmap
-import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.FilterTileMode
 import org.jetbrains.skia.Image
 import org.jetbrains.skia.Paint
@@ -38,6 +39,7 @@ import org.jetbrains.skia.RuntimeEffect
 import org.jetbrains.skia.RuntimeShaderBuilder
 import org.jetbrains.skia.SamplingMode
 import org.jetbrains.skia.Shader
+import kotlin.math.roundToInt
 
 private const val YUV420P_SKSL = """
 uniform shader yTex;
@@ -45,49 +47,37 @@ uniform shader uTex;
 uniform shader vTex;
 uniform int colorSpace;
 uniform int colorRange;
-uniform float alphaOnly;
 
-float samplePlane(shader s, float2 coord) {
-    half4 c = s.eval(coord);
-    return alphaOnly > 0.5 ? float(c.a) : float(c.r);
-}
+half4 main(vec2 coord) {
+    float y = max(yTex.eval(coord).r, yTex.eval(coord).a);
+    float u = max(uTex.eval(coord * 0.5).r, uTex.eval(coord * 0.5).a);
+    float v = max(vTex.eval(coord * 0.5).r, vTex.eval(coord * 0.5).a);
 
-half4 main(float2 fragCoord) {
-    float yRaw = samplePlane(yTex, fragCoord);
-    float2 chromaCoord = fragCoord * 0.5;
-    float uRaw = samplePlane(uTex, chromaCoord);
-    float vRaw = samplePlane(vTex, chromaCoord);
-
-    float y;
-    float u;
-    float v;
-    if (colorRange == 1) {
-        y = yRaw;
-        u = uRaw - (128.0 / 255.0);
-        v = vRaw - (128.0 / 255.0);
+    if (colorRange == 0) {
+        y = (y - 0.062745098) * 1.164383562;
+        u = (u - 0.501960784) * 1.138392857;
+        v = (v - 0.501960784) * 1.138392857;
     } else {
-        y = (yRaw - (16.0 / 255.0)) * (255.0 / 219.0);
-        u = (uRaw - (128.0 / 255.0)) * (255.0 / 224.0);
-        v = (vRaw - (128.0 / 255.0)) * (255.0 / 224.0);
+        u = u - 0.5;
+        v = v - 0.5;
     }
 
-    float r;
-    float g;
-    float b;
+    vec3 rgb;
     if (colorSpace == 1) {
-        r = y + 1.402 * v;
-        g = y - 0.344136 * u - 0.714136 * v;
-        b = y + 1.772 * u;
+        rgb.r = y + 1.402 * v;
+        rgb.g = y - 0.344136 * u - 0.714136 * v;
+        rgb.b = y + 1.772 * u;
     } else if (colorSpace == 2) {
-        r = y + 1.4746 * v;
-        g = y - 0.164553 * u - 0.571353 * v;
-        b = y + 1.8814 * u;
+        rgb.r = y + 1.4746 * v;
+        rgb.g = y - 0.164553 * u - 0.571353 * v;
+        rgb.b = y + 1.8814 * u;
     } else {
-        r = y + 1.5748 * v;
-        g = y - 0.187324 * u - 0.468124 * v;
-        b = y + 1.8556 * u;
+        rgb.r = y + 1.5748 * v;
+        rgb.g = y - 0.187324 * u - 0.468124 * v;
+        rgb.b = y + 1.8556 * u;
     }
-    return half4(clamp(r, 0.0, 1.0), clamp(g, 0.0, 1.0), clamp(b, 0.0, 1.0), 1.0);
+
+    return half4(clamp(rgb, 0.0, 1.0), 1.0);
 }
 """
 
@@ -96,56 +86,56 @@ uniform shader yTex;
 uniform shader uvTex;
 uniform int colorSpace;
 uniform int colorRange;
-uniform float alphaOnly;
 
-half4 main(float2 fragCoord) {
-    half4 ySample = yTex.eval(fragCoord);
-    float yRaw = alphaOnly > 0.5 ? float(ySample.a) : float(ySample.r);
-    half4 uvSample = uvTex.eval(fragCoord * 0.5);
-    float uRaw = float(uvSample.r);
-    float vRaw = float(uvSample.g);
+half4 main(vec2 coord) {
+    float y = max(yTex.eval(coord).r, yTex.eval(coord).a);
+    vec2 uv = uvTex.eval(coord * 0.5).rg;
+    float u = uv.r;
+    float v = uv.g;
 
-    float y;
-    float u;
-    float v;
-    if (colorRange == 1) {
-        y = yRaw;
-        u = uRaw - (128.0 / 255.0);
-        v = vRaw - (128.0 / 255.0);
+    if (colorRange == 0) {
+        y = (y - 0.062745098) * 1.164383562;
+        u = (u - 0.501960784) * 1.138392857;
+        v = (v - 0.501960784) * 1.138392857;
     } else {
-        y = (yRaw - (16.0 / 255.0)) * (255.0 / 219.0);
-        u = (uRaw - (128.0 / 255.0)) * (255.0 / 224.0);
-        v = (vRaw - (128.0 / 255.0)) * (255.0 / 224.0);
+        u = u - 0.5;
+        v = v - 0.5;
     }
 
-    float r;
-    float g;
-    float b;
+    vec3 rgb;
     if (colorSpace == 1) {
-        r = y + 1.402 * v;
-        g = y - 0.344136 * u - 0.714136 * v;
-        b = y + 1.772 * u;
+        rgb.r = y + 1.402 * v;
+        rgb.g = y - 0.344136 * u - 0.714136 * v;
+        rgb.b = y + 1.772 * u;
     } else if (colorSpace == 2) {
-        r = y + 1.4746 * v;
-        g = y - 0.164553 * u - 0.571353 * v;
-        b = y + 1.8814 * u;
+        rgb.r = y + 1.4746 * v;
+        rgb.g = y - 0.164553 * u - 0.571353 * v;
+        rgb.b = y + 1.8814 * u;
     } else {
-        r = y + 1.5748 * v;
-        g = y - 0.187324 * u - 0.468124 * v;
-        b = y + 1.8556 * u;
+        rgb.r = y + 1.5748 * v;
+        rgb.g = y - 0.187324 * u - 0.468124 * v;
+        rgb.b = y + 1.8556 * u;
     }
-    return half4(clamp(r, 0.0, 1.0), clamp(g, 0.0, 1.0), clamp(b, 0.0, 1.0), 1.0);
+
+    return half4(clamp(rgb, 0.0, 1.0), 1.0);
 }
 """
 
-private object VideoShaderEffects {
+internal object VideoShaderEffects {
     val yuv420pEffect: RuntimeEffect? by lazy {
-        runCatching { RuntimeEffect.makeForShader(YUV420P_SKSL) }.getOrNull()
+        runCatching { RuntimeEffect.makeForShader(YUV420P_SKSL) }
+            .onFailure { System.err.println("VideoShaderEffects: YUV420P shader compile failed: ${it.message}") }
+            .getOrNull()
     }
 
     val nv12Effect: RuntimeEffect? by lazy {
-        runCatching { RuntimeEffect.makeForShader(NV12_SKSL) }.getOrNull()
+        runCatching { RuntimeEffect.makeForShader(NV12_SKSL) }
+            .onFailure { System.err.println("VideoShaderEffects: NV12 shader compile failed: ${it.message}") }
+            .getOrNull()
     }
+
+    val isYuvShaderAvailable: Boolean
+        get() = yuv420pEffect != null
 }
 
 /**
@@ -160,10 +150,26 @@ fun VideoPlayerSurface(
     modifier: Modifier = Modifier,
 ) {
     val hasRenderedFrame = remember(videoPlayer) { booleanArrayOf(false) }
+    val renderPaint = remember { Paint() }
+    val yuvBuilder = remember(VideoShaderEffects.yuv420pEffect) {
+        VideoShaderEffects.yuv420pEffect?.let { RuntimeShaderBuilder(it) }
+    }
+    val nv12Builder = remember(VideoShaderEffects.nv12Effect) {
+        VideoShaderEffects.nv12Effect?.let { RuntimeShaderBuilder(it) }
+    }
+
+    DisposableEffect(renderPaint, yuvBuilder, nv12Builder) {
+        onDispose {
+            renderPaint.close()
+            yuvBuilder?.close()
+            nv12Builder?.close()
+        }
+    }
 
     Box(
         modifier = modifier
             .background(Color.Black)
+            .onSizeChanged { videoPlayer.setTargetSize(it.width, it.height) }
             .drawBehind {
                 // Subscribe to frameSequence inside drawBehind so new frames trigger redraws without recomposition.
                 val sequence = videoPlayer.frameSequence
@@ -178,6 +184,9 @@ fun VideoPlayerSurface(
                                 canvasWidth = size.width,
                                 canvasHeight = size.height,
                                 contentScale = contentScale,
+                                renderPaint = renderPaint,
+                                yuvBuilder = yuvBuilder,
+                                nv12Builder = nv12Builder,
                             )
                         }
                     }
@@ -222,6 +231,9 @@ private fun drawVideoFrame(
     canvasWidth: Float,
     canvasHeight: Float,
     contentScale: ContentScale,
+    renderPaint: Paint,
+    yuvBuilder: RuntimeShaderBuilder?,
+    nv12Builder: RuntimeShaderBuilder?,
 ) {
     val frameW = frame.width.toFloat()
     val frameH = frame.height.toFloat()
@@ -231,16 +243,17 @@ private fun drawVideoFrame(
         srcSize = Size(frameW, frameH),
         dstSize = Size(canvasWidth, canvasHeight),
     )
-    val drawW = frameW * scaleFactor.scaleX
-    val drawH = frameH * scaleFactor.scaleY
-    val offsetX = (canvasWidth - drawW) * 0.5f
-    val offsetY = (canvasHeight - drawH) * 0.5f
+    val scale = scaleFactor.scaleX
+    val dstW = (frameW * scale).roundToInt()
+    val dstH = (frameH * scale).roundToInt()
+    val offsetX = ((canvasWidth - dstW) / 2f).roundToInt().toFloat()
+    val offsetY = ((canvasHeight - dstH) / 2f).roundToInt().toFloat()
 
     when (frame.format) {
         VideoPixelFormat.BGRA -> {
             val bitmap = frame.bgraBitmap ?: return
             Image.makeFromBitmap(bitmap).use { image ->
-                val dstRect = Rect.makeXYWH(offsetX, offsetY, drawW, drawH)
+                val dstRect = Rect.makeXYWH(offsetX, offsetY, dstW.toFloat(), dstH.toFloat())
                 skiaCanvas.save()
                 skiaCanvas.clipRect(Rect.makeWH(canvasWidth, canvasHeight))
                 skiaCanvas.drawImageRect(
@@ -256,13 +269,14 @@ private fun drawVideoFrame(
         }
 
         VideoPixelFormat.YUV420P -> {
-            val effect = VideoShaderEffects.yuv420pEffect ?: return
+            val builder = yuvBuilder ?: return
             val yBmp = frame.planeY ?: return
             val uBmp = frame.planeU ?: return
             val vBmp = frame.planeV ?: return
             drawWithThreePlanes(
                 skiaCanvas = skiaCanvas,
-                effect = effect,
+                builder = builder,
+                renderPaint = renderPaint,
                 yBmp = yBmp,
                 uBmp = uBmp,
                 vBmp = vBmp,
@@ -277,12 +291,13 @@ private fun drawVideoFrame(
         }
 
         VideoPixelFormat.NV12 -> {
-            val effect = VideoShaderEffects.nv12Effect ?: return
+            val builder = nv12Builder ?: return
             val yBmp = frame.planeY ?: return
             val uvBmp = frame.planeUV ?: return
             drawWithTwoPlanes(
                 skiaCanvas = skiaCanvas,
-                effect = effect,
+                builder = builder,
+                renderPaint = renderPaint,
                 yBmp = yBmp,
                 uvBmp = uvBmp,
                 frame = frame,
@@ -299,7 +314,8 @@ private fun drawVideoFrame(
 
 private fun drawWithThreePlanes(
     skiaCanvas: org.jetbrains.skia.Canvas,
-    effect: RuntimeEffect,
+    builder: RuntimeShaderBuilder,
+    renderPaint: Paint,
     yBmp: Bitmap,
     uBmp: Bitmap,
     vBmp: Bitmap,
@@ -311,38 +327,31 @@ private fun drawWithThreePlanes(
     scaleX: Float,
     scaleY: Float,
 ) {
-    Image.makeFromBitmap(yBmp).use { yImg ->
-        Image.makeFromBitmap(uBmp).use { uImg ->
-            Image.makeFromBitmap(vBmp).use { vImg ->
-                yImg.makePlaneShader().use { yShader ->
-                    uImg.makePlaneShader().use { uShader ->
-                        vImg.makePlaneShader().use { vShader ->
-                            val builder = RuntimeShaderBuilder(effect).apply {
-                                child("yTex", yShader)
-                                child("uTex", uShader)
-                                child("vTex", vShader)
-                                uniform("colorSpace", frame.colorSpace.toUniformInt())
-                                uniform("colorRange", frame.colorRange.toUniformInt())
-                                uniform("alphaOnly", if (yBmp.colorType == ColorType.ALPHA_8) 1f else 0f)
-                            }
-                            builder.makeShader().use { shader ->
-                                Paint().use { paint ->
-                                    paint.shader = shader
-                                    drawTransformedShaderRect(
-                                        skiaCanvas = skiaCanvas,
-                                        frameWidth = frame.width.toFloat(),
-                                        frameHeight = frame.height.toFloat(),
-                                        canvasWidth = canvasWidth,
-                                        canvasHeight = canvasHeight,
-                                        offsetX = offsetX,
-                                        offsetY = offsetY,
-                                        scaleX = scaleX,
-                                        scaleY = scaleY,
-                                        paint = paint,
-                                    )
-                                }
-                            }
-                        }
+    yBmp.makePlaneShader().use { yShader ->
+        uBmp.makePlaneShader().use { uShader ->
+            vBmp.makePlaneShader().use { vShader ->
+                builder.child("yTex", yShader)
+                builder.child("uTex", uShader)
+                builder.child("vTex", vShader)
+                builder.uniform("colorSpace", frame.colorSpace.toUniformInt())
+                builder.uniform("colorRange", frame.colorRange.toUniformInt())
+                builder.makeShader().use { shader ->
+                    renderPaint.shader = shader
+                    try {
+                        drawTransformedShaderRect(
+                            skiaCanvas = skiaCanvas,
+                            frameWidth = frame.width.toFloat(),
+                            frameHeight = frame.height.toFloat(),
+                            canvasWidth = canvasWidth,
+                            canvasHeight = canvasHeight,
+                            offsetX = offsetX,
+                            offsetY = offsetY,
+                            scaleX = scaleX,
+                            scaleY = scaleY,
+                            paint = renderPaint,
+                        )
+                    } finally {
+                        renderPaint.shader = null
                     }
                 }
             }
@@ -352,7 +361,8 @@ private fun drawWithThreePlanes(
 
 private fun drawWithTwoPlanes(
     skiaCanvas: org.jetbrains.skia.Canvas,
-    effect: RuntimeEffect,
+    builder: RuntimeShaderBuilder,
+    renderPaint: Paint,
     yBmp: Bitmap,
     uvBmp: Bitmap,
     frame: VideoFrame,
@@ -363,34 +373,29 @@ private fun drawWithTwoPlanes(
     scaleX: Float,
     scaleY: Float,
 ) {
-    Image.makeFromBitmap(yBmp).use { yImg ->
-        Image.makeFromBitmap(uvBmp).use { uvImg ->
-            yImg.makePlaneShader().use { yShader ->
-                uvImg.makePlaneShader().use { uvShader ->
-                    val builder = RuntimeShaderBuilder(effect).apply {
-                        child("yTex", yShader)
-                        child("uvTex", uvShader)
-                        uniform("colorSpace", frame.colorSpace.toUniformInt())
-                        uniform("colorRange", frame.colorRange.toUniformInt())
-                        uniform("alphaOnly", if (yBmp.colorType == ColorType.ALPHA_8) 1f else 0f)
-                    }
-                    builder.makeShader().use { shader ->
-                        Paint().use { paint ->
-                            paint.shader = shader
-                            drawTransformedShaderRect(
-                                skiaCanvas = skiaCanvas,
-                                frameWidth = frame.width.toFloat(),
-                                frameHeight = frame.height.toFloat(),
-                                canvasWidth = canvasWidth,
-                                canvasHeight = canvasHeight,
-                                offsetX = offsetX,
-                                offsetY = offsetY,
-                                scaleX = scaleX,
-                                scaleY = scaleY,
-                                paint = paint,
-                            )
-                        }
-                    }
+    yBmp.makePlaneShader().use { yShader ->
+        uvBmp.makePlaneShader().use { uvShader ->
+            builder.child("yTex", yShader)
+            builder.child("uvTex", uvShader)
+            builder.uniform("colorSpace", frame.colorSpace.toUniformInt())
+            builder.uniform("colorRange", frame.colorRange.toUniformInt())
+            builder.makeShader().use { shader ->
+                renderPaint.shader = shader
+                try {
+                    drawTransformedShaderRect(
+                        skiaCanvas = skiaCanvas,
+                        frameWidth = frame.width.toFloat(),
+                        frameHeight = frame.height.toFloat(),
+                        canvasWidth = canvasWidth,
+                        canvasHeight = canvasHeight,
+                        offsetX = offsetX,
+                        offsetY = offsetY,
+                        scaleX = scaleX,
+                        scaleY = scaleY,
+                        paint = renderPaint,
+                    )
+                } finally {
+                    renderPaint.shader = null
                 }
             }
         }
@@ -409,15 +414,18 @@ private fun drawTransformedShaderRect(
     scaleY: Float,
     paint: Paint,
 ) {
-    skiaCanvas.save()
-    skiaCanvas.clipRect(Rect.makeWH(canvasWidth, canvasHeight))
-    skiaCanvas.translate(offsetX, offsetY)
-    skiaCanvas.scale(scaleX, scaleY)
-    skiaCanvas.drawRect(Rect.makeWH(frameWidth, frameHeight), paint)
-    skiaCanvas.restore()
+    val count = skiaCanvas.save()
+    try {
+        skiaCanvas.clipRect(Rect.makeWH(canvasWidth, canvasHeight))
+        skiaCanvas.translate(offsetX, offsetY)
+        skiaCanvas.scale(scaleX, scaleY)
+        skiaCanvas.drawRect(Rect.makeWH(frameWidth, frameHeight), paint)
+    } finally {
+        skiaCanvas.restoreToCount(count)
+    }
 }
 
-private fun Image.makePlaneShader(): Shader =
+private fun Bitmap.makePlaneShader(): Shader =
     makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP, SamplingMode.LINEAR)
 
 private fun VideoColorSpace.toUniformInt(): Int = when (this) {

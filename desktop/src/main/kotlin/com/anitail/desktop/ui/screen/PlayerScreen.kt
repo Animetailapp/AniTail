@@ -2,7 +2,6 @@ package com.anitail.desktop.ui.screen
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -36,10 +35,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -68,10 +65,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.constants.PlayerHorizontalPadding
@@ -120,6 +122,31 @@ private enum class DesktopRightPanelTab {
 }
 
 private val WidePlayerBreakpoint = 840.dp
+
+internal fun fullscreenPlayerScale(
+    availableWidth: Dp,
+    availableHeight: Dp,
+): Float = minOf(
+    (availableWidth - 48.dp) / 650.dp,
+    availableHeight / 1030.dp,
+).coerceAtLeast(0f)
+
+internal fun fullscreenArtworkSize(
+    availableWidth: Int,
+    availableHeight: Int,
+    controlsHeight: Int,
+    aspectRatio: Float,
+    preferredHeight: Int,
+): IntSize {
+    if (availableWidth <= 0 || availableHeight <= 0) return IntSize.Zero
+    val safeAspectRatio = aspectRatio.takeIf { it.isFinite() && it > 0.1f } ?: 1f
+    val maxHeight = (availableHeight - controlsHeight).coerceAtLeast(0)
+    if (maxHeight == 0) return IntSize.Zero
+    val targetHeight = minOf(preferredHeight.coerceAtLeast(1), maxHeight)
+    val width = minOf(availableWidth, (targetHeight * safeAspectRatio).roundToInt().coerceAtLeast(1))
+    val height = (width / safeAspectRatio).roundToInt().coerceIn(1, targetHeight)
+    return IntSize(width = width, height = height)
+}
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -431,7 +458,12 @@ fun PlayerScreen(
     ) {
         val isWide = maxWidth >= WidePlayerBreakpoint
         val screenMaxWidth = maxWidth
-        val screenMaxHeight = maxHeight
+        var artworkAspectRatio by remember(item.id, hiResArtworkUrl) { mutableStateOf(1f) }
+        val videoAspectRatio = playerState.videoPlayer.aspectRatio
+            .takeIf { it.isFinite() && it > 0.1f }
+            ?.coerceIn(0.56f, 2.35f)
+            ?: (16f / 9f)
+        val mediaAspectRatio = if (playerState.isVideoMode) videoAspectRatio else artworkAspectRatio
 
         PlayerBackgroundLayer(
             style = playerBackgroundStyle,
@@ -562,68 +594,128 @@ fun PlayerScreen(
                     horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Left Column: Artwork / Live Video + Expressive Controls + Connected Button Group
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
+                    // Left Pane: Dynamically Scaled Artwork / Live Video + Expressive Controls
+                    BoxWithConstraints(
+                        contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .weight(1f, fill = false)
-                            .widthIn(max = 520.dp)
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState())
-                            .animateContentSize(),
+                            .weight(1f)
+                            .fillMaxHeight(),
                     ) {
-                        PlayerMediaStage(
-                            item = item,
-                            playerState = playerState,
-                            hiResArtworkUrl = hiResArtworkUrl,
-                            artworkFallbackUrls = artworkFallbackUrls,
-                            swipeOffsetX = thumbnailOffsetX.value,
-                            swipeModifier = artworkSwipeModifier,
-                            modifier = Modifier
-                                .widthIn(max = 420.dp)
-                                .fillMaxWidth(0.92f)
-                                .height(360.dp.coerceAtMost((screenMaxHeight * 0.48f).coerceAtLeast(220.dp))),
+                        val density = LocalDensity.current
+                        val scale = fullscreenPlayerScale(maxWidth, maxHeight)
+                        val controlsMaxWidth = (620.dp * scale).coerceIn(380.dp, 760.dp)
+                        val preferredMediaHeightDp = maxOf(
+                            360.dp,
+                            (if (playerState.isVideoMode) 640.dp else 580.dp) * scale,
                         )
+                        val verticalGap = (18.dp * scale).coerceIn(10.dp, 22.dp)
+                        val buttonsGap = (14.dp * scale).coerceIn(8.dp, 18.dp)
+                        val gapPx = with(density) { verticalGap.roundToPx() }
+                        val preferredHeightPx = with(density) { preferredMediaHeightDp.roundToPx() }
 
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Layout(
+                            modifier = Modifier.fillMaxSize(),
+                            content = {
+                                PlayerMediaStage(
+                                    item = item,
+                                    playerState = playerState,
+                                    hiResArtworkUrl = hiResArtworkUrl,
+                                    artworkFallbackUrls = artworkFallbackUrls,
+                                    mediaAspectRatio = mediaAspectRatio,
+                                    onArtworkLoaded = { w, h ->
+                                        if (w > 0 && h > 0) {
+                                            artworkAspectRatio = (w.toFloat() / h.toFloat()).coerceIn(0.56f, 2.35f)
+                                        }
+                                    },
+                                    swipeOffsetX = thumbnailOffsetX.value,
+                                    swipeModifier = artworkSwipeModifier,
+                                )
 
-                        PlayerControls(
-                            item = item,
-                            playerState = playerState,
-                            isLiked = isLiked,
-                            textColor = textBackgroundColor,
-                            mutedTextColor = mutedTextColor,
-                            sliderStyle = sliderStyle,
-                            textButtonColor = textButtonColor,
-                            iconButtonColor = iconButtonColor,
-                            onToggleLike = { toggleLike(!isLiked) },
-                            onAddToPlaylist = { showPlaylistDialog = true },
-                            artistsWithId = controlArtistPairs,
-                            albumInfo = albumInfo,
-                            onOpenArtist = { id, name -> openArtist(id, name) },
-                            onOpenAlbum = { id, name -> openAlbum(id, name) },
-                            onShowMore = { showMoreMenu = true },
-                            modifier = Modifier.widthIn(max = 460.dp),
-                        )
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .widthIn(max = controlsMaxWidth)
+                                        .fillMaxWidth(),
+                                ) {
+                                    PlayerControls(
+                                        item = item,
+                                        playerState = playerState,
+                                        isLiked = isLiked,
+                                        textColor = textBackgroundColor,
+                                        mutedTextColor = mutedTextColor,
+                                        sliderStyle = sliderStyle,
+                                        textButtonColor = textButtonColor,
+                                        iconButtonColor = iconButtonColor,
+                                        onToggleLike = { toggleLike(!isLiked) },
+                                        onAddToPlaylist = { showPlaylistDialog = true },
+                                        artistsWithId = controlArtistPairs,
+                                        albumInfo = albumInfo,
+                                        onOpenArtist = { id, name -> openArtist(id, name) },
+                                        onOpenAlbum = { id, name -> openAlbum(id, name) },
+                                        onShowMore = { showMoreMenu = true },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                                    Spacer(modifier = Modifier.height(buttonsGap))
 
-                        PlayerConnectedButtonGroup(
-                            playerState = playerState,
-                            showLyrics = showLyrics && rightPanelTab == DesktopRightPanelTab.LYRICS,
-                            onToggleLyrics = ::toggleWideLyrics,
-                            showQueue = showQueueSidePanel && rightPanelTab == DesktopRightPanelTab.QUEUE,
-                            onToggleQueue = ::toggleWideQueue,
-                            onOpenAudioSettings = { showAudioSettingsDialog = true },
-                            onOpenSleepTimer = { showSleepTimerDialog = true },
-                            onToggleFullscreen = onCollapsePlayer,
-                            isFullscreen = true,
-                            onButtonColor = textBackgroundColor,
-                            containerColor = textBackgroundColor.copy(alpha = 0.12f),
-                            checkedContainerColor = iconButtonColor,
-                            checkedContentColor = textButtonColor,
-                        )
+                                    PlayerConnectedButtonGroup(
+                                        playerState = playerState,
+                                        showLyrics = showLyrics && rightPanelTab == DesktopRightPanelTab.LYRICS,
+                                        onToggleLyrics = ::toggleWideLyrics,
+                                        showQueue = showQueueSidePanel && rightPanelTab == DesktopRightPanelTab.QUEUE,
+                                        onToggleQueue = ::toggleWideQueue,
+                                        onOpenAudioSettings = { showAudioSettingsDialog = true },
+                                        onOpenSleepTimer = { showSleepTimerDialog = true },
+                                        onToggleFullscreen = onCollapsePlayer,
+                                        isFullscreen = true,
+                                        onButtonColor = textBackgroundColor,
+                                        containerColor = textBackgroundColor.copy(alpha = 0.12f),
+                                        checkedContainerColor = iconButtonColor,
+                                        checkedContentColor = textButtonColor,
+                                    )
+                                }
+                            },
+                        ) { measurables, constraints ->
+                            val availableW = constraints.maxWidth
+                            val availableH = constraints.maxHeight
+                            val controlsMeasurable = measurables[1]
+                            val mediaMeasurable = measurables[0]
+
+                            val controlsPlaceable = controlsMeasurable.measure(
+                                constraints.copy(
+                                    minWidth = 0,
+                                    minHeight = 0,
+                                    maxWidth = availableW,
+                                    maxHeight = availableH,
+                                ),
+                            )
+
+                            val artworkSize = fullscreenArtworkSize(
+                                availableWidth = availableW,
+                                availableHeight = (availableH - gapPx).coerceAtLeast(0),
+                                controlsHeight = controlsPlaceable.height,
+                                aspectRatio = mediaAspectRatio,
+                                preferredHeight = preferredHeightPx,
+                            )
+
+                            val mediaPlaceable = mediaMeasurable.measure(
+                                Constraints.fixed(artworkSize.width, artworkSize.height),
+                            )
+
+                            val activeGap = if (artworkSize.height > 0 && controlsPlaceable.height > 0) gapPx else 0
+                            val totalContentHeight = (mediaPlaceable.height + activeGap + controlsPlaceable.height)
+                                .coerceAtMost(availableH)
+                            val startY = ((availableH - totalContentHeight) / 2).coerceAtLeast(0)
+
+                            layout(availableW, availableH) {
+                                val mediaX = ((availableW - mediaPlaceable.width) / 2).coerceAtLeast(0)
+                                val controlsX = ((availableW - controlsPlaceable.width) / 2).coerceAtLeast(0)
+                                if (mediaPlaceable.height > 0) {
+                                    mediaPlaceable.placeRelative(mediaX, startY)
+                                }
+                                controlsPlaceable.placeRelative(controlsX, startY + mediaPlaceable.height + activeGap)
+                            }
+                        }
                     }
 
                     // Right Column: Toggleable Docked Lyrics & Queue Panel
@@ -815,11 +907,17 @@ fun PlayerScreen(
                                 playerState = playerState,
                                 hiResArtworkUrl = hiResArtworkUrl,
                                 artworkFallbackUrls = artworkFallbackUrls,
+                                mediaAspectRatio = mediaAspectRatio,
+                                onArtworkLoaded = { w, h ->
+                                    if (w > 0 && h > 0) {
+                                        artworkAspectRatio = (w.toFloat() / h.toFloat()).coerceIn(0.56f, 2.35f)
+                                    }
+                                },
                                 swipeOffsetX = thumbnailOffsetX.value,
                                 swipeModifier = artworkSwipeModifier,
                                 modifier = Modifier
-                                    .fillMaxHeight(0.84f)
-                                    .padding(horizontal = PlayerHorizontalPadding),
+                                    .fillMaxSize()
+                                    .padding(horizontal = PlayerHorizontalPadding, vertical = 12.dp),
                             )
                         }
                     }
@@ -985,145 +1083,166 @@ private fun PlayerTopBar(
     onDismissMoreMenu: () -> Unit,
     dropdownContent: @Composable () -> Unit,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+    val gapPx = with(LocalDensity.current) { 12.dp.roundToPx() }
+    Layout(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = PlayerHorizontalPadding, vertical = 16.dp),
-    ) {
-        FilledTonalIconButton(
-            onClick = onCollapse,
-            shapes = IconButtonShapes(
-                shape = CircleShape,
-                pressedShape = RoundedCornerShape(12.dp),
-            ),
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = textColor.copy(alpha = 0.12f),
-                contentColor = textColor,
-            ),
-            modifier = Modifier.size(40.dp),
-        ) {
-            Icon(
-                imageVector = ExpressiveIcons.KeyboardArrowDown,
-                contentDescription = stringResource("collapse"),
-                modifier = Modifier.size(22.dp),
-            )
-        }
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 12.dp),
-        ) {
-            Text(
-                text = stringResource("now_playing").uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = mutedTextColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val subtitleText = albumName?.takeIf { it.isNotBlank() }
-                ?: item.artist.takeIf { it.isNotBlank() }
-                ?: stringResource("queue")
-            Text(
-                text = subtitleText,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium,
-                color = textColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.basicMarquee(),
-            )
-        }
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (playerState.hasVideoStream) {
-                Surface(
+        content = {
+            FilledTonalIconButton(
+                onClick = onCollapse,
+                shapes = IconButtonShapes(
                     shape = CircleShape,
-                    color = textColor.copy(alpha = 0.12f),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(3.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    pressedShape = RoundedCornerShape(12.dp),
+                ),
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = textColor.copy(alpha = 0.12f),
+                    contentColor = textColor,
+                ),
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(
+                    imageVector = ExpressiveIcons.KeyboardArrowDown,
+                    contentDescription = stringResource("collapse"),
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = stringResource("now_playing").uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = mutedTextColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val subtitleText = albumName?.takeIf { it.isNotBlank() }
+                    ?: item.artist.takeIf { it.isNotBlank() }
+                    ?: stringResource("queue")
+                Text(
+                    text = subtitleText,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = textColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.basicMarquee(),
+                )
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (playerState.hasVideoStream) {
+                    Surface(
+                        shape = CircleShape,
+                        color = textColor.copy(alpha = 0.12f),
                     ) {
-                        PanelTabChip(
-                            label = stringResource("song"),
-                            icon = IconAssets.musicNote(),
-                            selected = !playerState.isVideoMode,
-                            activeBg = textColor,
-                            activeFg = if (textColor == Color.White) Color.Black else MaterialTheme.colorScheme.surface,
-                            inactiveFg = textColor,
-                            onClick = {
-                                if (playerState.isVideoMode) {
-                                    playerState.toggleVideoMode()
-                                }
-                            },
-                        )
-                        PanelTabChip(
-                            label = "Video",
-                            icon = ExpressiveIcons.Movie,
-                            selected = playerState.isVideoMode,
-                            activeBg = textColor,
-                            activeFg = if (textColor == Color.White) Color.Black else MaterialTheme.colorScheme.surface,
-                            inactiveFg = textColor,
-                            onClick = {
-                                if (!playerState.isVideoMode) {
-                                    playerState.toggleVideoMode()
-                                }
-                            },
+                        Row(
+                            modifier = Modifier.padding(3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            PanelTabChip(
+                                label = stringResource("song"),
+                                icon = IconAssets.musicNote(),
+                                selected = !playerState.isVideoMode,
+                                activeBg = textColor,
+                                activeFg = if (textColor == Color.White) Color.Black else MaterialTheme.colorScheme.surface,
+                                inactiveFg = textColor,
+                                onClick = {
+                                    if (playerState.isVideoMode) {
+                                        playerState.toggleVideoMode()
+                                    }
+                                },
+                            )
+                            PanelTabChip(
+                                label = "Video",
+                                icon = ExpressiveIcons.Movie,
+                                selected = playerState.isVideoMode,
+                                activeBg = textColor,
+                                activeFg = if (textColor == Color.White) Color.Black else MaterialTheme.colorScheme.surface,
+                                inactiveFg = textColor,
+                                onClick = {
+                                    if (!playerState.isVideoMode) {
+                                        playerState.toggleVideoMode()
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
+
+                if (playerState.tempo != 1f || playerState.pitchSemitone != 0) {
+                    Surface(
+                        shape = CircleShape,
+                        color = textColor.copy(alpha = 0.14f),
+                    ) {
+                        Text(
+                            text = "${"%.2f".format(playerState.tempo)}x",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = textColor,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         )
                     }
                 }
-            }
 
-            if (playerState.tempo != 1f || playerState.pitchSemitone != 0) {
-                Surface(
-                    shape = CircleShape,
-                    color = textColor.copy(alpha = 0.14f),
-                ) {
-                    Text(
-                        text = "${"%.2f".format(playerState.tempo)}x",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = textColor,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    )
+                Box {
+                    FilledTonalIconButton(
+                        onClick = onShowMore,
+                        shapes = IconButtonShapes(
+                            shape = CircleShape,
+                            pressedShape = RoundedCornerShape(12.dp),
+                        ),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = textColor.copy(alpha = 0.12f),
+                            contentColor = textColor,
+                        ),
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            imageVector = IconAssets.moreVert(),
+                            contentDescription = stringResource("more_options"),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = moreMenuExpanded,
+                        onDismissRequest = onDismissMoreMenu,
+                    ) {
+                        dropdownContent()
+                    }
                 }
             }
+        },
+    ) { measurables, constraints ->
+        val totalWidth = constraints.maxWidth
+        val looseConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+        val startPlaceable = measurables[0].measure(looseConstraints)
+        val endPlaceable = measurables[2].measure(looseConstraints)
+        val availableCenterWidth = (totalWidth - startPlaceable.width - endPlaceable.width - gapPx * 2)
+            .coerceAtLeast(0)
+        val centerPlaceable = measurables[1].measure(
+            looseConstraints.copy(maxWidth = availableCenterWidth),
+        )
+        val layoutHeight = maxOf(startPlaceable.height, centerPlaceable.height, endPlaceable.height)
+        val minCenterX = startPlaceable.width + gapPx
+        val maxCenterX = (totalWidth - endPlaceable.width - gapPx - centerPlaceable.width)
+            .coerceAtLeast(minCenterX)
+        val centerX = ((totalWidth - centerPlaceable.width) / 2).coerceIn(minCenterX, maxCenterX)
 
-            Box {
-                FilledTonalIconButton(
-                    onClick = onShowMore,
-                    shapes = IconButtonShapes(
-                        shape = CircleShape,
-                        pressedShape = RoundedCornerShape(12.dp),
-                    ),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = textColor.copy(alpha = 0.12f),
-                        contentColor = textColor,
-                    ),
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        imageVector = IconAssets.moreVert(),
-                        contentDescription = stringResource("more_options"),
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-
-                DropdownMenu(
-                    expanded = moreMenuExpanded,
-                    onDismissRequest = onDismissMoreMenu,
-                ) {
-                    dropdownContent()
-                }
-            }
+        layout(totalWidth, layoutHeight) {
+            startPlaceable.placeRelative(0, (layoutHeight - startPlaceable.height) / 2)
+            centerPlaceable.placeRelative(centerX, (layoutHeight - centerPlaceable.height) / 2)
+            endPlaceable.placeRelative(
+                totalWidth - endPlaceable.width,
+                (layoutHeight - endPlaceable.height) / 2,
+            )
         }
     }
 }
@@ -1134,23 +1253,26 @@ private fun PlayerMediaStage(
     playerState: PlayerState,
     hiResArtworkUrl: String?,
     artworkFallbackUrls: List<String>,
+    mediaAspectRatio: Float,
+    onArtworkLoaded: (width: Int, height: Int) -> Unit,
     swipeOffsetX: Float,
     swipeModifier: Modifier,
     modifier: Modifier = Modifier,
 ) {
-    Box(
+    val safeRatio = mediaAspectRatio.takeIf { it.isFinite() && it > 0.1f }?.coerceIn(0.56f, 2.35f) ?: 1f
+    BoxWithConstraints(
         contentAlignment = Alignment.Center,
         modifier = modifier,
     ) {
+        val containerRatio = if (maxHeight > 0.dp) maxWidth / maxHeight else safeRatio
+        val stageSizeModifier = if (safeRatio >= containerRatio) {
+            Modifier.fillMaxWidth().aspectRatio(safeRatio)
+        } else {
+            Modifier.fillMaxHeight().aspectRatio(safeRatio)
+        }
         if (playerState.isVideoMode) {
-            val aspect = playerState.videoPlayer.aspectRatio
-                .takeIf { it.isFinite() && it > 0.1f }
-                ?.coerceIn(0.56f, 2.35f)
-                ?: (16f / 9f)
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(aspect)
+                modifier = stageSizeModifier
                     .shadow(20.dp, RoundedCornerShape(24.dp))
                     .clip(RoundedCornerShape(24.dp))
                     .background(Color.Black),
@@ -1163,16 +1285,18 @@ private fun PlayerMediaStage(
             }
         } else {
             Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .aspectRatio(1f)
-                    .then(swipeModifier),
+                modifier = stageSizeModifier.then(swipeModifier),
             ) {
                 RemoteImage(
                     url = hiResArtworkUrl,
                     contentDescription = item.title,
                     fallbackUrls = artworkFallbackUrls,
-                    contentScale = ContentScale.Crop,
+                    contentScale = if (safeRatio > 1.08f || safeRatio < 0.92f) {
+                        ContentScale.Fit
+                    } else {
+                        ContentScale.Crop
+                    },
+                    onImageLoaded = onArtworkLoaded,
                     modifier = Modifier
                         .fillMaxSize()
                         .offset { IntOffset(swipeOffsetX.roundToInt(), 0) }
