@@ -96,7 +96,9 @@ import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.Artist
 import com.anitail.innertube.models.ArtistItem
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.PodcastItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.YTItem
 import com.anitail.innertube.models.WatchEndpoint
@@ -582,8 +584,17 @@ fun HomeScreen(
             }
 
             // 6. Remote Sections (Rows/Grids)
-            homePage?.sections?.forEach { section ->
-                item {
+            homePage?.sections?.forEachIndexed { index, section ->
+                val sectionSongs = section.items.filterIsInstance<SongItem>()
+                val hasPlayableSongs = sectionSongs.isNotEmpty()
+                val isAllSongs = section.items.isNotEmpty() && section.items.all { it is SongItem }
+                val isSongGrid = (isAllSongs && section.items.size >= 4) ||
+                        section.title.equals("Quick picks", ignoreCase = true) ||
+                        section.title.contains("rápida", ignoreCase = true) ||
+                        section.title.contains("nuevo", ignoreCase = true) ||
+                        section.title.contains("listen again", ignoreCase = true)
+
+                item(key = "home_section_title_${section.endpoint?.browseId ?: section.title}_$index") {
                     val shape = if (section.items.all { it is ArtistItem }) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
                     NavigationTitle(
                         title = section.title.orEmpty(),
@@ -604,12 +615,17 @@ fun HomeScreen(
                                 else if (id == "FEmusic_charts") onNavigate("charts")
                                 else onNavigate("browse/$id")
                             } 
-                        }
+                        },
+                        onPlayAllClick = if (hasPlayableSongs) {
+                            {
+                                val librarySongs = sectionSongs.map { songItemToLibraryItem(it) }
+                                playerState.playQueue(librarySongs, startIndex = 0)
+                            }
+                        } else null,
                     )
                 }
-                item {
-                    val isGrid = section.title.equals("Quick picks", ignoreCase = true)
-                    if (isGrid) {
+                item(key = "home_section_items_${section.endpoint?.browseId ?: section.title}_$index") {
+                    if (isSongGrid) {
                         val libraryItems = section.items.mapNotNull { it.toLibraryItem() }
                         val songItemsById = section.items.filterIsInstance<SongItem>().associateBy { it.id }
                         val sectionGridState = rememberLazyGridState()
@@ -631,7 +647,7 @@ fun HomeScreen(
                                 val songItem = songItemsById[item.id] ?: return@menu emptyList()
                                 menuActionsForSong(item, songItem)
                             },
-                            rows = 4,
+                            rows = minOf(4, (libraryItems.size + 1) / 2).coerceAtLeast(1),
                             gridState = sectionGridState,
                             flingBehavior = sectionFlingBehavior,
                             itemWidth = horizontalLazyGridItemWidth,

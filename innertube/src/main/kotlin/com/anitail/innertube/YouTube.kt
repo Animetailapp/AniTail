@@ -824,11 +824,11 @@ object YouTube {
             ?: response.contents?.sectionListRenderer
 
         val continuationToken = sectionListRender?.continuations?.getContinuation()
+            ?: sectionListRender?.contents?.getContinuation()
 
-        val carousels = sectionListRender?.contents?.mapNotNull { it.musicCarouselShelfRenderer } ?: emptyList()
-        val sections = carousels.mapNotNull {
-            HomePage.Section.fromMusicCarouselShelfRenderer(it)
-        }.toMutableList()
+        val sections = sectionListRender?.contents?.mapNotNull {
+            HomePage.Section.fromContent(it)
+        }.orEmpty().toMutableList()
 
         val chips = sectionListRender?.header?.chipCloudRenderer?.chips?.mapNotNull { HomePage.Chip.fromChipCloudChipRenderer(it) }
 
@@ -848,11 +848,11 @@ object YouTube {
             }
 
         val continuationToken = continuationContents?.continuations?.getContinuation()
+            ?: continuationContents?.contents?.getContinuation()
 
         val sections = continuationContents?.contents
-            ?.mapNotNull { it.musicCarouselShelfRenderer }
             ?.mapNotNull {
-                HomePage.Section.fromMusicCarouselShelfRenderer(it)
+                HomePage.Section.fromContent(it)
             }.orEmpty()
 
         HomePage(null, sections, continuationToken)
@@ -997,13 +997,15 @@ object YouTube {
                 }
             }
 
-            val contents = if (tabs != null && tabs.size >= tabIndex) {
-                tabs[tabIndex].tabRenderer.content?.sectionListRenderer?.contents?.firstOrNull()
-            }
-            else {
+            val sectionContents = if (tabs != null && tabIndex in tabs.indices) {
+                tabs[tabIndex].tabRenderer.content?.sectionListRenderer?.contents
+            } else {
                 println("[UPLOAD_DEBUG] No tabs or tabIndex out of range")
                 null
             }
+
+            val contents = sectionContents?.find { it.gridRenderer != null || it.musicShelfRenderer != null }
+                ?: sectionContents?.firstOrNull()
 
             println("[UPLOAD_DEBUG] contents null? ${contents == null}")
             println("[UPLOAD_DEBUG] gridRenderer null? ${contents?.gridRenderer == null}")
