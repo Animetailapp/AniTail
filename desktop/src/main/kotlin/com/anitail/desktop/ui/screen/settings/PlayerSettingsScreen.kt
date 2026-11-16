@@ -38,7 +38,7 @@ internal fun PlayerSettingsScreen(
     val showLyrics by preferences.showLyrics.collectAsState()
     val romanizeLyrics by preferences.romanizeLyrics.collectAsState()
 
-    val castSupported = false
+    val castSupported = true
 
     SettingsSubScreen(
         title = stringResource("player_and_audio"),

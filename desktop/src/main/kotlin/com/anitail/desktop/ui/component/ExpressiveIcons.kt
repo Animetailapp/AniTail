@@ -157,6 +157,41 @@ object ExpressiveIcons {
         )
     }
 
+    val Cast: ImageVector by lazy {
+        materialSymbol(
+            name = "Outlined.Cast",
+            pathData = "M480-480Zm320 320H600q0-20-1.5-40t-4.5-40h206v-480H160v46q-20-3-40-4.5T80-680v-40q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160Zm-720 0v-120q50 0 85 35t35 85H80Zm200 0q0-83-58.5-141.5T80-360v-80q117 0 198.5 81.5T360-160h-80Zm160 0q0-75-28.5-140.5t-77-114q-48.5-48.5-114-77T80-520v-80q91 0 171 34.5T391-471q60 60 94.5 140T520-160h-80Z",
+        )
+    }
+
+    val PictureInPicture: ImageVector by lazy {
+        materialSymbol(
+            name = "Filled.PictureInPicture",
+            pathData = "M440-280h320v-240H440v240ZM160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160Z",
+        )
+    }
+
+    val Devices: ImageVector by lazy {
+        materialSymbol(
+            name = "Outlined.Devices",
+            pathData = "M760-440h120v-200H760v200Zm-440 80h400v-360H320v360ZM160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h640q33 0 56.5 23.5T880-720v160h-80v-160H160v480h480v80H160Z",
+        )
+    }
+
+    val MoreVert: ImageVector by lazy {
+        materialSymbol(
+            name = "MoreVert",
+            pathData = "M480-160q-33 0-56.5-23.5T400-240q0-33 23.5-56.5T480-320q33 0 56.5 23.5T560-240q0 33-23.5 56.5T480-160Zm0-240q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm0-240q-33 0-56.5-23.5T400-720q0-33 23.5-56.5T480-800q33 0 56.5 23.5T560-720q0 33-23.5 56.5T480-640Z",
+        )
+    }
+
+    val Close: ImageVector by lazy {
+        materialSymbol(
+            name = "Close",
+            pathData = "m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z",
+        )
+    }
+
     private fun materialSymbol(
         name: String,
         pathData: String,

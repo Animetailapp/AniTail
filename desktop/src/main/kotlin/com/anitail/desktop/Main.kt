@@ -113,12 +113,17 @@ import com.anitail.desktop.ui.loadBitmapResource
 import com.anitail.desktop.ui.component.AudioSettingsDialog
 import com.anitail.desktop.ui.component.BottomSheet
 import com.anitail.desktop.ui.component.DesktopTopBar
+import com.anitail.desktop.ui.component.DesktopCastDialog
 import com.anitail.desktop.ui.component.FloatingSearchOverlay
 import com.anitail.desktop.ui.component.LyricsSideSheet
 import com.anitail.desktop.ui.component.MiniPlayer
 import com.anitail.desktop.ui.component.QueueSideSheet
 import com.anitail.desktop.ui.component.ShortcutsOverlay
 import com.anitail.desktop.ui.component.SongRecognitionDialog
+import com.anitail.desktop.ui.component.VideoFullscreenOverlay
+import com.anitail.desktop.ui.component.VideoMiniViewer
+import com.anitail.desktop.ui.window.MiniplayerWindow
+import androidx.compose.ui.window.WindowPlacement
 import com.anitail.desktop.ui.component.rememberBottomSheetState
 import com.anitail.desktop.ui.screen.AlbumDetailScreen
 import com.anitail.desktop.ui.screen.ArtistDetailScreen
@@ -132,6 +137,8 @@ import com.anitail.desktop.ui.screen.library.LibraryScreen
 import com.anitail.desktop.ui.screen.MoodAndGenresScreen
 import com.anitail.desktop.ui.screen.NewReleaseScreen
 import com.anitail.desktop.ui.screen.PlayerScreen
+import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.player.rememberPlayerState
 import com.anitail.desktop.ui.screen.PlaylistDetailScreen
 import com.anitail.desktop.ui.screen.SearchScreen
 import com.anitail.desktop.ui.screen.SettingsScreen
@@ -449,6 +456,8 @@ private fun realMain(args: Array<String>) {
     application {
         val windowState = rememberWindowState(width = 1400.dp, height = 900.dp)
         val windowIcon = remember { loadBitmapResource("drawable/ic_anitail.png") }
+        val playerState = rememberPlayerState()
+
         Window(
             onCloseRequest = ::exitApplication,
             title = "AniTail Desktop",
@@ -458,7 +467,18 @@ private fun realMain(args: Array<String>) {
         ) {
             AniTailDesktopApp(
                 windowState = windowState,
+                playerState = playerState,
                 onCloseRequest = ::exitApplication,
+            )
+        }
+
+        if (playerState.showMiniPlayer) {
+            MiniplayerWindow(
+                playerState = playerState,
+                onCloseRequest = { playerState.showMiniPlayer = false },
+                onRestoreMainWindow = {
+                    windowState.isMinimized = false
+                },
             )
         }
     }
@@ -468,6 +488,7 @@ private fun realMain(args: Array<String>) {
 @Composable
 private fun FrameWindowScope.AniTailDesktopApp(
     windowState: WindowState,
+    playerState: PlayerState,
     onCloseRequest: () -> Unit,
 ) {
     // Replace legacy store with Database and Preferences
@@ -477,7 +498,6 @@ private fun FrameWindowScope.AniTailDesktopApp(
     val authService = remember { DesktopAuthService() }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val playerState = rememberPlayerState()
     val appLanguage by preferences.appLanguage.collectAsState()
     val strings = remember(appLanguage) { AndroidStringLoader.load(appLanguage) }
     val darkMode by preferences.darkMode.collectAsState()
@@ -1488,6 +1508,22 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     playerBottomSheetState.dismiss()
                 } else if (playerBottomSheetState.isDismissed) {
                     playerBottomSheetState.collapseSoft()
+                }
+            }
+
+            LaunchedEffect(playerBottomSheetState.isExpanded) {
+                playerState.isPlayerExpanded = playerBottomSheetState.isExpanded
+            }
+
+            LaunchedEffect(playerState.isFullscreenOverlay) {
+                if (playerState.isFullscreenOverlay) {
+                    if (windowState.placement != WindowPlacement.Fullscreen) {
+                        windowState.placement = WindowPlacement.Fullscreen
+                    }
+                } else {
+                    if (windowState.placement == WindowPlacement.Fullscreen) {
+                        windowState.placement = WindowPlacement.Floating
+                    }
                 }
             }
 
@@ -2604,6 +2640,42 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     onVolumeChange = { playerState.updateVolume(it) },
                     onDismiss = { showMiniPlayerAudioSettings = false },
                 )
+
+                // Floating PiP Video Viewer (visible when player is collapsed)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(
+                            end = 24.dp,
+                            bottom = if (playerState.currentItem != null) 96.dp else 24.dp,
+                        ),
+                ) {
+                    VideoMiniViewer(
+                        playerState = playerState,
+                        onOpenFullPlayer = { playerBottomSheetState.expandSoft() },
+                    )
+                }
+
+                // Immersive Fullscreen Theater Overlay
+                if (playerState.isFullscreenOverlay) {
+                    VideoFullscreenOverlay(
+                        playerState = playerState,
+                        onExitFullscreen = {
+                            playerState.isFullscreenOverlay = false
+                            if (windowState.placement == WindowPlacement.Fullscreen) {
+                                windowState.placement = WindowPlacement.Floating
+                            }
+                        },
+                    )
+                }
+
+                // Cast to TV & Speakers Dialog
+                if (playerState.showCastDialog) {
+                    DesktopCastDialog(
+                        playerState = playerState,
+                        onDismissRequest = { playerState.showCastDialog = false },
+                    )
+                }
             }
             }
         }

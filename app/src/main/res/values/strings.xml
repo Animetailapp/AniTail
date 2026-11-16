@@ -1,6 +1,15 @@
 <resources>
     <!-- App -->
     <string name="app_name">AniTail Music</string>
+    <string name="cast">Cast to TV and speakers</string>
+    <string name="video_viewer">Video viewer</string>
+    <string name="open_miniplayer">Open mini player</string>
+    <string name="close_miniplayer">Close mini player</string>
+    <string name="fullscreen">Fullscreen</string>
+    <string name="exit_fullscreen">Exit fullscreen</string>
+    <string name="miniplayer">Mini player</string>
+    <string name="enter_focus_mode">Focus mode</string>
+    <string name="exit_focus_mode">Exit focus mode</string>
 
     <!-- Bottom navigation -->
     <string name="home">Home</string>

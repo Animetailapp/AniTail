@@ -1,4 +1,15 @@
 <resources>
+    <!-- Controles del reproductor -->
+    <string name="cast">Reproducir en TV y altavoces</string>
+    <string name="video_viewer">Visor de vídeo</string>
+    <string name="open_miniplayer">Abrir mini reproductor</string>
+    <string name="close_miniplayer">Cerrar mini reproductor</string>
+    <string name="fullscreen">Pantalla completa</string>
+    <string name="exit_fullscreen">Salir de pantalla completa</string>
+    <string name="miniplayer">Mini reproductor</string>
+    <string name="enter_focus_mode">Modo enfoque</string>
+    <string name="exit_focus_mode">Salir del modo enfoque</string>
+
     <!-- Navegación inferior -->
     <string name="home">Inicio</string>
     <string name="songs">Canciones</string>

@@ -61,6 +61,29 @@ class PlayerState {
     var isVideoMode by mutableStateOf(false)
         private set
 
+    var showMiniPlayer by mutableStateOf(false)
+    var miniplayerFocusMode by mutableStateOf(false)
+    var showVideoViewer by mutableStateOf(false)
+    var isFullscreenOverlay by mutableStateOf(false)
+    var showCastDialog by mutableStateOf(false)
+    var isCasting by mutableStateOf(false)
+    var isPlayerExpanded by mutableStateOf(false)
+
+    fun toggleMiniPlayer() {
+        showMiniPlayer = !showMiniPlayer
+    }
+
+    fun toggleVideoViewer() {
+        showVideoViewer = !showVideoViewer
+        if (showVideoViewer && !isVideoMode) {
+            setVideoMode(true)
+        }
+    }
+
+    fun toggleFullscreenOverlay() {
+        isFullscreenOverlay = !isFullscreenOverlay
+    }
+
     var onPlaybackEvent: ((LibraryItem, Long) -> Unit)? = null
     var onQueueEnded: ((LibraryItem) -> Unit)? = null
     var onPlaybackErrorEvent: ((LibraryItem, String) -> Unit)? = null

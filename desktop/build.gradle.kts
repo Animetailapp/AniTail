@@ -76,6 +76,7 @@ dependencies {
     implementation(libs.commons.codec)
     implementation(libs.jna)
     implementation(libs.jna.platform)
+    implementation(libs.jmdns)
     implementation("org.xerial:sqlite-jdbc:3.54.1.0")
     implementation("com.google.api-client:google-api-client:2.9.2")
     implementation("com.google.oauth-client:google-oauth-client-jetty:1.39.0")

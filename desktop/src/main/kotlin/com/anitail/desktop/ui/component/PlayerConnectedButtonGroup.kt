@@ -5,12 +5,14 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -98,6 +100,12 @@ fun PlayerConnectedButtonGroup(
     onOpenSleepTimer: () -> Unit,
     onToggleFullscreen: (() -> Unit)? = null,
     isFullscreen: Boolean = false,
+    onCastClick: (() -> Unit)? = { playerState.showCastDialog = true },
+    isCasting: Boolean = playerState.isCasting,
+    onVideoClick: (() -> Unit)? = { playerState.toggleVideoViewer() },
+    isVideoActive: Boolean = playerState.showVideoViewer || playerState.isVideoMode,
+    onMiniplayerClick: (() -> Unit)? = { playerState.toggleMiniPlayer() },
+    showMiniplayer: Boolean = playerState.showMiniPlayer,
     onButtonColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.65f),
     checkedContainerColor: Color = MaterialTheme.colorScheme.primaryContainer,
@@ -164,16 +172,6 @@ fun PlayerConnectedButtonGroup(
                 onTrigger = ::toggleMute,
             ),
         )
-        if (playerState.hasVideoStream) {
-            add(
-                ConnectedGroupAction(
-                    label = "Video",
-                    icon = ExpressiveIcons.Movie,
-                    checked = playerState.isVideoMode,
-                    onTrigger = { playerState.toggleVideoMode() },
-                ),
-            )
-        }
         add(
             ConnectedGroupAction(
                 label = stringResource("lyrics"),
@@ -207,16 +205,46 @@ fun PlayerConnectedButtonGroup(
                 onTrigger = onOpenAudioSettings,
             ),
         )
-        if (onToggleFullscreen != null) {
+        if (onCastClick != null) {
             add(
                 ConnectedGroupAction(
-                    label = if (isFullscreen) "Exit fullscreen" else "Fullscreen",
-                    icon = if (isFullscreen) ExpressiveIcons.FullscreenExit else ExpressiveIcons.Fullscreen,
-                    checked = isFullscreen,
-                    onTrigger = onToggleFullscreen,
+                    label = stringResource("cast"),
+                    icon = ExpressiveIcons.Cast,
+                    checked = isCasting,
+                    onTrigger = onCastClick,
                 ),
             )
         }
+        if (onVideoClick != null && playerState.hasVideoStream) {
+            add(
+                ConnectedGroupAction(
+                    label = stringResource("video_viewer"),
+                    icon = ExpressiveIcons.Movie,
+                    checked = isVideoActive,
+                    onTrigger = onVideoClick,
+                ),
+            )
+        }
+        if (onMiniplayerClick != null) {
+            add(
+                ConnectedGroupAction(
+                    label = stringResource(if (showMiniplayer) "close_miniplayer" else "open_miniplayer"),
+                    icon = ExpressiveIcons.PictureInPicture,
+                    checked = showMiniplayer,
+                    onTrigger = onMiniplayerClick,
+                ),
+            )
+        }
+        val actualFullscreenAction = onToggleFullscreen ?: { playerState.toggleFullscreenOverlay() }
+        val actualFullscreenChecked = isFullscreen || playerState.isFullscreenOverlay
+        add(
+            ConnectedGroupAction(
+                label = stringResource(if (actualFullscreenChecked) "exit_fullscreen" else "fullscreen"),
+                icon = if (actualFullscreenChecked) ExpressiveIcons.FullscreenExit else ExpressiveIcons.Fullscreen,
+                checked = actualFullscreenChecked,
+                onTrigger = actualFullscreenAction,
+            ),
+        )
     }
 
     val buttonColors: ToggleButtonColors = ToggleButtonDefaults.colors(
@@ -328,6 +356,7 @@ fun PlayerConnectedButtonGroup(
                     }
                 },
                 menuContent = { menuState ->
+                    val shape = MenuDefaults.itemShape(index, actions.size).shape
                     DropdownMenuItem(
                         onClick = {
                             action.onTrigger()
@@ -339,16 +368,31 @@ fun PlayerConnectedButtonGroup(
                             } else {
                                 action.label
                             }
-                            Text(text = title, maxLines = 1)
+                            Text(
+                                text = title,
+                                maxLines = 1,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                            )
                         },
                         leadingIcon = {
                             Icon(
                                 imageVector = action.icon,
                                 contentDescription = null,
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(20.dp),
                             )
                         },
-                        shape = MenuDefaults.itemShape(index, actions.size).shape,
+                        shape = shape,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                            .background(
+                                color = if (action.checked) {
+                                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
+                                },
+                                shape = shape,
+                            ),
                     )
                 },
             )
