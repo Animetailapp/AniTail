@@ -69,6 +69,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.player.RepeatMode
 import com.anitail.desktop.ui.screen.formatTime
 import kotlinx.coroutines.delay
 import kotlin.math.abs
@@ -157,14 +158,16 @@ fun PlayerConnectedButtonGroup(
         null
     }
 
-    val actions = buildList {
+    val actualFullscreenAction = onToggleFullscreen ?: { playerState.toggleFullscreenOverlay() }
+    val actualFullscreenChecked = isFullscreen || playerState.isFullscreenOverlay
+
+    val leftActions = buildList {
         add(
             ConnectedGroupAction(
-                label = volumeText,
-                icon = volumeIcon,
-                checked = volume <= 0.01f,
-                isVolume = true,
-                onTrigger = ::toggleMute,
+                label = stringResource("queue"),
+                icon = ExpressiveIcons.QueueMusic,
+                checked = showQueue,
+                onTrigger = onToggleQueue,
             ),
         )
         add(
@@ -177,61 +180,48 @@ fun PlayerConnectedButtonGroup(
         )
         add(
             ConnectedGroupAction(
-                label = stringResource("queue"),
-                icon = ExpressiveIcons.QueueMusic,
-                checked = showQueue,
-                onTrigger = onToggleQueue,
+                label = stringResource("shuffle"),
+                icon = ExpressiveIcons.Shuffle,
+                checked = playerState.shuffleEnabled,
+                onTrigger = { playerState.toggleShuffle() },
             ),
         )
         add(
             ConnectedGroupAction(
-                label = stringResource("sleep_timer"),
-                icon = ExpressiveIcons.Bedtime,
-                badgeText = sleepBadge,
-                checked = playerState.isSleepTimerActive,
-                onTrigger = onOpenSleepTimer,
+                label = stringResource("repeat"),
+                icon = if (playerState.repeatMode == RepeatMode.ONE) ExpressiveIcons.RepeatOne else ExpressiveIcons.Repeat,
+                checked = playerState.repeatMode != RepeatMode.OFF,
+                onTrigger = { playerState.toggleRepeat() },
+            ),
+        )
+    }
+
+    val rightActions = buildList {
+        add(
+            ConnectedGroupAction(
+                label = volumeText,
+                icon = volumeIcon,
+                checked = volume <= 0.01f,
+                isVolume = true,
+                onTrigger = ::toggleMute,
             ),
         )
         add(
             ConnectedGroupAction(
-                label = stringResource("equalizer"),
-                icon = ExpressiveIcons.Equalizer,
-                checked = false,
-                onTrigger = onOpenAudioSettings,
+                label = stringResource("cast"),
+                icon = ExpressiveIcons.Cast,
+                checked = isCasting,
+                onTrigger = { onCastClick?.invoke() ?: run { playerState.showCastDialog = true } },
             ),
         )
-        if (onCastClick != null) {
-            add(
-                ConnectedGroupAction(
-                    label = stringResource("cast"),
-                    icon = ExpressiveIcons.Cast,
-                    checked = isCasting,
-                    onTrigger = onCastClick,
-                ),
-            )
-        }
-        if (onVideoClick != null && playerState.hasVideoStream) {
-            add(
-                ConnectedGroupAction(
-                    label = stringResource("video_viewer"),
-                    icon = ExpressiveIcons.Movie,
-                    checked = isVideoActive,
-                    onTrigger = onVideoClick,
-                ),
-            )
-        }
-        if (onMiniplayerClick != null) {
-            add(
-                ConnectedGroupAction(
-                    label = stringResource(if (showMiniplayer) "close_miniplayer" else "open_miniplayer"),
-                    icon = ExpressiveIcons.PictureInPicture,
-                    checked = showMiniplayer,
-                    onTrigger = onMiniplayerClick,
-                ),
-            )
-        }
-        val actualFullscreenAction = onToggleFullscreen ?: { playerState.toggleFullscreenOverlay() }
-        val actualFullscreenChecked = isFullscreen || playerState.isFullscreenOverlay
+        add(
+            ConnectedGroupAction(
+                label = stringResource("video_viewer"),
+                icon = ExpressiveIcons.Movie,
+                checked = isVideoActive,
+                onTrigger = { onVideoClick?.invoke() ?: run { playerState.toggleVideoViewer() } },
+            ),
+        )
         add(
             ConnectedGroupAction(
                 label = stringResource(if (actualFullscreenChecked) "exit_fullscreen" else "fullscreen"),
@@ -250,147 +240,177 @@ fun PlayerConnectedButtonGroup(
     )
 
     val leadingShapes = ButtonGroupDefaults.connectedLeadingButtonShapes(
-        checkedShape = CircleShape,
+        checkedShape = RoundedCornerShape(
+            topStart = 16.dp,
+            bottomStart = 16.dp,
+            topEnd = 6.dp,
+            bottomEnd = 6.dp,
+        ),
     )
     val middleShapes = ButtonGroupDefaults.connectedMiddleButtonShapes(
-        checkedShape = RoundedCornerShape(14.dp),
+        checkedShape = RoundedCornerShape(6.dp),
     )
     val trailingShapes = ButtonGroupDefaults.connectedTrailingButtonShapes(
-        checkedShape = RoundedCornerShape(14.dp),
+        checkedShape = RoundedCornerShape(
+            topStart = 6.dp,
+            bottomStart = 6.dp,
+            topEnd = 16.dp,
+            bottomEnd = 16.dp,
+        ),
     )
 
-    ButtonGroup(
-        overflowIndicator = { menuState ->
-            ButtonGroupDefaults.OverflowIndicator(
-                menuState = menuState,
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = containerColor,
-                    contentColor = onButtonColor,
-                ),
-            )
-        },
-        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-        modifier = modifier,
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        actions.forEachIndexed { index, action ->
-            val shapes: ToggleButtonShapes = when (index) {
-                0 -> leadingShapes
-                actions.lastIndex -> trailingShapes
-                else -> middleShapes
-            }
-
-            customItem(
-                buttonGroupContent = {
-                    if (action.isVolume) {
-                        Box(
-                            modifier = Modifier
-                                .onPointerEvent(PointerEventType.Enter) { isButtonHovered = true }
-                                .onPointerEvent(PointerEventType.Exit) { isButtonHovered = false }
-                                .onPointerEvent(PointerEventType.Scroll) { event ->
-                                    val deltaY = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
-                                    if (deltaY != 0f) {
-                                        stepVolume(if (deltaY < 0f) 0.05f else -0.05f)
-                                    }
-                                }
-                                .onPreviewKeyEvent { keyEvent ->
-                                    if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                                    when (keyEvent.key) {
-                                        Key.DirectionUp -> {
-                                            isKeyboardOpen = true
-                                            stepVolume(0.05f)
-                                            true
-                                        }
-                                        Key.DirectionDown -> {
-                                            isKeyboardOpen = true
-                                            stepVolume(-0.05f)
-                                            true
-                                        }
-                                        Key.M -> {
-                                            isKeyboardOpen = true
-                                            toggleMute()
-                                            true
-                                        }
-                                        Key.Escape -> {
-                                            if (showVolumePopup) {
-                                                isKeyboardOpen = false
-                                                showVolumePopup = false
-                                                true
-                                            } else {
-                                                false
-                                            }
-                                        }
-                                        else -> false
-                                    }
-                                },
-                        ) {
-                            ConnectedGroupToggle(
-                                action = action,
-                                shapes = shapes,
-                                colors = buttonColors,
-                            )
-
-                            VolumePopupOverlay(
-                                visible = showVolumePopup,
-                                volume = volume,
-                                onVolumeChange = { playerState.updateVolume(it.toDouble()) },
-                                onToggleMute = ::toggleMute,
-                                onStepVolume = ::stepVolume,
-                                onPopupHoverChanged = { isPopupHovered = it },
-                                onDismissRequest = {
-                                    isKeyboardOpen = false
-                                    showVolumePopup = false
-                                },
-                            )
-                        }
-                    } else {
+        // Grupo izquierdo: Cola, Letras, Aleatorio, Repeticion
+        ButtonGroup(
+            overflowIndicator = { menuState ->
+                ButtonGroupDefaults.OverflowIndicator(
+                    menuState = menuState,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = containerColor,
+                        contentColor = onButtonColor,
+                    ),
+                )
+            },
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        ) {
+            leftActions.forEachIndexed { index, action ->
+                val shapes: ToggleButtonShapes = when (index) {
+                    0 -> leadingShapes
+                    leftActions.lastIndex -> trailingShapes
+                    else -> middleShapes
+                }
+                customItem(
+                    buttonGroupContent = {
                         ConnectedGroupToggle(
                             action = action,
                             shapes = shapes,
                             colors = buttonColors,
                         )
-                    }
-                },
-                menuContent = { menuState ->
-                    val shape = MenuDefaults.itemShape(index, actions.size).shape
-                    DropdownMenuItem(
-                        onClick = {
-                            action.onTrigger()
-                            menuState.dismiss()
-                        },
-                        text = {
-                            val title = if (action.badgeText != null) {
-                                "${action.label} (${action.badgeText})"
-                            } else {
-                                action.label
+                    },
+                    menuContent = { menuState ->
+                        val shape = MenuDefaults.itemShape(index, leftActions.size).shape
+                        DropdownMenuItem(
+                            onClick = {
+                                action.onTrigger()
+                                menuState.dismiss()
+                            },
+                            text = { Text(action.label) },
+                            leadingIcon = { Icon(action.icon, contentDescription = null) },
+                            shape = shape,
+                        )
+                    },
+                )
+            }
+        }
+
+        // Grupo derecho: Volumen, Transmitir, Video, Pantalla completa
+        ButtonGroup(
+            overflowIndicator = { menuState ->
+                ButtonGroupDefaults.OverflowIndicator(
+                    menuState = menuState,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = containerColor,
+                        contentColor = onButtonColor,
+                    ),
+                )
+            },
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        ) {
+            rightActions.forEachIndexed { index, action ->
+                val shapes: ToggleButtonShapes = when (index) {
+                    0 -> leadingShapes
+                    rightActions.lastIndex -> trailingShapes
+                    else -> middleShapes
+                }
+                customItem(
+                    buttonGroupContent = {
+                        if (action.isVolume) {
+                            Box(
+                                modifier = Modifier
+                                    .onPointerEvent(PointerEventType.Enter) { isButtonHovered = true }
+                                    .onPointerEvent(PointerEventType.Exit) { isButtonHovered = false }
+                                    .onPointerEvent(PointerEventType.Scroll) { event ->
+                                        val deltaY = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                                        if (deltaY != 0f) {
+                                            stepVolume(if (deltaY < 0f) 0.05f else -0.05f)
+                                        }
+                                    }
+                                    .onPreviewKeyEvent { keyEvent ->
+                                        if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                                        when (keyEvent.key) {
+                                            Key.DirectionUp -> {
+                                                isKeyboardOpen = true
+                                                stepVolume(0.05f)
+                                                true
+                                            }
+                                            Key.DirectionDown -> {
+                                                isKeyboardOpen = true
+                                                stepVolume(-0.05f)
+                                                true
+                                            }
+                                            Key.M -> {
+                                                isKeyboardOpen = true
+                                                toggleMute()
+                                                true
+                                            }
+                                            Key.Escape -> {
+                                                if (showVolumePopup) {
+                                                    isKeyboardOpen = false
+                                                    showVolumePopup = false
+                                                    true
+                                                } else {
+                                                    false
+                                                }
+                                            }
+                                            else -> false
+                                        }
+                                    },
+                            ) {
+                                ConnectedGroupToggle(
+                                    action = action,
+                                    shapes = shapes,
+                                    colors = buttonColors,
+                                )
+
+                                VolumePopupOverlay(
+                                    visible = showVolumePopup,
+                                    volume = volume,
+                                    onVolumeChange = { playerState.updateVolume(it.toDouble()) },
+                                    onToggleMute = ::toggleMute,
+                                    onStepVolume = ::stepVolume,
+                                    onPopupHoverChanged = { isPopupHovered = it },
+                                    onDismissRequest = {
+                                        isKeyboardOpen = false
+                                        showVolumePopup = false
+                                    },
+                                )
                             }
-                            Text(
-                                text = title,
-                                maxLines = 1,
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                        } else {
+                            ConnectedGroupToggle(
+                                action = action,
+                                shapes = shapes,
+                                colors = buttonColors,
                             )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = action.icon,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        },
-                        shape = shape,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                            .background(
-                                color = if (action.checked) {
-                                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
-                                } else {
-                                    MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f)
-                                },
-                                shape = shape,
-                            ),
-                    )
-                },
-            )
+                        }
+                    },
+                    menuContent = { menuState ->
+                        val shape = MenuDefaults.itemShape(index, rightActions.size).shape
+                        DropdownMenuItem(
+                            onClick = {
+                                action.onTrigger()
+                                menuState.dismiss()
+                            },
+                            text = { Text(action.label) },
+                            leadingIcon = { Icon(action.icon, contentDescription = null) },
+                            shape = shape,
+                        )
+                    },
+                )
+            }
         }
     }
 }
@@ -401,6 +421,7 @@ private fun ConnectedGroupToggle(
     action: ConnectedGroupAction,
     shapes: ToggleButtonShapes,
     colors: ToggleButtonColors,
+    modifier: Modifier = Modifier,
 ) {
     val hasBadge = !action.badgeText.isNullOrBlank()
     ToggleButton(
@@ -408,25 +429,18 @@ private fun ConnectedGroupToggle(
         onCheckedChange = { action.onTrigger() },
         shapes = shapes,
         colors = colors,
-        contentPadding = if (hasBadge) {
-            PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-        } else {
-            PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-        },
-        modifier = Modifier.height(40.dp),
+        contentPadding = PaddingValues(0.dp),
+        modifier = modifier.size(width = 44.dp, height = 40.dp),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
+        Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = action.icon,
                 contentDescription = action.label,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(20.dp),
             )
             if (hasBadge) {
                 Text(
-                    text = action.badgeText!!,
+                    text = action.badgeText,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,

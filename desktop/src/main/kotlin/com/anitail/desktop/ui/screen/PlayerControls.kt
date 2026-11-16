@@ -342,51 +342,11 @@ fun PlayerControls(
                 label = "player_play_width",
             )
 
-            val shuffleCorner by animateDpAsState(
-                targetValue = if (playerState.shuffleEnabled) 12.dp else 20.dp,
-                animationSpec = spring(),
-                label = "player_shuffle_corner",
-            )
-            val repeatActive = playerState.repeatMode != RepeatMode.OFF
-            val repeatCorner by animateDpAsState(
-                targetValue = if (repeatActive) 12.dp else 20.dp,
-                animationSpec = spring(),
-                label = "player_repeat_corner",
-            )
-
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                // Shuffle
-                FilledTonalIconButton(
-                    onClick = { playerState.toggleShuffle() },
-                    shapes = IconButtonShapes(
-                        shape = RoundedCornerShape(shuffleCorner),
-                        pressedShape = RoundedCornerShape(10.dp),
-                    ),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = if (playerState.shuffleEnabled) {
-                            iconButtonColor.copy(alpha = 0.24f)
-                        } else {
-                            Color.Transparent
-                        },
-                        contentColor = if (playerState.shuffleEnabled) {
-                            textColor
-                        } else {
-                            mutedTextColor
-                        },
-                    ),
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        imageVector = ExpressiveIcons.Shuffle,
-                        contentDescription = stringResource("shuffle"),
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-
                 // Previous + Morphing Play/Pause + Next cluster
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -486,44 +446,6 @@ fun PlayerControls(
                             modifier = Modifier.size(sizes.sideIconSize),
                         )
                     }
-                }
-
-                // Repeat
-                FilledTonalIconButton(
-                    onClick = { playerState.toggleRepeat() },
-                    shapes = IconButtonShapes(
-                        shape = RoundedCornerShape(repeatCorner),
-                        pressedShape = RoundedCornerShape(10.dp),
-                    ),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = if (repeatActive) {
-                            iconButtonColor.copy(alpha = 0.24f)
-                        } else {
-                            Color.Transparent
-                        },
-                        contentColor = if (repeatActive) {
-                            textColor
-                        } else {
-                            mutedTextColor
-                        },
-                    ),
-                    modifier = Modifier.size(40.dp),
-                ) {
-                    Icon(
-                        imageVector = if (playerState.repeatMode == RepeatMode.ONE) {
-                            ExpressiveIcons.RepeatOne
-                        } else {
-                            ExpressiveIcons.Repeat
-                        },
-                        contentDescription = stringResource(
-                            when (playerState.repeatMode) {
-                                RepeatMode.ONE -> "repeat_one"
-                                RepeatMode.ALL -> "repeat_all"
-                                RepeatMode.OFF -> "repeat"
-                            },
-                        ),
-                        modifier = Modifier.size(20.dp),
-                    )
                 }
             }
         }

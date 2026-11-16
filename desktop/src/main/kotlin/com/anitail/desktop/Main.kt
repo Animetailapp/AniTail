@@ -2646,6 +2646,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                         isLyricsSideSheetOpen = showLyricsSideSheet,
                                         isQueueSideSheetOpen = showQueueSideSheet,
                                         onOpenAudioSettings = { showMiniPlayerAudioSettings = true },
+                                        onToggleMiniPlayer = { playerState.toggleMiniPlayer() },
                                     )
                                 }
                             },

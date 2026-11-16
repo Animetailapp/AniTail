@@ -83,6 +83,7 @@ fun MiniPlayer(
     isLyricsSideSheetOpen: Boolean = false,
     isQueueSideSheetOpen: Boolean = false,
     onOpenAudioSettings: (() -> Unit)? = null,
+    onToggleMiniPlayer: (() -> Unit)? = null,
 ) {
     val item = playerState.currentItem
     val preferences = remember { DesktopPreferences.getInstance() }
@@ -279,6 +280,23 @@ fun MiniPlayer(
                                 imageVector = ExpressiveIcons.Equalizer,
                                 contentDescription = stringResource("equalizer"),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                    if (onToggleMiniPlayer != null) {
+                        IconButton(
+                            onClick = onToggleMiniPlayer,
+                            modifier = Modifier.size(34.dp),
+                        ) {
+                            Icon(
+                                imageVector = ExpressiveIcons.PictureInPicture,
+                                contentDescription = stringResource("open_miniplayer"),
+                                tint = if (playerState.showMiniPlayer) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
                                 modifier = Modifier.size(18.dp),
                             )
                         }
