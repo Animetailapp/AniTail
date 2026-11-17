@@ -132,7 +132,7 @@ class DesktopDiscordRPC(
     }
 
     companion object {
-        private const val APPLICATION_ID = "1271273225120125040"
+        private const val APPLICATION_ID = "1447278780795064401"
     }
 }
 
@@ -235,10 +235,11 @@ private class DiscordGatewayClient(
             put("urls", JSONArray().put(imageUrl))
         }.toString().toRequestBody("application/json".toMediaType())
 
+        val bearerToken = if (token.startsWith("Bearer ", ignoreCase = true)) token else "Bearer $token"
         val request = Request.Builder()
             .url("https://discord.com/api/v9/applications/$applicationId/external-assets")
             .post(body)
-            .header("Authorization", token)
+            .header("Authorization", bearerToken)
             .header("User-Agent", SuperProperties.userAgent)
             .header("X-Super-Properties", SuperProperties.superPropertiesBase64)
             .build()
@@ -335,17 +336,16 @@ private class DiscordGatewayClient(
     }
 
     private fun sendIdentify(ws: WebSocket) {
+        val bearerToken = if (token.startsWith("Bearer ", ignoreCase = true)) token else "Bearer $token"
         val msg = JSONObject().apply {
             put("op", 2)
             put("d", JSONObject().apply {
-                put("token", token)
-                put("capabilities", 65)
-                put("properties", SuperProperties.superProperties)
-                put("presence", JSONObject().apply {
-                    put("status", "online")
-                    put("since", 0)
-                    put("activities", JSONArray())
-                    put("afk", false)
+                put("token", bearerToken)
+                put("intents", 0)
+                put("properties", JSONObject().apply {
+                    put("os", SuperProperties.osName)
+                    put("browser", "AniTail")
+                    put("device", SuperProperties.deviceName)
                 })
                 put("compress", false)
             })

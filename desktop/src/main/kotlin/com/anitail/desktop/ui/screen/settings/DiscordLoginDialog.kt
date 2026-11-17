@@ -17,13 +17,12 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.anitail.desktop.auth.DesktopDiscordService
+import com.anitail.desktop.auth.DiscordAuthResult
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.util.JavaFxManager
@@ -40,67 +41,62 @@ import javafx.concurrent.Worker
 import javafx.embed.swing.JFXPanel
 import javafx.scene.Scene
 import javafx.scene.web.WebView
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.net.URLDecoder
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.SwingUtilities
-
-private const val DISCORD_LOGIN_URL = "https://discord.com/login"
-
-private const val EXTRACT_DISCORD_TOKEN_JS = """
-    (function() {
-        try {
-            var iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            document.body.appendChild(iframe);
-            var token = iframe.contentWindow.localStorage.getItem('token');
-            iframe.remove();
-            if (token && token !== 'null' && token !== 'undefined') {
-                return token.replace(/^"|"$/g, '');
-            }
-        } catch (e) {}
-        try {
-            var direct = window.localStorage.getItem('token');
-            if (direct && direct !== 'null' && direct !== 'undefined') {
-                return direct.replace(/^"|"$/g, '');
-            }
-        } catch (e) {}
-        return '';
-    })();
-"""
 
 @Composable
 internal fun DiscordLoginDialog(
     onDismiss: () -> Unit,
-    onTokenCaptured: (String) -> Unit,
+    onAuthSuccess: (DiscordAuthResult) -> Unit,
+    onAuthError: (String) -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
+    val authSession = remember { DesktopDiscordService.createAuthSession() }
     var isLoading by remember { mutableStateOf(true) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
-    val tokenCapturedOnce = remember { AtomicBoolean(false) }
+    val handledCallback = remember { AtomicBoolean(false) }
 
-    fun tryExtractToken(view: WebView) {
-        if (tokenCapturedOnce.get()) return
-        val location = view.engine.location.orEmpty()
-        if (!location.contains("discord.com")) return
-        val result = runCatching {
-            view.engine.executeScript(EXTRACT_DISCORD_TOKEN_JS)?.toString()?.trim().orEmpty()
-        }.getOrDefault("")
-        if (result.isNotBlank() && result != "null" && result != "undefined" && tokenCapturedOnce.compareAndSet(false, true)) {
+    fun handleRedirectUrl(url: String) {
+        if (!url.startsWith(DesktopDiscordService.DISCORD_REDIRECT_URI)) return
+        if (!handledCallback.compareAndSet(false, true)) return
+
+        val query = url.substringAfter("?", "")
+        val params = parseQueryParams(query)
+        val error = params["error"]
+        val code = params["code"]
+        val state = params["state"].orEmpty()
+
+        if (!error.isNullOrBlank()) {
             SwingUtilities.invokeLater {
-                onTokenCaptured(result)
+                onAuthError(params["error_description"] ?: error)
             }
+            return
         }
-    }
 
-    LaunchedEffect(webViewRef) {
-        val view = webViewRef ?: return@LaunchedEffect
-        while (isActive && !tokenCapturedOnce.get()) {
-            delay(750L)
-            Platform.runLater {
-                val loc = view.engine.location.orEmpty()
-                if (loc.contains("/channels/") || loc.contains("/app")) {
-                    tryExtractToken(view)
-                }
+        if (code.isNullOrBlank()) {
+            SwingUtilities.invokeLater {
+                onAuthError("Missing authorization code")
+            }
+            return
+        }
+
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                DesktopDiscordService.exchangeCode(
+                    code = code,
+                    verifier = authSession.pkceVerifier,
+                    state = state,
+                    expectedState = authSession.state,
+                )
+            }
+            result.onSuccess { authResult ->
+                onAuthSuccess(authResult)
+            }.onFailure { err ->
+                onAuthError(err.message ?: "Discord OAuth error")
             }
         }
     }
@@ -150,23 +146,11 @@ internal fun DiscordLoginDialog(
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(
-                            onClick = {
-                                val view = webViewRef
-                                if (view != null) {
-                                    Platform.runLater { tryExtractToken(view) }
-                                }
-                            },
-                        ) {
-                            Text(stringResource("refresh"))
-                        }
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                imageVector = IconAssets.close(),
-                                contentDescription = stringResource("close"),
-                            )
-                        }
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = IconAssets.close(),
+                            contentDescription = stringResource("close"),
+                        )
                     }
                 }
 
@@ -190,23 +174,21 @@ internal fun DiscordLoginDialog(
                                         SwingUtilities.invokeLater {
                                             isLoading = newState == Worker.State.RUNNING || newState == Worker.State.SCHEDULED
                                         }
-                                        if (newState == Worker.State.SUCCEEDED) {
-                                            val loc = webView.engine.location.orEmpty()
-                                            if (loc.contains("/channels/") || loc.contains("/app")) {
-                                                tryExtractToken(webView)
-                                            }
+                                        val loc = webView.engine.location.orEmpty()
+                                        if (loc.startsWith(DesktopDiscordService.DISCORD_REDIRECT_URI)) {
+                                            handleRedirectUrl(loc)
                                         }
                                     }
 
                                     webView.engine.locationProperty().addListener { _, _, newLocation ->
                                         if (!newLocation.isNullOrBlank() &&
-                                            (newLocation.contains("/channels/") || newLocation.contains("/app"))
+                                            newLocation.startsWith(DesktopDiscordService.DISCORD_REDIRECT_URI)
                                         ) {
-                                            tryExtractToken(webView)
+                                            handleRedirectUrl(newLocation)
                                         }
                                     }
 
-                                    webView.engine.load(DISCORD_LOGIN_URL)
+                                    webView.engine.load(authSession.authorizeUrl)
                                     panel.scene = Scene(webView)
                                 }
                             }
@@ -219,3 +201,15 @@ internal fun DiscordLoginDialog(
     }
 }
 
+private fun parseQueryParams(query: String): Map<String, String> {
+    if (query.isBlank()) return emptyMap()
+    return query.split("&").mapNotNull { pair ->
+        val idx = pair.indexOf('=')
+        if (idx <= 0) null
+        else {
+            val key = URLDecoder.decode(pair.substring(0, idx), Charsets.UTF_8)
+            val value = URLDecoder.decode(pair.substring(idx + 1), Charsets.UTF_8)
+            key to value
+        }
+    }.toMap()
+}

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -22,7 +21,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,8 +67,6 @@ internal fun DiscordSettingsScreen(
     val discordAvatarUrl by preferences.discordAvatarUrl.collectAsState()
 
     var showDiscordLoginDialog by remember { mutableStateOf(false) }
-    var showTokenDialog by remember { mutableStateOf(false) }
-    var tokenInput by remember(discordToken) { mutableStateOf(discordToken) }
     var isTesting by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<Boolean?>(null) }
 
@@ -104,40 +100,13 @@ internal fun DiscordSettingsScreen(
     if (showDiscordLoginDialog) {
         DiscordLoginDialog(
             onDismiss = { showDiscordLoginDialog = false },
-            onTokenCaptured = { capturedToken ->
+            onAuthSuccess = { authResult ->
                 showDiscordLoginDialog = false
-                applyDiscordToken(capturedToken)
+                applyDiscordToken(authResult.accessToken)
             },
-        )
-    }
-
-    if (showTokenDialog) {
-        AlertDialog(
-            onDismissRequest = { showTokenDialog = false },
-            title = { Text("Discord Token") },
-            text = {
-                OutlinedTextField(
-                    value = tokenInput,
-                    onValueChange = { tokenInput = it },
-                    label = { Text("Token") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showTokenDialog = false
-                        applyDiscordToken(tokenInput)
-                    },
-                ) {
-                    Text(stringResource("save"))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTokenDialog = false }) {
-                    Text(stringResource("cancel"))
-                }
+            onAuthError = {
+                showDiscordLoginDialog = false
+                testResult = false
             },
         )
     }
@@ -276,7 +245,6 @@ internal fun DiscordSettingsScreen(
                         Spacer(modifier = Modifier.weight(1f))
                         TextButton(
                             onClick = {
-                                tokenInput = ""
                                 preferences.setDiscordToken("")
                                 preferences.setDiscordName("")
                                 preferences.setDiscordUsername("")
@@ -302,30 +270,18 @@ internal fun DiscordSettingsScreen(
                         Text(stringResource("discord_test_connection"))
                     }
                 } else {
-                    Row(
+                    Button(
+                        onClick = { showDiscordLoginDialog = true },
+                        enabled = !isTesting,
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Button(
-                            onClick = { showDiscordLoginDialog = true },
-                            enabled = !isTesting,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Icon(
-                                imageVector = IconAssets.discord(),
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(stringResource("login"))
-                        }
-                        OutlinedButton(
-                            onClick = { showTokenDialog = true },
-                            enabled = !isTesting,
-                        ) {
-                            Text("Token")
-                        }
+                        Icon(
+                            imageVector = IconAssets.discord(),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource("login"))
                     }
                 }
             }
