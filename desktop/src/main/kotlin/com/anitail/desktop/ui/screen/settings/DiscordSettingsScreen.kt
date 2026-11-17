@@ -68,6 +68,7 @@ internal fun DiscordSettingsScreen(
 
     var isTesting by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<Boolean?>(null) }
+    var authError by remember { mutableStateOf<String?>(null) }
 
     fun applyDiscordToken(rawToken: String, rawRefreshToken: String? = null) {
         val token = rawToken.trim()
@@ -75,6 +76,7 @@ internal fun DiscordSettingsScreen(
         scope.launch {
             isTesting = true
             testResult = null
+            authError = null
             val ok = withContext(Dispatchers.IO) {
                 val profile = DesktopDiscordService.fetchProfile(token)
                 if (profile != null) {
@@ -90,6 +92,7 @@ internal fun DiscordSettingsScreen(
                     false
                 }
             }
+            if (!ok) authError = "No se pudo verificar el perfil de Discord"
             testResult = ok
             isTesting = false
         }
@@ -99,6 +102,7 @@ internal fun DiscordSettingsScreen(
         scope.launch {
             isTesting = true
             testResult = null
+            authError = null
             val authResult = DesktopDiscordService.startBrowserOAuthLogin()
             authResult.onSuccess { result ->
                 val ok = withContext(Dispatchers.IO) {
@@ -116,8 +120,11 @@ internal fun DiscordSettingsScreen(
                         false
                     }
                 }
+                if (!ok) authError = "No se pudo obtener el perfil de Discord"
                 testResult = ok
-            }.onFailure {
+            }.onFailure { err ->
+                println("[DiscordAuth] Login failed: ${err.message}")
+                authError = err.message ?: "Error al iniciar sesión con Discord"
                 testResult = false
             }
             isTesting = false
@@ -222,7 +229,7 @@ internal fun DiscordSettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = stringResource("discord_ipc_not_found"),
+                                    text = authError ?: stringResource("discord_status_error"),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.error,
                                 )

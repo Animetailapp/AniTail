@@ -118,6 +118,9 @@ object DesktopDiscordService {
 
         client.newCall(request).execute().use { response ->
             val body = response.body.string()
+            if (!response.isSuccessful) {
+                println("[DiscordAuth] Token exchange failed HTTP ${response.code}: $body")
+            }
             check(response.isSuccessful) { "Discord OAuth token error HTTP ${response.code}: $body" }
             val json = JSONObject(body)
             return DiscordAuthResult(
@@ -139,33 +142,51 @@ object DesktopDiscordService {
             "Bearer $trimmedToken"
         }
 
-        val request = Request.Builder()
+        val usersMeRequest = Request.Builder()
+            .url("https://discord.com/api/v10/users/@me")
+            .header("Authorization", bearerHeader)
+            .build()
+
+        val oauthMeRequest = Request.Builder()
             .url("https://discord.com/api/v10/oauth2/@me")
             .header("Authorization", bearerHeader)
             .build()
 
         return runCatching {
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@use null
+            client.newCall(usersMeRequest).execute().use { response ->
                 val body = response.body.string()
-                if (body.isBlank()) return@use null
-
+                if (response.isSuccessful && body.isNotBlank()) {
+                    val user = JSONObject(body)
+                    return@runCatching parseProfile(user)
+                }
+                println("[DiscordAuth] /users/@me HTTP ${response.code}: $body")
+            }
+            client.newCall(oauthMeRequest).execute().use { response ->
+                val body = response.body.string()
+                if (!response.isSuccessful || body.isBlank()) {
+                    println("[DiscordAuth] /oauth2/@me HTTP ${response.code}: $body")
+                    return@use null
+                }
                 val root = JSONObject(body)
                 val user = root.optJSONObject("user") ?: return@use null
-                val id = user.optString("id")
-                val avatarHash = user.optString("avatar")
-                val discriminator = user.optString("discriminator")
-                val username = user.optString("username").takeIf { it.isNotBlank() } ?: ""
-                val globalName = user.optString("global_name").takeIf { it.isNotBlank() }
-                val displayName = globalName ?: username.ifBlank { "Discord" }
-
-                DiscordProfile(
-                    name = displayName,
-                    username = username.ifBlank { displayName },
-                    avatarUrl = buildAvatarUrl(id = id, avatarHash = avatarHash, discriminator = discriminator),
-                )
+                parseProfile(user)
             }
         }.getOrNull()
+    }
+
+    private fun parseProfile(user: JSONObject): DiscordProfile {
+        val id = user.optString("id")
+        val avatarHash = user.optString("avatar")
+        val discriminator = user.optString("discriminator")
+        val username = user.optString("username").takeIf { it.isNotBlank() } ?: ""
+        val globalName = user.optString("global_name").takeIf { it.isNotBlank() }
+        val displayName = globalName ?: username.ifBlank { "Discord" }
+
+        return DiscordProfile(
+            name = displayName,
+            username = username.ifBlank { displayName },
+            avatarUrl = buildAvatarUrl(id = id, avatarHash = avatarHash, discriminator = discriminator),
+        )
     }
 
     private fun buildAvatarUrl(
@@ -204,7 +225,8 @@ object DesktopDiscordService {
                         .orEmpty()
                         .trim()
                 }
-                check(callbackUrl.startsWith(DISCORD_REDIRECT_URI)) {
+                println("[DiscordAuth] Received OAuth callback: $callbackUrl")
+                check(callbackUrl.startsWith("$DISCORD_URI_SCHEME:", ignoreCase = true)) {
                     "Unexpected Discord OAuth callback: $callbackUrl"
                 }
 
