@@ -1,5 +1,15 @@
 package com.anitail.desktop
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
@@ -1966,7 +1976,49 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                 .fillMaxHeight()
                                 .padding(16.dp),
                         ) {
-                            when (currentScreen) {
+                            AnimatedContent(
+                                targetState = currentScreen,
+                                transitionSpec = {
+                                    val tabOrder = mapOf(
+                                        DesktopScreen.Home to 0,
+                                        DesktopScreen.Explore to 1,
+                                        DesktopScreen.Library to 2,
+                                        DesktopScreen.History to 3,
+                                        DesktopScreen.Stats to 4,
+                                        DesktopScreen.Search to 5,
+                                    )
+                                    val fromTab = tabOrder[initialState]
+                                    val toTab = tabOrder[targetState]
+                                    val direction = when {
+                                        fromTab != null && toTab != null -> if (toTab >= fromTab) 1 else -1
+                                        fromTab != null && toTab == null -> 1
+                                        fromTab == null && toTab != null -> -1
+                                        else -> 1
+                                    }
+                                    val spatialSpec = spring<androidx.compose.ui.unit.IntOffset>(
+                                        dampingRatio = 0.84f,
+                                        stiffness = 400f,
+                                    )
+                                    val scaleSpec = spring<Float>(
+                                        dampingRatio = 0.86f,
+                                        stiffness = 440f,
+                                    )
+                                    (fadeIn(animationSpec = tween(200)) +
+                                        slideInHorizontally(animationSpec = spatialSpec) { fullWidth ->
+                                            direction * (fullWidth / 14)
+                                        } +
+                                        scaleIn(initialScale = 0.97f, animationSpec = scaleSpec))
+                                        .togetherWith(
+                                            fadeOut(animationSpec = tween(140)) +
+                                                slideOutHorizontally(animationSpec = spatialSpec) { fullWidth ->
+                                                    -direction * (fullWidth / 18)
+                                                } +
+                                                scaleOut(targetScale = 0.985f, animationSpec = scaleSpec),
+                                        )
+                                },
+                                label = "DesktopScreenTransition",
+                            ) { screen ->
+                            when (screen) {
                         DesktopScreen.Home -> {
                         HomeScreen(
                             homePage = homePage,
@@ -2670,6 +2722,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                         },
                     )
                 }
+                            }
                             }
                         }
                         LyricsSideSheet(

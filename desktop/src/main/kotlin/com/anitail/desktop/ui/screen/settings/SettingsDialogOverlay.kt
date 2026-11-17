@@ -1,11 +1,16 @@
 package com.anitail.desktop.ui.screen
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -459,8 +464,29 @@ fun SettingsDialogOverlay(
                         }
 
                         CompositionLocalProvider(LocalSettingsEmbeddedInDialog provides true) {
-                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                                when (currentDestination) {
+                            AnimatedContent(
+                                targetState = currentDestination,
+                                transitionSpec = {
+                                    val spatialSpec = spring<androidx.compose.ui.unit.IntOffset>(
+                                        dampingRatio = 0.86f,
+                                        stiffness = 460f,
+                                    )
+                                    val scaleSpec = spring<Float>(
+                                        dampingRatio = 0.88f,
+                                        stiffness = 480f,
+                                    )
+                                    (fadeIn(tween(180)) +
+                                        slideInVertically(spatialSpec) { it / 20 } +
+                                        scaleIn(initialScale = 0.985f, animationSpec = scaleSpec))
+                                        .togetherWith(
+                                            fadeOut(tween(120)) +
+                                                slideOutVertically(spatialSpec) { -it / 24 },
+                                        )
+                                },
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                label = "SettingsPaneTransition",
+                            ) { destination ->
+                                when (destination) {
                                     SettingsDestination.MAIN,
                                     SettingsDestination.APPEARANCE -> AppearanceSettingsScreen(
                                         preferences = preferences,
