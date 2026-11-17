@@ -8,6 +8,7 @@ import com.anitail.innertube.models.YouTubeLocale
 import com.anitail.innertube.models.body.*
 import com.anitail.innertube.models.response.NextResponse
 import com.anitail.innertube.utils.parseCookieString
+import com.anitail.innertube.utils.sanitizeCookieString
 import com.anitail.innertube.utils.sha1
 import io.ktor.client.*
 import io.ktor.client.call.body
@@ -72,9 +73,10 @@ class InnerTube {
         }
     var cookie: String? = null
         set(value) {
-            field = value
-            cookieMap = if (value == null) emptyMap() else parseCookieString(value)
-            innerTubeX.cookie = value
+            val sanitized = sanitizeCookieString(value)
+            field = sanitized
+            cookieMap = if (sanitized == null) emptyMap() else parseCookieString(sanitized)
+            innerTubeX.cookie = sanitized
         }
     private var cookieMap = emptyMap<String, String>()
 

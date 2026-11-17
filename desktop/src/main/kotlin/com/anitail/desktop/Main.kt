@@ -163,6 +163,7 @@ import com.anitail.innertube.pages.ChartsPage
 import com.anitail.innertube.pages.ExplorePage
 import com.anitail.innertube.pages.HomePage
 import com.anitail.innertube.models.WatchEndpoint
+import com.anitail.innertube.utils.sanitizeCookieString
 import com.anitail.shared.model.LibraryItem
 import java.net.URI
 import java.time.LocalDateTime
@@ -1038,7 +1039,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
             username = proxyUsername,
             password = proxyPassword,
         )
-        YouTube.cookie = credentials?.cookie ?: youtubeCookie
+        val activeCookie = sanitizeCookieString(credentials?.cookie ?: youtubeCookie)
+        YouTube.cookie = activeCookie
         YouTube.visitorData = credentials?.visitorData
         YouTube.dataSyncId = normalizeDataSyncId(credentials?.dataSyncId)
         YouTube.proxy = proxyConfig.proxy
@@ -1048,7 +1050,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
             hl = resolveContentLanguage(contentLanguage),
             gl = resolveContentCountry(contentCountry)
         )
-        println("Anitail: YouTube API initialized with Cookie: ${youtubeCookie?.take(20)}..., Locale: $contentLanguage-$contentCountry")
+        println("Anitail: YouTube API initialized with Cookie: ${activeCookie?.take(20)}..., Locale: $contentLanguage-$contentCountry")
     }
 
     // Initial page loading and reload on auth changes
@@ -1073,7 +1075,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
             username = proxyUsername,
             password = proxyPassword,
         )
-        YouTube.cookie = credentials?.cookie ?: youtubeCookie
+        val activeCookie = sanitizeCookieString(credentials?.cookie ?: youtubeCookie)
+        YouTube.cookie = activeCookie
         YouTube.visitorData = credentials?.visitorData
         YouTube.dataSyncId = normalizeDataSyncId(credentials?.dataSyncId)
         YouTube.proxy = proxyConfig.proxy
@@ -1113,7 +1116,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
     // Trigger library sync when enabled and cookie available
     LaunchedEffect(ytmSync, authCredentials?.cookie, youtubeCookie) {
-        val activeCookie = authCredentials?.cookie ?: youtubeCookie
+        val activeCookie = sanitizeCookieString(authCredentials?.cookie ?: youtubeCookie)
         if (!shouldStartSync(ytmSync, activeCookie)) return@LaunchedEffect
 
         YouTube.cookie = activeCookie

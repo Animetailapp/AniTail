@@ -1357,8 +1357,6 @@ object YouTube {
         val rawText = httpResponse.body<String>()
         val response = Json { ignoreUnknownKeys = true; explicitNulls = false }
             .decodeFromString<BrowseResponse>(rawText)
-        println("[HISTORY_DEBUG] raw length=${rawText.length}")
-        println("[HISTORY_DEBUG] raw head=${rawText.take(1500)}")
 
         val sectionList = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
             ?.tabRenderer?.content?.sectionListRenderer

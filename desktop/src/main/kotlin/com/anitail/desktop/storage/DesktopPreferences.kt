@@ -23,6 +23,7 @@ import com.anitail.desktop.ui.screen.library.PlaylistSortType
 import com.anitail.desktop.ui.screen.library.SongFilter
 import com.anitail.desktop.ui.screen.library.SongSortType
 import com.anitail.desktop.i18n.SYSTEM_DEFAULT
+import com.anitail.innertube.utils.sanitizeCookieString
 
 /**
  * Desktop preferences storage system.
@@ -1105,8 +1106,9 @@ class DesktopPreferences private constructor(
     }
 
     fun setYoutubeCookie(value: String?) {
-        _youtubeCookie.value = value
-        persistSensitiveValue(SensitiveKeys.YOUTUBE_COOKIE, value)
+        val sanitized = sanitizeCookieString(value)
+        _youtubeCookie.value = sanitized
+        persistSensitiveValue(SensitiveKeys.YOUTUBE_COOKIE, sanitized)
         save()
     }
 
@@ -1351,11 +1353,16 @@ class DesktopPreferences private constructor(
 
             _showLyrics.value = json.optBoolean("showLyrics", true)
             _romanizeLyrics.value = json.optBoolean("romanizeLyrics", false)
-            _youtubeCookie.value = readNullableSensitiveValue(
+            val rawYoutubeCookie = readNullableSensitiveValue(
                 json = json,
                 legacyJsonKey = "youtubeCookie",
                 secureKey = SensitiveKeys.YOUTUBE_COOKIE,
             )
+            val cleanYoutubeCookie = sanitizeCookieString(rawYoutubeCookie)
+            _youtubeCookie.value = cleanYoutubeCookie
+            if (rawYoutubeCookie != null && rawYoutubeCookie != cleanYoutubeCookie) {
+                persistSensitiveValue(SensitiveKeys.YOUTUBE_COOKIE, cleanYoutubeCookie)
+            }
 
             if (migratedSensitiveValues) {
                 migratedSensitiveValues = false
