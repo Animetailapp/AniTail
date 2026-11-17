@@ -60,6 +60,7 @@ import com.anitail.desktop.db.mapper.toSongArtistMaps
 import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.component.rememberExpressiveAvatarShape
 import com.anitail.desktop.ui.component.ArtistPickerDialog
 import com.anitail.desktop.ui.component.ContextMenuAction
 import com.anitail.desktop.ui.component.ItemContextMenu
@@ -725,16 +726,15 @@ private fun YouTubeGridItem(
             .padding(4.dp),
     ) {
         Box(modifier = Modifier.size(size)) {
+            val itemShape = when (item) {
+                is ArtistItem -> rememberExpressiveAvatarShape(item.id)
+                else -> RoundedCornerShape(8.dp)
+            }
             RemoteImage(
                 url = item.thumbnail,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(
-                        when (item) {
-                            is ArtistItem -> CircleShape
-                            else -> RoundedCornerShape(8.dp)
-                        }
-                    ),
+                    .clip(itemShape),
             )
             if (isActive && isPlaying) {
                 Box(

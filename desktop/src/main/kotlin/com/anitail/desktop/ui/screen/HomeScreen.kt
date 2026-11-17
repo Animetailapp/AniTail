@@ -85,6 +85,7 @@ import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.PlayingIndicatorBox
 import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.component.rememberExpressiveAvatarShape
 import com.anitail.desktop.ui.component.ShimmerQuickPicksGrid
 import com.anitail.desktop.ui.component.ShimmerSectionRow
 import com.anitail.desktop.i18n.LocalStrings
@@ -831,7 +832,7 @@ private fun HomeItemCard(
     menuActionsForSong: (SongItem) -> List<ContextMenuAction>,
 ) {
     val isArtist = item is ArtistItem
-    val shape = if (isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
+    val shape = if (isArtist) rememberExpressiveAvatarShape(item.id) else RoundedCornerShape(ThumbnailCornerRadius)
     val (title, subtitle) = when (item) {
         is SongItem -> item.title to item.artists.joinToString { it.name }
         is AlbumItem -> item.title to item.artists?.joinToString { it.name }.orEmpty()
@@ -1031,7 +1032,7 @@ private fun KeepListeningRow(
     ) {
         items(items) { item ->
             val isArtist = item.playbackUrl.contains("/channel/")
-            val shape = if (isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
+            val shape = if (isArtist) rememberExpressiveAvatarShape(item.id) else RoundedCornerShape(ThumbnailCornerRadius)
             val contextMenuItems = toContextMenuItems(menuActions(item))
 
             ContextMenuArea(items = { contextMenuItems }) {

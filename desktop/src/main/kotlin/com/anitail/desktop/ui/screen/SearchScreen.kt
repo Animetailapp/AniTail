@@ -60,6 +60,7 @@ import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.component.rememberExpressiveAvatarShape
 import com.anitail.desktop.ui.component.ShimmerListItem
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.AlbumItem
@@ -591,16 +592,15 @@ private fun SearchResultItem(
     ) {
         // Thumbnail
         Box(modifier = Modifier.size(56.dp)) {
+            val itemShape = when (item) {
+                is ArtistItem -> rememberExpressiveAvatarShape(item.id)
+                else -> RoundedCornerShape(6.dp)
+            }
             RemoteImage(
                 url = item.thumbnail,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(
-                        when (item) {
-                            is ArtistItem -> CircleShape
-                            else -> RoundedCornerShape(6.dp)
-                        }
-                    ),
+                    .clip(itemShape),
             )
             if (isActive && isPlaying) {
                 Box(

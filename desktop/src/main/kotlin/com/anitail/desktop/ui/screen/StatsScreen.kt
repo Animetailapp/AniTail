@@ -73,6 +73,7 @@ import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.PlayingIndicatorBox
 import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.component.rememberExpressiveAvatarShape
 import com.anitail.desktop.ui.screen.library.GridThumbnailHeight
 import com.anitail.desktop.ui.screen.library.SongSortType
 import com.anitail.desktop.ui.screen.library.sortSongs
@@ -469,7 +470,7 @@ fun StatsScreen(
                                 title = "${index + 1}. ${artist.name}",
                                 subtitle = subtitle,
                                 thumbnailUrl = artist.thumbnailUrl,
-                                shape = CircleShape,
+                                shape = rememberExpressiveAvatarShape(artist.id),
                                 isActive = false,
                                 isPlaying = false,
                                 modifier = Modifier.combinedClickable(

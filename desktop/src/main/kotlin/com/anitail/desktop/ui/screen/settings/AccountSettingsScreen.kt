@@ -39,6 +39,7 @@ import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.storage.AvatarSourcePreference
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
+import com.anitail.desktop.ui.component.ExpressiveFramedAvatar
 import com.anitail.desktop.ui.component.RemoteImage
 import kotlinx.coroutines.launch
 
@@ -211,11 +212,12 @@ internal fun AccountSettingsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (isLoggedIn && accountInfo?.thumbnailUrl != null) {
-                    RemoteImage(
+                    ExpressiveFramedAvatar(
                         url = accountInfo?.thumbnailUrl,
                         contentDescription = null,
-                        modifier = Modifier.size(32.dp),
-                        shape = CircleShape,
+                        shapeKey = accountInfo?.name ?: accountInfo?.email ?: accountInfo?.thumbnailUrl,
+                        ringWidth = 2.dp,
+                        modifier = Modifier.size(36.dp),
                     )
                 } else {
                     Icon(
