@@ -5,6 +5,7 @@ import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.ui.screen.ListeningPeriod
 import com.anitail.desktop.ui.screen.OptionStats
 import com.anitail.desktop.ui.screen.buildSoundCapsuleOverview
+import com.anitail.desktop.ui.screen.computePeriodInsights
 import com.anitail.desktop.ui.screen.computeSongStats
 import com.anitail.desktop.ui.screen.statToPeriod
 import java.time.LocalDateTime
@@ -97,5 +98,41 @@ class StatsLogicTest {
         val feb = overview.months[1]
         assertEquals("UC1", feb.topArtist?.id)
         assertFalse(feb.totalSongsPlayed == 0)
+    }
+
+    @Test
+    fun computePeriodInsightsCalculatesStreaksPeakHourAndBuckets() {
+        val song1 = SongEntity(id = "s1", title = "One", artistName = "Artist A", duration = 180)
+        val song2 = SongEntity(id = "s2", title = "Two", artistName = "Artist B", duration = 200)
+        val maps = listOf(
+            SongArtistMap(songId = "s1", artistId = "UC1", position = 0),
+            SongArtistMap(songId = "s2", artistId = "UC2", position = 0),
+        )
+        val events = listOf(
+            EventEntity(id = 1, songId = "s1", timestamp = LocalDateTime.of(2026, 3, 1, 10, 0), playTime = 60_000L),
+            EventEntity(id = 2, songId = "s2", timestamp = LocalDateTime.of(2026, 3, 2, 22, 0), playTime = 180_000L),
+            EventEntity(id = 3, songId = "s2", timestamp = LocalDateTime.of(2026, 3, 3, 22, 0), playTime = 120_000L),
+            EventEntity(id = 4, songId = "s1", timestamp = LocalDateTime.of(2026, 3, 5, 15, 0), playTime = 90_000L),
+        )
+        val fromMs = LocalDateTime.of(2026, 2, 28, 0, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
+        val toMs = LocalDateTime.of(2026, 3, 10, 0, 0).toInstant(ZoneOffset.UTC).toEpochMilli()
+
+        val insights = computePeriodInsights(
+            events = events,
+            songsById = mapOf(song1.id to song1, song2.id to song2),
+            songArtistMaps = maps,
+            fromTimeMs = fromMs,
+            toTimeMs = toMs,
+        )
+
+        assertEquals(450_000L, insights.totalTimeMs)
+        assertEquals(4, insights.totalPlays)
+        assertEquals(2, insights.uniqueSongs)
+        assertEquals(2, insights.uniqueArtists)
+        assertEquals(4, insights.activeDays)
+        assertEquals(3, insights.longestStreakDays)
+        assertEquals(22, insights.peakHour)
+        assertEquals(4, insights.activityBuckets.size)
+        assertEquals(300_000L, insights.periodBreakdown[ListeningPeriod.NIGHT])
     }
 }

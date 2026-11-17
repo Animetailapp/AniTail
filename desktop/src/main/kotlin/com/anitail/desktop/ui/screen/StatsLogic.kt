@@ -7,9 +7,13 @@ import com.anitail.desktop.db.entities.SongArtistMap
 import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.relations.artistIdsForSong
 import com.anitail.desktop.db.relations.primaryArtistIdForSong
+import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.YearMonth
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.temporal.WeekFields
 import java.util.Locale
 
 internal enum class OptionStats { WEEKS, MONTHS, YEARS, CONTINUOUS }
@@ -146,6 +150,146 @@ private fun eventInRange(
 ): Boolean {
     val timeMs = event.timestamp.toInstant(ZoneOffset.UTC).toEpochMilli()
     return timeMs > fromTimeMs && timeMs <= toTimeMs
+}
+
+internal data class PeriodActivityBucket(
+    val label: String,
+    val playTimeMs: Long,
+    val playCount: Int,
+)
+
+internal data class PeriodInsights(
+    val totalTimeMs: Long,
+    val totalPlays: Int,
+    val uniqueSongs: Int,
+    val uniqueArtists: Int,
+    val activeDays: Int,
+    val longestStreakDays: Int,
+    val peakHour: Int?,
+    val periodBreakdown: Map<ListeningPeriod, Long>,
+    val activityBuckets: List<PeriodActivityBucket>,
+)
+
+internal fun computePeriodInsights(
+    events: List<EventEntity>,
+    songsById: Map<String, SongEntity>,
+    songArtistMaps: List<SongArtistMap>,
+    fromTimeMs: Long,
+    toTimeMs: Long,
+): PeriodInsights {
+    val filtered = events.filter { eventInRange(it, fromTimeMs, toTimeMs) && songsById.containsKey(it.songId) }
+    if (filtered.isEmpty()) {
+        return PeriodInsights(
+            totalTimeMs = 0L,
+            totalPlays = 0,
+            uniqueSongs = 0,
+            uniqueArtists = 0,
+            activeDays = 0,
+            longestStreakDays = 0,
+            peakHour = null,
+            periodBreakdown = ListeningPeriod.entries.associateWith { 0L },
+            activityBuckets = emptyList(),
+        )
+    }
+
+    var totalTimeMs = 0L
+    val uniqueSongs = HashSet<String>()
+    val uniqueArtists = HashSet<String>()
+    val activeDates = HashSet<LocalDate>()
+    val hourTotals = LongArray(24)
+    val periodTotals = ListeningPeriod.entries.associateWith { 0L }.toMutableMap()
+
+    filtered.forEach { event ->
+        val song = songsById[event.songId]
+        val playTime = effectivePlayTimeMs(event, song)
+        totalTimeMs += playTime
+        uniqueSongs.add(event.songId)
+
+        val artistIds = artistIdsForSong(event.songId, songArtistMaps)
+        if (artistIds.isNotEmpty()) {
+            uniqueArtists.addAll(artistIds)
+        } else {
+            val fallbackName = song?.artistName?.trim()?.lowercase(Locale.ROOT).orEmpty()
+            if (fallbackName.isNotBlank()) uniqueArtists.add(fallbackName)
+        }
+
+        val date = event.timestamp.toLocalDate()
+        activeDates.add(date)
+
+        val hour = event.timestamp.hour.coerceIn(0, 23)
+        hourTotals[hour] += playTime
+
+        val period = when (hour) {
+            in 5..11 -> ListeningPeriod.MORNING
+            in 12..16 -> ListeningPeriod.AFTERNOON
+            in 17..20 -> ListeningPeriod.EVENING
+            else -> ListeningPeriod.NIGHT
+        }
+        periodTotals[period] = periodTotals.getValue(period) + playTime
+    }
+
+    val sortedDates = activeDates.sorted()
+    var longestStreak = 0
+    var currentStreak = 0
+    var prevDate: LocalDate? = null
+    sortedDates.forEach { date ->
+        currentStreak = if (prevDate != null && date == prevDate!!.plusDays(1)) {
+            currentStreak + 1
+        } else {
+            1
+        }
+        if (currentStreak > longestStreak) longestStreak = currentStreak
+        prevDate = date
+    }
+
+    val peakHour = hourTotals.indices.maxByOrNull { hourTotals[it] }?.takeIf { hourTotals[it] > 0L }
+
+    val effectiveFromMs = if (fromTimeMs <= 0L) {
+        filtered.minOf { it.timestamp.toInstant(ZoneOffset.UTC).toEpochMilli() }
+    } else {
+        fromTimeMs
+    }
+    val spanDays = ((toTimeMs - effectiveFromMs) / 86_400_000L).coerceAtLeast(1L)
+
+    val dayFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
+    val monthFormatter = DateTimeFormatter.ofPattern("MMM yy", Locale.getDefault())
+    val weekFields = WeekFields.of(Locale.getDefault())
+
+    val bucketsMap = linkedMapOf<String, StatsAccumulator>()
+    filtered.sortedBy { it.timestamp }.forEach { event ->
+        val date = event.timestamp.toLocalDate()
+        val key = when {
+            spanDays <= 35L -> dayFormatter.format(date)
+            spanDays <= 185L -> {
+                val week = date.get(weekFields.weekOfWeekBasedYear())
+                "S$week ${date.year % 100}"
+            }
+            else -> monthFormatter.format(date)
+        }
+        val acc = bucketsMap.getOrPut(key) { StatsAccumulator() }
+        acc.count += 1
+        acc.timeMs += effectivePlayTimeMs(event, songsById[event.songId])
+    }
+
+    val activityBuckets = bucketsMap.entries.map { (label, acc) ->
+        PeriodActivityBucket(
+            label = label,
+            playTimeMs = acc.timeMs,
+            playCount = acc.count,
+        )
+    }
+
+    return PeriodInsights(
+        totalTimeMs = totalTimeMs,
+        totalPlays = filtered.size,
+        uniqueSongs = uniqueSongs.size,
+        uniqueArtists = uniqueArtists.size,
+        activeDays = activeDates.size,
+        longestStreakDays = longestStreak,
+        peakHour = peakHour,
+        periodBreakdown = periodTotals,
+        activityBuckets = activityBuckets,
+    )
 }
 
 internal enum class ListeningPeriod {
