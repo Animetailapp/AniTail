@@ -243,6 +243,8 @@ fun StatsScreen(
 
     val mostPlayedSongs = remember(songStats) { songStats.map { it.song } }
     val mostPlayedSongItems = remember(mostPlayedSongs) { mostPlayedSongs.map { it.toLibraryItem() } }
+    val totalPeriodTimeMs = remember(songStats) { songStats.sumOf { it.timeListened } }
+    val totalPeriodPlays = remember(songStats) { songStats.sumOf { it.songCountListened } }
     val capsuleOverview = remember(events, songsById, songArtistMaps, artistsById) {
         buildSoundCapsuleOverview(
             events = events,
@@ -251,7 +253,7 @@ fun StatsScreen(
             artistsById = artistsById,
         )
     }
-    var viewMode by remember { mutableStateOf(StatsViewMode.CAPSULE) }
+    var viewMode by remember { mutableStateOf(StatsViewMode.EXPLORER) }
     var capsuleSubView by remember { mutableStateOf<CapsuleSubView>(CapsuleSubView.Overview) }
 
     fun copyToClipboard(text: String) {
@@ -450,6 +452,34 @@ fun StatsScreen(
                     currentValue = indexChips,
                     onValueUpdate = { indexChips = it },
                 )
+            }
+
+            item(key = "periodSummary") {
+                AnimatedContent(
+                    targetState = selectedOption to indexChips,
+                    transitionSpec = {
+                        (scaleIn(
+                            initialScale = 0.98f,
+                            animationSpec = spring(dampingRatio = 0.86f, stiffness = 420f),
+                        ) + fadeIn(animationSpec = tween(220)))
+                            .togetherWith(
+                                scaleOut(
+                                    targetScale = 0.98f,
+                                    animationSpec = spring(dampingRatio = 0.86f, stiffness = 420f),
+                                ) + fadeOut(animationSpec = tween(140)),
+                            )
+                    },
+                    label = "StatsPeriodSummaryTransition",
+                ) { _ ->
+                    StatsPeriodSummaryRow(
+                        totalTimeMs = totalPeriodTimeMs,
+                        totalPlays = totalPeriodPlays,
+                        uniqueSongsCount = songStats.size,
+                        topArtist = artistStats.firstOrNull(),
+                        onOpenArtist = { artist -> onOpenArtist(artist.id, artist.name) },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    )
+                }
             }
 
             item(key = "mostPlayedSongs") {
@@ -733,15 +763,126 @@ private fun StatsModeToggle(
             modifier = Modifier.padding(3.dp),
         ) {
             StatsModePill(
-                label = stringResource("sound_capsule_title"),
-                selected = selectedMode == StatsViewMode.CAPSULE,
-                onClick = { onSelectMode(StatsViewMode.CAPSULE) },
-            )
-            StatsModePill(
                 label = stringResource("stats"),
                 selected = selectedMode == StatsViewMode.EXPLORER,
                 onClick = { onSelectMode(StatsViewMode.EXPLORER) },
             )
+            StatsModePill(
+                label = stringResource("sound_capsule_title"),
+                selected = selectedMode == StatsViewMode.CAPSULE,
+                onClick = { onSelectMode(StatsViewMode.CAPSULE) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatsPeriodSummaryRow(
+    totalTimeMs: Long,
+    totalPlays: Int,
+    uniqueSongsCount: Int,
+    topArtist: ArtistStatsEntry?,
+    onOpenArtist: (com.anitail.desktop.db.entities.ArtistEntity) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+            modifier = Modifier.weight(1f),
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            ) {
+                Text(
+                    text = stringResource("time_listened"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                )
+                Text(
+                    text = makeTimeString(totalTimeMs).ifBlank { "0s" },
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+            modifier = Modifier.weight(1f),
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            ) {
+                Text(
+                    text = stringResource("songs"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                )
+                Text(
+                    text = pluralStringResource("n_time", totalPlays, totalPlays),
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "$uniqueSongsCount ${stringResource("songs").lowercase()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.78f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
+        if (topArtist != null) {
+            val shape = rememberExpressiveAvatarShape(topArtist.artist.id)
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f),
+                modifier = Modifier
+                    .weight(1.2f)
+                    .clip(RoundedCornerShape(18.dp))
+                    .clickable { onOpenArtist(topArtist.artist) },
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                ) {
+                    RemoteImage(
+                        url = topArtist.artist.thumbnailUrl,
+                        shape = shape,
+                        modifier = Modifier.size(48.dp).clip(shape),
+                    )
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            text = stringResource("sound_capsule_top_artist"),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
+                        )
+                        Text(
+                            text = topArtist.artist.name,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
         }
     }
 }
