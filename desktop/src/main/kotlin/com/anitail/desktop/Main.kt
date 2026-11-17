@@ -834,6 +834,20 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     )
                 }
             }
+            // Registrar la reproducción en el historial remoto de YouTube Music
+            if (!pauseListenHistory && !YouTube.cookie.isNullOrBlank()) {
+                scope.launch(Dispatchers.IO) {
+                    runCatching {
+                        val trackingUrl = YouTube.player(
+                            videoId = item.id,
+                            client = com.anitail.innertube.models.YouTubeClient.WEB_REMIX,
+                        ).getOrNull()?.playbackTracking?.videostatsPlaybackUrl?.baseUrl
+                        if (trackingUrl != null) {
+                            YouTube.registerPlayback(null, trackingUrl)
+                        }
+                    }.onFailure { System.err.println("Main: registerPlayback failed: ${it.message}") }
+                }
+            }
         }
         onDispose {
             playerState.onPlaybackEvent = null

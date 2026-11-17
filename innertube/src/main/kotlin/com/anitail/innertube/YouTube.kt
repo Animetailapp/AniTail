@@ -1355,15 +1355,33 @@ object YouTube {
             setLogin = true
         ).body<BrowseResponse>()
 
-        HistoryPage(
-            sections = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
-                ?.tabRenderer?.content?.sectionListRenderer?.contents
-                ?.mapNotNull {
-                    it.musicShelfRenderer?.let { musicShelfRenderer ->
-                        HistoryPage.fromMusicShelfRenderer(musicShelfRenderer)
-                    }
-                }
-        )
+        val sectionList = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+            ?.tabRenderer?.content?.sectionListRenderer
+            ?: response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer
+            ?: response.contents?.sectionListRenderer
+
+        val sections = sectionList?.contents
+            ?.mapNotNull { it.musicShelfRenderer?.let { shelf -> HistoryPage.fromMusicShelfRenderer(shelf) } }
+            .orEmpty()
+            .toMutableList()
+
+        // Seguir continuaciones para traer más historial
+        var token = sectionList?.continuations?.getContinuation()
+            ?: sectionList?.contents?.getContinuation()
+        var pages = 0
+        while (token != null && pages < 5) {
+            pages++
+            val next = innerTube.browse(WEB_REMIX, continuation = token, setLogin = true)
+                .body<BrowseResponse>()
+            val cont = next.continuationContents?.sectionListContinuation
+            if (cont == null) break
+            cont.contents.mapNotNull {
+                it.musicShelfRenderer?.let { shelf -> HistoryPage.fromMusicShelfRenderer(shelf) }
+            }.let { sections.addAll(it) }
+            token = cont.continuations?.getContinuation() ?: cont.contents.getContinuation()
+        }
+
+        HistoryPage(sections = sections)
     }
 
     /**
