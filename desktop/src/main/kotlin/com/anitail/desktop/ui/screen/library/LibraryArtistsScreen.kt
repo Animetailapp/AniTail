@@ -101,9 +101,13 @@ fun LibraryArtistsScreen(
         artists.associate { artist -> artist.id to artistPlayTime(artist, stats) }
     }
 
-    val filteredArtists = remember(artists, filter) {
-        // Desktop parity decision: in Library we only expose followed/subscribed artists.
-        artists.filter { it.bookmarkedAt != null }
+    val filteredArtists = remember(artists, filter, songCountByArtist) {
+        when (filter) {
+            ArtistFilter.LIKED -> artists.filter { it.bookmarkedAt != null }
+            ArtistFilter.LIBRARY -> artists.filter {
+                it.bookmarkedAt != null || (songCountByArtist[it.id] ?: 0) > 0
+            }
+        }
     }
     val sortedArtists = remember(filteredArtists, sortType, sortDescending, songCountByArtist, playTimeByArtist) {
         sortArtists(

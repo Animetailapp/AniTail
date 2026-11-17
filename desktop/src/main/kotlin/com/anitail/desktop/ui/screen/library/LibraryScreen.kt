@@ -1,5 +1,13 @@
 package com.anitail.desktop.ui.screen.library
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -67,8 +75,24 @@ fun LibraryScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        when (filter) {
+    AnimatedContent(
+        targetState = filter,
+        transitionSpec = {
+            (scaleIn(
+                initialScale = 0.98f,
+                animationSpec = spring(dampingRatio = 0.86f, stiffness = 420f),
+            ) + fadeIn(animationSpec = tween(200)))
+                .togetherWith(
+                    scaleOut(
+                        targetScale = 0.98f,
+                        animationSpec = spring(dampingRatio = 0.86f, stiffness = 420f),
+                    ) + fadeOut(animationSpec = tween(140)),
+                )
+        },
+        label = "LibraryFilterTransition",
+        modifier = Modifier.fillMaxSize(),
+    ) { activeFilter ->
+        when (activeFilter) {
             LibraryFilter.LIBRARY -> LibraryMixScreen(
                 database = database,
                 downloadService = downloadService,
@@ -110,7 +134,7 @@ fun LibraryScreen(
                 onOpenArtist = onOpenArtist,
             )
             LibraryFilter.ARTISTS -> LibraryArtistsScreen(
-                artists = database.bookmarkedArtists().collectAsState(initial = emptyList()).value,
+                artists = database.artists.collectAsState(initial = emptyList()).value,
                 songs = database.songs.collectAsState(initial = emptyList()).value,
                 playerState = playerState,
                 preferences = preferences,
