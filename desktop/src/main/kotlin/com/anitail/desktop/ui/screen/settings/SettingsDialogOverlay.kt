@@ -25,6 +25,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -87,7 +91,8 @@ fun SettingsDialogOverlay(
         exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.96f, animationSpec = tween(150)),
     ) {
         var currentDestination by remember { mutableStateOf(SettingsDestination.APPEARANCE) }
-        var searchQuery by remember { mutableStateOf("") }
+        val searchState = rememberTextFieldState()
+        val searchQuery = searchState.text.toString()
 
         val latestVersionName by preferences.latestVersionName.collectAsState()
         val currentVersionName = remember { DesktopUpdater.currentVersionName() }
@@ -295,9 +300,8 @@ fun SettingsDialogOverlay(
                             .padding(start = 16.dp, end = 12.dp, top = 16.dp, bottom = 16.dp),
                     ) {
                         SettingsDialogSearchBar(
-                            query = searchQuery,
-                            onQueryChange = { searchQuery = it },
-                            onClear = { searchQuery = "" },
+                            state = searchState,
+                            onClear = { searchState.clearText() },
                         )
 
                         Spacer(modifier = Modifier.height(14.dp))
@@ -508,10 +512,10 @@ fun SettingsDialogOverlay(
 
 @Composable
 private fun SettingsDialogSearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
+    state: TextFieldState,
     onClear: () -> Unit,
 ) {
+    val isEmpty = state.text.isEmpty()
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -536,7 +540,7 @@ private fun SettingsDialogSearchBar(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                if (query.isEmpty()) {
+                if (isEmpty) {
                     Text(
                         text = stringResource("search_settings_placeholder"),
                         style = MaterialTheme.typography.bodyMedium,
@@ -546,9 +550,8 @@ private fun SettingsDialogSearchBar(
                     )
                 }
                 BasicTextField(
-                    value = query,
-                    onValueChange = onQueryChange,
-                    singleLine = true,
+                    state = state,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(
                         color = MaterialTheme.colorScheme.onSurface,
                     ),
@@ -556,7 +559,7 @@ private fun SettingsDialogSearchBar(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            if (query.isNotEmpty()) {
+            if (!isEmpty) {
                 IconButton(
                     onClick = onClear,
                     modifier = Modifier.size(28.dp),

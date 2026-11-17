@@ -362,7 +362,7 @@ internal fun LegacyAccountSettingsScreen(
     val canUseDiscordAvatar = isLoggedIn || discordToken.isNotBlank()
     val discordStatusErrorText = stringResource("discord_status_error")
     val openUrl: (String) -> Unit = { url ->
-        runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url.trim())) }
+        val _ = runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url.trim())) }
     }
 
     fun refreshDiscordProfile(token: String) {
@@ -2431,6 +2431,7 @@ internal fun SettingsSlider(
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
+            @Suppress("DEPRECATION")
             Slider(
                 value = value,
                 onValueChange = onValueChange,

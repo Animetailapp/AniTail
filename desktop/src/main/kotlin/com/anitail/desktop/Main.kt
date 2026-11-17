@@ -1454,7 +1454,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     runCatching { GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.fullScreenWindow == window }.getOrDefault(false)
                 if (isFullScreen) return
 
-                runCatching {
+                val _ = runCatching {
                     if (snapMode != WindowSnapMode.FLOATING || isWindowAtWorkArea(window)) {
                         val bounds = window.bounds
                         val width = bounds.width.coerceAtLeast(1)
@@ -1568,7 +1568,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
             LaunchedEffect(playerState.isFullscreenOverlay) {
                 if (playerState.isFullscreenOverlay) {
-                    runCatching {
+                    val _ = runCatching {
                         window.shape = null
                     }
                     if (windowState.placement != WindowPlacement.Fullscreen) {
