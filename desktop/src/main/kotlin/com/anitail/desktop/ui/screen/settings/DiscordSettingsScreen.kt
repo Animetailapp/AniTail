@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.anitail.desktop.auth.DesktopDiscordService
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
@@ -69,10 +70,15 @@ internal fun DiscordSettingsScreen(
             isTesting = true
             testResult = null
             val result = withContext(Dispatchers.IO) {
-                val client = DiscordIpcClient("1271273225120125040")
-                val connected = client.connect()
-                if (connected) client.close()
-                connected
+                val token = preferences.discordToken.value.trim()
+                if (token.isNotEmpty()) {
+                    DesktopDiscordService.fetchProfile(token) != null
+                } else {
+                    val client = DiscordIpcClient("1271273225120125040")
+                    val connected = client.connect()
+                    if (connected) client.close()
+                    connected
+                }
             }
             testResult = result
             isTesting = false

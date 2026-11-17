@@ -738,7 +738,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
     LaunchedEffect(enableDiscordRPC) {
         if (enableDiscordRPC) {
             if (discordRPC == null) {
-                val rpc = DesktopDiscordRPC()
+                val rpc = DesktopDiscordRPC(tokenProvider = { preferences.discordToken.value })
                 discordRPC = rpc
                 discordRpcController = com.anitail.desktop.rpc.DesktopPlayerRpcController(rpc)
             }
