@@ -170,19 +170,26 @@ fun ArtistDetailScreen(
                     // Header: Imagen grande con fading edge
                     item(key = "header") {
                         Column {
-                            // Imagen del artista con aspect ratio como Android
+                            // Imagen del artista / canal adaptada a Desktop
                             page.artist.thumbnail?.let { thumbnail ->
+                                val bannerUrl = remember(thumbnail) {
+                                    if (thumbnail.contains("lh3.googleusercontent.com")) {
+                                        thumbnail.replace(Regex("=w\\d+-h\\d+.*$"), "=w1200-h600-p-l90-rj")
+                                            .replace(Regex("=s\\d+.*$"), "=w1200-h600-p-l90-rj")
+                                    } else {
+                                        thumbnail
+                                    }
+                                }
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .aspectRatio(1.2f / 1f),
+                                        .height(280.dp),
                                 ) {
                                     RemoteImage(
-                                        url = thumbnail,
+                                        url = bannerUrl,
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .align(Alignment.TopCenter)
-                                            .fadingEdge(bottom = 200.dp),
+                                            .fillMaxSize()
+                                            .fadingEdge(bottom = 120.dp),
                                         contentScale = ContentScale.Crop,
                                     )
                                 }
@@ -202,8 +209,23 @@ fun ArtistDetailScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     fontSize = 32.sp,
-                                    modifier = Modifier.padding(bottom = 16.dp)
+                                    modifier = Modifier.padding(bottom = 4.dp)
                                 )
+
+                                val metaText = listOfNotNull(
+                                    page.subscriberCountText?.takeIf { it.isNotBlank() },
+                                    page.monthlyListenerCount?.takeIf { it.isNotBlank() },
+                                ).joinToString(" • ")
+                                if (metaText.isNotBlank()) {
+                                    Text(
+                                        text = metaText,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(bottom = 12.dp),
+                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
 
                                 // Fila de botones
                                 Row(
@@ -784,6 +806,38 @@ private fun YouTubeGridItem(
                         text = author,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                }
+            }
+            is PodcastItem -> {
+                val meta = listOfNotNull(
+                    item.author?.name?.takeIf { it.isNotBlank() },
+                    item.episodeCountText?.takeIf { it.isNotBlank() },
+                ).joinToString(" • ")
+                if (meta.isNotBlank()) {
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                }
+            }
+            is EpisodeItem -> {
+                val meta = listOfNotNull(
+                    item.author?.name?.takeIf { it.isNotBlank() },
+                    item.publishDateText?.takeIf { it.isNotBlank() },
+                ).joinToString(" • ")
+                if (meta.isNotBlank()) {
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(horizontal = 4.dp)
                     )
                 }
