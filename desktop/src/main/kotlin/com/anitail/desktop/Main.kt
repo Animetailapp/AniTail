@@ -164,6 +164,8 @@ import com.anitail.innertube.pages.ExplorePage
 import com.anitail.innertube.pages.HomePage
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.innertube.utils.sanitizeCookieString
+import com.anitail.desktop.ui.screen.home.HomeInfinitePaginationState
+import com.anitail.desktop.ui.screen.home.loadNextHomePage
 import com.anitail.shared.model.LibraryItem
 import java.net.URI
 import java.time.LocalDateTime
@@ -790,6 +792,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
     var isHomeLoading by remember { mutableStateOf(false) }
     var isHomeRefreshing by remember { mutableStateOf(false) }
     var isLoadingMore by remember { mutableStateOf(false) }
+    var homePaginationState by remember { mutableStateOf(HomeInfinitePaginationState()) }
     var explorePage by remember { mutableStateOf<ExplorePage?>(null) }
     var chartsPage by remember { mutableStateOf<ChartsPage?>(null) }
     var isExploreLoading by remember { mutableStateOf(false) }
@@ -1300,6 +1303,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
         homeShuffleSeed = System.currentTimeMillis()
         scope.launch {
             isHomeRefreshing = true
+            homePaginationState = HomeInfinitePaginationState()
             loadHomePage(
                 onLoading = { isHomeLoading = it },
                 onPage = { page -> homePage = page },
@@ -1956,6 +1960,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             songArtistMaps = songArtistMaps,
                             onChipSelected = { chip ->
                                 scope.launch {
+                                    homePaginationState = HomeInfinitePaginationState()
                                     handleChipSelection(
                                         chip = chip,
                                         selectedChip = selectedChip,
@@ -1970,15 +1975,23 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             },
                             onLoadMore = {
                                 if (isLoadingMore) return@HomeScreen
-                                val continuation = homePage?.continuation ?: return@HomeScreen
+                                val currentPage = homePage ?: return@HomeScreen
+                                if (currentPage.continuation == null && selectedChip != null) return@HomeScreen
+                                if (currentPage.continuation == null && homePaginationState.exhausted) return@HomeScreen
                                 scope.launch {
                                     isLoadingMore = true
-                                    val nextPage = YouTube.home(continuation).getOrNull()
-                                    if (nextPage != null) {
-                                        homePage = homePage?.copy(
-                                            sections = homePage?.sections.orEmpty() + nextPage.sections,
-                                            continuation = nextPage.continuation,
-                                        )
+                                    val result = loadNextHomePage(
+                                        currentHomePage = currentPage,
+                                        selectedChip = selectedChip,
+                                        paginationState = homePaginationState,
+                                    ) { cont, params ->
+                                        YouTube.home(continuation = cont, params = params).getOrNull()
+                                    }
+                                    if (result != null) {
+                                        homePage = result.first
+                                        homePaginationState = result.second
+                                    } else if (currentPage.continuation == null && selectedChip == null) {
+                                        homePaginationState = homePaginationState.copy(exhausted = true)
                                     }
                                     isLoadingMore = false
                                 }

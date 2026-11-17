@@ -51,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -308,13 +309,23 @@ fun HomeScreen(
         menuActionsForSong(libraryItem, song)
     }
 
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+    val currentOnLoadMore by rememberUpdatedState(onLoadMore)
+    val currentIsLoadingMore by rememberUpdatedState(isLoadingMore)
+    val currentIsLoading by rememberUpdatedState(isLoading)
+    val currentIsRefreshing by rememberUpdatedState(isRefreshing)
+
+    LaunchedEffect(listState, homePage?.sections?.size, homePage?.continuation, selectedChip) {
+        snapshotFlow {
+            val layout = listState.layoutInfo
+            val total = layout.totalItemsCount
+            val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index
+            val nearEnd = lastVisible != null && total > 0 && lastVisible >= total - 3
+            nearEnd && !currentIsLoadingMore && !currentIsLoading && !currentIsRefreshing
+        }
             .distinctUntilChanged()
-            .collect { lastVisible ->
-                val total = listState.layoutInfo.totalItemsCount
-                if (lastVisible != null && total > 0 && lastVisible >= total - 3) {
-                    onLoadMore()
+            .collect { shouldLoad ->
+                if (shouldLoad) {
+                    currentOnLoadMore()
                 }
             }
     }
