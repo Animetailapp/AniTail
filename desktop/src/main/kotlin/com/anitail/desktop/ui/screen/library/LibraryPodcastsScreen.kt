@@ -174,9 +174,24 @@ fun LibraryPodcastsScreen(
             InnertubeYouTube.episodesForLater().onSuccess { episodes ->
                 savedEpisodes = episodes
             }
-            InnertubeYouTube.libraryPodcastChannels().onSuccess { page ->
-                podcastChannels = page.items.filterIsInstance<ArtistItem>()
+            val apiChannels = InnertubeYouTube.libraryPodcastChannels()
+                .getOrNull()
+                ?.items
+                ?.filterIsInstance<ArtistItem>()
+                .orEmpty()
+            val showChannels = savedShows.mapNotNull { show ->
+                val chId = show.channelId ?: show.author?.id ?: return@mapNotNull null
+                val chName = show.author?.name?.takeIf { it.isNotBlank() } ?: show.title
+                ArtistItem(
+                    id = chId,
+                    title = chName,
+                    thumbnail = show.thumbnail,
+                    shuffleEndpoint = null,
+                    radioEndpoint = null,
+                )
             }
+            val apiIds = apiChannels.map { it.id }.toSet()
+            podcastChannels = apiChannels + showChannels.filter { it.id !in apiIds }.distinctBy { it.id }
         }
         isLoading = false
     }

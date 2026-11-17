@@ -52,6 +52,7 @@ import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.desktop.ui.component.ShimmerBox
 import com.anitail.desktop.ui.component.ShimmerListItem
 import com.anitail.innertube.YouTube
+import com.anitail.innertube.models.PlaylistItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.pages.PlaylistPage
 import com.anitail.shared.model.LibraryItem
@@ -94,8 +95,88 @@ fun PlaylistDetailScreen(
             isLoading = true
             error = null
             try {
-                val result = YouTube.playlist(playlistId)
-                playlistPage = result.getOrNull()
+                val normalizedId = playlistId.removePrefix("VL")
+                playlistPage = when (normalizedId) {
+                    "RDPN" -> {
+                        val info = YouTube.newEpisodesPlaylistInfo().getOrNull() ?: PlaylistItem(
+                            id = "RDPN",
+                            title = playlistName.ifBlank { strings.get("new_episodes") },
+                            author = null,
+                            songCountText = null,
+                            thumbnail = null,
+                            playEndpoint = null,
+                            shuffleEndpoint = null,
+                            radioEndpoint = null,
+                        )
+                        val songs = YouTube.newEpisodes().getOrElse { emptyList() }.distinctBy { it.id }
+                        val enrichedInfo = if (info.thumbnail == null && songs.isNotEmpty()) {
+                            info.copy(thumbnail = songs.first().thumbnail)
+                        } else {
+                            info
+                        }
+                        PlaylistPage(
+                            playlist = enrichedInfo,
+                            songs = songs,
+                            songsContinuation = null,
+                            continuation = null,
+                        )
+                    }
+
+                    "SE" -> {
+                        val episodes = YouTube.episodesForLater().getOrElse { emptyList() }.distinctBy { it.id }
+                        PlaylistPage(
+                            playlist = PlaylistItem(
+                                id = "SE",
+                                title = playlistName.ifBlank { strings.get("episodes_for_later") },
+                                author = null,
+                                songCountText = if (episodes.isNotEmpty()) {
+                                    strings.plural("n_episode", episodes.size, episodes.size)
+                                } else {
+                                    null
+                                },
+                                thumbnail = episodes.firstOrNull()?.thumbnail,
+                                playEndpoint = null,
+                                shuffleEndpoint = null,
+                                radioEndpoint = null,
+                            ),
+                            songs = episodes,
+                            songsContinuation = null,
+                            continuation = null,
+                        )
+                    }
+
+                    else -> {
+                        val result = YouTube.playlist(playlistId)
+                        result.getOrNull() ?: run {
+                            val podcastResult = if (normalizedId.startsWith("MPSP")) {
+                                YouTube.podcast(normalizedId).getOrNull()
+                            } else {
+                                null
+                            }
+                            if (podcastResult != null) {
+                                val mappedSongs = podcastResult.episodes.map { it.asSongItem() }
+                                PlaylistPage(
+                                    playlist = PlaylistItem(
+                                        id = podcastResult.podcast.id,
+                                        title = podcastResult.podcast.title,
+                                        author = podcastResult.podcast.author,
+                                        songCountText = podcastResult.podcast.episodeCountText,
+                                        thumbnail = podcastResult.podcast.thumbnail,
+                                        playEndpoint = podcastResult.podcast.playEndpoint,
+                                        shuffleEndpoint = podcastResult.podcast.shuffleEndpoint,
+                                        radioEndpoint = null,
+                                    ),
+                                    songs = mappedSongs,
+                                    songsContinuation = null,
+                                    continuation = null,
+                                )
+                            } else {
+                                error = result.exceptionOrNull()?.message ?: strings.get("error_loading_playlist")
+                                null
+                            }
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 error = e.message ?: strings.get("error_loading_playlist")
             } finally {
