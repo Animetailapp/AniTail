@@ -1142,6 +1142,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
         events,
         hideExplicit,
         quickPicksMode,
+        homeShuffleSeed,
     ) {
         delay(500)
         withContext(Dispatchers.Default) {
@@ -1203,7 +1204,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
     // Recommendation logic remains similar...
     // [Truncated for brevity, keeping recommendation logic same as before but using updated libraryItems]
-    LaunchedEffect(libraryItems.size) {
+    LaunchedEffect(libraryItems.size, homeShuffleSeed) {
         delay(1000)
         if (libraryItems.size >= 3) {
             withContext(Dispatchers.Default) {
@@ -1278,7 +1279,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
         }
     }
 
-    LaunchedEffect(allSongs.size, hideExplicit) {
+    LaunchedEffect(allSongs.size, hideExplicit, homeShuffleSeed) {
         delay(1000)
         scope.launch(Dispatchers.IO) {
             val discover = HomeDiscoveryService.loadDailyDiscover(database, hideExplicit)
