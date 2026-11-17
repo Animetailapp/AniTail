@@ -62,6 +62,7 @@ fun LibraryScreen(
                     LibraryFilter.SONGS to stringResource("songs"),
                     LibraryFilter.ALBUMS to stringResource("albums"),
                     LibraryFilter.ARTISTS to stringResource("artists"),
+                    LibraryFilter.PODCASTS to stringResource("filter_podcasts"),
                     LibraryFilter.DOWNLOADED to stringResource("filter_downloaded"),
                 ),
                 currentValue = filter,
@@ -141,6 +142,14 @@ fun LibraryScreen(
                 database = database,
                 onDeselect = { preferences.setLibraryFilter(LibraryFilter.LIBRARY) },
                 onArtistClick = { artistId, artistName -> onOpenArtist(artistId, artistName) },
+            )
+            LibraryFilter.PODCASTS -> LibraryPodcastsScreen(
+                database = database,
+                downloadService = downloadService,
+                playerState = playerState,
+                onDeselect = { preferences.setLibraryFilter(LibraryFilter.LIBRARY) },
+                onOpenArtist = onOpenArtist,
+                onOpenPlaylist = onOpenPlaylist,
             )
             LibraryFilter.DOWNLOADED -> LibraryDownloadedScreen(
                 database = database,

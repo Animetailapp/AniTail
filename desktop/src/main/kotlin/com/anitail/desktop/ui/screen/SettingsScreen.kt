@@ -1060,6 +1060,7 @@ internal fun LegacyAppearanceSettingsScreen(
                 LibraryFilter.ALBUMS -> stringResource("albums")
                 LibraryFilter.PLAYLISTS -> stringResource("playlists")
                 LibraryFilter.LIBRARY -> stringResource("filter_library")
+                LibraryFilter.PODCASTS -> stringResource("filter_podcasts")
                 LibraryFilter.DOWNLOADED -> stringResource("filter_downloaded")
             }
         }
