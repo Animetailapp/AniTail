@@ -25,11 +25,9 @@ private val expressiveAvatarPolygons by lazy {
         MaterialShapes.Cookie9Sided,
         MaterialShapes.Cookie6Sided,
         MaterialShapes.Cookie4Sided,
-        MaterialShapes.Clover4Leaf,
-        MaterialShapes.SoftBurst,
-        MaterialShapes.Sunny,
-        MaterialShapes.Flower,
-        MaterialShapes.PuffyDiamond,
+        MaterialShapes.Cookie7Sided,
+        MaterialShapes.Cookie12Sided,
+        MaterialShapes.Circle,
     )
 }
 
