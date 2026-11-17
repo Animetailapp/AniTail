@@ -1,10 +1,13 @@
 package com.anitail.desktop.ui.screen
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,7 +24,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -65,6 +71,18 @@ internal fun DiscordSettingsScreen(
     val discordName by preferences.discordName.collectAsState()
     val discordUsername by preferences.discordUsername.collectAsState()
     val discordAvatarUrl by preferences.discordAvatarUrl.collectAsState()
+    val advancedMode by preferences.discordAdvancedMode.collectAsState()
+    val userStatus by preferences.discordUserStatus.collectAsState()
+    val activityType by preferences.discordActivityType.collectAsState()
+    val activityName by preferences.discordActivityName.collectAsState()
+    val detailsTemplate by preferences.discordDetailsTemplate.collectAsState()
+    val stateTemplate by preferences.discordStateTemplate.collectAsState()
+    val button1Enabled by preferences.discordButton1Enabled.collectAsState()
+    val button1Label by preferences.discordButton1Label.collectAsState()
+    val button1Url by preferences.discordButton1Url.collectAsState()
+    val button2Enabled by preferences.discordButton2Enabled.collectAsState()
+    val button2Label by preferences.discordButton2Label.collectAsState()
+    val button2Url by preferences.discordButton2Url.collectAsState()
 
     var isTesting by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<Boolean?>(null) }
@@ -174,6 +192,123 @@ internal fun DiscordSettingsScreen(
             checked = discordRpcEnabled,
             onCheckedChange = { preferences.setEnableDiscordRPC(it) },
         )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Advanced Mode toggle
+        SettingsSwitch(
+            title = stringResource("discord_advanced_mode"),
+            subtitle = stringResource("discord_advanced_mode_description"),
+            checked = advancedMode,
+            onCheckedChange = { preferences.setDiscordAdvancedMode(it) },
+            enabled = discordRpcEnabled,
+        )
+
+        AnimatedVisibility(visible = advancedMode && discordRpcEnabled) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val statusOptions = listOf(
+                    "online" to stringResource("discord_status_online"),
+                    "idle" to stringResource("discord_status_idle"),
+                    "dnd" to stringResource("discord_status_dnd"),
+                )
+                SettingsDropdown(
+                    title = stringResource("discord_status"),
+                    subtitle = statusOptions.firstOrNull { it.first == userStatus }?.second
+                        ?: stringResource("discord_status_online"),
+                    options = statusOptions.map { it.second },
+                    selectedIndex = statusOptions.indexOfFirst { it.first == userStatus }.coerceAtLeast(0),
+                    onSelect = { index -> preferences.setDiscordUserStatus(statusOptions[index].first) },
+                )
+
+                val activityTypeOptions = listOf(
+                    2 to stringResource("discord_activity_listening"),
+                    0 to stringResource("discord_activity_playing"),
+                    3 to stringResource("discord_activity_watching"),
+                    5 to stringResource("discord_activity_competing"),
+                )
+                SettingsDropdown(
+                    title = stringResource("discord_activity_type"),
+                    subtitle = activityTypeOptions.firstOrNull { it.first == activityType }?.second
+                        ?: stringResource("discord_activity_listening"),
+                    options = activityTypeOptions.map { it.second },
+                    selectedIndex = activityTypeOptions.indexOfFirst { it.first == activityType }.coerceAtLeast(0),
+                    onSelect = { index -> preferences.setDiscordActivityType(activityTypeOptions[index].first) },
+                )
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    tonalElevation = 2.dp,
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = activityName,
+                            onValueChange = { preferences.setDiscordActivityName(it) },
+                            label = { Text(stringResource("discord_activity_name")) },
+                            placeholder = { Text("AniTail Music") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = detailsTemplate,
+                            onValueChange = { preferences.setDiscordDetailsTemplate(it) },
+                            label = { Text(stringResource("discord_details")) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = stateTemplate,
+                            onValueChange = { preferences.setDiscordStateTemplate(it) },
+                            label = { Text(stringResource("discord_state")) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        @OptIn(ExperimentalLayoutApi::class)
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            listOf("{song.name}", "{artist.name}", "{album.name}", "{song.id}").forEach { token ->
+                                SuggestionChip(
+                                    onClick = { preferences.setDiscordDetailsTemplate("$detailsTemplate $token".trim()) },
+                                    label = { Text(token, style = MaterialTheme.typography.labelSmall) },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                AndroidPreferenceGroupTitle(title = stringResource("discord_buttons"))
+
+                DiscordButtonConfigCard(
+                    title = stringResource("discord_button_1"),
+                    enabled = button1Enabled,
+                    onEnabledChange = { preferences.setDiscordButton1Enabled(it) },
+                    label = button1Label,
+                    onLabelChange = { preferences.setDiscordButton1Label(it) },
+                    url = button1Url,
+                    onUrlChange = { preferences.setDiscordButton1Url(it) },
+                )
+
+                DiscordButtonConfigCard(
+                    title = stringResource("discord_button_2"),
+                    enabled = button2Enabled,
+                    onEnabledChange = { preferences.setDiscordButton2Enabled(it) },
+                    label = button2Label,
+                    onLabelChange = { preferences.setDiscordButton2Label(it) },
+                    url = button2Url,
+                    onUrlChange = { preferences.setDiscordButton2Url(it) },
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -317,7 +452,69 @@ internal fun DiscordSettingsScreen(
             item = previewItem,
             positionMs = previewPositionMs,
             isPlaying = isPreviewPlaying,
+            advancedMode = advancedMode,
+            activityType = activityType,
+            activityName = activityName,
+            detailsTemplate = detailsTemplate,
+            stateTemplate = stateTemplate,
+            button1Enabled = button1Enabled,
+            button1Label = button1Label,
+            button1Url = button1Url,
+            button2Enabled = button2Enabled,
+            button2Label = button2Label,
+            button2Url = button2Url,
         )
+    }
+}
+
+@Composable
+private fun DiscordButtonConfigCard(
+    title: String,
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    label: String,
+    onLabelChange: (String) -> Unit,
+    url: String,
+    onUrlChange: (String) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 2.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Switch(checked = enabled, onCheckedChange = onEnabledChange)
+            }
+            if (enabled) {
+                OutlinedTextField(
+                    value = label,
+                    onValueChange = onLabelChange,
+                    label = { Text(stringResource("discord_button_label")) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = onUrlChange,
+                    label = { Text(stringResource("discord_button_url")) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
 }
 
@@ -326,7 +523,36 @@ private fun DiscordPreviewCard(
     item: LibraryItem?,
     positionMs: Long,
     isPlaying: Boolean,
+    advancedMode: Boolean,
+    activityType: Int,
+    activityName: String,
+    detailsTemplate: String,
+    stateTemplate: String,
+    button1Enabled: Boolean,
+    button1Label: String,
+    button1Url: String,
+    button2Enabled: Boolean,
+    button2Label: String,
+    button2Url: String,
 ) {
+    val rawTitle = item?.title ?: "Song Title"
+    val rawArtist = item?.artist ?: "Artist"
+    val rawId = item?.id.orEmpty()
+    fun render(tpl: String) = tpl
+        .replace("{song.name}", rawTitle)
+        .replace("{artist.name}", rawArtist)
+        .replace("{album.name}", "Album")
+        .replace("{song.id}", rawId)
+
+    val headerPrefix = when (if (advancedMode) activityType else 2) {
+        0 -> stringResource("discord_activity_playing")
+        3 -> stringResource("discord_activity_watching")
+        5 -> stringResource("discord_activity_competing")
+        else -> stringResource("discord_activity_listening")
+    }
+    val headerName = if (advancedMode && activityName.isNotBlank()) activityName else "AniTail"
+    val previewDetails = if (item != null && advancedMode) render(detailsTemplate.ifBlank { "{song.name}" }) else rawTitle
+    val previewState = if (item != null && advancedMode) render(stateTemplate.ifBlank { "{artist.name}" }) else rawArtist
     val durationMs = max(item?.durationMs ?: 0L, 1L)
     val progress = if (item != null) {
         (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
@@ -347,7 +573,7 @@ private fun DiscordPreviewCard(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = "Listening to AniTail",
+                text = "$headerPrefix $headerName",
                 style = MaterialTheme.typography.labelLarge,
                 textAlign = TextAlign.Start,
                 fontWeight = FontWeight.ExtraBold,
@@ -384,7 +610,7 @@ private fun DiscordPreviewCard(
                         .padding(horizontal = 6.dp),
                 ) {
                     Text(
-                        text = item?.title ?: "Song title",
+                        text = previewDetails,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.ExtraBold,
@@ -392,7 +618,7 @@ private fun DiscordPreviewCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = item?.artist ?: "Artist",
+                        text = previewState,
                         fontSize = 16.sp,
                         color = MaterialTheme.colorScheme.secondary,
                         maxLines = 1,
@@ -430,19 +656,44 @@ private fun DiscordPreviewCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedButton(
-                enabled = item != null,
-                onClick = {
-                    val trackId = item?.id?.trim().orEmpty()
-                    if (trackId.isNotBlank()) {
-                        val _ = runCatching {
-                            java.awt.Desktop.getDesktop().browse(java.net.URI("https://music.youtube.com/watch?v=$trackId"))
+            val previewBtn1Label = if (advancedMode) {
+                if (button1Enabled) render(button1Label).takeIf { it.isNotBlank() } else null
+            } else {
+                "Listen on YouTube Music"
+            }
+            val previewBtn1Url = if (advancedMode) render(button1Url) else "https://music.youtube.com/watch?v=$rawId"
+
+            if (previewBtn1Label != null) {
+                OutlinedButton(
+                    enabled = item != null,
+                    onClick = {
+                        if (previewBtn1Url.startsWith("http")) {
+                            val _ = runCatching {
+                                java.awt.Desktop.getDesktop().browse(java.net.URI(previewBtn1Url))
+                            }
                         }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Listen on YouTube Music")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(previewBtn1Label)
+                }
+            }
+            if (!advancedMode || button2Enabled) {
+                val previewBtn2Label = if (advancedMode) render(button2Label).ifBlank { "Join our discord" } else "Join our discord"
+                val previewBtn2Url = if (advancedMode) render(button2Url) else "https://discord.gg/H8x3yNbc67"
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedButton(
+                    onClick = {
+                        if (previewBtn2Url.startsWith("http")) {
+                            val _ = runCatching {
+                                java.awt.Desktop.getDesktop().browse(java.net.URI(previewBtn2Url))
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(previewBtn2Label)
+                }
             }
         }
     }

@@ -333,6 +333,42 @@ class DesktopPreferences private constructor(
     private val _discordLastErrorMessage = MutableStateFlow("")
     val discordLastErrorMessage: StateFlow<String> = _discordLastErrorMessage.asStateFlow()
 
+    private val _discordAdvancedMode = MutableStateFlow(false)
+    val discordAdvancedMode: StateFlow<Boolean> = _discordAdvancedMode.asStateFlow()
+
+    private val _discordUserStatus = MutableStateFlow("online")
+    val discordUserStatus: StateFlow<String> = _discordUserStatus.asStateFlow()
+
+    private val _discordActivityType = MutableStateFlow(2)
+    val discordActivityType: StateFlow<Int> = _discordActivityType.asStateFlow()
+
+    private val _discordActivityName = MutableStateFlow("")
+    val discordActivityName: StateFlow<String> = _discordActivityName.asStateFlow()
+
+    private val _discordDetailsTemplate = MutableStateFlow("{song.name}")
+    val discordDetailsTemplate: StateFlow<String> = _discordDetailsTemplate.asStateFlow()
+
+    private val _discordStateTemplate = MutableStateFlow("{artist.name}")
+    val discordStateTemplate: StateFlow<String> = _discordStateTemplate.asStateFlow()
+
+    private val _discordButton1Enabled = MutableStateFlow(true)
+    val discordButton1Enabled: StateFlow<Boolean> = _discordButton1Enabled.asStateFlow()
+
+    private val _discordButton1Label = MutableStateFlow("Listen on YouTube Music")
+    val discordButton1Label: StateFlow<String> = _discordButton1Label.asStateFlow()
+
+    private val _discordButton1Url = MutableStateFlow("https://music.youtube.com/watch?v={song.id}")
+    val discordButton1Url: StateFlow<String> = _discordButton1Url.asStateFlow()
+
+    private val _discordButton2Enabled = MutableStateFlow(true)
+    val discordButton2Enabled: StateFlow<Boolean> = _discordButton2Enabled.asStateFlow()
+
+    private val _discordButton2Label = MutableStateFlow("Join our discord")
+    val discordButton2Label: StateFlow<String> = _discordButton2Label.asStateFlow()
+
+    private val _discordButton2Url = MutableStateFlow("https://discord.gg/H8x3yNbc67")
+    val discordButton2Url: StateFlow<String> = _discordButton2Url.asStateFlow()
+
     private val _spotifyAccessToken = MutableStateFlow("")
     val spotifyAccessToken: StateFlow<String> = _spotifyAccessToken.asStateFlow()
 
@@ -928,6 +964,66 @@ class DesktopPreferences private constructor(
         save()
     }
 
+    fun setDiscordAdvancedMode(value: Boolean) {
+        _discordAdvancedMode.value = value
+        save()
+    }
+
+    fun setDiscordUserStatus(value: String) {
+        _discordUserStatus.value = value
+        save()
+    }
+
+    fun setDiscordActivityType(value: Int) {
+        _discordActivityType.value = value
+        save()
+    }
+
+    fun setDiscordActivityName(value: String) {
+        _discordActivityName.value = value
+        save()
+    }
+
+    fun setDiscordDetailsTemplate(value: String) {
+        _discordDetailsTemplate.value = value
+        save()
+    }
+
+    fun setDiscordStateTemplate(value: String) {
+        _discordStateTemplate.value = value
+        save()
+    }
+
+    fun setDiscordButton1Enabled(value: Boolean) {
+        _discordButton1Enabled.value = value
+        save()
+    }
+
+    fun setDiscordButton1Label(value: String) {
+        _discordButton1Label.value = value
+        save()
+    }
+
+    fun setDiscordButton1Url(value: String) {
+        _discordButton1Url.value = value
+        save()
+    }
+
+    fun setDiscordButton2Enabled(value: Boolean) {
+        _discordButton2Enabled.value = value
+        save()
+    }
+
+    fun setDiscordButton2Label(value: String) {
+        _discordButton2Label.value = value
+        save()
+    }
+
+    fun setDiscordButton2Url(value: String) {
+        _discordButton2Url.value = value
+        save()
+    }
+
     fun setEnableDiscordRPC(value: Boolean) {
         _enableDiscordRPC.value = value
         save()
@@ -1260,6 +1356,18 @@ class DesktopPreferences private constructor(
                 json.optString("discordAvatarUrl", "").takeIf { it != "null" } ?: ""
             _discordInfoDismissed.value = json.optBoolean("discordInfoDismissed", false)
             _enableDiscordRPC.value = json.optBoolean("discordRPCEnable", true)
+            _discordAdvancedMode.value = json.optBoolean("discordAdvancedMode", false)
+            _discordUserStatus.value = json.optString("discordUserStatus", "online").ifBlank { "online" }
+            _discordActivityType.value = json.optInt("discordActivityType", 2)
+            _discordActivityName.value = json.optString("discordActivityName", "")
+            _discordDetailsTemplate.value = json.optString("discordDetailsTemplate", "{song.name}")
+            _discordStateTemplate.value = json.optString("discordStateTemplate", "{artist.name}")
+            _discordButton1Enabled.value = json.optBoolean("discordButton1Enabled", true)
+            _discordButton1Label.value = json.optString("discordButton1Label", "Listen on YouTube Music")
+            _discordButton1Url.value = json.optString("discordButton1Url", "https://music.youtube.com/watch?v={song.id}")
+            _discordButton2Enabled.value = json.optBoolean("discordButton2Enabled", true)
+            _discordButton2Label.value = json.optString("discordButton2Label", "Join our discord")
+            _discordButton2Url.value = json.optString("discordButton2Url", "https://discord.gg/H8x3yNbc67")
             _discordLastSyncEpochMillis.value = json.optLong("discordLastSyncEpochMillis", 0L)
             _discordLastErrorMessage.value =
                 json.optString("discordLastErrorMessage", "").takeIf { it != "null" } ?: ""
@@ -1514,6 +1622,18 @@ class DesktopPreferences private constructor(
                 put("discordAvatarUrl", _discordAvatarUrl.value)
                 put("discordInfoDismissed", _discordInfoDismissed.value)
                 put("discordRPCEnable", _enableDiscordRPC.value)
+                put("discordAdvancedMode", _discordAdvancedMode.value)
+                put("discordUserStatus", _discordUserStatus.value)
+                put("discordActivityType", _discordActivityType.value)
+                put("discordActivityName", _discordActivityName.value)
+                put("discordDetailsTemplate", _discordDetailsTemplate.value)
+                put("discordStateTemplate", _discordStateTemplate.value)
+                put("discordButton1Enabled", _discordButton1Enabled.value)
+                put("discordButton1Label", _discordButton1Label.value)
+                put("discordButton1Url", _discordButton1Url.value)
+                put("discordButton2Enabled", _discordButton2Enabled.value)
+                put("discordButton2Label", _discordButton2Label.value)
+                put("discordButton2Url", _discordButton2Url.value)
                 put("discordLastSyncEpochMillis", _discordLastSyncEpochMillis.value)
                 put("discordLastErrorMessage", _discordLastErrorMessage.value)
                 put("spotifyUserName", _spotifyUserName.value)

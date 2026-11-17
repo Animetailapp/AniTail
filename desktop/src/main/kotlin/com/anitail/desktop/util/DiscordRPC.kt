@@ -1,6 +1,7 @@
 package com.anitail.desktop.util
 
 import com.anitail.desktop.auth.DesktopDiscordService
+import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.shared.model.LibraryItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -88,26 +89,68 @@ class DesktopDiscordRPC(
             val gw = gatewayClient ?: return@runCatching
             if (!gw.isConnected()) gw.connect()
 
-            val songTitle = item.title.trim().ifEmpty { "Unknown" }.let { if (it.length < 2) "$it " else it }.take(128)
-            val presenceState = item.artist.trim().ifEmpty { "Unknown artist" }.let { if (it.length < 2) "$it " else it }.take(128)
-            val albumText = ("Album: " + (albumName?.takeIf { it.isNotBlank() } ?: "Unknown")).take(128)
-            val videoId = extractVideoId(item.playbackUrl, item.id)
+            val prefs = DesktopPreferences.getInstance()
+            val advancedMode = prefs.discordAdvancedMode.value
+            val rawSongTitle = item.title.trim().ifEmpty { "Unknown" }
+            val rawArtist = item.artist.trim().ifEmpty { "Unknown artist" }
+            val rawAlbum = albumName?.takeIf { it.isNotBlank() } ?: "Unknown"
+            val videoId = extractVideoId(item.playbackUrl, item.id).orEmpty()
+
+            val songTitle = if (advancedMode) {
+                renderTemplate(prefs.discordDetailsTemplate.value.ifBlank { "{song.name}" }, rawSongTitle, rawArtist, rawAlbum, videoId)
+            } else {
+                rawSongTitle
+            }.let { if (it.length < 2) "$it " else it }.take(128)
+
+            val presenceState = if (advancedMode) {
+                renderTemplate(prefs.discordStateTemplate.value.ifBlank { "{artist.name}" }, rawSongTitle, rawArtist, rawAlbum, videoId)
+            } else {
+                rawArtist
+            }.let { if (it.length < 2) "$it " else it }.take(128)
+
+            val activityType = if (advancedMode) prefs.discordActivityType.value else 2
+            val activityName = if (advancedMode) {
+                prefs.discordActivityName.value.trim().ifEmpty { "AniTail Music" }
+            } else {
+                "AniTail Music"
+            }.take(128)
+            val userStatus = if (advancedMode) prefs.discordUserStatus.value.ifBlank { "online" } else "online"
+            val albumText = ("Album: $rawAlbum").take(128)
 
             val largeImageAsset = item.artworkUrl?.takeIf { it.isNotBlank() }?.let { gw.resolveExternalAsset(it) }
             val smallImageAsset = artistThumbnailUrl?.takeIf { it.isNotBlank() }?.let { gw.resolveExternalAsset(it) }
 
             val buttonLabels = JSONArray()
             val buttonUrls = JSONArray()
-            if (!videoId.isNullOrBlank()) {
-                buttonLabels.put("Listen on YouTube Music")
-                buttonUrls.put("https://music.youtube.com/watch?v=$videoId")
+            if (advancedMode) {
+                if (prefs.discordButton1Enabled.value) {
+                    val label = renderTemplate(prefs.discordButton1Label.value, rawSongTitle, rawArtist, rawAlbum, videoId).take(32)
+                    val url = renderTemplate(prefs.discordButton1Url.value, rawSongTitle, rawArtist, rawAlbum, videoId)
+                    if (label.isNotBlank() && url.startsWith("http")) {
+                        buttonLabels.put(label)
+                        buttonUrls.put(url)
+                    }
+                }
+                if (prefs.discordButton2Enabled.value) {
+                    val label = renderTemplate(prefs.discordButton2Label.value, rawSongTitle, rawArtist, rawAlbum, videoId).take(32)
+                    val url = renderTemplate(prefs.discordButton2Url.value, rawSongTitle, rawArtist, rawAlbum, videoId)
+                    if (label.isNotBlank() && url.startsWith("http")) {
+                        buttonLabels.put(label)
+                        buttonUrls.put(url)
+                    }
+                }
+            } else {
+                if (videoId.isNotBlank()) {
+                    buttonLabels.put("Listen on YouTube Music")
+                    buttonUrls.put("https://music.youtube.com/watch?v=$videoId")
+                }
+                buttonLabels.put("Join our discord")
+                buttonUrls.put("https://discord.gg/H8x3yNbc67")
             }
-            buttonLabels.put("Join our discord")
-            buttonUrls.put("https://discord.gg/H8x3yNbc67")
 
             val activity = JSONObject().apply {
-                put("name", "AniTail Music")
-                put("type", 2)
+                put("name", activityName)
+                put("type", activityType)
                 put("application_id", APPLICATION_ID)
                 put("details", songTitle)
                 put("state", presenceState)
@@ -124,18 +167,32 @@ class DesktopDiscordRPC(
                         put("small_text", presenceState)
                     }
                 })
-                put("buttons", buttonLabels)
-                put("metadata", JSONObject().apply {
-                    put("button_urls", buttonUrls)
-                })
+                if (buttonLabels.length() > 0) {
+                    put("buttons", buttonLabels)
+                    put("metadata", JSONObject().apply {
+                        put("button_urls", buttonUrls)
+                    })
+                }
             }
-            gw.setActivity(activity)
+            gw.setActivity(activity, userStatus)
         }
     }
 
     suspend fun clearActivity() = withContext(Dispatchers.IO) {
         val _ = runCatching { gatewayClient?.clearActivity() }
     }
+
+    private fun renderTemplate(
+        template: String,
+        songName: String,
+        artistName: String,
+        albumName: String,
+        songId: String,
+    ): String = template
+        .replace("{song.name}", songName)
+        .replace("{artist.name}", artistName)
+        .replace("{album.name}", albumName)
+        .replace("{song.id}", songId)
 
     private fun extractVideoId(playbackUrl: String?, fallbackId: String): String? {
         if (!playbackUrl.isNullOrBlank()) {
@@ -172,6 +229,7 @@ private class DiscordGatewayClient(
     @Volatile private var sessionId: String? = null
     @Volatile private var resumeGatewayUrl: String? = null
     @Volatile private var pendingActivity: JSONObject? = null
+    @Volatile private var pendingStatus: String = "online"
     private var heartbeatJob: Job? = null
 
     fun isConnected(): Boolean = connected && webSocket != null
@@ -241,21 +299,22 @@ private class DiscordGatewayClient(
         return true
     }
 
-    fun setActivity(activity: JSONObject) {
+    fun setActivity(activity: JSONObject, status: String = "online") {
         pendingActivity = activity
+        pendingStatus = status
         if (!isConnected()) {
             connect()
             return
         }
         if (ready) {
-            sendPresence(listOf(activity))
+            sendPresence(listOf(activity), status)
         }
     }
 
     fun clearActivity() {
         pendingActivity = null
         if (isConnected() && ready) {
-            sendPresence(emptyList())
+            sendPresence(emptyList(), pendingStatus)
         }
     }
 
@@ -326,11 +385,11 @@ private class DiscordGatewayClient(
                         sessionId = data?.optString("session_id")?.takeIf { it.isNotBlank() }
                         resumeGatewayUrl = data?.optString("resume_gateway_url")?.takeIf { it.isNotBlank() }
                         ready = true
-                        pendingActivity?.let { sendPresence(listOf(it)) }
+                        pendingActivity?.let { sendPresence(listOf(it), pendingStatus) }
                     }
                     "RESUMED" -> {
                         ready = true
-                        pendingActivity?.let { sendPresence(listOf(it)) }
+                        pendingActivity?.let { sendPresence(listOf(it), pendingStatus) }
                     }
                 }
             }
@@ -397,7 +456,7 @@ private class DiscordGatewayClient(
         ws.send(msg.toString())
     }
 
-    private fun sendPresence(activities: List<JSONObject>) {
+    private fun sendPresence(activities: List<JSONObject>, status: String = "online") {
         val ws = webSocket ?: return
         val activityArray = JSONArray().apply {
             activities.forEach { put(it) }
@@ -407,7 +466,7 @@ private class DiscordGatewayClient(
             put("d", JSONObject().apply {
                 put("since", System.currentTimeMillis())
                 put("activities", activityArray)
-                put("status", "online")
+                put("status", status)
                 put("afk", false)
             })
         }
