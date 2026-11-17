@@ -33,8 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -177,7 +175,7 @@ fun ArtistDetailScreen(
                     // Header: Imagen grande con fading edge
                     item(key = "header") {
                         Column {
-                            // Imagen del artista / canal adaptada a Desktop (sin recortar logos cuadrados)
+                            // Banner del artista / canal estilo Metrolist
                             page.artist.thumbnail?.let { thumbnail ->
                                 val bannerUrl = remember(thumbnail) {
                                     if (thumbnail.contains("lh3.googleusercontent.com")) {
@@ -188,27 +186,17 @@ fun ArtistDetailScreen(
                                     }
                                 }
                                 Box(
-                                    contentAlignment = Alignment.Center,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(280.dp),
+                                        .height(320.dp),
                                 ) {
                                     RemoteImage(
                                         url = bannerUrl,
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .alpha(0.32f)
-                                            .blur(26.dp)
-                                            .fadingEdge(bottom = 140.dp),
+                                            .align(Alignment.TopCenter)
+                                            .fadingEdge(bottom = 160.dp),
                                         contentScale = ContentScale.Crop,
-                                    )
-                                    RemoteImage(
-                                        url = bannerUrl,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(top = 12.dp, bottom = 12.dp)
-                                            .fadingEdge(bottom = 80.dp),
-                                        contentScale = ContentScale.Fit,
                                     )
                                 }
                             }

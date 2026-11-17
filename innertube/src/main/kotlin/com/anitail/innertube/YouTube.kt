@@ -383,10 +383,15 @@ object YouTube {
             )
         }
 
-        val descriptionRuns = response.contents?.sectionListRenderer?.contents
+        val descriptionRuns = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+            ?.tabRenderer?.content?.sectionListRenderer?.contents
             ?.firstOrNull { it.musicDescriptionShelfRenderer != null }
             ?.musicDescriptionShelfRenderer?.description?.runs
             ?.let(::mapRuns)
+            ?: response.contents?.sectionListRenderer?.contents
+                ?.firstOrNull { it.musicDescriptionShelfRenderer != null }
+                ?.musicDescriptionShelfRenderer?.description?.runs
+                ?.let(::mapRuns)
             ?: response.header?.musicImmersiveHeaderRenderer?.description?.runs?.let(::mapRuns)
 
         ArtistPage(
