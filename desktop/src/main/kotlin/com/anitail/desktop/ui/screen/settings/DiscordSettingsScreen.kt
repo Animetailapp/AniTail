@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -67,34 +68,78 @@ internal fun DiscordSettingsScreen(
     val discordUsername by preferences.discordUsername.collectAsState()
     val discordAvatarUrl by preferences.discordAvatarUrl.collectAsState()
 
+    var showDiscordLoginDialog by remember { mutableStateOf(false) }
+    var showTokenDialog by remember { mutableStateOf(false) }
     var tokenInput by remember(discordToken) { mutableStateOf(discordToken) }
     var isTesting by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<Boolean?>(null) }
 
-    fun testConnection() {
+    fun applyDiscordToken(rawToken: String) {
+        val token = rawToken.trim()
+        if (token.isEmpty()) return
         scope.launch {
             isTesting = true
             testResult = null
-            val result = withContext(Dispatchers.IO) {
-                val token = tokenInput.trim()
-                if (token.isEmpty()) {
-                    false
+            val ok = withContext(Dispatchers.IO) {
+                val profile = DesktopDiscordService.fetchProfile(token)
+                if (profile != null) {
+                    preferences.setDiscordToken(token)
+                    preferences.setDiscordName(profile.name)
+                    preferences.setDiscordUsername(profile.username)
+                    preferences.setDiscordAvatarUrl(profile.avatarUrl.orEmpty())
+                    true
                 } else {
-                    val profile = DesktopDiscordService.fetchProfile(token)
-                    if (profile != null) {
-                        preferences.setDiscordToken(token)
-                        preferences.setDiscordName(profile.name)
-                        preferences.setDiscordUsername(profile.username)
-                        preferences.setDiscordAvatarUrl(profile.avatarUrl.orEmpty())
-                        true
-                    } else {
-                        false
-                    }
+                    false
                 }
             }
-            testResult = result
+            testResult = ok
             isTesting = false
         }
+    }
+
+    fun testConnection() {
+        applyDiscordToken(discordToken)
+    }
+
+    if (showDiscordLoginDialog) {
+        DiscordLoginDialog(
+            onDismiss = { showDiscordLoginDialog = false },
+            onTokenCaptured = { capturedToken ->
+                showDiscordLoginDialog = false
+                applyDiscordToken(capturedToken)
+            },
+        )
+    }
+
+    if (showTokenDialog) {
+        AlertDialog(
+            onDismissRequest = { showTokenDialog = false },
+            title = { Text("Discord Token") },
+            text = {
+                OutlinedTextField(
+                    value = tokenInput,
+                    onValueChange = { tokenInput = it },
+                    label = { Text("Token") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showTokenDialog = false
+                        applyDiscordToken(tokenInput)
+                    },
+                ) {
+                    Text(stringResource("save"))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTokenDialog = false }) {
+                    Text(stringResource("cancel"))
+                }
+            },
+        )
     }
 
     SettingsSubScreen(
@@ -207,29 +252,26 @@ internal fun DiscordSettingsScreen(
                     }
                 }
 
-                OutlinedTextField(
-                    value = tokenInput,
-                    onValueChange = { tokenInput = it },
-                    label = { Text("Discord Token") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                if (discordUsername.isNotBlank() || discordName.isNotBlank()) {
+                if (discordToken.isNotBlank()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (discordAvatarUrl.isNotBlank()) {
                             RemoteImage(
                                 url = discordAvatarUrl,
                                 contentDescription = null,
                                 modifier = Modifier
-                                    .size(28.dp)
+                                    .size(32.dp)
                                     .clip(CircleShape),
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
                         }
                         Text(
-                            text = if (discordName.isNotBlank()) "$discordName (@$discordUsername)" else "@$discordUsername",
+                            text = when {
+                                discordName.isNotBlank() && discordUsername.isNotBlank() -> "$discordName (@$discordUsername)"
+                                discordUsername.isNotBlank() -> "@$discordUsername"
+                                else -> stringResource("discord_status_connected")
+                            },
                             style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         TextButton(
@@ -245,20 +287,46 @@ internal fun DiscordSettingsScreen(
                             Text(stringResource("logout"))
                         }
                     }
-                }
 
-                OutlinedButton(
-                    onClick = { testConnection() },
-                    enabled = !isTesting,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(
-                        imageVector = IconAssets.discord(),
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource("discord_test_connection"))
+                    OutlinedButton(
+                        onClick = { testConnection() },
+                        enabled = !isTesting,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(
+                            imageVector = IconAssets.discord(),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource("discord_test_connection"))
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Button(
+                            onClick = { showDiscordLoginDialog = true },
+                            enabled = !isTesting,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(
+                                imageVector = IconAssets.discord(),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource("login"))
+                        }
+                        OutlinedButton(
+                            onClick = { showTokenDialog = true },
+                            enabled = !isTesting,
+                        ) {
+                            Text("Token")
+                        }
+                    }
                 }
             }
         }
