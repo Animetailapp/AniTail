@@ -5,9 +5,12 @@ import com.anitail.desktop.db.entities.ArtistEntity
 import com.anitail.desktop.db.entities.EventEntity
 import com.anitail.desktop.db.entities.SongArtistMap
 import com.anitail.desktop.db.entities.SongEntity
+import com.anitail.desktop.db.relations.artistIdsForSong
 import com.anitail.desktop.db.relations.primaryArtistIdForSong
 import java.time.LocalDateTime
+import java.time.YearMonth
 import java.time.ZoneOffset
+import java.util.Locale
 
 internal enum class OptionStats { WEEKS, MONTHS, YEARS, CONTINUOUS }
 
@@ -143,4 +146,373 @@ private fun eventInRange(
 ): Boolean {
     val timeMs = event.timestamp.toInstant(ZoneOffset.UTC).toEpochMilli()
     return timeMs > fromTimeMs && timeMs <= toTimeMs
+}
+
+internal enum class ListeningPeriod {
+    MORNING,
+    AFTERNOON,
+    EVENING,
+    NIGHT,
+}
+
+internal data class TopArtistUi(
+    val id: String,
+    val name: String,
+    val thumbnailUrl: String?,
+    val playCount: Int,
+    val timeListenedMs: Long,
+    val isNewTopFive: Boolean,
+)
+
+internal data class TopSongUi(
+    val id: String,
+    val title: String,
+    val thumbnailUrl: String?,
+    val subtitle: String? = null,
+    val playCount: Int,
+    val timeListenedMs: Long,
+    val isNew: Boolean,
+)
+
+internal data class RankedArtistUi(
+    val rank: Int,
+    val id: String,
+    val name: String,
+    val thumbnailUrl: String?,
+    val playCount: Int,
+    val timeListenedMs: Long,
+    val isNewTopFive: Boolean,
+)
+
+internal data class SoundCapsuleMonthUiState(
+    val year: Int,
+    val month: Int,
+    val totalPlayTimeMs: Long,
+    val totalSongsPlayed: Int,
+    val topArtist: TopArtistUi?,
+    val topSong: TopSongUi?,
+    val rankedSongs: List<TopSongUi>,
+    val rankedArtists: List<RankedArtistUi>,
+    val dailyPlayTimeMs: List<Long>,
+    val periodPlayTimeMs: Map<ListeningPeriod, Long>,
+) {
+    val yearMonth: YearMonth
+        get() = YearMonth.of(year, month)
+    val monthKey: String
+        get() = "$year-$month"
+    val totalMinutes: Int
+        get() = (totalPlayTimeMs / 60_000L).toInt()
+}
+
+internal data class SoundCapsuleOverview(
+    val months: List<SoundCapsuleMonthUiState>,
+    val totalSongsSinceJoining: Int,
+    val totalPlayTimeMs: Long,
+    val uniqueArtistsCount: Int,
+    val uniqueSongsCount: Int,
+)
+
+internal fun buildSoundCapsuleOverview(
+    events: List<EventEntity>,
+    songsById: Map<String, SongEntity>,
+    songArtistMaps: List<SongArtistMap>,
+    artistsById: Map<String, ArtistEntity>,
+    now: YearMonth = YearMonth.now(),
+): SoundCapsuleOverview {
+    if (events.isEmpty()) {
+        return SoundCapsuleOverview(
+            months = listOf(emptySoundCapsuleMonth(now)),
+            totalSongsSinceJoining = 0,
+            totalPlayTimeMs = 0L,
+            uniqueArtistsCount = 0,
+            uniqueSongsCount = 0,
+        )
+    }
+
+    val firstMonth = events.minOf { YearMonth.of(it.timestamp.year, it.timestamp.monthValue) }
+    val startMonth = if (now.isBefore(firstMonth)) firstMonth else now
+    val eventsByMonth = events.groupBy { YearMonth.of(it.timestamp.year, it.timestamp.monthValue) }
+    val monthsDescending = generateMonthsDescending(start = startMonth, end = firstMonth)
+
+    val monthTopArtistIds = mutableMapOf<YearMonth, List<String>>()
+    val monthTopSongIds = mutableMapOf<YearMonth, String?>()
+
+    val rawMonths = monthsDescending.map { month ->
+        val monthEvents = eventsByMonth[month].orEmpty()
+        if (monthEvents.isEmpty()) {
+            monthTopArtistIds[month] = emptyList()
+            monthTopSongIds[month] = null
+            return@map emptySoundCapsuleMonth(month)
+        }
+
+        val totalPlayTimeMs = monthEvents.sumOf { effectivePlayTimeMs(it, songsById[it.songId]) }
+        val rankedSongsRaw = computeRankedSongsForMonth(monthEvents, songsById, songArtistMaps, artistsById, limit = 20)
+        val rankedArtistsRaw = computeRankedArtistsForMonth(monthEvents, songsById, songArtistMaps, artistsById, limit = 20)
+
+        monthTopArtistIds[month] = rankedArtistsRaw.take(5).map { it.id }
+        monthTopSongIds[month] = rankedSongsRaw.firstOrNull()?.id
+
+        SoundCapsuleMonthUiState(
+            year = month.year,
+            month = month.monthValue,
+            totalPlayTimeMs = totalPlayTimeMs,
+            totalSongsPlayed = monthEvents.size,
+            topArtist = null,
+            topSong = rankedSongsRaw.firstOrNull(),
+            rankedSongs = rankedSongsRaw,
+            rankedArtists = rankedArtistsRaw.mapIndexed { index, stat ->
+                RankedArtistUi(
+                    rank = index + 1,
+                    id = stat.id,
+                    name = stat.name,
+                    thumbnailUrl = stat.thumbnailUrl,
+                    playCount = stat.playCount,
+                    timeListenedMs = stat.playTimeMs,
+                    isNewTopFive = false,
+                )
+            },
+            dailyPlayTimeMs = buildDailyPlayTime(month, monthEvents, songsById),
+            periodPlayTimeMs = buildPeriodPlayTime(monthEvents, songsById),
+        )
+    }
+
+    val monthsWithBadges = rawMonths.map { state ->
+        if (state.totalSongsPlayed <= 0) return@map state
+        val prevMonth = state.yearMonth.minusMonths(1)
+        val prevTopFive = monthTopArtistIds[prevMonth].orEmpty().toSet()
+        val prevTopSongId = monthTopSongIds[prevMonth]
+
+        val updatedArtists = state.rankedArtists.map { artist ->
+            artist.copy(isNewTopFive = artist.rank <= 5 && artist.id !in prevTopFive)
+        }
+        val updatedTopSong = state.topSong?.let { top ->
+            top.copy(isNew = top.id != prevTopSongId)
+        }
+        val updatedSongs = state.rankedSongs.mapIndexed { index, song ->
+            if (index == 0 && updatedTopSong != null) updatedTopSong else song
+        }
+
+        state.copy(
+            topArtist = updatedArtists.firstOrNull()?.let { first ->
+                TopArtistUi(
+                    id = first.id,
+                    name = first.name,
+                    thumbnailUrl = first.thumbnailUrl,
+                    playCount = first.playCount,
+                    timeListenedMs = first.timeListenedMs,
+                    isNewTopFive = first.isNewTopFive,
+                )
+            },
+            topSong = updatedTopSong,
+            rankedSongs = updatedSongs,
+            rankedArtists = updatedArtists,
+        )
+    }
+
+    val totalPlayTime = events.sumOf { effectivePlayTimeMs(it, songsById[it.songId]) }
+    val uniqueSongs = events.mapNotNull { event -> songsById[event.songId]?.id }.toSet().size
+    val uniqueArtists = events.flatMap { event ->
+        val song = songsById[event.songId] ?: return@flatMap emptyList()
+        val ids = artistIdsForSong(song.id, songArtistMaps)
+        if (ids.isNotEmpty()) ids else listOfNotNull(song.artistName?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.isNotBlank() })
+    }.toSet().size
+
+    return SoundCapsuleOverview(
+        months = monthsWithBadges,
+        totalSongsSinceJoining = events.size,
+        totalPlayTimeMs = totalPlayTime,
+        uniqueArtistsCount = uniqueArtists,
+        uniqueSongsCount = uniqueSongs,
+    )
+}
+
+private data class CapsuleArtistAccumulator(
+    val id: String,
+    val name: String,
+    var thumbnailUrl: String?,
+    var playCount: Int = 0,
+    var playTimeMs: Long = 0L,
+)
+
+private fun computeRankedSongsForMonth(
+    monthEvents: List<EventEntity>,
+    songsById: Map<String, SongEntity>,
+    songArtistMaps: List<SongArtistMap>,
+    artistsById: Map<String, ArtistEntity>,
+    limit: Int,
+): List<TopSongUi> {
+    val totals = linkedMapOf<String, StatsAccumulator>()
+    monthEvents.forEach { event ->
+        val song = songsById[event.songId] ?: return@forEach
+        val acc = totals.getOrPut(song.id) { StatsAccumulator() }
+        acc.count += 1
+        acc.timeMs += effectivePlayTimeMs(event, song)
+    }
+    return totals.entries
+        .mapNotNull { (songId, acc) ->
+            val song = songsById[songId] ?: return@mapNotNull null
+            val primaryArtistName = primaryArtistIdForSong(song.id, songArtistMaps)
+                ?.let { artistsById[it]?.name }
+                ?: song.artistName
+            TopSongUi(
+                id = song.id,
+                title = song.title,
+                thumbnailUrl = song.thumbnailUrl,
+                subtitle = primaryArtistName,
+                playCount = acc.count,
+                timeListenedMs = acc.timeMs,
+                isNew = false,
+            )
+        }
+        .sortedWith(compareByDescending<TopSongUi> { it.timeListenedMs }.thenByDescending { it.playCount })
+        .take(limit)
+}
+
+private fun computeRankedArtistsForMonth(
+    monthEvents: List<EventEntity>,
+    songsById: Map<String, SongEntity>,
+    songArtistMaps: List<SongArtistMap>,
+    artistsById: Map<String, ArtistEntity>,
+    limit: Int,
+): List<CapsuleArtistAccumulator> {
+    val rawStats = linkedMapOf<String, CapsuleArtistAccumulator>()
+    monthEvents.forEach { event ->
+        val song = songsById[event.songId] ?: return@forEach
+        val playTimeMs = effectivePlayTimeMs(event, song)
+        val mappedArtistIds = artistIdsForSong(song.id, songArtistMaps)
+        if (mappedArtistIds.isNotEmpty()) {
+            mappedArtistIds.forEach { artistId ->
+                val artist = artistsById[artistId]
+                val name = artist?.name ?: song.artistName?.split(",", "&", ";")?.firstOrNull()?.trim().orEmpty()
+                if (name.isBlank()) return@forEach
+                val acc = rawStats.getOrPut(artistId) {
+                    CapsuleArtistAccumulator(
+                        id = artistId,
+                        name = name,
+                        thumbnailUrl = artist?.thumbnailUrl ?: song.thumbnailUrl,
+                    )
+                }
+                if (acc.thumbnailUrl.isNullOrBlank()) {
+                    acc.thumbnailUrl = artist?.thumbnailUrl ?: song.thumbnailUrl
+                }
+                acc.playCount += 1
+                acc.playTimeMs += playTimeMs
+            }
+        } else {
+            val fallbackName = song.artistName
+                ?.split(",", "&", ";")
+                ?.firstOrNull()
+                ?.trim()
+                .orEmpty()
+            if (fallbackName.isNotBlank()) {
+                val fallbackId = "local:${fallbackName.lowercase(Locale.ROOT)}"
+                val acc = rawStats.getOrPut(fallbackId) {
+                    CapsuleArtistAccumulator(
+                        id = fallbackId,
+                        name = fallbackName,
+                        thumbnailUrl = song.thumbnailUrl,
+                    )
+                }
+                if (acc.thumbnailUrl.isNullOrBlank()) {
+                    acc.thumbnailUrl = song.thumbnailUrl
+                }
+                acc.playCount += 1
+                acc.playTimeMs += playTimeMs
+            }
+        }
+    }
+
+    val mergedByName = linkedMapOf<String, CapsuleArtistAccumulator>()
+    rawStats.values.forEach { stat ->
+        val normalizedName = stat.name.trim().lowercase(Locale.ROOT)
+        if (normalizedName.isBlank()) return@forEach
+        val current = mergedByName[normalizedName]
+        if (current == null) {
+            mergedByName[normalizedName] = stat.copy()
+        } else {
+            val currentGenerated = current.id.startsWith("LA") || current.id.startsWith("local:")
+            val statGenerated = stat.id.startsWith("LA") || stat.id.startsWith("local:")
+            val preferredId = when {
+                currentGenerated && !statGenerated -> stat.id
+                !currentGenerated && statGenerated -> current.id
+                stat.playTimeMs > current.playTimeMs -> stat.id
+                else -> current.id
+            }
+            val preferredName = if (preferredId == stat.id) stat.name else current.name
+            val preferredThumb = current.thumbnailUrl?.takeIf { it.isNotBlank() } ?: stat.thumbnailUrl
+            mergedByName[normalizedName] = CapsuleArtistAccumulator(
+                id = preferredId,
+                name = preferredName,
+                thumbnailUrl = preferredThumb,
+                playCount = current.playCount + stat.playCount,
+                playTimeMs = current.playTimeMs + stat.playTimeMs,
+            )
+        }
+    }
+
+    return mergedByName.values
+        .sortedWith(compareByDescending<CapsuleArtistAccumulator> { it.playTimeMs }.thenByDescending { it.playCount })
+        .take(limit)
+}
+
+private fun buildDailyPlayTime(
+    month: YearMonth,
+    monthEvents: List<EventEntity>,
+    songsById: Map<String, SongEntity>,
+): List<Long> {
+    val dailyTotals = MutableList(month.lengthOfMonth()) { 0L }
+    monthEvents.forEach { event ->
+        val dayIndex = event.timestamp.dayOfMonth - 1
+        if (dayIndex in dailyTotals.indices) {
+            dailyTotals[dayIndex] += effectivePlayTimeMs(event, songsById[event.songId])
+        }
+    }
+    return dailyTotals
+}
+
+private fun buildPeriodPlayTime(
+    monthEvents: List<EventEntity>,
+    songsById: Map<String, SongEntity>,
+): Map<ListeningPeriod, Long> {
+    val totals = ListeningPeriod.entries.associateWith { 0L }.toMutableMap()
+    monthEvents.forEach { event ->
+        val period = when (event.timestamp.hour) {
+            in 5..11 -> ListeningPeriod.MORNING
+            in 12..16 -> ListeningPeriod.AFTERNOON
+            in 17..20 -> ListeningPeriod.EVENING
+            else -> ListeningPeriod.NIGHT
+        }
+        totals[period] = totals.getValue(period) + effectivePlayTimeMs(event, songsById[event.songId])
+    }
+    return totals
+}
+
+private fun effectivePlayTimeMs(event: EventEntity, song: SongEntity?): Long {
+    if (event.playTime > 0L) return event.playTime
+    val durationSeconds = song?.duration ?: 0
+    return if (durationSeconds > 0) durationSeconds * 1_000L else 0L
+}
+
+private fun emptySoundCapsuleMonth(month: YearMonth): SoundCapsuleMonthUiState =
+    SoundCapsuleMonthUiState(
+        year = month.year,
+        month = month.monthValue,
+        totalPlayTimeMs = 0L,
+        totalSongsPlayed = 0,
+        topArtist = null,
+        topSong = null,
+        rankedSongs = emptyList(),
+        rankedArtists = emptyList(),
+        dailyPlayTimeMs = List(month.lengthOfMonth()) { 0L },
+        periodPlayTimeMs = ListeningPeriod.entries.associateWith { 0L },
+    )
+
+private fun generateMonthsDescending(start: YearMonth, end: YearMonth): List<YearMonth> {
+    val months = mutableListOf<YearMonth>()
+    var current = start
+    while (!current.isBefore(end)) {
+        months += current
+        current = current.minusMonths(1)
+    }
+    return months
 }
