@@ -287,7 +287,7 @@ class HttpRangeInputStream(
             if (cached != null) return@coroutineScope cached
 
             val candidate =
-                async(Dispatchers.IO, start = CoroutineStart.LAZY) {
+                prefetchScope.async(Dispatchers.IO, start = CoroutineStart.LAZY) {
                     downloadChunkSuspend(start, sizeToFetch, acquirePermit).also { putChunk(start, it) }
                 }
             val deferred =
@@ -349,14 +349,15 @@ class HttpRangeInputStream(
         currentStart: Long,
         currentChunkLen: Long,
     ) {
-        prefetchJob?.cancel()
+        if (prefetchJob?.isActive == true) return
         val prefetchChunkSize = synchronized(this) { effectiveChunkCap }
         val prefetchStarts = mutableListOf<Long>()
         var nextStart = currentStart + currentChunkLen
         for (i in 0 until 3) {
             if (mediaSize > 0L && nextStart >= mediaSize) break
-            val isCached = synchronized(chunkCache) { chunkCache.containsKey(nextStart) }
-            if (!isCached) {
+            val isCached = cachedChunkAt(nextStart) != null
+            val isInFlight = synchronized(inFlightChunks) { inFlightChunks.containsKey(nextStart) }
+            if (!isCached && !isInFlight) {
                 prefetchStarts.add(nextStart)
             }
             nextStart += prefetchChunkSize.toLong()

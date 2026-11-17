@@ -658,7 +658,7 @@ class PlayerState {
                 if (info.targetVideoId.isNotBlank() && info.targetVideoId != videoId && !info.audioUrl.isNullOrBlank()) {
                     val switched = nativePlayer.switchAudioStreamPreservingPosition(
                         url = info.audioUrl,
-                        headers = info.headers,
+                        headers = info.audioHeaders,
                         contentLengthBytes = info.audioContentLengthBytes,
                         targetPositionMs = targetPositionMs,
                         playWhenReady = shouldPlay,

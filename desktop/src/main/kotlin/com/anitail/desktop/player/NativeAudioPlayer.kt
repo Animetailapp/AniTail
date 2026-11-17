@@ -61,6 +61,7 @@ data class VideoStreamInfo(
     val mimeType: String? = null,
     val contentLengthBytes: Long? = null,
     val audioUrl: String? = null,
+    val audioHeaders: Map<String, String> = headers,
     val audioContentLengthBytes: Long? = null,
     val targetVideoId: String = "",
 )
@@ -614,9 +615,24 @@ class NativeAudioPlayer {
                 val videoUrl = stream.videoUrl
                 val candidateAudioUrl = stream.audioUrl.takeUnless { it.startsWith("sabr", ignoreCase = true) }
                 val videoAccessible = !videoUrl.isNullOrBlank() && probeStreamAccessible(videoUrl, stream.headers)
+                val dedicatedAudioStream =
+                    if (videoAccessible && candidateId != videoId) {
+                        DesktopInnerTubeXPlayer.extractStream(candidateId, audioQuality)
+                            .getOrNull()
+                            ?.takeIf { audioStream ->
+                                !audioStream.audioUrl.startsWith("sabr", ignoreCase = true) &&
+                                    probeStreamAccessible(audioStream.audioUrl, audioStream.headers)
+                            }
+                    } else {
+                        null
+                    }
+                val resolvedAudioUrl = dedicatedAudioStream?.audioUrl ?: candidateAudioUrl
+                val resolvedAudioHeaders = dedicatedAudioStream?.headers ?: stream.headers
+                val resolvedAudioLength = dedicatedAudioStream?.contentLengthBytes ?: stream.contentLengthBytes
                 val audioAccessible = candidateId == videoId ||
-                    candidateAudioUrl.isNullOrBlank() ||
-                    probeStreamAccessible(candidateAudioUrl, stream.headers)
+                    resolvedAudioUrl.isNullOrBlank() ||
+                    dedicatedAudioStream != null ||
+                    probeStreamAccessible(resolvedAudioUrl, resolvedAudioHeaders)
                 if (videoAccessible && audioAccessible) {
                     val info = VideoStreamInfo(
                         url = videoUrl!!,
@@ -625,8 +641,9 @@ class NativeAudioPlayer {
                         height = stream.videoHeight,
                         mimeType = stream.videoMimeType,
                         contentLengthBytes = stream.videoContentLengthBytes,
-                        audioUrl = candidateAudioUrl,
-                        audioContentLengthBytes = stream.contentLengthBytes,
+                        audioUrl = resolvedAudioUrl,
+                        audioHeaders = resolvedAudioHeaders,
+                        audioContentLengthBytes = resolvedAudioLength,
                         targetVideoId = candidateId,
                     )
                     if ((stream.videoHeight ?: 0) >= 720) {
