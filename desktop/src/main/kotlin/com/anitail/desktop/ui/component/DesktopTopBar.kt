@@ -1,8 +1,12 @@
 package com.anitail.desktop.ui.component
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,14 +37,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -102,7 +114,7 @@ fun DesktopTopBar(
             .fillMaxWidth()
             .height(48.dp)
             .background(surfaceColor)
-            .padding(start = 12.dp, end = 8.dp),
+            .padding(start = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         WindowDragArea(
@@ -395,24 +407,127 @@ private fun WindowControls(
     val restoreLabel = stringResource("restore")
     val maximizeLabel = stringResource("maximize")
     val closeLabel = stringResource("close")
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        IconButton(
+    val iconColor = colors.contentColor
+    val hoverBg = iconColor.copy(alpha = 0.10f)
+
+    Row(
+        modifier = Modifier.fillMaxHeight(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        WindowControlButton(
+            description = minimizeLabel,
+            iconColor = iconColor,
+            hoverBackgroundColor = hoverBg,
+            hoverIconColor = iconColor,
             onClick = { windowState.isMinimized = true },
-            colors = colors,
-        ) {
-            Icon(IconAssets.windowMinimize(), contentDescription = minimizeLabel)
+        ) { tint ->
+            Canvas(modifier = Modifier.size(10.dp)) {
+                val stroke = 1.dp.toPx()
+                val y = size.height / 2f
+                drawLine(
+                    color = tint,
+                    start = Offset(0f, y),
+                    end = Offset(size.width, y),
+                    strokeWidth = stroke,
+                    cap = StrokeCap.Butt,
+                )
+            }
         }
-        IconButton(
+        WindowControlButton(
+            description = if (isMaximized) restoreLabel else maximizeLabel,
+            iconColor = iconColor,
+            hoverBackgroundColor = hoverBg,
+            hoverIconColor = iconColor,
             onClick = onToggleMaximize,
-            colors = colors,
-        ) {
-            val icon = if (isMaximized) IconAssets.windowRestore() else IconAssets.windowMaximize()
-            val description = if (isMaximized) restoreLabel else maximizeLabel
-            Icon(icon, contentDescription = description)
+        ) { tint ->
+            Canvas(modifier = Modifier.size(10.dp)) {
+                val stroke = 1.dp.toPx()
+                if (isMaximized) {
+                    val boxSize = size.width * 0.78f
+                    val offset = size.width - boxSize
+                    // Back (top-right) overlapping square edges
+                    val backPath = Path().apply {
+                        moveTo(offset, offset)
+                        lineTo(offset, 0f)
+                        lineTo(size.width, 0f)
+                        lineTo(size.width, boxSize)
+                        lineTo(boxSize, boxSize)
+                    }
+                    drawPath(
+                        path = backPath,
+                        color = tint,
+                        style = Stroke(width = stroke),
+                    )
+                    // Front (bottom-left) square
+                    drawRect(
+                        color = tint,
+                        topLeft = Offset(0f, offset),
+                        size = Size(boxSize, boxSize),
+                        style = Stroke(width = stroke),
+                    )
+                } else {
+                    drawRect(
+                        color = tint,
+                        topLeft = Offset(0.5f, 0.5f),
+                        size = Size(size.width - 1f, size.height - 1f),
+                        style = Stroke(width = stroke),
+                    )
+                }
+            }
         }
-        IconButton(onClick = onWindowClose, colors = colors) {
-            Icon(IconAssets.close(), contentDescription = closeLabel)
+        WindowControlButton(
+            description = closeLabel,
+            iconColor = iconColor,
+            hoverBackgroundColor = Color(0xFFC42B1C),
+            hoverIconColor = Color.White,
+            onClick = onWindowClose,
+        ) { tint ->
+            Canvas(modifier = Modifier.size(10.dp)) {
+                val stroke = 1.dp.toPx()
+                drawLine(
+                    color = tint,
+                    start = Offset(0.5f, 0.5f),
+                    end = Offset(size.width - 0.5f, size.height - 0.5f),
+                    strokeWidth = stroke,
+                )
+                drawLine(
+                    color = tint,
+                    start = Offset(size.width - 0.5f, 0.5f),
+                    end = Offset(0.5f, size.height - 0.5f),
+                    strokeWidth = stroke,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun WindowControlButton(
+    description: String,
+    iconColor: Color,
+    hoverBackgroundColor: Color,
+    hoverIconColor: Color,
+    onClick: () -> Unit,
+    content: @Composable (Color) -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val tint = if (isHovered) hoverIconColor else iconColor
+    Box(
+        modifier = Modifier
+            .width(46.dp)
+            .fillMaxHeight()
+            .background(if (isHovered) hoverBackgroundColor else Color.Transparent)
+            .semantics { contentDescription = description }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        content(tint)
     }
 }
 
