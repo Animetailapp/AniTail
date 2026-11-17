@@ -1349,11 +1349,16 @@ object YouTube {
     }
 
     suspend fun musicHistory() = runCatching {
-        val response = innerTube.browse(
+        val httpResponse = innerTube.browse(
             client = WEB_REMIX,
             browseId = "FEmusic_history",
             setLogin = true
-        ).body<BrowseResponse>()
+        )
+        val rawText = httpResponse.body<String>()
+        val response = Json { ignoreUnknownKeys = true; explicitNulls = false }
+            .decodeFromString<BrowseResponse>(rawText)
+        println("[HISTORY_DEBUG] raw length=${rawText.length}")
+        println("[HISTORY_DEBUG] raw head=${rawText.take(1500)}")
 
         val sectionList = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
             ?.tabRenderer?.content?.sectionListRenderer
