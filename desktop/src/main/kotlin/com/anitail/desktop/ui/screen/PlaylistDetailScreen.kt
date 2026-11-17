@@ -108,7 +108,12 @@ fun PlaylistDetailScreen(
                             shuffleEndpoint = null,
                             radioEndpoint = null,
                         )
-                        val songs = YouTube.newEpisodes().getOrElse { emptyList() }.distinctBy { it.id }
+                        val episodesResult = YouTube.newEpisodes()
+                        episodesResult.onFailure { throwable ->
+                            println("[PODCAST_UI] RDPN newEpisodes failed: ${throwable.message}")
+                            error = throwable.message ?: strings.get("error_loading_playlist")
+                        }
+                        val songs = episodesResult.getOrNull().orEmpty().distinctBy { it.id }
                         val enrichedInfo = if (info.thumbnail == null && songs.isNotEmpty()) {
                             info.copy(thumbnail = songs.first().thumbnail)
                         } else {
@@ -123,7 +128,12 @@ fun PlaylistDetailScreen(
                     }
 
                     "SE" -> {
-                        val episodes = YouTube.episodesForLater().getOrElse { emptyList() }.distinctBy { it.id }
+                        val episodesResult = YouTube.episodesForLater()
+                        episodesResult.onFailure { throwable ->
+                            println("[PODCAST_UI] SE episodesForLater failed: ${throwable.message}")
+                            error = throwable.message ?: strings.get("error_loading_playlist")
+                        }
+                        val episodes = episodesResult.getOrNull().orEmpty().distinctBy { it.id }
                         PlaylistPage(
                             playlist = PlaylistItem(
                                 id = "SE",
@@ -344,7 +354,7 @@ fun PlaylistDetailScreen(
                                 Spacer(Modifier.height(12.dp))
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    page.playlist.shuffleEndpoint?.let {
+                                    if (page.playlist.shuffleEndpoint != null || page.songs.isNotEmpty()) {
                                         Button(
                                             onClick = {
                                                 val songs = page.songs.shuffled().map { songItemToLibraryItem(it) }

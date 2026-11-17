@@ -120,6 +120,7 @@ fun LibraryPodcastsScreen(
     var savedEpisodes by remember { mutableStateOf<List<SongItem>>(emptyList()) }
     var podcastChannels by remember { mutableStateOf<List<ArtistItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf<String?>(null) }
 
     val songs by database.songs.collectAsState(initial = emptyList())
     val playlists by database.playlists.collectAsState(initial = emptyList())
@@ -161,21 +162,33 @@ fun LibraryPodcastsScreen(
 
     suspend fun loadPodcastData() {
         isLoading = true
+        loadError = null
         withContext(Dispatchers.IO) {
-            InnertubeYouTube.newEpisodesPlaylistInfo().onSuccess { rdpnPlaylist = it }
-            InnertubeYouTube.library("FEmusic_liked_playlists").onSuccess { page ->
-                sePlaylist = page.items
-                    .filterIsInstance<PlaylistItem>()
-                    .find { it.id == "SE" }
+            InnertubeYouTube.newEpisodesPlaylistInfo()
+                .onSuccess { rdpnPlaylist = it }
+                .onFailure { println("[PODCAST_UI] newEpisodesPlaylistInfo failed: ${it.message}") }
+            InnertubeYouTube.library("FEmusic_liked_playlists")
+                .onSuccess { page ->
+                    sePlaylist = page.items
+                        .filterIsInstance<PlaylistItem>()
+                        .find { it.id == "SE" }
+                }
+                .onFailure { println("[PODCAST_UI] FEmusic_liked_playlists failed: ${it.message}") }
+            InnertubeYouTube.savedPodcastShows()
+                .onSuccess { savedShows = it }
+                .onFailure {
+                    println("[PODCAST_UI] savedPodcastShows failed: ${it.message}")
+                    if (loadError == null) loadError = it.message
+                }
+            InnertubeYouTube.episodesForLater()
+                .onSuccess { savedEpisodes = it }
+                .onFailure { println("[PODCAST_UI] episodesForLater failed: ${it.message}") }
+            val channelsResult = InnertubeYouTube.libraryPodcastChannels()
+            channelsResult.onFailure {
+                println("[PODCAST_UI] libraryPodcastChannels failed: ${it.message}")
+                if (loadError == null) loadError = it.message
             }
-            InnertubeYouTube.savedPodcastShows().onSuccess { shows ->
-                savedShows = shows
-            }
-            InnertubeYouTube.episodesForLater().onSuccess { episodes ->
-                savedEpisodes = episodes
-            }
-            val apiChannels = InnertubeYouTube.libraryPodcastChannels()
-                .getOrNull()
+            val apiChannels = channelsResult.getOrNull()
                 ?.items
                 ?.filterIsInstance<ArtistItem>()
                 .orEmpty()
@@ -196,7 +209,7 @@ fun LibraryPodcastsScreen(
         isLoading = false
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(InnertubeYouTube.cookie) {
         loadPodcastData()
     }
 
@@ -440,7 +453,7 @@ fun LibraryPodcastsScreen(
                             item(key = "podcasts-channels-empty") {
                                 EmptyPodcastPlaceholder(
                                     title = stringResource("no_subscribed_channels"),
-                                    subtitle = stringResource("filter_channels"),
+                                    subtitle = loadError ?: stringResource("filter_channels"),
                                 )
                             }
                         } else {
