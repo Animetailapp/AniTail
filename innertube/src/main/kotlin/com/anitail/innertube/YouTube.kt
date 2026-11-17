@@ -1689,21 +1689,23 @@ object YouTube {
             setLogin = true
         ).body<BrowseResponse>()
 
-        // VLSE uses musicPlaylistShelfRenderer, not musicShelfRenderer
-        val contents = response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer
-            ?.contents?.firstOrNull()
+        val sectionList = response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer
+            ?: response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()?.tabRenderer?.content?.sectionListRenderer
+            ?: response.contents?.sectionListRenderer
 
-        val shelfContents = contents?.musicPlaylistShelfRenderer?.contents
-            ?: contents?.musicShelfRenderer?.contents
+        val shelfContents = sectionList?.contents?.flatMap { content ->
+            content.musicPlaylistShelfRenderer?.contents
+                ?: content.musicShelfRenderer?.contents
+                ?: emptyList()
+        }.orEmpty()
 
-        // Parse musicResponsiveListItemRenderer (standard playlist format)
-        shelfContents?.mapNotNull { it.musicResponsiveListItemRenderer }
-            ?.mapNotNull { renderer ->
-                val videoId = renderer.videoId ?: return@mapNotNull null
+        shelfContents.mapNotNull { content ->
+            content.musicResponsiveListItemRenderer?.let { renderer ->
+                val videoId = renderer.videoId ?: return@let null
                 val setVideoId = renderer.playlistSetVideoId
                 val title = renderer.flexColumns.firstOrNull()
                     ?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()?.text
-                    ?: return@mapNotNull null
+                    ?: return@let null
                 val artistRun = renderer.flexColumns.getOrNull(1)
                     ?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.firstOrNull()
                 SongItem(
@@ -1716,7 +1718,29 @@ object YouTube {
                     setVideoId = setVideoId,
                     isEpisode = true,
                 )
-            } ?: emptyList()
+            } ?: content.musicMultiRowListItemRenderer?.let { renderer ->
+                val videoId = renderer.onTap?.watchEndpoint?.videoId
+                    ?: renderer.title?.runs?.firstOrNull()?.navigationEndpoint?.watchEndpoint?.videoId
+                    ?: renderer.menu?.menuRenderer?.items?.firstNotNullOfOrNull {
+                        it.menuNavigationItemRenderer?.navigationEndpoint?.watchEndpoint?.videoId
+                    }
+                    ?: return@let null
+                val title = renderer.title?.runs?.firstOrNull()?.text ?: return@let null
+                SongItem(
+                    id = videoId,
+                    title = title,
+                    artists = renderer.subtitle?.runs?.mapNotNull { run ->
+                        run.navigationEndpoint?.browseEndpoint?.let { endpoint ->
+                            Artist(name = run.text, id = endpoint.browseId)
+                        }
+                    } ?: emptyList(),
+                    album = null,
+                    duration = null,
+                    thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
+                    isEpisode = true,
+                )
+            }
+        }
     }
 
     /**

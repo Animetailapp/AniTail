@@ -6,10 +6,12 @@ import com.anitail.innertube.models.Artist
 import com.anitail.innertube.models.ArtistItem
 import com.anitail.innertube.models.BrowseEndpoint
 import com.anitail.innertube.models.MusicCarouselShelfRenderer
+import com.anitail.innertube.models.MusicMultiRowListItemRenderer
 import com.anitail.innertube.models.MusicResponsiveListItemRenderer
 import com.anitail.innertube.models.MusicShelfRenderer
 import com.anitail.innertube.models.MusicTwoRowItemRenderer
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.PodcastItem
 import com.anitail.innertube.models.Run
 import com.anitail.innertube.models.SectionListRenderer
 import com.anitail.innertube.models.SongItem
@@ -43,11 +45,13 @@ data class ArtistPage(
         }
 
         private fun fromMusicShelfRenderer(renderer: MusicShelfRenderer): ArtistSection? {
+            val items = renderer.contents?.mapNotNull { content ->
+                content.musicResponsiveListItemRenderer?.let { fromMusicResponsiveListItemRenderer(it) }
+                    ?: content.musicMultiRowListItemRenderer?.let { fromMusicMultiRowListItemRenderer(it) }
+            }?.ifEmpty { null } ?: return null
             return ArtistSection(
                 title = renderer.title?.runs?.firstOrNull()?.text ?: "",
-                items = renderer.contents?.getItems()?.mapNotNull {
-                    fromMusicResponsiveListItemRenderer(it)
-                }?.ifEmpty { null } ?: return null,
+                items = items,
                 moreEndpoint = renderer.title?.runs?.firstOrNull()?.navigationEndpoint?.browseEndpoint
             )
         }
@@ -60,9 +64,34 @@ data class ArtistPage(
                         fromMusicTwoRowItemRenderer(twoRowRenderer)
                     } ?: content.musicResponsiveListItemRenderer?.let { listItemRenderer ->
                         fromMusicResponsiveListItemRenderer(listItemRenderer)
+                    } ?: content.musicMultiRowListItemRenderer?.let { multiRowRenderer ->
+                        fromMusicMultiRowListItemRenderer(multiRowRenderer)
                     }
                 }.ifEmpty { null } ?: return null,
                 moreEndpoint = renderer.header.musicCarouselShelfBasicHeaderRenderer.moreContentButton?.buttonRenderer?.navigationEndpoint?.browseEndpoint
+            )
+        }
+
+        private fun fromMusicMultiRowListItemRenderer(renderer: MusicMultiRowListItemRenderer): SongItem? {
+            val videoId = renderer.onTap?.watchEndpoint?.videoId
+                ?: renderer.title?.runs?.firstOrNull()?.navigationEndpoint?.watchEndpoint?.videoId
+                ?: renderer.menu?.menuRenderer?.items?.firstNotNullOfOrNull {
+                    it.menuNavigationItemRenderer?.navigationEndpoint?.watchEndpoint?.videoId
+                }
+                ?: return null
+            val title = renderer.title?.runs?.firstOrNull()?.text ?: return null
+            return SongItem(
+                id = videoId,
+                title = title,
+                artists = renderer.subtitle?.runs?.mapNotNull { run ->
+                    run.navigationEndpoint?.browseEndpoint?.let { endpoint ->
+                        Artist(name = run.text, id = endpoint.browseId)
+                    }
+                } ?: emptyList(),
+                album = null,
+                duration = null,
+                thumbnail = renderer.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl() ?: "",
+                isEpisode = true,
             )
         }
 
@@ -202,6 +231,31 @@ data class ArtistPage(
                         radioEndpoint = renderer.menu.menuRenderer.items.find {
                             it.menuNavigationItemRenderer?.icon?.iconType == "MIX"
                         }?.menuNavigationItemRenderer?.navigationEndpoint?.watchPlaylistEndpoint ?: return null,
+                    )
+                }
+
+                renderer.isPodcast -> {
+                    val libraryTokens = PageHelper.extractLibraryTokensFromMenuItems(renderer.menu?.menuRenderer?.items)
+                    PodcastItem(
+                        id = renderer.navigationEndpoint.browseEndpoint?.browseId ?: return null,
+                        title = renderer.title.runs?.firstOrNull()?.text ?: return null,
+                        author = renderer.subtitle?.runs?.firstOrNull()?.let {
+                            Artist(
+                                name = it.text,
+                                id = it.navigationEndpoint?.browseEndpoint?.browseId
+                            )
+                        },
+                        episodeCountText = renderer.subtitle?.runs?.lastOrNull()?.text,
+                        thumbnail = renderer.thumbnailRenderer.musicThumbnailRenderer?.getThumbnailUrl(),
+                        playEndpoint = renderer.thumbnailOverlay
+                            ?.musicItemThumbnailOverlayRenderer?.content
+                            ?.musicPlayButtonRenderer?.playNavigationEndpoint
+                            ?.watchPlaylistEndpoint,
+                        shuffleEndpoint = renderer.menu?.menuRenderer?.items?.find {
+                            it.menuNavigationItemRenderer?.icon?.iconType == "MUSIC_SHUFFLE"
+                        }?.menuNavigationItemRenderer?.navigationEndpoint?.watchPlaylistEndpoint,
+                        libraryAddToken = libraryTokens.addToken,
+                        libraryRemoveToken = libraryTokens.removeToken,
                     )
                 }
 
