@@ -735,19 +735,22 @@ private fun FrameWindowScope.AniTailDesktopApp(
         }
     }
 
-    LaunchedEffect(enableDiscordRPC, playerState.isPlaying, playerState.currentItem == null) {
-        val shouldBeRunning = enableDiscordRPC &&
-            playerState.isPlaying && playerState.currentItem != null
-        if (shouldBeRunning) {
+    LaunchedEffect(enableDiscordRPC) {
+        if (enableDiscordRPC) {
             if (discordRPC == null) {
-                discordRPC = DesktopDiscordRPC()
-                discordRpcController = com.anitail.desktop.rpc.DesktopPlayerRpcController(discordRPC!!)
+                val rpc = DesktopDiscordRPC()
+                discordRPC = rpc
+                discordRpcController = com.anitail.desktop.rpc.DesktopPlayerRpcController(rpc)
             }
         } else {
-            discordRpcController?.close()
+            val controller = discordRpcController
+            val rpc = discordRPC
             discordRpcController = null
-            discordRPC?.closeRPC()
             discordRPC = null
+            kotlinx.coroutines.withContext(Dispatchers.IO) {
+                controller?.close()
+                rpc?.closeRPC()
+            }
         }
     }
 
@@ -765,9 +768,20 @@ private fun FrameWindowScope.AniTailDesktopApp(
         currentSongId?.let { id -> songsById[id]?.duration }
     }
 
-    LaunchedEffect(currentSongId, currentArtistThumbnail, currentAlbumName, discordRpcController) {
+    LaunchedEffect(
+        enableDiscordRPC,
+        playerState.isPlaying,
+        currentSongId,
+        currentArtistThumbnail,
+        currentAlbumName,
+        discordRpcController,
+    ) {
         val controller = discordRpcController ?: return@LaunchedEffect
-        val item = playerState.currentItem ?: return@LaunchedEffect
+        val item = playerState.currentItem
+        if (!enableDiscordRPC || !playerState.isPlaying || item == null) {
+            controller.clearActivity()
+            return@LaunchedEffect
+        }
 
         val timeStart = System.currentTimeMillis()
         val durationMs = item.durationMs

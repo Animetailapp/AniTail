@@ -33,7 +33,9 @@ class DesktopDiscordRPC {
         timeEnd: Long     // milliseconds
     ) = withContext(Dispatchers.IO) {
         runCatching {
-            val presenceState = item.artist.takeIf { it.isNotBlank() } ?: "Unknown artist"
+            val songTitle = item.title.trim().ifEmpty { "Unknown" }.let { if (it.length < 2) "$it " else it }.take(128)
+            val presenceState = item.artist.trim().ifEmpty { "Unknown artist" }.let { if (it.length < 2) "$it " else it }.take(128)
+            val albumText = ("Album: " + (albumName?.takeIf { it.isNotBlank() } ?: "Unknown")).take(128)
 
             // Discord expects Unix timestamps in SECONDS, not milliseconds
             val startSec = timeStart / 1000L
@@ -43,28 +45,54 @@ class DesktopDiscordRPC {
             // same as how Android's Discord Social SDK passes thumbnailUrl directly.
             val largeImage = item.artworkUrl?.takeIf { it.isNotBlank() } ?: ASSET_LOGO
             val smallImage = artistThumbnailUrl?.takeIf { it.isNotBlank() }
+            val videoId = extractVideoId(item.playbackUrl, item.id)
+
+            val buttons = org.json.JSONArray().apply {
+                if (!videoId.isNullOrBlank()) {
+                    put(JSONObject().apply {
+                        put("label", "Listen on YouTube Music")
+                        put("url", "https://music.youtube.com/watch?v=$videoId")
+                    })
+                }
+                put(JSONObject().apply {
+                    put("label", "Join our discord")
+                    put("url", "https://discord.gg/H8x3yNbc67")
+                })
+            }
 
             val activityJson = JSONObject().apply {
                 put("type", 2) // Listening
-                put("name", "AniTail Music")
-                put("details", item.title.take(128))
-                put("state", presenceState.take(128))
+                put("details", songTitle)
+                put("state", presenceState)
                 put("timestamps", JSONObject().apply {
                     put("start", startSec)
                     if (endSec > startSec) put("end", endSec)
                 })
                 put("assets", JSONObject().apply {
                     put("large_image", largeImage)
-                    put("large_text", ("Album: " + (albumName?.takeIf { it.isNotBlank() } ?: "Unknown")).take(128))
+                    put("large_text", albumText)
                     if (smallImage != null) {
                         put("small_image", smallImage)
-                        put("small_text", presenceState.take(128))
+                        put("small_text", presenceState)
                     }
                 })
+                put("buttons", buttons)
             }
 
             client.setActivity(activityJson)
         }
+    }
+
+    suspend fun clearActivity() = withContext(Dispatchers.IO) {
+        val _ = runCatching { client.clearActivity() }
+    }
+
+    private fun extractVideoId(playbackUrl: String?, fallbackId: String): String? {
+        if (!playbackUrl.isNullOrBlank()) {
+            Regex("[?&]v=([a-zA-Z0-9_-]{11})").find(playbackUrl)?.groupValues?.getOrNull(1)?.let { return it }
+            Regex("youtu\\.be/([a-zA-Z0-9_-]{11})").find(playbackUrl)?.groupValues?.getOrNull(1)?.let { return it }
+        }
+        return fallbackId.takeIf { it.matches(Regex("[a-zA-Z0-9_-]{11}")) }
     }
 
     companion object {
@@ -215,7 +243,41 @@ class DiscordIpcClient(private val clientId: String) {
     }
 
     fun setActivity(activityJson: JSONObject) {
-        if (!connected && !connect()) return
+        if (!connected && !connect()) {
+            println("[DiscordRPC] Could not connect to Discord IPC pipe/socket")
+            return
+        }
+        if (!sendSetActivity(activityJson)) {
+            if (activityJson.has("type")) {
+                val fallback = JSONObject(activityJson.toString()).apply { remove("type") }
+                if (!connected && !connect()) return
+                sendSetActivity(fallback)
+            }
+        }
+    }
+
+    fun clearActivity() {
+        if (!connected) return
+        val payload = JSONObject().apply {
+            put("cmd", "SET_ACTIVITY")
+            put("args", JSONObject().apply {
+                put("pid", ProcessHandle.current().pid().toInt())
+                put("activity", JSONObject.NULL)
+            })
+            put("nonce", java.util.UUID.randomUUID().toString())
+        }
+        try {
+            send(1, payload.toString())
+            val response = receive()
+            if (response == null) {
+                close()
+            }
+        } catch (_: Exception) {
+            close()
+        }
+    }
+
+    private fun sendSetActivity(activityJson: JSONObject): Boolean {
         val payload = JSONObject().apply {
             put("cmd", "SET_ACTIVITY")
             put("args", JSONObject().apply {
@@ -224,24 +286,31 @@ class DiscordIpcClient(private val clientId: String) {
             })
             put("nonce", java.util.UUID.randomUUID().toString())
         }
-        try {
+        return try {
             send(1, payload.toString())
-            // Consume Discord's response (required to keep pipe state valid)
             val response = receive()
-            // If Discord reports an error, disconnect so next call retries
-            if (response == null || response.optString("evt") == "ERROR") {
-                connected = false
+            if (response == null) {
+                println("[DiscordRPC] No response from Discord IPC; closing connection")
+                close()
+                false
+            } else if (response.optString("evt") == "ERROR") {
+                println("[DiscordRPC] SET_ACTIVITY rejected: ${response.optJSONObject("data")}")
+                false
+            } else {
+                true
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            println("[DiscordRPC] SET_ACTIVITY failed: ${e.message}")
             close()
+            false
         }
     }
 
     fun close() {
-        runCatching { streamOut?.close() }
-        runCatching { streamIn?.close() }
-        runCatching { socketChannel?.close() }
-        runCatching { windowsPipe?.close() }
+        val _ = runCatching { streamOut?.close() }
+        val _ = runCatching { streamIn?.close() }
+        val _ = runCatching { socketChannel?.close() }
+        val _ = runCatching { windowsPipe?.close() }
         streamOut = null
         streamIn = null
         socketChannel = null
