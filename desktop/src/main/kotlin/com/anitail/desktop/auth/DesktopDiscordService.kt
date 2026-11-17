@@ -41,11 +41,12 @@ data class DiscordAuthResult(
 )
 
 object DesktopDiscordService {
-    const val DISCORD_APP_ID = "1447278780795064401"
-    const val DISCORD_REDIRECT_URI = "metrolist-auth://discord/callback"
+    const val DISCORD_APP_ID = "1359660031183818955"
+    private const val DISCORD_URI_SCHEME = "discord-$DISCORD_APP_ID"
+    const val DISCORD_REDIRECT_URI = "$DISCORD_URI_SCHEME:///authorize/callback"
     private const val DISCORD_OAUTH_AUTHORIZE = "https://discord.com/oauth2/authorize"
     private const val DISCORD_OAUTH_TOKEN = "https://discord.com/api/v10/oauth2/token"
-    private const val DISCORD_SCOPES = "openid sdk.social_layer_presence"
+    private const val DISCORD_SCOPES = "identify openid sdk.social_layer_presence"
 
     private val client = OkHttpClient.Builder().build()
     private val random = SecureRandom()
@@ -250,7 +251,7 @@ object DesktopDiscordService {
     private fun registerCallbackRelay(port: Int) {
         val os = System.getProperty("os.name").lowercase()
         if (!os.contains("win")) return
-        val baseKey = "Software\\Classes\\metrolist-auth"
+        val baseKey = "Software\\Classes\\$DISCORD_URI_SCHEME"
         val commandKey = "$baseKey\\shell\\open\\command"
         val command =
             "powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command " +
@@ -259,7 +260,7 @@ object DesktopDiscordService {
                 "\$w.WriteLine('%1');\$w.Flush();\$c.Close()\""
 
         Advapi32Util.registryCreateKey(WinReg.HKEY_CURRENT_USER, baseKey)
-        Advapi32Util.registrySetStringValue(WinReg.HKEY_CURRENT_USER, baseKey, "", "URL:Metrolist Discord Auth")
+        Advapi32Util.registrySetStringValue(WinReg.HKEY_CURRENT_USER, baseKey, "", "URL:AniTail Discord Auth")
         Advapi32Util.registrySetStringValue(WinReg.HKEY_CURRENT_USER, baseKey, "URL Protocol", "")
         Advapi32Util.registryCreateKey(WinReg.HKEY_CURRENT_USER, commandKey)
         Advapi32Util.registrySetStringValue(WinReg.HKEY_CURRENT_USER, commandKey, "", command)

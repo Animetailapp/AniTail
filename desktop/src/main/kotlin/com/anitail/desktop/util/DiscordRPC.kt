@@ -146,7 +146,7 @@ class DesktopDiscordRPC(
     }
 
     companion object {
-        private const val APPLICATION_ID = "1447278780795064401"
+        private const val APPLICATION_ID = DesktopDiscordService.DISCORD_APP_ID
     }
 }
 
