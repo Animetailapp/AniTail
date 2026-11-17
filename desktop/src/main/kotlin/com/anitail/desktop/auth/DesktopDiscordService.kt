@@ -1,9 +1,20 @@
 package com.anitail.desktop.auth
 
+import com.sun.jna.platform.win32.Advapi32Util
+import com.sun.jna.platform.win32.WinReg
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.awt.Desktop
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.URI
+import java.net.URLDecoder
 import java.net.URLEncoder
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -174,4 +185,96 @@ object DesktopDiscordService {
     }
 
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8)
+
+    suspend fun startBrowserOAuthLogin(
+        timeoutMs: Int = 180_000,
+    ): Result<DiscordAuthResult> = withContext(Dispatchers.IO) {
+        runCatching {
+            val session = createAuthSession()
+            ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { serverSocket ->
+                serverSocket.soTimeout = timeoutMs
+                val port = serverSocket.localPort
+                registerCallbackRelay(port)
+                openDiscordAuthUrl(session.authorizeUrl)
+
+                val callbackUrl = serverSocket.accept().use { clientSocket ->
+                    BufferedReader(InputStreamReader(clientSocket.getInputStream(), Charsets.UTF_8))
+                        .readLine()
+                        .orEmpty()
+                        .trim()
+                }
+                check(callbackUrl.startsWith(DISCORD_REDIRECT_URI)) {
+                    "Unexpected Discord OAuth callback: $callbackUrl"
+                }
+
+                val query = callbackUrl.substringAfter("?", "")
+                val params = parseQueryParams(query)
+                val error = params["error"]
+                if (!error.isNullOrBlank()) {
+                    error(params["error_description"] ?: error)
+                }
+                val code = params["code"]?.takeIf { it.isNotBlank() }
+                    ?: error("Missing authorization code")
+                val state = params["state"].orEmpty()
+
+                exchangeCode(
+                    code = code,
+                    verifier = session.pkceVerifier,
+                    state = state,
+                    expectedState = session.state,
+                ).getOrThrow()
+            }
+        }
+    }
+
+    private fun openDiscordAuthUrl(authorizeUrl: String) {
+        val discordAppUrl = if (authorizeUrl.startsWith("https://discord.com/oauth2/authorize")) {
+            authorizeUrl.replace("https://discord.com", "discord://action")
+        } else {
+            authorizeUrl
+        }
+        check(Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+            "Desktop browser action is not supported"
+        }
+        try {
+            Desktop.getDesktop().browse(URI(discordAppUrl))
+        } catch (_: Exception) {
+            if (discordAppUrl != authorizeUrl) {
+                Desktop.getDesktop().browse(URI(authorizeUrl))
+            } else {
+                throw IllegalStateException("Unable to open Discord authorization URL")
+            }
+        }
+    }
+
+    private fun registerCallbackRelay(port: Int) {
+        val os = System.getProperty("os.name").lowercase()
+        if (!os.contains("win")) return
+        val baseKey = "Software\\Classes\\metrolist-auth"
+        val commandKey = "$baseKey\\shell\\open\\command"
+        val command =
+            "powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -Command " +
+                "\"\$c=New-Object Net.Sockets.TcpClient('127.0.0.1',$port);" +
+                "\$w=New-Object IO.StreamWriter(\$c.GetStream());" +
+                "\$w.WriteLine('%1');\$w.Flush();\$c.Close()\""
+
+        Advapi32Util.registryCreateKey(WinReg.HKEY_CURRENT_USER, baseKey)
+        Advapi32Util.registrySetStringValue(WinReg.HKEY_CURRENT_USER, baseKey, "", "URL:Metrolist Discord Auth")
+        Advapi32Util.registrySetStringValue(WinReg.HKEY_CURRENT_USER, baseKey, "URL Protocol", "")
+        Advapi32Util.registryCreateKey(WinReg.HKEY_CURRENT_USER, commandKey)
+        Advapi32Util.registrySetStringValue(WinReg.HKEY_CURRENT_USER, commandKey, "", command)
+    }
+
+    private fun parseQueryParams(query: String): Map<String, String> {
+        if (query.isBlank()) return emptyMap()
+        return query.split("&").mapNotNull { pair ->
+            val idx = pair.indexOf('=')
+            if (idx <= 0) null
+            else {
+                val key = URLDecoder.decode(pair.substring(0, idx), Charsets.UTF_8)
+                val value = URLDecoder.decode(pair.substring(idx + 1), Charsets.UTF_8)
+                key to value
+            }
+        }.toMap()
+    }
 }

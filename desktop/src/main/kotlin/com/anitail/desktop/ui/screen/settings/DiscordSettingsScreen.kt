@@ -66,7 +66,6 @@ internal fun DiscordSettingsScreen(
     val discordUsername by preferences.discordUsername.collectAsState()
     val discordAvatarUrl by preferences.discordAvatarUrl.collectAsState()
 
-    var showDiscordLoginDialog by remember { mutableStateOf(false) }
     var isTesting by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<Boolean?>(null) }
 
@@ -96,22 +95,37 @@ internal fun DiscordSettingsScreen(
         }
     }
 
-    fun testConnection() {
-        applyDiscordToken(discordToken)
+    fun startDiscordLogin() {
+        scope.launch {
+            isTesting = true
+            testResult = null
+            val authResult = DesktopDiscordService.startBrowserOAuthLogin()
+            authResult.onSuccess { result ->
+                val ok = withContext(Dispatchers.IO) {
+                    val profile = DesktopDiscordService.fetchProfile(result.accessToken)
+                    if (profile != null) {
+                        preferences.setDiscordToken(result.accessToken)
+                        if (result.refreshToken.isNotBlank()) {
+                            preferences.setDiscordRefreshToken(result.refreshToken)
+                        }
+                        preferences.setDiscordName(profile.name)
+                        preferences.setDiscordUsername(profile.username)
+                        preferences.setDiscordAvatarUrl(profile.avatarUrl.orEmpty())
+                        true
+                    } else {
+                        false
+                    }
+                }
+                testResult = ok
+            }.onFailure {
+                testResult = false
+            }
+            isTesting = false
+        }
     }
 
-    if (showDiscordLoginDialog) {
-        DiscordLoginDialog(
-            onDismiss = { showDiscordLoginDialog = false },
-            onAuthSuccess = { authResult ->
-                showDiscordLoginDialog = false
-                applyDiscordToken(authResult.accessToken, authResult.refreshToken)
-            },
-            onAuthError = {
-                showDiscordLoginDialog = false
-                testResult = false
-            },
-        )
+    fun testConnection() {
+        applyDiscordToken(discordToken)
     }
 
     SettingsSubScreen(
@@ -275,7 +289,7 @@ internal fun DiscordSettingsScreen(
                     }
                 } else {
                     Button(
-                        onClick = { showDiscordLoginDialog = true },
+                        onClick = { startDiscordLogin() },
                         enabled = !isTesting,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
