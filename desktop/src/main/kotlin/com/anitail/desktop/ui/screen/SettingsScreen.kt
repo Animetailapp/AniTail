@@ -52,6 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -2164,39 +2165,48 @@ private fun AboutTeamMemberCard(
 
 // === Helper Components ===
 
+internal val LocalSettingsEmbeddedInDialog = compositionLocalOf { false }
+
 @Composable
 internal fun SettingsSubScreen(
     title: String,
     onBack: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val embeddedInDialog = LocalSettingsEmbeddedInDialog.current
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = IconAssets.arrowBack(),
-                    contentDescription = stringResource("back"),
+        if (!embeddedInDialog) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = IconAssets.arrowBack(),
+                        contentDescription = stringResource("back"),
+                    )
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineMedium,
                 )
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineMedium,
-            )
         }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            contentPadding = PaddingValues(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(if (embeddedInDialog) 8.dp else 4.dp),
+            contentPadding = if (embeddedInDialog) {
+                PaddingValues(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 24.dp)
+            } else {
+                PaddingValues(horizontal = 12.dp)
+            },
         ) {
             item {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (embeddedInDialog) 8.dp else 4.dp),
                     content = content,
                 )
             }

@@ -145,6 +145,7 @@ import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.player.rememberPlayerState
 import com.anitail.desktop.ui.screen.PlaylistDetailScreen
 import com.anitail.desktop.ui.screen.SearchScreen
+import com.anitail.desktop.ui.screen.SettingsDialogOverlay
 import com.anitail.desktop.ui.screen.SettingsScreen
 import com.anitail.desktop.ui.screen.StatsScreen
 import com.anitail.desktop.ui.screen.songItemToLibraryItem
@@ -1587,6 +1588,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
             var showQueueSideSheet by remember { mutableStateOf(false) }
             var sideSheetPinned by remember { mutableStateOf(false) }
             var showMiniPlayerAudioSettings by remember { mutableStateOf(false) }
+            var showSettingsDialog by remember { mutableStateOf(false) }
             var activeTextInputs by remember { mutableIntStateOf(0) }
             @OptIn(ExperimentalComposeUiApi::class)
             val textInputInterceptor = remember {
@@ -1636,15 +1638,16 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                 }
 
                                 ctrlOrMeta && event.key == Key.Comma -> {
-                                    if (currentScreen != DesktopScreen.Settings) {
-                                        navigationHistory.add(currentScreen)
-                                        currentScreen = DesktopScreen.Settings
-                                    }
+                                    showSettingsDialog = !showSettingsDialog
                                     true
                                 }
 
                                 event.key == Key.Escape -> {
                                     when {
+                                        showSettingsDialog -> {
+                                            showSettingsDialog = false
+                                            true
+                                        }
                                         showFloatingSearch -> {
                                             showFloatingSearch = false
                                             true
@@ -1678,6 +1681,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                     !showShortcutsOverlay &&
                                     !showSongRecognitionDialog &&
                                     !showMiniPlayerAudioSettings &&
+                                    !showSettingsDialog &&
                                     !playerState.showCastDialog -> {
                                     when {
                                         // Play / Pause (Space)
@@ -1862,7 +1866,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                 currentScreen = DesktopScreen.Stats
                             },
                             onSettings = {
-                                currentScreen = DesktopScreen.Settings
+                                showSettingsDialog = true
                             },
                             accountDisplayName = topBarAccountName,
                             accountAvatarUrl = topBarAccountAvatar,
@@ -2840,6 +2844,18 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     volume = playerState.volume,
                     onVolumeChange = { playerState.updateVolume(it) },
                     onDismiss = { showMiniPlayerAudioSettings = false },
+                )
+
+                SettingsDialogOverlay(
+                    visible = showSettingsDialog,
+                    onDismiss = { showSettingsDialog = false },
+                    preferences = preferences,
+                    downloadService = downloadService,
+                    authService = authService,
+                    authCredentials = authCredentials,
+                    playerState = playerState,
+                    onOpenLogin = {},
+                    onAuthChanged = { authCredentials = it },
                 )
 
                 // Floating PiP Video Viewer (visible when player is collapsed)
