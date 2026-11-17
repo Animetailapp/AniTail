@@ -612,15 +612,20 @@ class NativeAudioPlayer {
             if (innertubexResult.isSuccess) {
                 val stream = innertubexResult.getOrThrow()
                 val videoUrl = stream.videoUrl
-                if (!videoUrl.isNullOrBlank() && probeStreamAccessible(videoUrl, stream.headers)) {
+                val candidateAudioUrl = stream.audioUrl.takeUnless { it.startsWith("sabr", ignoreCase = true) }
+                val videoAccessible = !videoUrl.isNullOrBlank() && probeStreamAccessible(videoUrl, stream.headers)
+                val audioAccessible = candidateId == videoId ||
+                    candidateAudioUrl.isNullOrBlank() ||
+                    probeStreamAccessible(candidateAudioUrl, stream.headers)
+                if (videoAccessible && audioAccessible) {
                     val info = VideoStreamInfo(
-                        url = videoUrl,
+                        url = videoUrl!!,
                         headers = stream.headers,
                         width = stream.videoWidth,
                         height = stream.videoHeight,
                         mimeType = stream.videoMimeType,
                         contentLengthBytes = stream.videoContentLengthBytes,
-                        audioUrl = stream.audioUrl.takeUnless { it.startsWith("sabr", ignoreCase = true) },
+                        audioUrl = candidateAudioUrl,
                         audioContentLengthBytes = stream.contentLengthBytes,
                         targetVideoId = candidateId,
                     )
@@ -860,15 +865,29 @@ class NativeAudioPlayer {
             return true
         }
         return try {
+            // Probe past the first 64KB because some nopo streams (e.g. WEB_EMBEDDED_PLAYER) allow 0-65535 but 403 on chunk #2+
             val request = Request.Builder()
                 .url(url)
                 .apply {
                     headers.forEach { (k, v) -> header(k, v) }
                 }
-                .header("Range", "bytes=0-0")
+                .header("Range", "bytes=65536-65536")
                 .build()
             httpClient.newCall(request).execute().use { response ->
-                response.code == 200 || response.code == 206
+                when (response.code) {
+                    200, 206 -> true
+                    416 -> {
+                        val headFallback = Request.Builder()
+                            .url(url)
+                            .apply { headers.forEach { (k, v) -> header(k, v) } }
+                            .header("Range", "bytes=0-0")
+                            .build()
+                        httpClient.newCall(headFallback).execute().use { r2 ->
+                            r2.code == 200 || r2.code == 206
+                        }
+                    }
+                    else -> false
+                }
             }
         } catch (_: Exception) {
             false
