@@ -136,6 +136,7 @@ fun HistoryScreen(
     var detailsItem by remember { mutableStateOf<LibraryItem?>(null) }
     var historyPage by remember { mutableStateOf<HistoryPage?>(null) }
     var isRemoteLoading by remember { mutableStateOf(false) }
+    var remoteError by remember { mutableStateOf<String?>(null) }
 
     val isLoggedIn = remember(YouTube.cookie) {
         val cookie = YouTube.cookie.orEmpty()
@@ -157,7 +158,15 @@ fun HistoryScreen(
     LaunchedEffect(historySource, isLoggedIn) {
         if (historySource != HistorySource.REMOTE || !isLoggedIn) return@LaunchedEffect
         isRemoteLoading = true
-        historyPage = withContext(Dispatchers.IO) { YouTube.musicHistory().getOrNull() }
+        remoteError = null
+        val result = withContext(Dispatchers.IO) { YouTube.musicHistory() }
+        historyPage = result.getOrNull()
+        result.exceptionOrNull()?.let {
+            System.err.println("HistoryScreen: remote history failed: ${it::class.simpleName}: ${it.message}")
+            it.printStackTrace()
+            remoteError = "${it::class.simpleName}: ${it.message}"
+        }
+        System.err.println("HistoryScreen: remote history sections=${historyPage?.sections?.size} songs=${historyPage?.sections?.sumOf { it.songs.size }}")
         isRemoteLoading = false
     }
 
@@ -528,7 +537,7 @@ fun HistoryScreen(
                     } else if (filteredRemoteSections.isNullOrEmpty()) {
                         item {
                             Text(
-                                text = stringResource("history_empty"),
+                                text = stringResource("history_empty") + (remoteError?.let { "\n$it" } ?: ""),
                                 modifier = Modifier.padding(horizontal = 16.dp),
                             )
                         }
