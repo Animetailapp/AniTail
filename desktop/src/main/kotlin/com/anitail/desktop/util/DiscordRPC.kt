@@ -1,5 +1,6 @@
 package com.anitail.desktop.util
 
+import com.anitail.desktop.auth.DesktopDiscordService
 import com.anitail.shared.model.LibraryItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +25,8 @@ import java.util.concurrent.TimeUnit
 
 class DesktopDiscordRPC(
     private val tokenProvider: () -> String = { "" },
+    private val refreshTokenProvider: () -> String = { "" },
+    private val onTokenRefreshed: (String, String) -> Unit = { _, _ -> },
 ) {
     private var gatewayClient: DiscordGatewayClient? = null
     private var activeToken: String = ""
@@ -43,11 +46,22 @@ class DesktopDiscordRPC(
         }
         if (gatewayClient == null || activeToken != token) {
             gatewayClient?.close()
-            gatewayClient = DiscordGatewayClient(APPLICATION_ID, token)
+            gatewayClient = createGatewayClient(token)
             activeToken = token
         }
         return gatewayClient?.connect() == true
     }
+
+    private fun createGatewayClient(token: String): DiscordGatewayClient =
+        DiscordGatewayClient(
+            applicationId = APPLICATION_ID,
+            initialToken = token,
+            refreshTokenProvider = refreshTokenProvider,
+            onTokenRefreshed = { newAccess, newRefresh ->
+                activeToken = newAccess
+                onTokenRefreshed(newAccess, newRefresh)
+            },
+        )
 
     fun closeRPC() {
         gatewayClient?.close()
@@ -68,7 +82,7 @@ class DesktopDiscordRPC(
 
             if (gatewayClient == null || activeToken != token) {
                 gatewayClient?.close()
-                gatewayClient = DiscordGatewayClient(APPLICATION_ID, token)
+                gatewayClient = createGatewayClient(token)
                 activeToken = token
             }
             val gw = gatewayClient ?: return@runCatching
@@ -138,8 +152,11 @@ class DesktopDiscordRPC(
 
 private class DiscordGatewayClient(
     private val applicationId: String,
-    private val token: String,
+    initialToken: String,
+    private val refreshTokenProvider: () -> String,
+    private val onTokenRefreshed: (String, String) -> Unit,
 ) {
+    @Volatile private var token: String = initialToken
     private val httpClient = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .build()
@@ -190,7 +207,22 @@ private class DiscordGatewayClient(
                     connected = false
                     ready = false
                     heartbeatJob?.cancel()
-                    if (!closed && code != 4004) {
+                    if (closed) return
+                    if (code == 4004) {
+                        val refresh = refreshTokenProvider().trim()
+                        if (refresh.isNotEmpty()) {
+                            scope.launch {
+                                val refreshed = DesktopDiscordService.refreshToken(refresh).getOrNull()
+                                if (refreshed != null && refreshed.accessToken.isNotBlank()) {
+                                    token = refreshed.accessToken
+                                    onTokenRefreshed(refreshed.accessToken, refreshed.refreshToken)
+                                    sessionId = null
+                                    sequence = null
+                                    connect()
+                                }
+                            }
+                        }
+                    } else {
                         scheduleReconnect()
                     }
                 }

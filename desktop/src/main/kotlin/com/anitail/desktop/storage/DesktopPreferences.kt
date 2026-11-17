@@ -309,6 +309,9 @@ class DesktopPreferences private constructor(
     private val _discordToken = MutableStateFlow("")
     val discordToken: StateFlow<String> = _discordToken.asStateFlow()
 
+    private val _discordRefreshToken = MutableStateFlow("")
+    val discordRefreshToken: StateFlow<String> = _discordRefreshToken.asStateFlow()
+
     private val _discordName = MutableStateFlow("")
     val discordName: StateFlow<String> = _discordName.asStateFlow()
 
@@ -894,6 +897,12 @@ class DesktopPreferences private constructor(
         save()
     }
 
+    fun setDiscordRefreshToken(value: String) {
+        _discordRefreshToken.value = value
+        persistSensitiveValue(SensitiveKeys.DISCORD_REFRESH_TOKEN, value)
+        save()
+    }
+
     fun setDiscordName(value: String) {
         _discordName.value = value
         save()
@@ -1240,6 +1249,11 @@ class DesktopPreferences private constructor(
                 legacyJsonKey = "discordToken",
                 secureKey = SensitiveKeys.DISCORD_TOKEN,
             )
+            _discordRefreshToken.value = readSensitiveValue(
+                json = json,
+                legacyJsonKey = "discordRefreshToken",
+                secureKey = SensitiveKeys.DISCORD_REFRESH_TOKEN,
+            )
             _discordName.value = json.optString("discordName", "")
             _discordUsername.value = json.optString("discordUsername", "")
             _discordAvatarUrl.value =
@@ -1417,6 +1431,7 @@ class DesktopPreferences private constructor(
     private fun clearSensitiveStoreEntries() {
         secureStore.remove(SensitiveKeys.PROXY_PASSWORD)
         secureStore.remove(SensitiveKeys.DISCORD_TOKEN)
+        secureStore.remove(SensitiveKeys.DISCORD_REFRESH_TOKEN)
         secureStore.remove(SensitiveKeys.SPOTIFY_ACCESS_TOKEN)
         secureStore.remove(SensitiveKeys.SPOTIFY_REFRESH_TOKEN)
         secureStore.remove(SensitiveKeys.LASTFM_SESSION_KEY)

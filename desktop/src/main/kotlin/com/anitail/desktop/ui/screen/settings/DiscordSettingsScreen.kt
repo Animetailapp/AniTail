@@ -70,7 +70,7 @@ internal fun DiscordSettingsScreen(
     var isTesting by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<Boolean?>(null) }
 
-    fun applyDiscordToken(rawToken: String) {
+    fun applyDiscordToken(rawToken: String, rawRefreshToken: String? = null) {
         val token = rawToken.trim()
         if (token.isEmpty()) return
         scope.launch {
@@ -80,6 +80,9 @@ internal fun DiscordSettingsScreen(
                 val profile = DesktopDiscordService.fetchProfile(token)
                 if (profile != null) {
                     preferences.setDiscordToken(token)
+                    if (!rawRefreshToken.isNullOrBlank()) {
+                        preferences.setDiscordRefreshToken(rawRefreshToken.trim())
+                    }
                     preferences.setDiscordName(profile.name)
                     preferences.setDiscordUsername(profile.username)
                     preferences.setDiscordAvatarUrl(profile.avatarUrl.orEmpty())
@@ -102,7 +105,7 @@ internal fun DiscordSettingsScreen(
             onDismiss = { showDiscordLoginDialog = false },
             onAuthSuccess = { authResult ->
                 showDiscordLoginDialog = false
-                applyDiscordToken(authResult.accessToken)
+                applyDiscordToken(authResult.accessToken, authResult.refreshToken)
             },
             onAuthError = {
                 showDiscordLoginDialog = false
@@ -246,6 +249,7 @@ internal fun DiscordSettingsScreen(
                         TextButton(
                             onClick = {
                                 preferences.setDiscordToken("")
+                                preferences.setDiscordRefreshToken("")
                                 preferences.setDiscordName("")
                                 preferences.setDiscordUsername("")
                                 preferences.setDiscordAvatarUrl("")
