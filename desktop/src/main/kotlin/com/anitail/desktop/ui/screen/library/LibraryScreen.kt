@@ -146,9 +146,11 @@ fun LibraryScreen(
             LibraryFilter.PODCASTS -> LibraryPodcastsScreen(
                 database = database,
                 downloadService = downloadService,
+                preferences = preferences,
                 playerState = playerState,
                 onDeselect = { preferences.setLibraryFilter(LibraryFilter.LIBRARY) },
                 onOpenArtist = onOpenArtist,
+                onOpenAlbum = onOpenAlbum,
                 onOpenPlaylist = onOpenPlaylist,
             )
             LibraryFilter.DOWNLOADED -> LibraryDownloadedScreen(
