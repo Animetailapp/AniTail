@@ -319,13 +319,6 @@ internal fun AccountSettingsScreen(
             onClick = onOpenSpotifyImport,
         )
 
-        AndroidPreferenceGroupTitle(title = stringResource("discord"))
-        AndroidPreferenceEntry(
-            title = stringResource("discord_integration"),
-            icon = IconAssets.discord(),
-            onClick = onOpenDiscordSettings,
-        )
-
         AndroidPreferenceGroupTitle(title = stringResource("avatar"))
         AndroidPreferenceEntry(
             title = stringResource("avatar_source"),
