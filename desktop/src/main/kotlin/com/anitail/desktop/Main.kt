@@ -2859,8 +2859,32 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
                 // Immersive Fullscreen Theater Overlay
                 if (playerState.isFullscreenOverlay) {
+                    val currentFullscreenItem = playerState.currentItem
+                    val currentFullscreenSong = currentFullscreenItem?.id?.let { songsById[it] }
                     VideoFullscreenOverlay(
                         playerState = playerState,
+                        isLiked = currentFullscreenSong?.liked == true,
+                        onToggleLike = {
+                            val current = currentFullscreenItem ?: return@VideoFullscreenOverlay
+                            scope.launch {
+                                if (currentFullscreenSong == null) {
+                                    database.insertSong(current.toSongEntity().copy(liked = true))
+                                } else {
+                                    database.toggleSongLike(current.id)
+                                }
+                            }
+                        },
+                        songRomanizeLyrics = currentFullscreenSong?.romanizeLyrics ?: true,
+                        onSetSongRomanizeLyrics = { enabled ->
+                            val current = currentFullscreenItem ?: return@VideoFullscreenOverlay
+                            scope.launch {
+                                if (currentFullscreenSong == null) {
+                                    database.insertSong(current.toSongEntity().copy(romanizeLyrics = enabled))
+                                } else {
+                                    database.updateSong(currentFullscreenSong.copy(romanizeLyrics = enabled))
+                                }
+                            }
+                        },
                         onExitFullscreen = {
                             playerState.isFullscreenOverlay = false
                             if (windowState.placement == WindowPlacement.Fullscreen) {
