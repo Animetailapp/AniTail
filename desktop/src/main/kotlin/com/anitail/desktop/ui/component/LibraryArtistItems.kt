@@ -34,9 +34,11 @@ fun LibraryArtistListItem(
         title = artist.name,
         subtitle = pluralizeSongs(songCount),
         thumbnailContent = {
-            RemoteImage(
+            ExpressiveFramedAvatar(
                 url = artist.thumbnailUrl,
-                shape = CircleShape,
+                contentDescription = artist.name,
+                shapeKey = artist.id,
+                ringWidth = 1.5.dp,
                 modifier = Modifier.size(ListThumbnailSize),
             )
         },
@@ -70,9 +72,11 @@ fun LibraryArtistGridItem(
             .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        RemoteImage(
+        ExpressiveFramedAvatar(
             url = artist.thumbnailUrl,
-            shape = CircleShape,
+            contentDescription = artist.name,
+            shapeKey = artist.id,
+            ringWidth = 2.5.dp,
             modifier = Modifier.size(size),
         )
         Spacer(modifier = Modifier.height(6.dp))

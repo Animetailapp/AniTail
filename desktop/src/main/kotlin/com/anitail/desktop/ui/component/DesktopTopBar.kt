@@ -234,13 +234,12 @@ private fun AccountChip(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
         ) {
             if (!accountAvatarUrl.isNullOrBlank()) {
-                RemoteImage(
+                ExpressiveFramedAvatar(
                     url = accountAvatarUrl,
                     contentDescription = accountDisplayName,
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clip(CircleShape),
-                    shape = CircleShape,
+                    shapeKey = accountDisplayName ?: accountAvatarUrl,
+                    ringWidth = 1.5.dp,
+                    modifier = Modifier.size(24.dp),
                 )
             } else {
                 Icon(

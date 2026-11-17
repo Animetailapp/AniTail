@@ -50,6 +50,7 @@ import com.anitail.desktop.auth.DesktopDiscordService
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
+import com.anitail.desktop.ui.component.ExpressiveFramedAvatar
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.shared.model.LibraryItem
 import kotlinx.coroutines.Dispatchers
@@ -383,12 +384,12 @@ internal fun DiscordSettingsScreen(
                 if (discordToken.isNotBlank()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (discordAvatarUrl.isNotBlank()) {
-                            RemoteImage(
+                            ExpressiveFramedAvatar(
                                 url = discordAvatarUrl,
                                 contentDescription = null,
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape),
+                                shapeKey = discordUsername.ifBlank { discordName },
+                                ringWidth = 1.5.dp,
+                                modifier = Modifier.size(34.dp),
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                         }

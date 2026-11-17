@@ -710,7 +710,7 @@ private fun LocalSearchResultRow(
     }
 
     val thumbShape: Shape = if (entry.kind == LocalMatchKind.ARTIST) {
-        CircleShape
+        rememberExpressiveAvatarShape(entry.item.id)
     } else {
         RoundedCornerShape(8.dp)
     }
