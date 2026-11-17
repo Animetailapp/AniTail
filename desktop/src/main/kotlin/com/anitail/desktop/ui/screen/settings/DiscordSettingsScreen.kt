@@ -21,8 +21,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,7 +46,6 @@ import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.RemoteImage
-import com.anitail.desktop.util.DiscordIpcClient
 import com.anitail.shared.model.LibraryItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -61,7 +62,12 @@ internal fun DiscordSettingsScreen(
 ) {
     val scope = rememberCoroutineScope()
     val discordRpcEnabled by preferences.enableDiscordRPC.collectAsState()
+    val discordToken by preferences.discordToken.collectAsState()
+    val discordName by preferences.discordName.collectAsState()
+    val discordUsername by preferences.discordUsername.collectAsState()
+    val discordAvatarUrl by preferences.discordAvatarUrl.collectAsState()
 
+    var tokenInput by remember(discordToken) { mutableStateOf(discordToken) }
     var isTesting by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<Boolean?>(null) }
 
@@ -70,14 +76,20 @@ internal fun DiscordSettingsScreen(
             isTesting = true
             testResult = null
             val result = withContext(Dispatchers.IO) {
-                val token = preferences.discordToken.value.trim()
-                if (token.isNotEmpty()) {
-                    DesktopDiscordService.fetchProfile(token) != null
+                val token = tokenInput.trim()
+                if (token.isEmpty()) {
+                    false
                 } else {
-                    val client = DiscordIpcClient("1271273225120125040")
-                    val connected = client.connect()
-                    if (connected) client.close()
-                    connected
+                    val profile = DesktopDiscordService.fetchProfile(token)
+                    if (profile != null) {
+                        preferences.setDiscordToken(token)
+                        preferences.setDiscordName(profile.name)
+                        preferences.setDiscordUsername(profile.username)
+                        preferences.setDiscordAvatarUrl(profile.avatarUrl.orEmpty())
+                        true
+                    } else {
+                        false
+                    }
                 }
             }
             testResult = result
@@ -191,6 +203,46 @@ internal fun DiscordSettingsScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = tokenInput,
+                    onValueChange = { tokenInput = it },
+                    label = { Text("Discord Token") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                if (discordUsername.isNotBlank() || discordName.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (discordAvatarUrl.isNotBlank()) {
+                            RemoteImage(
+                                url = discordAvatarUrl,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = if (discordName.isNotBlank()) "$discordName (@$discordUsername)" else "@$discordUsername",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        TextButton(
+                            onClick = {
+                                tokenInput = ""
+                                preferences.setDiscordToken("")
+                                preferences.setDiscordName("")
+                                preferences.setDiscordUsername("")
+                                preferences.setDiscordAvatarUrl("")
+                                testResult = null
+                            },
+                        ) {
+                            Text(stringResource("logout"))
                         }
                     }
                 }
@@ -334,7 +386,7 @@ private fun DiscordPreviewCard(
                 onClick = {
                     val trackId = item?.id?.trim().orEmpty()
                     if (trackId.isNotBlank()) {
-                        runCatching {
+                        val _ = runCatching {
                             java.awt.Desktop.getDesktop().browse(java.net.URI("https://music.youtube.com/watch?v=$trackId"))
                         }
                     }
