@@ -1562,13 +1562,20 @@ object YouTube {
                 setLogin = true
             ).body<BrowseResponse>()
 
-            val sectionList = response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer
-                ?: response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()?.tabRenderer?.content?.sectionListRenderer
-                ?: response.contents?.sectionListRenderer
+            val sectionLists = listOfNotNull(
+                response.contents?.twoColumnBrowseResultsRenderer?.secondaryContents?.sectionListRenderer,
+                response.contents?.twoColumnBrowseResultsRenderer?.tabs?.firstOrNull()?.tabRenderer?.content?.sectionListRenderer,
+                response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()?.tabRenderer?.content?.sectionListRenderer,
+                response.contents?.sectionListRenderer,
+            )
 
-            val shelfContents = sectionList?.contents?.flatMap { content ->
-                content.musicShelfRenderer?.contents ?: content.musicPlaylistShelfRenderer?.contents ?: emptyList()
-            } ?: emptyList()
+            val shelfContents = sectionLists.flatMap { sectionList ->
+                sectionList.contents.orEmpty().flatMap { content ->
+                    content.musicShelfRenderer?.contents
+                        ?: content.musicPlaylistShelfRenderer?.contents
+                        ?: emptyList()
+                }
+            }
 
             shelfContents.mapNotNull { content ->
                 if (content.musicMultiRowListItemRenderer != null) {

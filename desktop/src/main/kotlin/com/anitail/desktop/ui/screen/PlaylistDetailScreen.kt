@@ -384,6 +384,21 @@ fun PlaylistDetailScreen(
                         }
                     }
 
+                    if (filteredSongs.isEmpty() && error == null) {
+                        item(key = "empty-playlist") {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxWidth().padding(48.dp),
+                            ) {
+                                Text(
+                                    text = stringResource("sound_capsule_no_data"),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+
                     items(items = filteredSongs, key = { (index, song) -> "${index}_${song.id}" }) { (originalIndex, song) ->
                         YouTubeListItem(
                             item = song,
