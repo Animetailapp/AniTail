@@ -101,6 +101,7 @@ fun DesktopTopBar(
     onRefreshHome: (() -> Unit)? = null,
     onSongRecognition: (() -> Unit)? = null,
     onShortcuts: (() -> Unit)? = null,
+    onAccountClick: (() -> Unit)? = null,
 ) {
     val logoBitmap = remember { loadBitmapResource("drawable/ic_anitail.png") }
     var rightSideWidthPx by remember { mutableStateOf(0) }
@@ -132,6 +133,7 @@ fun DesktopTopBar(
                 accountAvatarUrl = accountAvatarUrl,
                 pureBlack = pureBlack,
                 chipOffsetXPx = rightSideWidthPx / 2,
+                onAccountClick = onAccountClick,
             )
         }
 
@@ -170,6 +172,7 @@ private fun TitleContent(
     accountAvatarUrl: String?,
     pureBlack: Boolean,
     chipOffsetXPx: Int,
+    onAccountClick: (() -> Unit)? = null,
 ) {
     val appName = stringResource("app_name")
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -198,6 +201,7 @@ private fun TitleContent(
                 accountDisplayName = accountDisplayName,
                 accountAvatarUrl = accountAvatarUrl,
                 pureBlack = pureBlack,
+                onClick = onAccountClick,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .offset { IntOffset(chipOffsetXPx, 0) },
@@ -211,6 +215,7 @@ private fun AccountChip(
     accountDisplayName: String?,
     accountAvatarUrl: String?,
     pureBlack: Boolean,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val chipBackground = if (pureBlack) {
@@ -223,7 +228,9 @@ private fun AccountChip(
     Surface(
         modifier = modifier
             .height(34.dp)
-            .widthIn(max = 340.dp),
+            .widthIn(max = 340.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(18.dp),
         color = chipBackground,
         tonalElevation = 0.dp,

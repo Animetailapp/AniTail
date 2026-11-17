@@ -1,6 +1,11 @@
 package com.anitail.innertube
 
 import com.anitail.innertube.models.AccountInfo
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonObject
 import com.anitail.innertube.models.YTItem
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.Artist
@@ -1950,6 +1955,101 @@ object YouTube {
             .actions[0].openPopupAction.popup.multiPageMenuRenderer
             .header?.activeAccountHeaderRenderer
             ?.toAccountInfo()!!
+    }
+
+    suspend fun accountChannels(): Result<List<com.anitail.innertube.models.YouTubeChannelAccount>> = runCatching {
+        val raw = innerTube.accountsList(WEB_REMIX).bodyAsText()
+        val root = Json.parseToJsonElement(raw).jsonObject
+        val channels = mutableListOf<com.anitail.innertube.models.YouTubeChannelAccount>()
+        collectChannelAccounts(root, channels)
+        if (channels.isEmpty()) {
+            accountInfo().getOrNull()?.let { info ->
+                channels += com.anitail.innertube.models.YouTubeChannelAccount(
+                    name = info.name,
+                    handle = info.channelHandle,
+                    byline = info.email,
+                    thumbnailUrl = info.thumbnailUrl,
+                    dataSyncId = dataSyncId,
+                    pageId = null,
+                    isSelected = true,
+                )
+            }
+        }
+        channels
+    }
+
+    private fun collectChannelAccounts(
+        element: JsonElement,
+        out: MutableList<com.anitail.innertube.models.YouTubeChannelAccount>,
+    ) {
+        when (element) {
+            is JsonObject -> {
+                val accountItem = element["accountItem"] as? JsonObject
+                if (accountItem != null) {
+                    parseChannelAccount(accountItem)?.let { out += it }
+                }
+                element.values.forEach { child -> collectChannelAccounts(child, out) }
+            }
+            is JsonArray -> {
+                element.forEach { child -> collectChannelAccounts(child, out) }
+            }
+            else -> Unit
+        }
+    }
+
+    private fun parseChannelAccount(item: JsonObject): com.anitail.innertube.models.YouTubeChannelAccount? {
+        val name = extractRunsText(item["accountName"]) ?: return null
+        val handle = extractRunsText(item["channelHandle"])
+        val byline = extractRunsText(item["accountByline"])
+        val thumbnailUrl = (item["accountPhoto"] as? JsonObject)
+            ?.get("thumbnails")
+            ?.let { it as? JsonArray }
+            ?.lastOrNull()
+            ?.let { it as? JsonObject }
+            ?.get("url")
+            ?.jsonPrimitive
+            ?.contentOrNull
+        val isSelected = item["isSelected"]?.jsonPrimitive?.booleanOrNull == true
+        val supportedTokens = (item["serviceEndpoint"] as? JsonObject)
+            ?.get("selectActiveIdentityEndpoint")
+            ?.let { it as? JsonObject }
+            ?.get("supportedTokens")
+            ?.let { it as? JsonArray }
+        var syncId: String? = null
+        var pageId: String? = null
+        supportedTokens?.forEach { tokenEl ->
+            val obj = tokenEl as? JsonObject ?: return@forEach
+            (obj["datasyncIdToken"] as? JsonObject)
+                ?.get("datasyncIdToken")
+                ?.jsonPrimitive
+                ?.contentOrNull
+                ?.takeIf { it.isNotBlank() }
+                ?.let { syncId = it }
+            (obj["pageIdToken"] as? JsonObject)
+                ?.get("pageId")
+                ?.jsonPrimitive
+                ?.contentOrNull
+                ?.takeIf { it.isNotBlank() }
+                ?.let { pageId = it }
+        }
+        return com.anitail.innertube.models.YouTubeChannelAccount(
+            name = name,
+            handle = handle,
+            byline = byline,
+            thumbnailUrl = thumbnailUrl,
+            dataSyncId = syncId,
+            pageId = pageId,
+            isSelected = isSelected,
+        )
+    }
+
+    private fun extractRunsText(node: JsonElement?): String? {
+        val obj = node as? JsonObject ?: return null
+        val runs = obj["runs"] as? JsonArray
+        val joined = runs?.mapNotNull { (it as? JsonObject)?.get("text")?.jsonPrimitive?.contentOrNull }
+            ?.joinToString("")
+            ?.takeIf { it.isNotBlank() }
+        return joined ?: obj["simpleText"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
     }
 
     suspend fun feedback(tokens: List<String>): Result<Boolean> = runCatching {

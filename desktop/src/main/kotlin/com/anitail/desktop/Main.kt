@@ -126,6 +126,7 @@ import com.anitail.desktop.ui.component.ShortcutsOverlay
 import com.anitail.desktop.ui.component.SongRecognitionDialog
 import com.anitail.desktop.ui.component.VideoFullscreenOverlay
 import com.anitail.desktop.ui.component.VideoMiniViewer
+import com.anitail.desktop.ui.component.YouTubeChannelPickerDialog
 import com.anitail.desktop.ui.window.MiniplayerWindow
 import androidx.compose.ui.window.WindowPlacement
 import com.anitail.desktop.ui.component.rememberBottomSheetState
@@ -1610,6 +1611,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
             var sideSheetPinned by remember { mutableStateOf(false) }
             var showMiniPlayerAudioSettings by remember { mutableStateOf(false) }
             var showSettingsDialog by remember { mutableStateOf(false) }
+            var showChannelPickerDialog by remember { mutableStateOf(false) }
             var activeTextInputs by remember { mutableIntStateOf(0) }
             @OptIn(ExperimentalComposeUiApi::class)
             val textInputInterceptor = remember {
@@ -1888,6 +1890,13 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             },
                             onSettings = {
                                 showSettingsDialog = true
+                            },
+                            onAccountClick = {
+                                if (!authCredentials?.cookie.isNullOrBlank()) {
+                                    showChannelPickerDialog = true
+                                } else {
+                                    showSettingsDialog = true
+                                }
                             },
                             accountDisplayName = topBarAccountName,
                             accountAvatarUrl = topBarAccountAvatar,
@@ -2878,6 +2887,19 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     playerState = playerState,
                     onOpenLogin = {},
                     onAuthChanged = { authCredentials = it },
+                )
+
+                YouTubeChannelPickerDialog(
+                    visible = showChannelPickerDialog,
+                    authService = authService,
+                    onDismiss = { showChannelPickerDialog = false },
+                    onChannelSwitched = {
+                        authCredentials = authService.credentials
+                        refreshHome()
+                    },
+                    onSignInAgain = {
+                        showSettingsDialog = true
+                    },
                 )
 
                 // Floating PiP Video Viewer (visible when player is collapsed)

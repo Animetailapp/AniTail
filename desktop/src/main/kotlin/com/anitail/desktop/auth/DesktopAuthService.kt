@@ -155,6 +155,21 @@ class DesktopAuthService(
     }
 
     /**
+     * Actualiza dataSyncId y refresca la información del canal activo.
+     */
+    suspend fun switchChannel(dataSyncId: String?): AccountInfo? {
+        val normalized = dataSyncId?.substringBefore("||")?.trim()?.takeIf { it.isNotBlank() }
+        val updated = (_credentials ?: AuthCredentials()).copy(dataSyncId = normalized)
+        saveCredentials(updated)
+        return refreshAccountInfo()
+    }
+
+    suspend fun fetchChannels(): Result<List<com.anitail.innertube.models.YouTubeChannelAccount>> =
+        withContext(Dispatchers.IO) {
+            com.anitail.innertube.YouTube.accountChannels()
+        }
+
+    /**
      * Actualiza dataSyncId.
      */
     suspend fun updateDataSyncId(dataSyncId: String) {

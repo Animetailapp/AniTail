@@ -23,6 +23,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.put
 import java.net.Proxy
 import java.io.IOException
 import kotlinx.coroutines.delay
@@ -501,6 +502,29 @@ class InnerTube {
         httpClient.post("account/account_menu") {
             ytClient(client, setLogin = true)
             setBody(AccountMenuBody(client.toContext(locale, visitorData, dataSyncId)))
+        }
+    }
+
+    suspend fun accountsList(client: YouTubeClient) = withRetry {
+        httpClient.post("account/accounts_list") {
+            ytClient(client, setLogin = true)
+            setBody(
+                kotlinx.serialization.json.buildJsonObject {
+                    put("context", Json.encodeToJsonElement(
+                        Context.serializer(),
+                        client.toContext(locale, visitorData, dataSyncId),
+                    ))
+                    put("callType", "ACCOUNT_MENU_REQUEST_TYPE_MANAGE")
+                    put(
+                        "accountReadMask",
+                        kotlinx.serialization.json.buildJsonObject {
+                            put("returnOwner", true)
+                            put("returnBrandAccounts", true)
+                            put("returnPersonaAccounts", true)
+                        },
+                    )
+                },
+            )
         }
     }
 
