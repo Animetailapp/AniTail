@@ -324,9 +324,9 @@ fun SettingsDialogOverlay(
         ) {
             Surface(
                 modifier = Modifier
-                    .widthIn(min = 760.dp, max = 980.dp)
-                    .fillMaxWidth(0.84f)
-                    .fillMaxHeight(0.86f)
+                    .widthIn(min = 860.dp, max = 1180.dp)
+                    .fillMaxWidth(0.92f)
+                    .fillMaxHeight(0.90f)
                     .padding(16.dp)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -342,7 +342,7 @@ fun SettingsDialogOverlay(
                     // Left Sidebar
                     Column(
                         modifier = Modifier
-                            .width(276.dp)
+                            .width(300.dp)
                             .fillMaxHeight()
                             .padding(start = 16.dp, end = 12.dp, top = 16.dp, bottom = 16.dp),
                     ) {
