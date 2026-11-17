@@ -284,7 +284,7 @@ class DesktopPreferences private constructor(
     private val _albumFilter = MutableStateFlow(AlbumFilter.LIKED)
     val albumFilter: StateFlow<AlbumFilter> = _albumFilter.asStateFlow()
 
-    private val _artistFilter = MutableStateFlow(ArtistFilter.LIKED)
+    private val _artistFilter = MutableStateFlow(ArtistFilter.LIBRARY)
     val artistFilter: StateFlow<ArtistFilter> = _artistFilter.asStateFlow()
 
     private val _showLikedPlaylist = MutableStateFlow(true)
@@ -1429,8 +1429,8 @@ class DesktopPreferences private constructor(
                 .let { value -> runCatching { SongFilter.valueOf(value.uppercase()) }.getOrDefault(SongFilter.LIKED) }
             _albumFilter.value = json.optString("albumFilter", "liked")
                 .let { value -> runCatching { AlbumFilter.valueOf(value.uppercase()) }.getOrDefault(AlbumFilter.LIKED) }
-            _artistFilter.value = json.optString("artistFilter", "liked")
-                .let { value -> runCatching { ArtistFilter.valueOf(value.uppercase()) }.getOrDefault(ArtistFilter.LIKED) }
+            _artistFilter.value = json.optString("artistFilter", "library")
+                .let { value -> runCatching { ArtistFilter.valueOf(value.uppercase()) }.getOrDefault(ArtistFilter.LIBRARY) }
 
             _showLikedPlaylist.value = json.optBoolean("showLikedPlaylist", true)
             _showDownloadedPlaylist.value = json.optBoolean("showDownloadedPlaylist", true)

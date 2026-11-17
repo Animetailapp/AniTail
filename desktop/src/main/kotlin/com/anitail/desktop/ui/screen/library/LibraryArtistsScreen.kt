@@ -93,18 +93,55 @@ fun LibraryArtistsScreen(
     val strings = LocalStrings.current
     val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
 
-    val stats = remember(songs, songArtistMaps) { buildArtistSongStats(songs, songArtistMaps) }
-    val songCountByArtist = remember(artists, stats) {
-        artists.associate { artist -> artist.id to artistSongCount(artist, stats) }
-    }
-    val playTimeByArtist = remember(artists, stats) {
-        artists.associate { artist -> artist.id to artistPlayTime(artist, stats) }
+    val effectiveArtists = remember(artists, songs, songArtistMaps) {
+        val byId = linkedMapOf<String, ArtistEntity>()
+        val seenNames = HashSet<String>()
+        artists.forEach { artist ->
+            byId[artist.id] = artist
+            seenNames.add(artist.name.trim().lowercase())
+        }
+        songs.forEach { song ->
+            if (song.inLibrary == null && !song.liked) return@forEach
+            val mappedId = primaryArtistIdForSong(song.id, songArtistMaps)
+            val rawName = song.artistName
+                ?.split(",", "&", ";")
+                ?.firstOrNull()
+                ?.trim()
+                .orEmpty()
+            if (rawName.isBlank()) return@forEach
+            val normalized = rawName.lowercase()
+            if (!mappedId.isNullOrBlank()) {
+                if (!byId.containsKey(mappedId) && seenNames.add(normalized)) {
+                    byId[mappedId] = ArtistEntity(
+                        id = mappedId,
+                        name = rawName,
+                        thumbnailUrl = song.thumbnailUrl,
+                    )
+                }
+            } else if (seenNames.add(normalized)) {
+                val localId = "local:$normalized"
+                byId[localId] = ArtistEntity(
+                    id = localId,
+                    name = rawName,
+                    thumbnailUrl = song.thumbnailUrl,
+                )
+            }
+        }
+        byId.values.toList()
     }
 
-    val filteredArtists = remember(artists, filter, songCountByArtist) {
+    val stats = remember(songs, songArtistMaps) { buildArtistSongStats(songs, songArtistMaps) }
+    val songCountByArtist = remember(effectiveArtists, stats) {
+        effectiveArtists.associate { artist -> artist.id to artistSongCount(artist, stats) }
+    }
+    val playTimeByArtist = remember(effectiveArtists, stats) {
+        effectiveArtists.associate { artist -> artist.id to artistPlayTime(artist, stats) }
+    }
+
+    val filteredArtists = remember(effectiveArtists, filter, songCountByArtist) {
         when (filter) {
-            ArtistFilter.LIKED -> artists.filter { it.bookmarkedAt != null }
-            ArtistFilter.LIBRARY -> artists.filter {
+            ArtistFilter.LIKED -> effectiveArtists.filter { it.bookmarkedAt != null }
+            ArtistFilter.LIBRARY -> effectiveArtists.filter {
                 it.bookmarkedAt != null || (songCountByArtist[it.id] ?: 0) > 0
             }
         }
