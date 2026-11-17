@@ -1,5 +1,6 @@
 package com.anitail.desktop.ui.screen
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,12 +23,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -170,17 +177,18 @@ fun ArtistDetailScreen(
                     // Header: Imagen grande con fading edge
                     item(key = "header") {
                         Column {
-                            // Imagen del artista / canal adaptada a Desktop
+                            // Imagen del artista / canal adaptada a Desktop (sin recortar logos cuadrados)
                             page.artist.thumbnail?.let { thumbnail ->
                                 val bannerUrl = remember(thumbnail) {
                                     if (thumbnail.contains("lh3.googleusercontent.com")) {
-                                        thumbnail.replace(Regex("=w\\d+-h\\d+.*$"), "=w1200-h600-p-l90-rj")
-                                            .replace(Regex("=s\\d+.*$"), "=w1200-h600-p-l90-rj")
+                                        thumbnail.replace(Regex("=w\\d+-h\\d+.*$"), "=w1200-h1000-p-l90-rj")
+                                            .replace(Regex("=s\\d+.*$"), "=w1200-h1000-p-l90-rj")
                                     } else {
                                         thumbnail
                                     }
                                 }
                                 Box(
+                                    contentAlignment = Alignment.Center,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(280.dp),
@@ -189,8 +197,18 @@ fun ArtistDetailScreen(
                                         url = bannerUrl,
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .fadingEdge(bottom = 120.dp),
+                                            .alpha(0.32f)
+                                            .blur(26.dp)
+                                            .fadingEdge(bottom = 140.dp),
                                         contentScale = ContentScale.Crop,
+                                    )
+                                    RemoteImage(
+                                        url = bannerUrl,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(top = 12.dp, bottom = 12.dp)
+                                            .fadingEdge(bottom = 80.dp),
+                                        contentScale = ContentScale.Fit,
                                     )
                                 }
                             }
@@ -273,9 +291,48 @@ fun ArtistDetailScreen(
                                     Spacer(modifier = Modifier.weight(1f))
 
                                     Row(
-                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
+                                        val playableItems = remember(page.sections) {
+                                            page.sections.flatMap { it.items }.mapNotNull { item ->
+                                                when (item) {
+                                                    is SongItem -> songItemToLibraryItem(item)
+                                                    is EpisodeItem -> songItemToLibraryItem(item.asSongItem())
+                                                    else -> null
+                                                }
+                                            }
+                                        }
+
+                                        // Botón Play
+                                        if (page.artist.playEndpoint != null || playableItems.isNotEmpty()) {
+                                            Button(
+                                                onClick = {
+                                                    val endpoint = page.artist.playEndpoint
+                                                    if (endpoint != null) {
+                                                        scope.launch {
+                                                            val result = YouTube.next(endpoint).getOrNull() ?: return@launch
+                                                            val seedSong = result.items.firstOrNull() ?: return@launch
+                                                            val plan = buildRadioQueuePlan(songItemToLibraryItem(seedSong), result)
+                                                            playerState.playQueue(plan.items, plan.startIndex)
+                                                        }
+                                                    } else if (playableItems.isNotEmpty()) {
+                                                        playerState.playQueue(playableItems, startIndex = 0)
+                                                    }
+                                                },
+                                                shape = RoundedCornerShape(50),
+                                                modifier = Modifier.height(40.dp),
+                                            ) {
+                                                Icon(
+                                                    IconAssets.play(),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp),
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(text = stringResource("play"), fontSize = 14.sp)
+                                            }
+                                        }
+
                                         // Botón Radio
                                         page.artist.radioEndpoint?.let {
                                             OutlinedButton(
@@ -305,17 +362,22 @@ fun ArtistDetailScreen(
                                         }
 
                                         // Botón Shuffle circular
-                                        page.artist.shuffleEndpoint?.let {
+                                        if (page.artist.shuffleEndpoint != null || playableItems.isNotEmpty()) {
                                             IconButton(
                                                 onClick = {
-                                                    val endpoint = page.artist.shuffleEndpoint ?: return@IconButton
-                                                    scope.launch {
-                                                        val result = YouTube.next(endpoint).getOrNull() ?: return@launch
-                                                        val items = result.items.map { songItemToLibraryItem(it) }
-                                                        if (items.isNotEmpty()) {
-                                                            playerState.shuffleEnabled = true
-                                                            playerState.playQueue(items, startIndex = 0)
+                                                    val endpoint = page.artist.shuffleEndpoint
+                                                    if (endpoint != null) {
+                                                        scope.launch {
+                                                            val result = YouTube.next(endpoint).getOrNull() ?: return@launch
+                                                            val items = result.items.map { songItemToLibraryItem(it) }
+                                                            if (items.isNotEmpty()) {
+                                                                playerState.shuffleEnabled = true
+                                                                playerState.playQueue(items, startIndex = 0)
+                                                            }
                                                         }
+                                                    } else if (playableItems.isNotEmpty()) {
+                                                        playerState.shuffleEnabled = true
+                                                        playerState.playQueue(playableItems.shuffled(), startIndex = 0)
                                                     }
                                                 },
                                                 modifier = Modifier
@@ -453,6 +515,22 @@ fun ArtistDetailScreen(
                         }
                     }
 
+                    if (!page.description.isNullOrBlank() ||
+                        !page.subscriberCountText.isNullOrBlank() ||
+                        !page.monthlyListenerCount.isNullOrBlank()
+                    ) {
+                        item(key = "about_artist") {
+                            AboutArtistSection(
+                                description = page.description,
+                                subscriberCountText = page.subscriberCountText,
+                                monthlyListenerCount = page.monthlyListenerCount,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                            )
+                        }
+                    }
+
                     item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
 
@@ -488,7 +566,19 @@ fun ArtistDetailScreen(
                     style = MaterialTheme.typography.titleLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+            IconButton(
+                onClick = {
+                    val shareUrl = artistPage?.artist?.shareLink
+                        ?: "https://music.youtube.com/channel/$artistId"
+                    copyToClipboard(shareUrl)
+                },
+            ) {
+                Icon(IconAssets.share(), contentDescription = stringResource("share"))
             }
         }
     }
@@ -843,6 +933,99 @@ private fun YouTubeGridItem(
                 }
             }
             else -> {}
+        }
+    }
+}
+
+@Composable
+private fun AboutArtistSection(
+    description: String?,
+    subscriberCountText: String?,
+    monthlyListenerCount: String?,
+    modifier: Modifier = Modifier,
+    collapsedMaxLines: Int = 4,
+) {
+    var isExpanded by remember(description) { mutableStateOf(false) }
+    var canExpand by remember(description) { mutableStateOf(false) }
+    val hasDescription = !description.isNullOrBlank()
+    val hasInfoRows = !subscriberCountText.isNullOrBlank() || !monthlyListenerCount.isNullOrBlank()
+
+    Card(
+        modifier = modifier.animateContentSize(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = IconAssets.info(),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    text = stringResource("about_artist"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (!subscriberCountText.isNullOrBlank()) {
+                Text(
+                    text = subscriberCountText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            if (!monthlyListenerCount.isNullOrBlank()) {
+                Text(
+                    text = monthlyListenerCount,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (hasInfoRows && hasDescription) {
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+            if (hasDescription) {
+                Text(
+                    text = description.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = if (isExpanded) Int.MAX_VALUE else collapsedMaxLines,
+                    overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { result ->
+                        if (!isExpanded) {
+                            canExpand = result.hasVisualOverflow
+                        }
+                    },
+                )
+            }
+            if (hasDescription && (canExpand || isExpanded)) {
+                TextButton(
+                    onClick = { isExpanded = !isExpanded },
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Icon(
+                        imageVector = if (isExpanded) IconAssets.expandLess() else IconAssets.expandMore(),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(if (isExpanded) "collapse" else "expand"),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
         }
     }
 }
