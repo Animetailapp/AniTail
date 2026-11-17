@@ -2853,6 +2853,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     downloadService = downloadService,
                     authService = authService,
                     authCredentials = authCredentials,
+                    accountInfo = accountInfo,
                     playerState = playerState,
                     onOpenLogin = {},
                     onAuthChanged = { authCredentials = it },

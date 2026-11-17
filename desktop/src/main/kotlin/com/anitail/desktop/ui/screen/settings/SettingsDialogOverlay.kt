@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -45,20 +46,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.auth.AccountInfo
 import com.anitail.desktop.auth.AuthCredentials
 import com.anitail.desktop.auth.DesktopAuthService
 import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.storage.AvatarSourcePreference
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
+import com.anitail.desktop.ui.loadBitmapResource
 import com.anitail.desktop.update.DesktopUpdater
+import java.time.LocalTime
 
 private data class SettingsSidebarItem(
     val destination: SettingsDestination,
@@ -81,6 +88,7 @@ fun SettingsDialogOverlay(
     downloadService: DesktopDownloadService,
     authService: DesktopAuthService,
     authCredentials: AuthCredentials?,
+    accountInfo: AccountInfo? = null,
     playerState: PlayerState? = null,
     onOpenLogin: () -> Unit,
     onAuthChanged: (AuthCredentials?) -> Unit,
@@ -95,9 +103,48 @@ fun SettingsDialogOverlay(
         val searchQuery = searchState.text.toString()
 
         val latestVersionName by preferences.latestVersionName.collectAsState()
+        val preferredAvatarSource by preferences.preferredAvatarSource.collectAsState()
+        val discordUsername by preferences.discordUsername.collectAsState()
+        val discordAvatarUrl by preferences.discordAvatarUrl.collectAsState()
         val currentVersionName = remember { DesktopUpdater.currentVersionName() }
         val hasUpdate = remember(latestVersionName, currentVersionName) {
             latestVersionName.isNotBlank() && DesktopUpdater.isVersionNewer(latestVersionName, currentVersionName)
+        }
+
+        val currentHour = remember { LocalTime.now().hour }
+        val greetingText = when (currentHour) {
+            in 6..11 -> stringResource("good_morning")
+            in 12..18 -> stringResource("good_afternoon")
+            else -> stringResource("good_evening")
+        }
+        val greetingImagePath = remember(currentHour) {
+            when (currentHour) {
+                in 6..11 -> "drawable/ic_user_device_day.png"
+                in 12..18 -> "drawable/ic_user_device_afternoon.png"
+                else -> "drawable/ic_user_device_night.png"
+            }
+        }
+        val greetingImage = remember(greetingImagePath) { loadBitmapResource(greetingImagePath) }
+        val deviceName = remember { resolveDeviceName() }
+        val googleAccountName = accountInfo?.name ?: authCredentials?.accountName
+        val googleAvatarUrl = accountInfo?.thumbnailUrl ?: authCredentials?.accountImageUrl
+        val displayName = remember(
+            preferredAvatarSource,
+            googleAccountName,
+            googleAvatarUrl,
+            discordUsername,
+            discordAvatarUrl,
+            deviceName,
+        ) {
+            val preferredName = when (preferredAvatarSource) {
+                AvatarSourcePreference.YOUTUBE -> {
+                    if (googleAvatarUrl.isNullOrBlank()) "" else googleAccountName?.trim().orEmpty()
+                }
+                AvatarSourcePreference.DISCORD -> {
+                    if (discordAvatarUrl.isNullOrBlank()) "" else discordUsername.trim().takeIf { it.isNotEmpty() }?.let { "@$it" }.orEmpty()
+                }
+            }
+            preferredName.ifBlank { deviceName }
         }
 
         val sectionInterface = stringResource("category_interface")
@@ -304,7 +351,16 @@ fun SettingsDialogOverlay(
                             onClear = { searchState.clearText() },
                         )
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        if (searchQuery.isBlank()) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            SettingsDialogGreetingCard(
+                                greetingText = greetingText,
+                                displayName = displayName,
+                                imageBitmap = greetingImage,
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
@@ -638,6 +694,57 @@ private fun SettingsSidebarRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsDialogGreetingCard(
+    greetingText: String,
+    displayName: String,
+    imageBitmap: ImageBitmap?,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(78.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 14.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = greetingText,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = if (displayName.isNotBlank()) displayName else "AniTail",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (imageBitmap != null) {
+                Image(
+                    painter = BitmapPainter(imageBitmap),
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                )
             }
         }
     }
