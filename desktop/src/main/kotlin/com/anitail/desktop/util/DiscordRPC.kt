@@ -193,11 +193,15 @@ class DiscordIpcClient(private val clientId: String) {
                 put("client_id", clientId)
             }
             send(0, payload.toString())
-            val response = receive() ?: return false
-            // READY event means success; anything else (ERROR) is failure
+            val (op, response) = receiveFrame() ?: return false
             val evt = response.optString("evt")
-            evt == "READY" || (evt != "ERROR" && response.optString("cmd") != "ERROR")
-        } catch (_: Exception) {
+            val ok = op == 1 && evt == "READY"
+            if (!ok) {
+                println("[DiscordRPC] Handshake rejected: op=$op response=$response")
+            }
+            ok
+        } catch (e: Exception) {
+            println("[DiscordRPC] Handshake failed: ${e.message}")
             false
         }
     }
@@ -205,17 +209,17 @@ class DiscordIpcClient(private val clientId: String) {
     private fun send(op: Int, payload: String) {
         val out = streamOut ?: return
         val bytes = payload.toByteArray(Charsets.UTF_8)
-        val header = ByteBuffer.allocate(8).apply {
+        val packet = ByteBuffer.allocate(8 + bytes.size).apply {
             order(ByteOrder.LITTLE_ENDIAN)
             putInt(op)
             putInt(bytes.size)
+            put(bytes)
         }.array()
-        out.write(header)
-        out.write(bytes)
+        out.write(packet)
         out.flush()
     }
 
-    private fun receive(): JSONObject? {
+    private fun receiveFrame(): Pair<Int, JSONObject>? {
         val input = streamIn ?: return null
         val header = ByteArray(8)
         var read = 0
@@ -237,9 +241,10 @@ class DiscordIpcClient(private val clientId: String) {
             if (r == -1) return null
             payloadRead += r
         }
-        return runCatching {
+        val json = runCatching {
             JSONObject(String(payloadBytes, Charsets.UTF_8))
-        }.getOrNull()
+        }.getOrNull() ?: return null
+        return op to json
     }
 
     fun setActivity(activityJson: JSONObject) {
@@ -268,8 +273,8 @@ class DiscordIpcClient(private val clientId: String) {
         }
         try {
             send(1, payload.toString())
-            val response = receive()
-            if (response == null) {
+            val frame = receiveFrame()
+            if (frame == null || frame.first == 2) {
                 close()
             }
         } catch (_: Exception) {
@@ -288,13 +293,14 @@ class DiscordIpcClient(private val clientId: String) {
         }
         return try {
             send(1, payload.toString())
-            val response = receive()
-            if (response == null) {
+            val frame = receiveFrame()
+            if (frame == null) {
                 println("[DiscordRPC] No response from Discord IPC; closing connection")
                 close()
                 false
-            } else if (response.optString("evt") == "ERROR") {
-                println("[DiscordRPC] SET_ACTIVITY rejected: ${response.optJSONObject("data")}")
+            } else if (frame.first == 2 || frame.second.optString("evt") == "ERROR") {
+                println("[DiscordRPC] SET_ACTIVITY rejected: op=${frame.first} data=${frame.second}")
+                if (frame.first == 2) close()
                 false
             } else {
                 true
