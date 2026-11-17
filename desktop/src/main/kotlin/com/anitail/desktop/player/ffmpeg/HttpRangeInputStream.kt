@@ -64,6 +64,8 @@ class HttpRangeInputStream(
     private val inFlightChunks = mutableMapOf<Long, Deferred<ByteArray>>()
     private var activeChunkStart = -1L
     private var activeChunkBytes = byteArrayOf()
+    @Volatile
+    private var effectiveChunkCap = chunkSize
     private var nextDemandChunkSize = minOf(initialChunkSize ?: STARTUP_PROBE_CHUNK_SIZE, chunkSize)
     private var demandChunkLimit = if (targetRequestDurationMs != null) nextDemandChunkSize else chunkSize
     private var hasFetchedChunk = false
@@ -348,6 +350,7 @@ class HttpRangeInputStream(
         currentChunkLen: Long,
     ) {
         prefetchJob?.cancel()
+        val prefetchChunkSize = synchronized(this) { effectiveChunkCap }
         val prefetchStarts = mutableListOf<Long>()
         var nextStart = currentStart + currentChunkLen
         for (i in 0 until 3) {
@@ -356,7 +359,7 @@ class HttpRangeInputStream(
             if (!isCached) {
                 prefetchStarts.add(nextStart)
             }
-            nextStart += chunkSize.toLong()
+            nextStart += prefetchChunkSize.toLong()
         }
         if (prefetchStarts.isNotEmpty()) {
             prefetchJob =
@@ -364,7 +367,7 @@ class HttpRangeInputStream(
                     for (start in prefetchStarts) {
                         if (closed) break
                         try {
-                            getOrDownloadChunk(start, chunkSize)
+                            getOrDownloadChunk(start, prefetchChunkSize)
                         } catch (_: CancellationException) {
                             break
                         } catch (_: Exception) {
@@ -412,7 +415,7 @@ class HttpRangeInputStream(
             "Chunk #$reqNum START: range=$start-$end expected=$expected timeout=${timeoutMs}ms",
         )
 
-        for (attempt in 0..1) {
+        for (attempt in 0..2) {
             if (closed) break
             var bodyDurationMs = 0L
             try {
@@ -495,7 +498,7 @@ class HttpRangeInputStream(
 
                 targetRequestDurationMs?.let { targetMs ->
                     synchronized(this) {
-                        demandChunkLimit = transferSizedChunkLimit(bytes.size, bodyDurationMs, targetMs, chunkSize)
+                        demandChunkLimit = transferSizedChunkLimit(bytes.size, bodyDurationMs, targetMs, effectiveChunkCap)
                     }
                 }
 
@@ -516,6 +519,21 @@ class HttpRangeInputStream(
                         " range=$start-$end ${e::class.simpleName}: ${e.message}",
                 )
                 if (closed) break
+                if (e is HttpMediaStatusException && e.playbackHttpStatusCode == 403 && expected > 131_072 && attempt < 2) {
+                    val capped = minOf(expected / 2, 262_144).coerceAtLeast(131_072)
+                    expected = capped
+                    end = start + expected - 1L
+                    synchronized(this) {
+                        effectiveChunkCap = minOf(effectiveChunkCap, capped)
+                        demandChunkLimit = minOf(demandChunkLimit, capped)
+                        nextDemandChunkSize = minOf(nextDemandChunkSize, capped)
+                    }
+                    FFmpegLogger.w(
+                        "HttpRange",
+                        "Chunk #$reqNum HTTP 403 on large range; capping chunk size to $capped and retrying",
+                    )
+                    continue
+                }
                 if (targetRequestDurationMs != null && e is InterruptedIOException) {
                     expected = minOf(expected, STARTUP_PROBE_CHUNK_SIZE)
                     end = start + expected - 1L
