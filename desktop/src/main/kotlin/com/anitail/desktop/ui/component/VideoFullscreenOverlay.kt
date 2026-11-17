@@ -75,6 +75,7 @@ import com.anitail.desktop.lyrics.LyricsResult
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.screen.formatTime
+import com.anitail.desktop.ui.screen.toHighResArtworkUrl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -239,12 +240,14 @@ fun VideoFullscreenOverlay(
                     )
                 } else {
                     val thumb = item?.artworkUrl
-                    if (!thumb.isNullOrBlank()) {
+                    val hiResThumb = remember(thumb) { toHighResArtworkUrl(thumb) ?: thumb }
+                    if (!hiResThumb.isNullOrBlank()) {
                         RemoteImage(
-                            url = thumb,
-                            contentDescription = item.title,
+                            url = hiResThumb,
+                            contentDescription = item?.title.orEmpty(),
+                            fallbackUrls = listOfNotNull(thumb?.takeIf { it != hiResThumb }),
                             modifier = Modifier
-                                .fillMaxHeight(0.65f)
+                                .fillMaxSize(0.82f)
                                 .clip(RoundedCornerShape(24.dp)),
                             contentScale = ContentScale.Fit,
                         )

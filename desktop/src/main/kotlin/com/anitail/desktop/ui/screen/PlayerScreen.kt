@@ -1683,7 +1683,7 @@ private fun EmptyPlayerState(
     }
 }
 
-private fun toHighResArtworkUrl(url: String?): String? {
+internal fun toHighResArtworkUrl(url: String?): String? {
     if (url.isNullOrBlank()) return url
     var result = url
     result = result.replace(Regex("w\\d+-h\\d+"), "w1200-h1200")

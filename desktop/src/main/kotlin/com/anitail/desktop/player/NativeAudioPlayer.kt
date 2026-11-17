@@ -600,6 +600,7 @@ class NativeAudioPlayer {
         ).distinct()
 
         var lastError: String? = null
+        var lowResFallback: VideoStreamInfo? = null
         val isLoggedIn = YouTube.cookie != null
 
         for (candidateId in candidateIds) {
@@ -612,19 +613,23 @@ class NativeAudioPlayer {
                 val stream = innertubexResult.getOrThrow()
                 val videoUrl = stream.videoUrl
                 if (!videoUrl.isNullOrBlank() && probeStreamAccessible(videoUrl, stream.headers)) {
-                    return@withContext Result.success(
-                        VideoStreamInfo(
-                            url = videoUrl,
-                            headers = stream.headers,
-                            width = stream.videoWidth,
-                            height = stream.videoHeight,
-                            mimeType = stream.videoMimeType,
-                            contentLengthBytes = stream.videoContentLengthBytes,
-                            audioUrl = stream.audioUrl.takeUnless { it.startsWith("sabr", ignoreCase = true) },
-                            audioContentLengthBytes = stream.contentLengthBytes,
-                            targetVideoId = candidateId,
-                        ),
+                    val info = VideoStreamInfo(
+                        url = videoUrl,
+                        headers = stream.headers,
+                        width = stream.videoWidth,
+                        height = stream.videoHeight,
+                        mimeType = stream.videoMimeType,
+                        contentLengthBytes = stream.videoContentLengthBytes,
+                        audioUrl = stream.audioUrl.takeUnless { it.startsWith("sabr", ignoreCase = true) },
+                        audioContentLengthBytes = stream.contentLengthBytes,
+                        targetVideoId = candidateId,
                     )
+                    if ((stream.videoHeight ?: 0) >= 720) {
+                        return@withContext Result.success(info)
+                    }
+                    if (lowResFallback == null || (info.height ?: 0) > (lowResFallback.height ?: 0)) {
+                        lowResFallback = info
+                    }
                 } else {
                     DesktopInnerTubeXPlayer.markStreamClientFailed(candidateId, stream.clientName)
                 }
@@ -712,6 +717,7 @@ class NativeAudioPlayer {
             }
         }
 
+        lowResFallback?.let { return@withContext Result.success(it) }
         Result.failure(IllegalStateException(lastError ?: "No se encontró stream de video reproducible para $videoId"))
     }
 
