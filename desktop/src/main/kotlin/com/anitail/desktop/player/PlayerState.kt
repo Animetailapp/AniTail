@@ -102,6 +102,8 @@ class PlayerState {
     private var currentAudioSwitchedForVideo = false
     private var crossfadeTriggeredForCurrentTrack = false
     private var prematureEndRecoveryCount = 0
+    private var videoStreamRefreshCount = 0
+    private var lastVideoStartTimeMs = 0L
 
     // Cola de reproducción
     private val _queue = mutableStateListOf<LibraryItem>()
@@ -115,6 +117,20 @@ class PlayerState {
     private val nativePlayer = NativeAudioPlayer()
     val videoPlayer: VideoPlayer = VideoPlayer().apply {
         audioPtsProvider = { nativePlayer.getCurrentAudioPtsMs() }
+        onStreamExpired = { status ->
+            scope.launch {
+                val item = currentItem ?: return@launch
+                val videoId = extractVideoId(item.playbackUrl) ?: return@launch
+                if (!isVideoMode || videoStreamRefreshCount >= 5) return@launch
+                val elapsedSinceStart = System.currentTimeMillis() - lastVideoStartTimeMs
+                if (videoStreamRefreshCount > 0 && elapsedSinceStart < 5_000L) {
+                    DesktopInnerTubeXPlayer.markStreamClientFailed(videoId, "WEB_EMBEDDED_PLAYER")
+                }
+                videoStreamRefreshCount++
+                println("Anitail VideoPlayer: stream expired (HTTP $status), refreshing video (attempt $videoStreamRefreshCount)")
+                startVideoForCurrentItem(item, videoId, preserveExistingAudio = true)
+            }
+        }
     }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -644,7 +660,15 @@ class PlayerState {
         startVideoForCurrentItem(item, videoId)
     }
 
-    private fun startVideoForCurrentItem(item: LibraryItem, videoId: String) {
+    private fun startVideoForCurrentItem(
+        item: LibraryItem,
+        videoId: String,
+        preserveExistingAudio: Boolean = false,
+    ) {
+        if (!preserveExistingAudio) {
+            videoStreamRefreshCount = 0
+        }
+        lastVideoStartTimeMs = System.currentTimeMillis()
         val generation = ++videoLoadGeneration
         videoLoadJob?.cancel()
         videoLoadJob = scope.launch {
@@ -655,7 +679,7 @@ class PlayerState {
             result.onSuccess { info ->
                 val targetPositionMs = nativePlayer.getCurrentPosition().takeIf { it > 0L } ?: position
                 val shouldPlay = isPlaying
-                if (info.targetVideoId.isNotBlank() && info.targetVideoId != videoId && !info.audioUrl.isNullOrBlank()) {
+                if (!preserveExistingAudio && info.targetVideoId.isNotBlank() && info.targetVideoId != videoId && !info.audioUrl.isNullOrBlank()) {
                     val switched = nativePlayer.switchAudioStreamPreservingPosition(
                         url = info.audioUrl,
                         headers = info.audioHeaders,
