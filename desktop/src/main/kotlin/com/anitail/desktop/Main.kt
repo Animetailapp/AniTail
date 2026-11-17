@@ -1304,10 +1304,24 @@ private fun FrameWindowScope.AniTailDesktopApp(
         scope.launch {
             isHomeRefreshing = true
             homePaginationState = HomeInfinitePaginationState()
-            loadHomePage(
-                onLoading = { isHomeLoading = it },
-                onPage = { page -> homePage = page },
-            )
+            YouTube.clear("home:")
+            YouTube.clear("library:")
+            val activeChip = selectedChip
+            if (activeChip != null) {
+                isHomeLoading = true
+                try {
+                    YouTube.home(params = activeChip.endpoint?.params).onSuccess { page ->
+                        homePage = page.copy(chips = homePage?.chips ?: page.chips)
+                    }
+                } finally {
+                    isHomeLoading = false
+                }
+            } else {
+                loadHomePage(
+                    onLoading = { isHomeLoading = it },
+                    onPage = { page -> homePage = page },
+                )
+            }
             if (authCredentials?.cookie?.isNotBlank() == true) {
                 accountInfo = authService.refreshAccountInfo()
                 YouTube.library("FEmusic_liked_playlists").onSuccess { page ->

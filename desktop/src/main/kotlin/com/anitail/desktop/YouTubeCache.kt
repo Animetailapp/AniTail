@@ -57,8 +57,10 @@ object YouTube {
         }
         val result: Result<T> = loader()
 
-        synchronized(lock) {
-            cache[key] = Pair(System.currentTimeMillis() + ttl, result as Any)
+        if (result.isSuccess) {
+            synchronized(lock) {
+                cache[key] = Pair(System.currentTimeMillis() + ttl, result as Any)
+            }
         }
         @Suppress("UNCHECKED_CAST")
         return result as Result<T>
