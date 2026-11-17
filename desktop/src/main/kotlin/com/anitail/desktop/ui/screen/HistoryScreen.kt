@@ -71,6 +71,7 @@ import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.screen.library.SelectionDownloadState
 import com.anitail.desktop.ui.screen.library.resolveSelectionDownloadState
+import com.anitail.desktop.sync.syncHistoryPageToDatabase
 import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.Artist
 import com.anitail.innertube.models.SongItem
@@ -140,7 +141,11 @@ fun HistoryScreen(
 
     val isLoggedIn = remember(YouTube.cookie) {
         val cookie = YouTube.cookie.orEmpty()
-        cookie.isNotBlank() && "SAPISID" in parseCookieString(cookie)
+        if (cookie.isBlank()) false
+        else {
+            val map = parseCookieString(cookie)
+            "SAPISID" in map || "__Secure-3PAPISID" in map || "__Secure-1PAPISID" in map || cookie.length > 20
+        }
     }
 
     LaunchedEffect(isSearching) {
@@ -152,22 +157,36 @@ fun HistoryScreen(
     LaunchedEffect(isLoggedIn) {
         if (!isLoggedIn) {
             historySource = HistorySource.LOCAL
+            return@LaunchedEffect
         }
-    }
-
-    LaunchedEffect(historySource, isLoggedIn) {
-        if (historySource != HistorySource.REMOTE || !isLoggedIn) return@LaunchedEffect
+        // Pre-carga inmediata de historial remoto y sincronización a base de datos (igual que Metrolist)
         isRemoteLoading = true
         remoteError = null
         val result = withContext(Dispatchers.IO) { YouTube.musicHistory() }
-        historyPage = result.getOrNull()
+        val page = result.getOrNull()
+        historyPage = page
         result.exceptionOrNull()?.let {
-            System.err.println("HistoryScreen: remote history failed: ${it::class.simpleName}: ${it.message}")
-            it.printStackTrace()
             remoteError = "${it::class.simpleName}: ${it.message}"
         }
-        System.err.println("HistoryScreen: remote history sections=${historyPage?.sections?.size} songs=${historyPage?.sections?.sumOf { it.songs.size }}")
         isRemoteLoading = false
+        page?.let { p ->
+            withContext(Dispatchers.IO) {
+                syncHistoryPageToDatabase(p, database)
+            }
+        }
+    }
+
+    LaunchedEffect(historySource) {
+        if (historySource == HistorySource.REMOTE && isLoggedIn && historyPage == null) {
+            isRemoteLoading = true
+            remoteError = null
+            val result = withContext(Dispatchers.IO) { YouTube.musicHistory() }
+            historyPage = result.getOrNull()
+            result.exceptionOrNull()?.let {
+                remoteError = "${it::class.simpleName}: ${it.message}"
+            }
+            isRemoteLoading = false
+        }
     }
 
     val groupedEvents = remember(events, songsById, query.text) {
@@ -555,8 +574,8 @@ fun HistoryScreen(
                                 val menuExpanded = remember(song.id) { mutableStateOf(false) }
                                 val itemEntity = songsById[song.id] ?: song.toSongEntity(inLibrary = false)
                                 val libraryItem = itemEntity.toLibraryItem()
-                                val menuActions = remember(song.id, songArtistMaps, downloadStates, downloadedSongs) {
-                                    buildBrowseSongMenuActions(
+                                val menuActions = remember(song.id, songArtistMaps, downloadStates, downloadedSongs, song.historyRemoveToken) {
+                                    val base = buildBrowseSongMenuActions(
                                         strings = strings,
                                         libraryItem = libraryItem,
                                         songItem = song,
@@ -575,6 +594,29 @@ fun HistoryScreen(
                                         onShowDetails = { detailsItem = it },
                                         copyToClipboard = ::copyToClipboard,
                                     )
+                                    val token = song.historyRemoveToken
+                                    if (!token.isNullOrBlank()) {
+                                        base + ContextMenuAction(
+                                            label = strings.get("delete"),
+                                            icon = IconAssets.delete(),
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    withContext(Dispatchers.IO) {
+                                                        YouTube.feedback(listOf(token))
+                                                    }
+                                                    historyPage = historyPage?.copy(
+                                                        sections = historyPage?.sections?.map { s ->
+                                                            if (s.title == section.title) {
+                                                                s.copy(songs = s.songs.filterNot { it.id == song.id })
+                                                            } else s
+                                                        }?.filter { it.songs.isNotEmpty() }
+                                                    )
+                                                }
+                                            },
+                                        )
+                                    } else {
+                                        base
+                                    }
                                 }
                                 Box {
                                     LibrarySongListItem(
@@ -588,12 +630,11 @@ fun HistoryScreen(
                                             if (song.id == playerState.currentItem?.id) {
                                                 playerState.togglePlayPause()
                                             } else {
-                                                coroutineScope.launch {
-                                                    val result = YouTube.next(WatchEndpoint(videoId = song.id)).getOrNull()
-                                                        ?: return@launch
-                                                    val plan = buildRadioQueuePlan(libraryItem, result)
-                                                    playerState.playQueue(plan.items, plan.startIndex)
+                                                val sectionSongs = section.songs.map { s ->
+                                                    (songsById[s.id] ?: s.toSongEntity(inLibrary = false)).toLibraryItem()
                                                 }
+                                                val songIndex = sectionSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                                                playerState.playQueue(sectionSongs, songIndex)
                                             }
                                         },
                                         onMenuClick = { menuExpanded.value = true },

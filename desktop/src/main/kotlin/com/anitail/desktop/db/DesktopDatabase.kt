@@ -432,6 +432,17 @@ class DesktopDatabase private constructor(
         saveEvents()
     }
 
+    suspend fun insertEvents(events: List<EventEntity>) = withContext(Dispatchers.IO) {
+        if (events.isEmpty()) return@withContext
+        var currentMax = _events.value.maxOfOrNull { it.id } ?: 0L
+        val newEvents = events.map { event ->
+            val id = if (event.id > 0) event.id else ++currentMax
+            event.copy(id = id)
+        }
+        _events.value = _events.value + newEvents
+        saveEvents()
+    }
+
     suspend fun clearEvents() = withContext(Dispatchers.IO) {
         _events.value = emptyList()
         saveEvents()

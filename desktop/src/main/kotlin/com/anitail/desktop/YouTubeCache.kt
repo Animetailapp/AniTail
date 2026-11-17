@@ -139,4 +139,5 @@ object YouTube {
     suspend fun visitorData() = InnertubeYouTube.visitorData()
     suspend fun accountInfo() = InnertubeYouTube.accountInfo()
     suspend fun getMediaInfo(videoId: String) = InnertubeYouTube.getMediaInfo(videoId)
+    suspend fun feedback(tokens: List<String>) = InnertubeYouTube.feedback(tokens)
 }
