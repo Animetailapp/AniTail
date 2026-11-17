@@ -39,6 +39,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,6 +70,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.i18n.stringResource
+import com.anitail.desktop.lyrics.DesktopLyricsService
+import com.anitail.desktop.lyrics.LyricsResult
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.screen.formatTime
@@ -97,7 +100,9 @@ fun VideoFullscreenOverlay(
     var isDraggingSlider by remember { mutableStateOf(false) }
     var showQueue by remember { mutableStateOf(false) }
     var showLyrics by remember { mutableStateOf(false) }
+    var showSubtitles by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
+    var subtitleLyrics by remember { mutableStateOf<LyricsResult?>(null) }
 
     fun resetInactivity() {
         isControlsVisible = true
@@ -141,6 +146,19 @@ fun VideoFullscreenOverlay(
     val progress = if (duration > 0L) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
     var sliderProgress by remember(position, duration) {
         mutableFloatStateOf(progress)
+    }
+
+    LaunchedEffect(showSubtitles, item?.id) {
+        if (!showSubtitles || item == null) {
+            if (!showSubtitles) subtitleLyrics = null
+            return@LaunchedEffect
+        }
+        subtitleLyrics = DesktopLyricsService.getLyrics(
+            title = item.title,
+            artist = item.artist,
+            durationSec = ((duration.takeIf { it > 0L } ?: item.durationMs ?: 0L) / 1000L).toInt(),
+            videoId = item.id,
+        ).getOrNull()
     }
 
     Box(
@@ -247,6 +265,33 @@ fun VideoFullscreenOverlay(
                         strokeWidth = 3.5.dp,
                     )
                 }
+
+                // Live Subtitle / Caption overlay when CC is active
+                if (showSubtitles) {
+                    val activeLine = subtitleLyrics?.getCurrentLine(position)?.text
+                    if (!activeLine.isNullOrBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(
+                                    start = 48.dp,
+                                    end = 48.dp,
+                                    bottom = if (isControlsVisible) 156.dp else 44.dp,
+                                )
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.Black.copy(alpha = 0.72f))
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                        ) {
+                            Text(
+                                text = activeLine,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = Color.White,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
             }
 
             if (showQueue) {
@@ -300,7 +345,7 @@ fun VideoFullscreenOverlay(
                             .fillMaxWidth()
                             .padding(horizontal = 20.dp, vertical = 16.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.Start,
                     ) {
                         IconButton(
                             onClick = onExitFullscreen,
@@ -313,20 +358,6 @@ fun VideoFullscreenOverlay(
                                 contentDescription = stringResource("exit_fullscreen"),
                                 tint = Color.White,
                                 modifier = Modifier.size(22.dp),
-                            )
-                        }
-
-                        IconButton(
-                            onClick = onExitFullscreen,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(Color.Black.copy(alpha = 0.45f), CircleShape),
-                        ) {
-                            Icon(
-                                imageVector = ExpressiveIcons.FullscreenExit,
-                                contentDescription = stringResource("exit_fullscreen"),
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp),
                             )
                         }
                     }
@@ -457,30 +488,35 @@ fun VideoFullscreenOverlay(
                                         )
                                     }
 
-                                    // Connected [Share, Like, More] pill (matching Metrolist & MiniPlayer)
+                                    // Metrolist-style [Share, Like] pill + circular (More) button
+                                    val pillContainer = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
+                                    val pillContent = MaterialTheme.colorScheme.onSecondaryContainer
                                     val pillColors = ToggleButtonDefaults.colors(
-                                        containerColor = Color.White.copy(alpha = 0.14f),
-                                        contentColor = Color.White,
-                                        checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                        checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        containerColor = pillContainer,
+                                        contentColor = pillContent,
+                                        checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    )
+                                    val likeColors = ToggleButtonDefaults.colors(
+                                        containerColor = pillContainer,
+                                        contentColor = pillContent,
+                                        checkedContainerColor = MaterialTheme.colorScheme.primary,
+                                        checkedContentColor = MaterialTheme.colorScheme.onPrimary,
                                     )
                                     val leftShapes = ButtonGroupDefaults.connectedLeadingButtonShapes(
                                         checkedShape = RoundedCornerShape(
-                                            topStart = 16.dp,
-                                            bottomStart = 16.dp,
+                                            topStart = 18.dp,
+                                            bottomStart = 18.dp,
                                             topEnd = 6.dp,
                                             bottomEnd = 6.dp,
                                         ),
-                                    )
-                                    val midShapes = ButtonGroupDefaults.connectedMiddleButtonShapes(
-                                        checkedShape = RoundedCornerShape(6.dp),
                                     )
                                     val rightShapes = ButtonGroupDefaults.connectedTrailingButtonShapes(
                                         checkedShape = RoundedCornerShape(
                                             topStart = 6.dp,
                                             bottomStart = 6.dp,
-                                            topEnd = 16.dp,
-                                            bottomEnd = 16.dp,
+                                            topEnd = 18.dp,
+                                            bottomEnd = 18.dp,
                                         ),
                                     )
 
@@ -518,8 +554,8 @@ fun VideoFullscreenOverlay(
                                                 resetInactivity()
                                                 onToggleLike()
                                             },
-                                            shapes = midShapes,
-                                            colors = pillColors,
+                                            shapes = rightShapes,
+                                            colors = likeColors,
                                             contentPadding = PaddingValues(0.dp),
                                             modifier = Modifier.size(width = 36.dp, height = 36.dp),
                                         ) {
@@ -529,27 +565,34 @@ fun VideoFullscreenOverlay(
                                                 modifier = Modifier.size(18.dp),
                                             )
                                         }
+                                    }
 
-                                        Box {
-                                            ToggleButton(
-                                                checked = showMoreMenu,
-                                                onCheckedChange = {
-                                                    resetInactivity()
-                                                    showMoreMenu = !showMoreMenu
-                                                },
-                                                shapes = rightShapes,
-                                                colors = pillColors,
-                                                contentPadding = PaddingValues(0.dp),
-                                                modifier = Modifier.size(width = 36.dp, height = 36.dp),
-                                            ) {
-                                                Icon(
-                                                    imageVector = IconAssets.moreVert(),
-                                                    contentDescription = stringResource("more_options"),
-                                                    modifier = Modifier.size(18.dp),
-                                                )
-                                            }
+                                    Spacer(modifier = Modifier.width(6.dp))
 
-                                            DropdownMenu(
+                                    Box {
+                                        ToggleButton(
+                                            checked = showMoreMenu,
+                                            onCheckedChange = {
+                                                resetInactivity()
+                                                showMoreMenu = !showMoreMenu
+                                            },
+                                            shapes = ToggleButtonShapes(
+                                                shape = CircleShape,
+                                                pressedShape = RoundedCornerShape(12.dp),
+                                                checkedShape = CircleShape,
+                                            ),
+                                            colors = pillColors,
+                                            contentPadding = PaddingValues(0.dp),
+                                            modifier = Modifier.size(36.dp),
+                                        ) {
+                                            Icon(
+                                                imageVector = IconAssets.moreVert(),
+                                                contentDescription = stringResource("more_options"),
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        }
+
+                                        DropdownMenu(
                                                 expanded = showMoreMenu,
                                                 onDismissRequest = { showMoreMenu = false },
                                             ) {
@@ -607,7 +650,6 @@ fun VideoFullscreenOverlay(
                                                     },
                                                 )
                                             }
-                                        }
                                     }
                                 }
                             }
@@ -671,7 +713,7 @@ fun VideoFullscreenOverlay(
                                 }
                             }
 
-                            // Right: Metrolist-style connected button group (Queue, Lyrics, Shuffle, Repeat, Volume, Cast, Video, Fullscreen)
+                            // Right: Metrolist-style single connected pill (Queue, Lyrics, Shuffle, Repeat, Volume, Video, CC, Miniplayer, Fullscreen)
                             Row(
                                 modifier = Modifier.weight(1.15f),
                                 horizontalArrangement = Arrangement.End,
@@ -700,8 +742,21 @@ fun VideoFullscreenOverlay(
                                         playerState.toggleVideoMode()
                                     },
                                     isVideoActive = playerState.isVideoMode,
-                                    onButtonColor = Color.White,
-                                    containerColor = Color.White.copy(alpha = 0.14f),
+                                    onSubtitleClick = {
+                                        resetInactivity()
+                                        showSubtitles = !showSubtitles
+                                    },
+                                    isSubtitleActive = showSubtitles,
+                                    onMiniplayerClick = {
+                                        resetInactivity()
+                                        onExitFullscreen()
+                                        playerState.toggleMiniPlayer()
+                                    },
+                                    showCastButton = false,
+                                    showMiniplayerButton = true,
+                                    sectioned = false,
+                                    onButtonColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
                                     checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                                     checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                                 )

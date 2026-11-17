@@ -107,6 +107,11 @@ fun PlayerConnectedButtonGroup(
     isVideoActive: Boolean = playerState.showVideoViewer || playerState.isVideoMode,
     onMiniplayerClick: (() -> Unit)? = { playerState.toggleMiniPlayer() },
     showMiniplayer: Boolean = playerState.showMiniPlayer,
+    onSubtitleClick: (() -> Unit)? = null,
+    isSubtitleActive: Boolean = false,
+    showCastButton: Boolean = true,
+    showMiniplayerButton: Boolean = false,
+    sectioned: Boolean = true,
     onButtonColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.65f),
     checkedContainerColor: Color = MaterialTheme.colorScheme.primaryContainer,
@@ -206,14 +211,16 @@ fun PlayerConnectedButtonGroup(
                 onTrigger = ::toggleMute,
             ),
         )
-        add(
-            ConnectedGroupAction(
-                label = stringResource("cast"),
-                icon = ExpressiveIcons.Cast,
-                checked = isCasting,
-                onTrigger = { onCastClick?.invoke() ?: run { playerState.showCastDialog = true } },
-            ),
-        )
+        if (showCastButton) {
+            add(
+                ConnectedGroupAction(
+                    label = stringResource("cast"),
+                    icon = ExpressiveIcons.Cast,
+                    checked = isCasting,
+                    onTrigger = { onCastClick?.invoke() ?: run { playerState.showCastDialog = true } },
+                ),
+            )
+        }
         add(
             ConnectedGroupAction(
                 label = stringResource("video_viewer"),
@@ -222,6 +229,26 @@ fun PlayerConnectedButtonGroup(
                 onTrigger = { onVideoClick?.invoke() ?: run { playerState.toggleVideoViewer() } },
             ),
         )
+        if (onSubtitleClick != null) {
+            add(
+                ConnectedGroupAction(
+                    label = stringResource("lyrics"),
+                    icon = ExpressiveIcons.ClosedCaption,
+                    checked = isSubtitleActive,
+                    onTrigger = onSubtitleClick,
+                ),
+            )
+        }
+        if (showMiniplayerButton && onMiniplayerClick != null) {
+            add(
+                ConnectedGroupAction(
+                    label = stringResource("mini_player"),
+                    icon = ExpressiveIcons.PictureInPicture,
+                    checked = showMiniplayer,
+                    onTrigger = onMiniplayerClick,
+                ),
+            )
+        }
         add(
             ConnectedGroupAction(
                 label = stringResource(if (actualFullscreenChecked) "exit_fullscreen" else "fullscreen"),
@@ -259,12 +286,8 @@ fun PlayerConnectedButtonGroup(
         ),
     )
 
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Grupo izquierdo: Cola, Letras, Aleatorio, Repeticion
+    @Composable
+    fun RenderActionGroup(actions: List<ConnectedGroupAction>) {
         ButtonGroup(
             overflowIndicator = { menuState ->
                 ButtonGroupDefaults.OverflowIndicator(
@@ -277,53 +300,10 @@ fun PlayerConnectedButtonGroup(
             },
             horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
         ) {
-            leftActions.forEachIndexed { index, action ->
+            actions.forEachIndexed { index, action ->
                 val shapes: ToggleButtonShapes = when (index) {
                     0 -> leadingShapes
-                    leftActions.lastIndex -> trailingShapes
-                    else -> middleShapes
-                }
-                customItem(
-                    buttonGroupContent = {
-                        ConnectedGroupToggle(
-                            action = action,
-                            shapes = shapes,
-                            colors = buttonColors,
-                        )
-                    },
-                    menuContent = { menuState ->
-                        val shape = MenuDefaults.itemShape(index, leftActions.size).shape
-                        DropdownMenuItem(
-                            onClick = {
-                                action.onTrigger()
-                                menuState.dismiss()
-                            },
-                            text = { Text(action.label) },
-                            leadingIcon = { Icon(action.icon, contentDescription = null) },
-                            shape = shape,
-                        )
-                    },
-                )
-            }
-        }
-
-        // Grupo derecho: Volumen, Transmitir, Video, Pantalla completa
-        ButtonGroup(
-            overflowIndicator = { menuState ->
-                ButtonGroupDefaults.OverflowIndicator(
-                    menuState = menuState,
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = containerColor,
-                        contentColor = onButtonColor,
-                    ),
-                )
-            },
-            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-        ) {
-            rightActions.forEachIndexed { index, action ->
-                val shapes: ToggleButtonShapes = when (index) {
-                    0 -> leadingShapes
-                    rightActions.lastIndex -> trailingShapes
+                    actions.lastIndex -> trailingShapes
                     else -> middleShapes
                 }
                 customItem(
@@ -398,7 +378,7 @@ fun PlayerConnectedButtonGroup(
                         }
                     },
                     menuContent = { menuState ->
-                        val shape = MenuDefaults.itemShape(index, rightActions.size).shape
+                        val shape = MenuDefaults.itemShape(index, actions.size).shape
                         DropdownMenuItem(
                             onClick = {
                                 action.onTrigger()
@@ -411,6 +391,25 @@ fun PlayerConnectedButtonGroup(
                     },
                 )
             }
+        }
+    }
+
+    if (sectioned) {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RenderActionGroup(leftActions)
+            RenderActionGroup(rightActions)
+        }
+    } else {
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RenderActionGroup(leftActions + rightActions)
         }
     }
 }
