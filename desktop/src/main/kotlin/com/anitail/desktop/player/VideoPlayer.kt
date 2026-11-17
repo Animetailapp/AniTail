@@ -418,7 +418,9 @@ class VideoPlayer(
                     requestHeaders = headers,
                     mediaSize = clen ?: 0L,
                     chunkSize = 4 * 1024 * 1024,
+                    requestTimeoutMs = 35_000L,
                     prefetchAhead = true,
+                    targetRequestDurationMs = 4_000L,
                     onStreamExpired = { status ->
                         synchronized(lifecycleLock) {
                             if (seekableSource === rangeInput) onStreamExpired?.invoke(status)

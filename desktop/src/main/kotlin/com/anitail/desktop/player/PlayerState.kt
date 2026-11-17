@@ -101,6 +101,7 @@ class PlayerState {
     private var videoLoadGeneration = 0L
     private var currentAudioSwitchedForVideo = false
     private var crossfadeTriggeredForCurrentTrack = false
+    private var prematureEndRecoveryCount = 0
 
     // Cola de reproducción
     private val _queue = mutableStateListOf<LibraryItem>()
@@ -213,6 +214,31 @@ class PlayerState {
     }
 
     private fun handlePlaybackEnded() {
+        val item = currentItem
+        val videoId = item?.let { extractVideoId(it.playbackUrl) }
+        val endedPrematurely =
+            item != null &&
+                videoId != null &&
+                duration > 20_000L &&
+                position in 1_000L until (duration - 10_000L) &&
+                prematureEndRecoveryCount < 2
+
+        if (endedPrematurely) {
+            prematureEndRecoveryCount++
+            val resumePosition = position
+            println("Anitail WARN: Stream ended prematurely at ${resumePosition}ms / ${duration}ms for ${item.title}; recovering...")
+            playJob?.cancel()
+            playJob = scope.launch {
+                isBuffering = true
+                val result = nativePlayer.playAtPosition(videoId, resumePosition, true)
+                if (result.isSuccess && isVideoMode && currentItem?.id == item.id) {
+                    videoPlayer.syncPosition(resumePosition, true)
+                }
+                isBuffering = false
+            }
+            return
+        }
+
         val shouldRecord = repeatMode == RepeatMode.ONE || !canSkipNext
         if (shouldRecord) {
             reportPlaybackIfNeeded(force = true)
@@ -269,6 +295,7 @@ class PlayerState {
         currentAudioSwitchedForVideo = false
         videoPlayer.stop()
         crossfadeTriggeredForCurrentTrack = false
+        prematureEndRecoveryCount = 0
 
         currentItem = item
         position = 0L

@@ -332,13 +332,22 @@ fun MiniPlayer(
                             )
 
                             // Compartir
+                            var shareCopied by remember { mutableStateOf(false) }
+                            LaunchedEffect(shareCopied) {
+                                if (shareCopied) {
+                                    delay(1500L)
+                                    shareCopied = false
+                                }
+                            }
                             ToggleButton(
-                                checked = false,
+                                checked = shareCopied,
                                 onCheckedChange = {
                                     val id = item.id
                                     runCatching {
+                                        val selection = java.awt.datatransfer.StringSelection("https://music.youtube.com/watch?v=$id")
                                         val clip = java.awt.Toolkit.getDefaultToolkit().systemClipboard
-                                        clip.setContents(java.awt.datatransfer.StringSelection("https://music.youtube.com/watch?v=$id"), null)
+                                        clip.setContents(selection, selection)
+                                        shareCopied = true
                                     }
                                 },
                                 shapes = leftShapes,
@@ -348,7 +357,7 @@ fun MiniPlayer(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = IconAssets.share(),
+                                        imageVector = if (shareCopied) IconAssets.check() else IconAssets.share(),
                                         contentDescription = stringResource("share"),
                                         modifier = Modifier.size(16.dp),
                                     )

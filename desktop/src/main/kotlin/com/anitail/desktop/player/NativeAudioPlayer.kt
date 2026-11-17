@@ -1010,6 +1010,9 @@ class NativeAudioPlayer {
                     requestHeaders = headers,
                     mediaSize = contentLengthBytes ?: 0L,
                     chunkSize = 1_048_576,
+                    requestTimeoutMs = 35_000L,
+                    prefetchAhead = true,
+                    targetRequestDurationMs = 4_000L,
                 )
                 val maxSize = (contentLengthBytes ?: (Int.MAX_VALUE.toLong() - 8L))
                     .coerceIn(1L, Int.MAX_VALUE.toLong() - 8L)

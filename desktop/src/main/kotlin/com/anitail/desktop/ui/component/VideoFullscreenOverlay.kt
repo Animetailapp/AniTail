@@ -75,7 +75,9 @@ import com.anitail.desktop.lyrics.LyricsResult
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.screen.formatTime
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.awt.Point
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
@@ -102,7 +104,23 @@ fun VideoFullscreenOverlay(
     var showLyrics by remember { mutableStateOf(false) }
     var showSubtitles by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
-    var subtitleLyrics by remember { mutableStateOf<LyricsResult?>(null) }
+    var shareCopied by remember { mutableStateOf(false) }
+
+    LaunchedEffect(shareCopied) {
+        if (shareCopied) {
+            delay(1500L)
+            shareCopied = false
+        }
+    }
+
+    fun copyTrackUrl(videoId: String) {
+        runCatching {
+            val url = "https://music.youtube.com/watch?v=$videoId"
+            val selection = StringSelection(url)
+            Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
+            shareCopied = true
+        }
+    }
 
     fun resetInactivity() {
         isControlsVisible = true
@@ -142,24 +160,6 @@ fun VideoFullscreenOverlay(
 
     val item = playerState.currentItem
     val duration = playerState.duration
-    val position = playerState.position
-    val progress = if (duration > 0L) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
-    var sliderProgress by remember(position, duration) {
-        mutableFloatStateOf(progress)
-    }
-
-    LaunchedEffect(showSubtitles, item?.id) {
-        if (!showSubtitles || item == null) {
-            if (!showSubtitles) subtitleLyrics = null
-            return@LaunchedEffect
-        }
-        subtitleLyrics = DesktopLyricsService.getLyrics(
-            title = item.title,
-            artist = item.artist,
-            durationSec = ((duration.takeIf { it > 0L } ?: item.durationMs ?: 0L) / 1000L).toInt(),
-            videoId = item.id,
-        ).getOrNull()
-    }
 
     Box(
         modifier = modifier
@@ -266,31 +266,17 @@ fun VideoFullscreenOverlay(
                     )
                 }
 
-                // Live Subtitle / Caption overlay when CC is active
-                if (showSubtitles) {
-                    val activeLine = subtitleLyrics?.getCurrentLine(position)?.text
-                    if (!activeLine.isNullOrBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(
-                                    start = 48.dp,
-                                    end = 48.dp,
-                                    bottom = if (isControlsVisible) 156.dp else 44.dp,
-                                )
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color.Black.copy(alpha = 0.72f))
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                        ) {
-                            Text(
-                                text = activeLine,
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = Color.White,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
+                // Live Subtitle / Caption overlay when CC is active (isolated from outer recomposition)
+                if (showSubtitles && item != null) {
+                    FullscreenSubtitleOverlay(
+                        playerState = playerState,
+                        videoId = item.id,
+                        title = item.title,
+                        artist = item.artist,
+                        durationMs = duration.takeIf { it > 0L } ?: item.durationMs ?: 0L,
+                        isControlsVisible = isControlsVisible,
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
                 }
             }
 
@@ -309,7 +295,7 @@ fun VideoFullscreenOverlay(
                     videoId = item.id,
                     artworkUrl = item.artworkUrl,
                     durationSec = ((duration.takeIf { it > 0L } ?: item.durationMs ?: 0L) / 1000L).toInt(),
-                    currentPositionMs = position,
+                    currentPositionMs = playerState.position,
                     isPlaying = playerState.isPlaying,
                     songRomanizeLyrics = songRomanizeLyrics,
                     onSetSongRomanizeLyrics = onSetSongRomanizeLyrics,
@@ -384,44 +370,15 @@ fun VideoFullscreenOverlay(
                             .fillMaxWidth()
                             .padding(horizontal = 28.dp, vertical = 18.dp),
                     ) {
-                        // Row 1: Slider and timestamps
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = formatTime(
-                                    if (isDraggingSlider) (sliderProgress * duration).toLong() else position,
-                                ),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color.White.copy(alpha = 0.9f),
-                            )
-                            Slider(
-                                value = if (isDraggingSlider) sliderProgress else progress,
-                                onValueChange = {
-                                    resetInactivity()
-                                    isDraggingSlider = true
-                                    sliderProgress = it
-                                },
-                                onValueChangeFinished = {
-                                    val targetMs = (sliderProgress * duration).toLong()
-                                    playerState.seekTo(targetMs)
-                                    isDraggingSlider = false
-                                    resetInactivity()
-                                },
-                                modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                                colors = SliderDefaults.colors(
-                                    thumbColor = MaterialTheme.colorScheme.primary,
-                                    activeTrackColor = MaterialTheme.colorScheme.primary,
-                                    inactiveTrackColor = Color.White.copy(alpha = 0.3f),
-                                ),
-                            )
-                            Text(
-                                text = formatTime(duration),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color.White.copy(alpha = 0.9f),
-                            )
-                        }
+                        // Row 1: Slider and timestamps (isolated composable to prevent recomposing entire overlay every 100ms)
+                        FullscreenSeekbarRow(
+                            playerState = playerState,
+                            onDraggingChange = { dragging ->
+                                isDraggingSlider = dragging
+                                resetInactivity()
+                            },
+                            onUserInteract = { resetInactivity() },
+                        )
 
                         Spacer(modifier = Modifier.height(6.dp))
 
@@ -525,16 +482,10 @@ fun VideoFullscreenOverlay(
                                         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
                                     ) {
                                         ToggleButton(
-                                            checked = false,
+                                            checked = shareCopied,
                                             onCheckedChange = {
                                                 resetInactivity()
-                                                runCatching {
-                                                    val clip = Toolkit.getDefaultToolkit().systemClipboard
-                                                    clip.setContents(
-                                                        StringSelection("https://music.youtube.com/watch?v=${item.id}"),
-                                                        null,
-                                                    )
-                                                }
+                                                copyTrackUrl(item.id)
                                             },
                                             shapes = leftShapes,
                                             colors = pillColors,
@@ -542,7 +493,7 @@ fun VideoFullscreenOverlay(
                                             modifier = Modifier.size(width = 36.dp, height = 36.dp),
                                         ) {
                                             Icon(
-                                                imageVector = IconAssets.share(),
+                                                imageVector = if (shareCopied) IconAssets.check() else IconAssets.share(),
                                                 contentDescription = stringResource("share"),
                                                 modifier = Modifier.size(18.dp),
                                             )
@@ -627,13 +578,7 @@ fun VideoFullscreenOverlay(
                                                     },
                                                     onClick = {
                                                         showMoreMenu = false
-                                                        runCatching {
-                                                            val clip = Toolkit.getDefaultToolkit().systemClipboard
-                                                            clip.setContents(
-                                                                StringSelection("https://music.youtube.com/watch?v=${item.id}"),
-                                                                null,
-                                                            )
-                                                        }
+                                                        copyTrackUrl(item.id)
                                                     },
                                                 )
                                                 DropdownMenuItem(
@@ -765,6 +710,126 @@ fun VideoFullscreenOverlay(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun FullscreenSeekbarRow(
+    playerState: PlayerState,
+    onDraggingChange: (Boolean) -> Unit,
+    onUserInteract: () -> Unit,
+) {
+    val duration = playerState.duration
+    val position = playerState.position
+    val progress = if (duration > 0L) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
+    var isDragging by remember { mutableStateOf(false) }
+    var sliderProgress by remember(position, duration) { mutableFloatStateOf(progress) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = formatTime(if (isDragging) (sliderProgress * duration).toLong() else position),
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.9f),
+        )
+        Slider(
+            value = if (isDragging) sliderProgress else progress,
+            onValueChange = {
+                onUserInteract()
+                if (!isDragging) {
+                    isDragging = true
+                    onDraggingChange(true)
+                }
+                sliderProgress = it
+            },
+            onValueChangeFinished = {
+                val targetMs = (sliderProgress * duration).toLong()
+                playerState.seekTo(targetMs)
+                isDragging = false
+                onDraggingChange(false)
+            },
+            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = Color.White.copy(alpha = 0.3f),
+            ),
+        )
+        Text(
+            text = formatTime(duration),
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.9f),
+        )
+    }
+}
+
+@Composable
+private fun FullscreenSubtitleOverlay(
+    playerState: PlayerState,
+    videoId: String,
+    title: String,
+    artist: String,
+    durationMs: Long,
+    isControlsVisible: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    var lyricsResult by remember(videoId) { mutableStateOf<LyricsResult?>(null) }
+    var isLoading by remember(videoId) { mutableStateOf(true) }
+
+    LaunchedEffect(videoId, title, artist, durationMs) {
+        isLoading = true
+        lyricsResult = withContext(Dispatchers.IO) {
+            val durationSec = (durationMs / 1000L).toInt().takeIf { it > 0 } ?: -1
+            val primary = DesktopLyricsService.getLyrics(
+                title = title,
+                artist = artist,
+                durationSec = durationSec,
+                videoId = videoId,
+            ).getOrNull()
+            if (primary != null && primary.hasSyncedLyrics) {
+                primary
+            } else {
+                val options = DesktopLyricsService.getAllLyricsOptions(
+                    title = title,
+                    artist = artist,
+                    durationSec = durationSec,
+                    videoId = videoId,
+                )
+                options.firstOrNull { it.hasSyncedLyrics } ?: primary
+            }
+        }
+        isLoading = false
+    }
+
+    val position = playerState.position
+    val captionText = when {
+        isLoading -> null
+        lyricsResult?.hasSyncedLyrics == true -> lyricsResult?.getCurrentLine(position)?.text
+        else -> null
+    }
+
+    if (!captionText.isNullOrBlank()) {
+        Box(
+            modifier = modifier
+                .padding(
+                    start = 48.dp,
+                    end = 48.dp,
+                    bottom = if (isControlsVisible) 156.dp else 44.dp,
+                )
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color.Black.copy(alpha = 0.72f))
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            Text(
+                text = captionText,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
