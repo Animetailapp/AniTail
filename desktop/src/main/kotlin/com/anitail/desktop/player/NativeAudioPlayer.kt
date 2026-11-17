@@ -1034,7 +1034,7 @@ class NativeAudioPlayer {
             }
 
             if (initialPositionMs > 0L) {
-                player.seekToAwait(initialPositionMs, 5_000L)
+                player.seekToAwait(initialPositionMs, 15_000L)
                 if (player.hasFailed) {
                     val failureStatus = (player.prepareFailure as? HttpMediaStatusException)?.playbackHttpStatusCode
                     return false to failureStatus

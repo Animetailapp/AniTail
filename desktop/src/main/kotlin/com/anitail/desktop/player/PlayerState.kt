@@ -628,23 +628,9 @@ class PlayerState {
         videoLoadGeneration++
         if (!enabled) {
             isVideoMode = false
+            isBuffering = false
+            currentAudioSwitchedForVideo = false
             videoPlayer.stop()
-            val item = currentItem
-            val videoId = item?.let { extractVideoId(it.playbackUrl) }
-            if (currentAudioSwitchedForVideo && item != null && videoId != null) {
-                currentAudioSwitchedForVideo = false
-                val targetPosition = nativePlayer.getCurrentPosition().takeIf { it > 0L } ?: position
-                val shouldPlay = isPlaying
-                audioRestoreJob = scope.launch {
-                    isBuffering = true
-                    nativePlayer.playAtPosition(videoId, targetPosition, shouldPlay)
-                    if (isActive && currentItem?.id == item.id) {
-                        isBuffering = false
-                    }
-                }
-            } else {
-                currentAudioSwitchedForVideo = false
-            }
             return
         }
         val item = currentItem
