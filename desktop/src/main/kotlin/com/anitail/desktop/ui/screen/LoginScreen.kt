@@ -42,6 +42,21 @@ fun LoginScreen(
     var extractedDataSyncId by remember { mutableStateOf<String?>(null) }
     var extractedCookie by remember { mutableStateOf<String?>(null) }
     var loginCompleted by remember { mutableStateOf(false) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    val disposedRef = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            disposedRef.set(true)
+            val view = webViewRef
+            webViewRef = null
+            if (view != null) {
+                JavaFxManager.runLater {
+                    view.engine.load(null)
+                }
+            }
+        }
+    }
 
     // Callback cuando se completa el login
     LaunchedEffect(extractedDataSyncId, extractedVisitorData, extractedCookie) {
@@ -94,47 +109,64 @@ fun LoginScreen(
                     JavaFxManager.ensureInitialized()
                     JFXPanel().also { panel ->
                         Platform.runLater {
+                            if (disposedRef.get()) return@runLater
                             val webView = WebView()
-                            
+                            scope.launch {
+                                if (disposedRef.get()) {
+                                    JavaFxManager.runLater { webView.engine.load(null) }
+                                } else {
+                                    webViewRef = webView
+                                }
+                            }
+
                             webView.engine.loadWorker.stateProperty().addListener { _, _, newState ->
-                                Platform.runLater {
-                                    isLoading = newState == Worker.State.RUNNING
-                                    currentUrl = webView.engine.location ?: ""
-                                    
-                                    if (newState == Worker.State.SUCCEEDED) {
-                                        // Extraer visitorData y dataSyncId del JavaScript
-                                        try {
-                                            val window = webView.engine.executeScript("window") as? JSObject
-                                            val ytConfig = window?.getMember("yt") as? JSObject
-                                            val config = ytConfig?.getMember("config_") as? JSObject
-                                            
-                                            config?.getMember("VISITOR_DATA")?.toString()?.let { vd ->
-                                                if (vd != "undefined" && vd.isNotBlank()) {
-                                                    extractedVisitorData = vd
-                                                }
+                                val loading = newState == Worker.State.RUNNING
+                                val url = webView.engine.location ?: ""
+                                var nextVisitorData: String? = null
+                                var nextDataSyncId: String? = null
+                                var nextCookie: String? = null
+
+                                if (newState == Worker.State.SUCCEEDED) {
+                                    // Extraer visitorData y dataSyncId del JavaScript
+                                    try {
+                                        val window = webView.engine.executeScript("window") as? JSObject
+                                        val ytConfig = window?.getMember("yt") as? JSObject
+                                        val config = ytConfig?.getMember("config_") as? JSObject
+
+                                        config?.getMember("VISITOR_DATA")?.toString()?.let { vd ->
+                                            if (vd != "undefined" && vd.isNotBlank()) {
+                                                nextVisitorData = vd
                                             }
-                                            
-                                            config?.getMember("DATASYNC_ID")?.toString()?.let { ds ->
-                                                if (ds != "undefined" && ds.isNotBlank()) {
-                                                    extractedDataSyncId = ds.substringBefore("||")
-                                                }
+                                        }
+
+                                        config?.getMember("DATASYNC_ID")?.toString()?.let { ds ->
+                                            if (ds != "undefined" && ds.isNotBlank()) {
+                                                nextDataSyncId = ds.substringBefore("||")
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        // Ignorar errores de JS
+                                    }
+
+                                    // Capturar cookies si estamos en YouTube Music
+                                    if (url.contains("music.youtube.com")) {
+                                        try {
+                                            val cookie = webView.engine.executeScript("document.cookie")?.toString()
+                                            if (!cookie.isNullOrBlank()) {
+                                                nextCookie = cookie
                                             }
                                         } catch (e: Exception) {
-                                            // Ignorar errores de JS
-                                        }
-                                        
-                                        // Capturar cookies si estamos en YouTube Music
-                                        if (currentUrl.contains("music.youtube.com")) {
-                                            try {
-                                                val cookie = webView.engine.executeScript("document.cookie")?.toString()
-                                                if (!cookie.isNullOrBlank()) {
-                                                    extractedCookie = cookie
-                                                }
-                                            } catch (e: Exception) {
-                                                // Ignorar
-                                            }
+                                            // Ignorar
                                         }
                                     }
+                                }
+
+                                scope.launch {
+                                    isLoading = loading
+                                    currentUrl = url
+                                    if (nextVisitorData != null) extractedVisitorData = nextVisitorData
+                                    if (nextDataSyncId != null) extractedDataSyncId = nextDataSyncId
+                                    if (nextCookie != null) extractedCookie = nextCookie
                                 }
                             }
                             

@@ -53,6 +53,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -184,13 +185,18 @@ fun SettingsScreen(
                 onBack = { currentDestination = SettingsDestination.MAIN },
             )
 
-            SettingsDestination.DISCORD -> DiscordSettingsScreen(
-                preferences = preferences,
-                previewItem = playerState?.currentItem,
-                previewPositionMs = playerState?.position ?: 0L,
-                isPreviewPlaying = playerState?.isPlaying == true,
-                onBack = { currentDestination = SettingsDestination.MAIN },
-            )
+            SettingsDestination.DISCORD -> {
+                val previewPositionMs by remember(playerState) {
+                    derivedStateOf { ((playerState?.position ?: 0L) / 1000L) * 1000L }
+                }
+                DiscordSettingsScreen(
+                    preferences = preferences,
+                    previewItem = playerState?.currentItem,
+                    previewPositionMs = previewPositionMs,
+                    isPreviewPlaying = playerState?.isPlaying == true,
+                    onBack = { currentDestination = SettingsDestination.MAIN },
+                )
+            }
 
             SettingsDestination.SPOTIFY_IMPORT -> SpotifyImportSettingsScreen(
                 preferences = preferences,

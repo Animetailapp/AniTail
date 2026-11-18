@@ -19,11 +19,25 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.player.ffmpeg.sharedMediaOkHttpClient
 import com.anitail.desktop.storage.DesktopPreferences
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import org.jetbrains.skia.Image
-import java.net.URI
+import okhttp3.Request
+import org.jetbrains.skia.Image as SkiaImage
+import org.jetbrains.skia.Paint as SkiaPaint
+import org.jetbrains.skia.Rect as SkiaRect
+import org.jetbrains.skia.SamplingMode
+import org.jetbrains.skia.Surface as SkiaSurface
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
 
 /**
  * RemoteImage - Carga y muestra imágenes remotas con caché en memoria
@@ -36,6 +50,7 @@ fun RemoteImage(
     shape: Shape = RoundedCornerShape(0.dp),
     contentScale: ContentScale = ContentScale.Crop,
     fallbackUrls: List<String> = emptyList(),
+    maxDimensionPx: Int = 768,
     onImageLoaded: ((width: Int, height: Int) -> Unit)? = null,
 ) {
     val candidates = remember(url, fallbackUrls) {
@@ -58,19 +73,10 @@ fun RemoteImage(
         currentOnImageLoaded?.invoke(loaded.width, loaded.height)
     }
 
-    LaunchedEffect(activeUrl, candidateIndex, candidates) {
+    LaunchedEffect(activeUrl, candidateIndex, candidates, maxDimensionPx) {
         if (image != null || activeUrl.isNullOrBlank()) return@LaunchedEffect
-        val bytes = withContext(Dispatchers.IO) {
-            runCatching { URI(activeUrl).toURL().readBytes() }.getOrNull()
-        } ?: run {
-            if (candidateIndex < candidates.lastIndex) {
-                candidateIndex += 1
-            }
-            return@LaunchedEffect
-        }
-        val bitmap = runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
+        val bitmap = ImageCache.loadOrFetch(activeUrl, maxDimensionPx = maxDimensionPx)
         if (bitmap != null) {
-            ImageCache.put(activeUrl, bitmap)
             image = bitmap
         } else if (candidateIndex < candidates.lastIndex) {
             candidateIndex += 1
@@ -94,7 +100,7 @@ fun RemoteImage(
 }
 
 /**
- * Caché en memoria para imágenes cargadas
+ * Caché en memoria y cargador deduplicado para imágenes remotas
  */
 internal object ImageCache {
     private data class CacheEntry(
@@ -104,6 +110,17 @@ internal object ImageCache {
 
     private val cache = LinkedHashMap<String, CacheEntry>(64, 0.75f, true)
     private var totalBytes = 0L
+
+    private val loaderScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val decodeSemaphore = Semaphore(6)
+    private val inFlight = ConcurrentHashMap<String, Deferred<ImageBitmap?>>()
+    private val httpClient by lazy {
+        sharedMediaOkHttpClient
+            .newBuilder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
 
     @Synchronized
     fun get(url: String?): ImageBitmap? = if (url == null) null else cache[url]?.bitmap
@@ -117,6 +134,74 @@ internal object ImageCache {
         }
         totalBytes += bytes
         trimToLimit(resolveMaxBytes())
+    }
+
+    suspend fun loadOrFetch(url: String, maxDimensionPx: Int = 768): ImageBitmap? {
+        get(url)?.let { return it }
+        val deferred = inFlight.computeIfAbsent(url) {
+            loaderScope.async {
+                try {
+                    get(url)?.let { return@async it }
+                    val bytes = fetchBytes(url) ?: return@async null
+                    val bitmap = decodeSemaphore.withPermit {
+                        decodeBitmap(bytes, maxDimensionPx)
+                    }
+                    if (bitmap != null) {
+                        put(url, bitmap)
+                    }
+                    bitmap
+                } finally {
+                    inFlight.remove(url)
+                }
+            }
+        }
+        return deferred.await()
+    }
+
+    private suspend fun fetchBytes(url: String): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching {
+            if (!url.startsWith("http://", ignoreCase = true) &&
+                !url.startsWith("https://", ignoreCase = true)
+            ) {
+                return@runCatching java.net.URI(url).toURL().openStream().use { it.readBytes() }
+            }
+            val request = Request.Builder().url(url).get().build()
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@runCatching null
+                response.body?.bytes()
+            }
+        }.getOrNull()
+    }
+
+    private fun decodeBitmap(bytes: ByteArray, maxDimensionPx: Int): ImageBitmap? {
+        return runCatching {
+            SkiaImage.makeFromEncoded(bytes).use { skiaImage ->
+                val srcW = skiaImage.width
+                val srcH = skiaImage.height
+                if (srcW <= 0 || srcH <= 0) return@use null
+                if (maxDimensionPx <= 0 || (srcW <= maxDimensionPx && srcH <= maxDimensionPx)) {
+                    return@use skiaImage.toComposeImageBitmap()
+                }
+                val scale = maxDimensionPx.toFloat() / maxOf(srcW, srcH).toFloat()
+                val dstW = (srcW * scale).roundToInt().coerceAtLeast(1)
+                val dstH = (srcH * scale).roundToInt().coerceAtLeast(1)
+                SkiaSurface.makeRasterN32Premul(dstW, dstH).use { surface ->
+                    SkiaPaint().use { paint ->
+                        surface.canvas.drawImageRect(
+                            skiaImage,
+                            SkiaRect.makeWH(srcW.toFloat(), srcH.toFloat()),
+                            SkiaRect.makeWH(dstW.toFloat(), dstH.toFloat()),
+                            SamplingMode.LINEAR,
+                            paint,
+                            true,
+                        )
+                    }
+                    surface.makeImageSnapshot().use { scaled ->
+                        scaled.toComposeImageBitmap()
+                    }
+                }
+            }
+        }.getOrNull()
     }
 
     @Synchronized

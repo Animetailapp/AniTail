@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -67,6 +68,7 @@ import com.anitail.desktop.db.mapper.toAlbumEntity
 import com.anitail.desktop.db.mapper.toLibraryItem
 import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.db.mapper.toSongArtistMaps
+import com.anitail.desktop.db.relations.indexPrimaryArtistIdBySongId
 import com.anitail.desktop.db.relations.primaryArtistIdForSong
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadState
@@ -147,8 +149,15 @@ fun ExploreScreen(
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
+    val downloadedSongIds = remember(downloadedSongs) {
+        downloadedSongs.mapTo(HashSet(downloadedSongs.size)) { it.songId }
+    }
     val downloadStates by downloadService.downloadStates.collectAsState()
+    val albumsById by database.albumsById.collectAsState()
     val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
+    val primaryArtistBySongId = remember(songArtistMaps) {
+        indexPrimaryArtistIdBySongId(songArtistMaps)
+    }
     var pendingPlaylistItem by remember { mutableStateOf<ExploreSongTarget?>(null) }
     var pendingAlbumPlaylist by remember { mutableStateOf<AlbumItem?>(null) }
     var detailsItem by remember { mutableStateOf<LibraryItem?>(null) }
@@ -217,9 +226,8 @@ fun ExploreScreen(
                 action = AlbumDownloadAction.DOWNLOAD,
             )
         }
-        val downloadedIds = downloadedSongs.map { it.songId }.toSet()
         val statuses = albumSongs.mapNotNull { song -> downloadStates[song.id]?.status }
-        val allDownloaded = albumSongs.all { song -> downloadedIds.contains(song.id) }
+        val allDownloaded = albumSongs.all { song -> downloadedSongIds.contains(song.id) }
         val anyActive = statuses.any { status ->
             status == DownloadStatus.QUEUED || status == DownloadStatus.DOWNLOADING
         }
@@ -343,7 +351,7 @@ fun ExploreScreen(
         val artistCandidates = songItem?.artists
             ?.mapNotNull { artist -> artist.id?.let { Artist(artist.name, it) } }
             .orEmpty()
-        val libraryArtistId = songEntity?.let { primaryArtistIdForSong(it.id, songArtistMaps) }
+        val libraryArtistId = songEntity?.let { primaryArtistBySongId[it.id] }
         val hasArtist = if (songItem != null) {
             artistCandidates.isNotEmpty()
         } else {
@@ -366,7 +374,7 @@ fun ExploreScreen(
             strings = strings,
             songId = libraryItem.id,
             downloadStates = downloadStates,
-            downloadedSongs = downloadedSongs,
+            downloadedSongIds = downloadedSongIds,
         )
         val isInLibrary = songEntity?.inLibrary != null
         val shareUrl = songItem?.shareLink ?: libraryItem.playbackUrl
@@ -509,7 +517,7 @@ fun ExploreScreen(
                                 val isActive = playerState.currentItem?.id == song.id
                                 val songEntity = songsById[song.id]
                                 val downloadState = downloadStates[song.id]
-                                val isDownloaded = downloadedSongs.any { it.songId == song.id }
+                                val isDownloaded = song.id in downloadedSongIds
                                 ExploreChartListItem(
                                     song = song,
                                     libraryItem = libraryItem,
@@ -611,7 +619,7 @@ fun ExploreScreen(
                         key = { it.id },
                     ) { album ->
                         val albumLibraryItem = albumItemToLibraryItem(album)
-                        val albumEntity by database.album(album.browseId).collectAsState(initial = null)
+                        val albumEntity = albumsById[album.browseId]
                         val albumMenuState = albumMenuStates[album.browseId]
                         val albumSongs = albumMenuState?.songs.orEmpty()
                         ExploreGridItem(
@@ -654,12 +662,12 @@ fun ExploreScreen(
             }
             chartsPage?.sections?.find { isTopMusicVideosSection(it.title) }?.let { topVideos ->
                 NavigationTitle(title = stringResource("top_music_videos"))
+                val videoSongs = remember(topVideos.items) { topVideos.items.filterIsInstance<SongItem>() }
                 LazyRow(
                     contentPadding = WindowInsets.systemBars
                         .only(WindowInsetsSides.Horizontal)
                         .asPaddingValues(),
                 ) {
-                    val videoSongs = topVideos.items.filterIsInstance<SongItem>()
                     if (videoSongs.isNotEmpty()) {
                         items(
                             items = videoSongs,
@@ -669,7 +677,7 @@ fun ExploreScreen(
                             val isActive = playerState.currentItem?.id == video.id
                             val songEntity = songsById[video.id]
                             val downloadState = downloadStates[video.id]
-                            val isDownloaded = downloadedSongs.any { it.songId == video.id }
+                            val isDownloaded = video.id in downloadedSongIds
                             ExploreGridItem(
                                 item = video,
                                 isActive = isActive,
@@ -758,7 +766,12 @@ fun ExploreScreen(
                     contentPadding = PaddingValues(6.dp),
                     modifier = Modifier.height((MoodAndGenresButtonHeight + 12.dp) * 4 + 12.dp),
                 ) {
-                    items(moodAndGenres) { item ->
+                    gridItemsIndexed(
+                        items = moodAndGenres,
+                        key = { index, item ->
+                            "${item.endpoint.browseId.orEmpty()}_${item.endpoint.params.orEmpty()}_$index"
+                        },
+                    ) { _, item ->
                         MoodAndGenresButton(
                             title = item.title,
                             onClick = {

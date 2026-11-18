@@ -214,6 +214,7 @@ class AudioRenderer private constructor(
         data: ByteArray,
         outputBoostDb: Double,
     ): ByteArray {
+        if (!equalizer.hasActiveProcessing(outputBoostDb)) return data
         val count = data.size / 2
         if (equalizerSamples.size < count) equalizerSamples = ShortArray(count)
         if (equalizerOutput.size != data.size) equalizerOutput = ByteArray(data.size)

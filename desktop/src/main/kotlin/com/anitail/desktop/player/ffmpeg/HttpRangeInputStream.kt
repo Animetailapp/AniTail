@@ -233,10 +233,16 @@ class HttpRangeInputStream(
             this.position = bounded
             reachedEof = false
             if (bounded < activeChunkStart || bounded >= activeChunkStart + activeChunkBytes.size) {
-                prefetchJob?.cancel()
-                activeChunkBytes = byteArrayOf()
-                activeChunkStart = -1L
-                nextDemandChunkSize = minOf(STARTUP_PROBE_CHUNK_SIZE, chunkSize)
+                val cached = cachedChunkAt(bounded)
+                if (cached != null) {
+                    activeChunkStart = cached.first
+                    activeChunkBytes = cached.second
+                } else {
+                    prefetchJob?.cancel()
+                    activeChunkBytes = byteArrayOf()
+                    activeChunkStart = -1L
+                    nextDemandChunkSize = minOf(STARTUP_PROBE_CHUNK_SIZE, chunkSize)
+                }
             }
         }
         return bounded
@@ -350,30 +356,35 @@ class HttpRangeInputStream(
         currentChunkLen: Long,
     ) {
         if (prefetchJob?.isActive == true) return
-        val prefetchChunkSize = synchronized(this) { effectiveChunkCap }
-        val prefetchStarts = mutableListOf<Long>()
+        val (prefetchCap, initialStep) = synchronized(this) {
+            val ramp = minOf(maxOf(nextDemandChunkSize, STARTUP_PROBE_CHUNK_SIZE * 2), demandChunkLimit, effectiveChunkCap)
+            effectiveChunkCap to ramp.coerceAtLeast(1)
+        }
+        val prefetchRequests = mutableListOf<Pair<Long, Int>>()
         var nextStart = currentStart + currentChunkLen
+        var stepChunkSize = initialStep
         for (i in 0 until 3) {
             if (mediaSize > 0L && nextStart >= mediaSize) break
             val isCached = cachedChunkAt(nextStart) != null
             val isInFlight = synchronized(inFlightChunks) { inFlightChunks.containsKey(nextStart) }
             if (!isCached && !isInFlight) {
-                prefetchStarts.add(nextStart)
+                prefetchRequests.add(nextStart to stepChunkSize)
             }
-            nextStart += prefetchChunkSize.toLong()
+            nextStart += stepChunkSize.toLong()
+            stepChunkSize = minOf(stepChunkSize.toLong() * 2L, prefetchCap.toLong()).toInt()
         }
-        if (prefetchStarts.isNotEmpty()) {
+        if (prefetchRequests.isNotEmpty()) {
             prefetchJob =
                 prefetchScope.launch {
-                    for (start in prefetchStarts) {
+                    for ((start, size) in prefetchRequests) {
                         if (closed) break
                         try {
-                            getOrDownloadChunk(start, prefetchChunkSize)
+                            getOrDownloadChunk(start, size)
                         } catch (_: CancellationException) {
                             break
                         } catch (_: Exception) {
                         }
-                        if (prefetchStarts.size > 1) delay(50.milliseconds)
+                        if (prefetchRequests.size > 1) delay(50.milliseconds)
                     }
                 }
         }

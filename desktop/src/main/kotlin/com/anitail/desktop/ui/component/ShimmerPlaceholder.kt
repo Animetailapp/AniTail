@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +32,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.anitail.desktop.ui.component.shimmer.LocalShimmerBrush
 
 /**
  * Efecto shimmer animado para placeholders de carga.
@@ -38,6 +40,12 @@ import androidx.compose.ui.unit.dp
  */
 @Composable
 fun shimmerBrush(): Brush {
+    LocalShimmerBrush.current?.let { return it }
+    return rememberSharedShimmerBrush()
+}
+
+@Composable
+private fun rememberSharedShimmerBrush(): Brush {
     val shimmerColors = listOf(
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
@@ -158,12 +166,15 @@ fun ShimmerSectionRow(
     itemSize: Dp = 128.dp,
     modifier: Modifier = Modifier,
 ) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = modifier,
-    ) {
-        items(itemCount) {
-            ShimmerGridItem(size = itemSize)
+    val brush = LocalShimmerBrush.current ?: rememberSharedShimmerBrush()
+    CompositionLocalProvider(LocalShimmerBrush provides brush) {
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = modifier,
+        ) {
+            items(itemCount) {
+                ShimmerGridItem(size = itemSize)
+            }
         }
     }
 }
@@ -177,19 +188,22 @@ fun ShimmerQuickPicksGrid(
     columns: Int = 3,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = modifier,
-    ) {
-        repeat(rows) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                repeat(columns) {
-                    ShimmerListItem(
-                        modifier = Modifier.weight(1f),
-                    )
+    val brush = LocalShimmerBrush.current ?: rememberSharedShimmerBrush()
+    CompositionLocalProvider(LocalShimmerBrush provides brush) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = modifier,
+        ) {
+            repeat(rows) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    repeat(columns) {
+                        ShimmerListItem(
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
         }
@@ -204,17 +218,20 @@ fun ShimmerChipsRow(
     chipCount: Int = 5,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = modifier.padding(horizontal = 12.dp),
-    ) {
-        repeat(chipCount) { index ->
-            ShimmerBox(
-                modifier = Modifier
-                    .width((60 + index * 10).dp)
-                    .height(32.dp),
-                shape = RoundedCornerShape(16.dp),
-            )
+    val brush = LocalShimmerBrush.current ?: rememberSharedShimmerBrush()
+    CompositionLocalProvider(LocalShimmerBrush provides brush) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = modifier.padding(horizontal = 12.dp),
+        ) {
+            repeat(chipCount) { index ->
+                ShimmerBox(
+                    modifier = Modifier
+                        .width((60 + index * 10).dp)
+                        .height(32.dp),
+                    shape = RoundedCornerShape(16.dp),
+                )
+            }
         }
     }
 }

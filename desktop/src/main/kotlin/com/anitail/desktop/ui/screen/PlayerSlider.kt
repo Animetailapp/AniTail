@@ -68,16 +68,20 @@ fun PlayerProgressSlider(
     val currentOnValueChange by rememberUpdatedState(onValueChange)
     val currentOnFinished by rememberUpdatedState(onValueChangeFinished)
 
-    val wavePhaseTransition = rememberInfiniteTransition(label = "squiggly_wave_phase")
-    val infinitePhase by wavePhaseTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2.0 * PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "squiggly_phase",
-    )
+    val phaseState = if (style == SliderStyle.SQUIGGLY && isPlaying && !isDragging) {
+        val wavePhaseTransition = rememberInfiniteTransition(label = "squiggly_wave_phase")
+        wavePhaseTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = (2.0 * PI).toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1200, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "squiggly_phase",
+        )
+    } else {
+        null
+    }
 
     val waveAmplitudeScale by animateFloatAsState(
         targetValue = if (style == SliderStyle.SQUIGGLY && isPlaying && !isDragging) 1f else 0f,
@@ -107,12 +111,7 @@ fun PlayerProgressSlider(
     )
 
     val phaseHolder = remember { object { var value = 0f } }
-    val activePhase = if (isPlaying && !isDragging) {
-        phaseHolder.value = infinitePhase
-        infinitePhase
-    } else {
-        phaseHolder.value
-    }
+    val wavePath = remember { Path() }
 
     Box(
         contentAlignment = Alignment.Center,
@@ -195,9 +194,15 @@ fun PlayerProgressSlider(
                                 cap = StrokeCap.Round,
                             )
                         } else {
+                            val activePhase = if (phaseState != null) {
+                                phaseHolder.value = phaseState.value
+                                phaseHolder.value
+                            } else {
+                                phaseHolder.value
+                            }
                             val wavelengthPx = 22.dp.toPx()
                             val stepPx = 2.dp.toPx().coerceAtLeast(1f)
-                            val path = Path()
+                            wavePath.rewind()
                             var x = trackStart
                             var first = true
                             val fadeZonePx = 12.dp.toPx()
@@ -208,16 +213,16 @@ fun PlayerProgressSlider(
                                 val angle = ((x - trackStart) / wavelengthPx) * (2.0 * PI).toFloat() - activePhase
                                 val y = cy + sin(angle) * amplitudePx * envelope
                                 if (first) {
-                                    path.moveTo(x, y)
+                                    wavePath.moveTo(x, y)
                                     first = false
                                 } else {
-                                    path.lineTo(x, y)
+                                    wavePath.lineTo(x, y)
                                 }
                                 x += stepPx
                             }
-                            path.lineTo(activeEnd, cy)
+                            wavePath.lineTo(activeEnd, cy)
                             drawPath(
-                                path = path,
+                                path = wavePath,
                                 color = activeColor,
                                 style = Stroke(width = strokePx, cap = StrokeCap.Round),
                             )

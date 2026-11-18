@@ -366,13 +366,25 @@ data class LyricsResult(
     val hasPlainLyrics: Boolean get() = !plainLyrics.isNullOrBlank()
 
     fun getCurrentLine(positionMs: Long): LyricLine? {
-        if (parsedLines.isEmpty()) return null
-        return parsedLines.lastOrNull { it.timestampMs <= positionMs }
+        val index = getCurrentLineIndex(positionMs)
+        return parsedLines.getOrNull(index)
     }
 
     fun getCurrentLineIndex(positionMs: Long): Int {
         if (parsedLines.isEmpty()) return -1
-        return parsedLines.indexOfLast { it.timestampMs <= positionMs }
+        var low = 0
+        var high = parsedLines.lastIndex
+        var result = -1
+        while (low <= high) {
+            val mid = (low + high) ushr 1
+            if (parsedLines[mid].timestampMs <= positionMs) {
+                result = mid
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
+        }
+        return result
     }
 }
 

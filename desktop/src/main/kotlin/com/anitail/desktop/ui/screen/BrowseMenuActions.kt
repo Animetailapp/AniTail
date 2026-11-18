@@ -7,6 +7,7 @@ import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.mapper.extractVideoId
 import com.anitail.desktop.db.mapper.toSongArtistMaps
 import com.anitail.desktop.db.mapper.toSongEntity
+import com.anitail.desktop.db.relations.indexPrimaryArtistIdBySongId
 import com.anitail.desktop.db.relations.primaryArtistIdForSong
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadState
@@ -70,6 +71,44 @@ fun buildBrowseSongMenuActions(
     copyToClipboard = copyToClipboard,
 )
 
+@Composable
+fun buildBrowseSongMenuActions(
+    libraryItem: LibraryItem,
+    songItem: SongItem?,
+    songsById: Map<String, SongEntity>,
+    primaryArtistBySongId: Map<String, String?>,
+    downloadStates: Map<String, DownloadState>,
+    downloadedSongIds: Set<String>,
+    database: DesktopDatabase,
+    downloadService: DesktopDownloadService,
+    playerState: PlayerState,
+    coroutineScope: CoroutineScope,
+    onOpenArtist: (String, String?) -> Unit,
+    onOpenAlbum: (String, String?) -> Unit,
+    onRequestPlaylist: (BrowseSongTarget) -> Unit,
+    onRequestArtists: (List<Artist>) -> Unit,
+    onShowDetails: (LibraryItem) -> Unit,
+    copyToClipboard: (String) -> Unit,
+): List<ContextMenuAction> = buildBrowseSongMenuActions(
+    strings = LocalStrings.current,
+    libraryItem = libraryItem,
+    songItem = songItem,
+    songsById = songsById,
+    primaryArtistBySongId = primaryArtistBySongId,
+    downloadStates = downloadStates,
+    downloadedSongIds = downloadedSongIds,
+    database = database,
+    downloadService = downloadService,
+    playerState = playerState,
+    coroutineScope = coroutineScope,
+    onOpenArtist = onOpenArtist,
+    onOpenAlbum = onOpenAlbum,
+    onRequestPlaylist = onRequestPlaylist,
+    onRequestArtists = onRequestArtists,
+    onShowDetails = onShowDetails,
+    copyToClipboard = copyToClipboard,
+)
+
 fun buildBrowseSongMenuActions(
     strings: StringResolver,
     libraryItem: LibraryItem,
@@ -90,10 +129,93 @@ fun buildBrowseSongMenuActions(
     copyToClipboard: (String) -> Unit,
 ): List<ContextMenuAction> {
     val songEntity = songsById[libraryItem.id]
+    val libraryArtistId = songEntity?.let { primaryArtistIdForSong(libraryItem.id, songArtistMaps) }
+    val downloadedSongIds = downloadedSongs.mapTo(HashSet(downloadedSongs.size)) { it.songId }
+    return buildBrowseSongMenuActionsInternal(
+        strings = strings,
+        libraryItem = libraryItem,
+        songItem = songItem,
+        songEntity = songEntity,
+        libraryArtistId = libraryArtistId,
+        downloadStates = downloadStates,
+        downloadedSongIds = downloadedSongIds,
+        database = database,
+        downloadService = downloadService,
+        playerState = playerState,
+        coroutineScope = coroutineScope,
+        onOpenArtist = onOpenArtist,
+        onOpenAlbum = onOpenAlbum,
+        onRequestPlaylist = onRequestPlaylist,
+        onRequestArtists = onRequestArtists,
+        onShowDetails = onShowDetails,
+        copyToClipboard = copyToClipboard,
+    )
+}
+
+fun buildBrowseSongMenuActions(
+    strings: StringResolver,
+    libraryItem: LibraryItem,
+    songItem: SongItem?,
+    songsById: Map<String, SongEntity>,
+    primaryArtistBySongId: Map<String, String?>,
+    downloadStates: Map<String, DownloadState>,
+    downloadedSongIds: Set<String>,
+    database: DesktopDatabase,
+    downloadService: DesktopDownloadService,
+    playerState: PlayerState,
+    coroutineScope: CoroutineScope,
+    onOpenArtist: (String, String?) -> Unit,
+    onOpenAlbum: (String, String?) -> Unit,
+    onRequestPlaylist: (BrowseSongTarget) -> Unit,
+    onRequestArtists: (List<Artist>) -> Unit,
+    onShowDetails: (LibraryItem) -> Unit,
+    copyToClipboard: (String) -> Unit,
+): List<ContextMenuAction> {
+    val songEntity = songsById[libraryItem.id]
+    val libraryArtistId = songEntity?.let { primaryArtistBySongId[libraryItem.id] }
+    return buildBrowseSongMenuActionsInternal(
+        strings = strings,
+        libraryItem = libraryItem,
+        songItem = songItem,
+        songEntity = songEntity,
+        libraryArtistId = libraryArtistId,
+        downloadStates = downloadStates,
+        downloadedSongIds = downloadedSongIds,
+        database = database,
+        downloadService = downloadService,
+        playerState = playerState,
+        coroutineScope = coroutineScope,
+        onOpenArtist = onOpenArtist,
+        onOpenAlbum = onOpenAlbum,
+        onRequestPlaylist = onRequestPlaylist,
+        onRequestArtists = onRequestArtists,
+        onShowDetails = onShowDetails,
+        copyToClipboard = copyToClipboard,
+    )
+}
+
+private fun buildBrowseSongMenuActionsInternal(
+    strings: StringResolver,
+    libraryItem: LibraryItem,
+    songItem: SongItem?,
+    songEntity: SongEntity?,
+    libraryArtistId: String?,
+    downloadStates: Map<String, DownloadState>,
+    downloadedSongIds: Set<String>,
+    database: DesktopDatabase,
+    downloadService: DesktopDownloadService,
+    playerState: PlayerState,
+    coroutineScope: CoroutineScope,
+    onOpenArtist: (String, String?) -> Unit,
+    onOpenAlbum: (String, String?) -> Unit,
+    onRequestPlaylist: (BrowseSongTarget) -> Unit,
+    onRequestArtists: (List<Artist>) -> Unit,
+    onShowDetails: (LibraryItem) -> Unit,
+    copyToClipboard: (String) -> Unit,
+): List<ContextMenuAction> {
     val artistCandidates = songItem?.artists
         ?.mapNotNull { artist -> artist.id?.let { Artist(artist.name, it) } }
         .orEmpty()
-    val libraryArtistId = songEntity?.let { primaryArtistIdForSong(libraryItem.id, songArtistMaps) }
     val hasArtist = if (songItem != null) {
         artistCandidates.isNotEmpty()
     } else {
@@ -116,7 +238,7 @@ fun buildBrowseSongMenuActions(
         strings = strings,
         songId = libraryItem.id,
         downloadStates = downloadStates,
-        downloadedSongs = downloadedSongs,
+        downloadedSongIds = downloadedSongIds,
     )
     val isInLibrary = songEntity?.inLibrary != null
     val shareUrl = songItem?.shareLink ?: libraryItem.playbackUrl

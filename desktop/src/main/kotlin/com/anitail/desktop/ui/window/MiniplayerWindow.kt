@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -145,9 +146,6 @@ private fun StandardMiniplayer(
     onRestoreMainWindow: () -> Unit,
 ) {
     val item = playerState.currentItem
-    val duration = playerState.duration
-    val position = playerState.position
-    val progress = if (duration > 0L) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
 
     Row(
         modifier = Modifier
@@ -242,32 +240,7 @@ private fun StandardMiniplayer(
             }
 
             // Progress Slider
-            Column(modifier = Modifier.fillMaxWidth()) {
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp)),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = formatTime(position),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = formatTime(duration),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            MiniplayerProgressSection(playerState = playerState)
 
             // Playback Actions Row
             Row(
@@ -329,6 +302,40 @@ private fun StandardMiniplayer(
 }
 
 @Composable
+private fun MiniplayerProgressSection(playerState: PlayerState) {
+    val duration = playerState.duration
+    val positionSecond by remember(playerState) {
+        derivedStateOf { playerState.position / 1000L }
+    }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        LinearProgressIndicator(
+            progress = { playerState.progress.coerceIn(0f, 1f) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp)),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = formatTime(positionSecond * 1000L),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = formatTime(duration),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
 private fun FocusModeMiniplayer(
     playerState: PlayerState,
     onCloseRequest: () -> Unit,
@@ -336,9 +343,6 @@ private fun FocusModeMiniplayer(
     onRestoreMainWindow: () -> Unit,
 ) {
     val item = playerState.currentItem
-    val duration = playerState.duration
-    val position = playerState.position
-    val progress = if (duration > 0L) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
     val hoverInteraction = remember { MutableInteractionSource() }
     val isHovered by hoverInteraction.collectIsHoveredAsState()
 
@@ -461,7 +465,7 @@ private fun FocusModeMiniplayer(
             Spacer(modifier = Modifier.height(10.dp))
 
             LinearProgressIndicator(
-                progress = { progress },
+                progress = { playerState.progress.coerceIn(0f, 1f) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(4.dp)

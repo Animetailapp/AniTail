@@ -236,6 +236,13 @@ object DesktopInnerTubeXPlayer {
     private class DesktopPlayerConfigRepository : PlayerConfigRepository {
         private val configFile: File = DesktopPaths.appDataDir().resolve("innertubex_player_config.json").toFile()
         private val metaFile: File = DesktopPaths.appDataDir().resolve("innertubex_player_config_meta.json").toFile()
+        private val cacheLock = Any()
+
+        @Volatile
+        private var cachedConfigJson: String? = null
+
+        @Volatile
+        private var cachedMetaJson: JSONObject? = null
 
         override val enabled: Boolean = true
         override val sourceUrl: String = PLAYER_CONFIG_URL
@@ -243,63 +250,89 @@ object DesktopInnerTubeXPlayer {
 
         override var cachedJson: String
             get() {
-                if (configFile.exists() && configFile.length() > 0) {
-                    val content = try {
-                        configFile.readText()
-                    } catch (_: Exception) {
-                        null
-                    }
-                    if (!content.isNullOrBlank()) return content
-                }
-                return try {
-                    DesktopPlayerConfigRepository::class.java.classLoader
-                        ?.getResourceAsStream("player_configs.json")
-                        ?.bufferedReader()
-                        ?.use { it.readText() }
-                        .orEmpty()
-                } catch (_: Exception) {
-                    ""
+                cachedConfigJson?.let { return it }
+                return synchronized(cacheLock) {
+                    cachedConfigJson?.let { return@synchronized it }
+                    val loaded = loadJsonFromDisk()
+                    cachedConfigJson = loaded
+                    loaded
                 }
             }
             set(value) {
+                synchronized(cacheLock) {
+                    cachedConfigJson = value
+                    try {
+                        configFile.parentFile?.mkdirs()
+                        configFile.writeText(value)
+                    } catch (_: Exception) {
+                        // Ignored
+                    }
+                }
+            }
+
+        private fun loadJsonFromDisk(): String {
+            if (configFile.exists() && configFile.length() > 0) {
+                val content = try {
+                    configFile.readText()
+                } catch (_: Exception) {
+                    null
+                }
+                if (!content.isNullOrBlank()) return content
+            }
+            return try {
+                DesktopPlayerConfigRepository::class.java.classLoader
+                    ?.getResourceAsStream("player_configs.json")
+                    ?.bufferedReader()
+                    ?.use { it.readText() }
+                    .orEmpty()
+            } catch (_: Exception) {
+                ""
+            }
+        }
+
+        private fun loadMetaLocked(): JSONObject {
+            cachedMetaJson?.let { return it }
+            val loaded = if (!metaFile.exists()) {
+                JSONObject()
+            } else {
                 try {
-                    configFile.parentFile?.mkdirs()
-                    configFile.writeText(value)
+                    JSONObject(metaFile.readText())
+                } catch (_: Exception) {
+                    JSONObject()
+                }
+            }
+            cachedMetaJson = loaded
+            return loaded
+        }
+
+        private inline fun <T> readMeta(block: (JSONObject) -> T): T =
+            synchronized(cacheLock) {
+                block(loadMetaLocked())
+            }
+
+        private fun writeMeta(mutate: (JSONObject) -> Unit) {
+            synchronized(cacheLock) {
+                try {
+                    val json = loadMetaLocked()
+                    mutate(json)
+                    metaFile.parentFile?.mkdirs()
+                    metaFile.writeText(json.toString())
                 } catch (_: Exception) {
                     // Ignored
                 }
             }
-
-        private fun readMeta(): JSONObject {
-            if (!metaFile.exists()) return JSONObject()
-            return try {
-                JSONObject(metaFile.readText())
-            } catch (_: Exception) {
-                JSONObject()
-            }
-        }
-
-        private fun writeMeta(mutate: (JSONObject) -> Unit) {
-            try {
-                val json = readMeta()
-                mutate(json)
-                metaFile.parentFile?.mkdirs()
-                metaFile.writeText(json.toString())
-            } catch (_: Exception) {
-                // Ignored
-            }
         }
 
         override var cachedAtMs: Long
-            get() = readMeta().optLong("cached_at_ms", 0L)
+            get() = readMeta { it.optLong("cached_at_ms", 0L) }
             set(value) = writeMeta { it.put("cached_at_ms", value) }
 
         override var cachedSourceUrl: String
-            get() = readMeta().optString("source_url", "")
+            get() = readMeta { it.optString("source_url", "") }
             set(value) = writeMeta { it.put("source_url", value) }
 
         override var cachedEtag: String
-            get() = readMeta().optString("etag", "")
+            get() = readMeta { it.optString("etag", "") }
             set(value) = writeMeta { it.put("etag", value) }
 
         private companion object {

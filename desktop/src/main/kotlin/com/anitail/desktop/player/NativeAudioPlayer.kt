@@ -434,7 +434,7 @@ class NativeAudioPlayer {
         }
         setNormalizationFactor(normalization)
 
-        val candidates = mutableListOf<ResolvedCandidate>()
+        var playbackStarted = false
         for (client in clientsToTry) {
             if (client.loginRequired && !isLoggedIn) continue
 
@@ -457,6 +457,7 @@ class NativeAudioPlayer {
                     val formats = orderFormatsByQuality(rawFormats, audioQuality)
                     if (formats.isEmpty()) continue
 
+                    val referer = refererForClient(client)
                     for (format in formats) {
                         val url = StreamUrlResolution.resolveStreamUrl(
                             NewPipeStreamUrlResolver,
@@ -466,9 +467,32 @@ class NativeAudioPlayer {
                         ).getOrNull()
 
                         if (url != null) {
-                            candidates.add(ResolvedCandidate(client, format, url))
-                            break
+                            val headers = buildStreamHeaders(url, client.userAgent, referer.takeIf { it.isNotBlank() })
+                            println(
+                                "NativeAudioPlayer: Probando formato ${format.mimeType} " +
+                                    "(${format.bitrate}) del cliente ${client.clientName}",
+                            )
+                            if (
+                                tryStartPlayback(
+                                    url = url,
+                                    headers = headers,
+                                    contentLengthBytes = format.contentLength,
+                                    userAgent = client.userAgent,
+                                    referer = referer,
+                                    allowProxyForVlc = true,
+                                    initialPositionMs = initialPositionMs,
+                                    startPlaying = startPlaying,
+                                    allowCrossfade = allowCrossfade,
+                                )
+                            ) {
+                                println("NativeAudioPlayer: ¡Reproducción iniciada con éxito! (Cliente: ${client.clientName})")
+                                playbackStarted = true
+                                break
+                            }
                         }
+                    }
+                    if (playbackStarted) {
+                        return@withContext Result.success(Unit)
                     }
                 } else {
                     lastError = playerResponse?.playabilityStatus?.reason ?: "Playability error"
@@ -481,33 +505,7 @@ class NativeAudioPlayer {
             }
         }
 
-        val orderedCandidates = orderCandidatesByQuality(candidates, audioQuality)
-        for (candidate in orderedCandidates) {
-            val referer = refererForClient(candidate.client)
-            val headers = buildStreamHeaders(candidate.url, candidate.client.userAgent, referer.takeIf { it.isNotBlank() })
-            println(
-                "NativeAudioPlayer: Probando formato ${candidate.format.mimeType} " +
-                    "(${candidate.format.bitrate}) del cliente ${candidate.client.clientName}",
-            )
-            if (
-                tryStartPlayback(
-                    url = candidate.url,
-                    headers = headers,
-                    contentLengthBytes = candidate.format.contentLength,
-                    userAgent = candidate.client.userAgent,
-                    referer = referer,
-                    allowProxyForVlc = true,
-                    initialPositionMs = initialPositionMs,
-                    startPlaying = startPlaying,
-                    allowCrossfade = allowCrossfade,
-                )
-            ) {
-                println("NativeAudioPlayer: ¡Reproducción iniciada con éxito! (Cliente: ${candidate.client.clientName})")
-                return@withContext Result.success(Unit)
-            }
-        }
-
-        if (candidates.isEmpty()) {
+        if (!playbackStarted) {
             println("NativeAudioPlayer: Intentando extracción directa mediante NewPipeExtractor...")
             val newPipeStreams = runCatching { NewPipeExtractor.newPipePlayer(videoId) }.getOrDefault(emptyList())
             for ((itag, streamUrl) in newPipeStreams) {
@@ -1244,10 +1242,10 @@ class NativeAudioPlayer {
 
     private suspend fun prepareVlcPlayer(url: String, userAgent: String? = null, referer: String? = null): Boolean =
         withContext(Dispatchers.Main) {
-            activeFfmpegPlayer?.close()
+            activeFfmpegPlayer?.closeAsync()
             activeFfmpegPlayer = null
             cancelFadeJobs()
-            outgoingFfmpegPlayer?.close()
+            outgoingFfmpegPlayer?.closeAsync()
             outgoingFfmpegPlayer = null
             fadeGain = 1.0
 
@@ -1354,9 +1352,9 @@ class NativeAudioPlayer {
     fun stop() {
         cancelFadeJobs()
         fadeGain = 1.0
-        outgoingFfmpegPlayer?.close()
+        outgoingFfmpegPlayer?.closeAsync()
         outgoingFfmpegPlayer = null
-        activeFfmpegPlayer?.close()
+        activeFfmpegPlayer?.closeAsync()
         activeFfmpegPlayer = null
         if (activeEngine == Engine.VLC) {
             mediaPlayer?.controls()?.stop()
@@ -1474,27 +1472,6 @@ class NativeAudioPlayer {
         val host = runCatching { URI(url).host?.lowercase() }.getOrNull()
         if (cookie != null && host != null && (host.endsWith("googlevideo.com") || host.endsWith("youtube.com"))) {
             put("Cookie", cookie)
-        }
-    }
-
-    private data class ResolvedCandidate(
-        val client: YouTubeClient,
-        val format: PlayerResponse.StreamingData.Format,
-        val url: String,
-    )
-
-    private fun orderCandidatesByQuality(
-        candidates: List<ResolvedCandidate>,
-        audioQuality: AudioQuality,
-    ): List<ResolvedCandidate> {
-        if (candidates.isEmpty()) return candidates
-        return when (audioQuality) {
-            AudioQuality.HIGH, AudioQuality.AUTO -> candidates.sortedByDescending { it.format.bitrate }
-            AudioQuality.LOW -> candidates.sortedBy { it.format.bitrate }
-            AudioQuality.MEDIUM -> candidates.sortedWith(
-                compareBy<ResolvedCandidate> { abs(it.format.bitrate - 192_000) }
-                    .thenByDescending { it.format.bitrate },
-            )
         }
     }
 

@@ -338,6 +338,7 @@ class AudioPlayer(
             }.apply {
                 priority = Thread.NORM_PRIORITY + 2
                 name = "AudioDecoder-Thread"
+                isDaemon = true
                 start()
             }
 
@@ -414,6 +415,7 @@ class AudioPlayer(
             }.apply {
                 priority = Thread.NORM_PRIORITY + 2
                 name = "AudioRenderer-Thread"
+                isDaemon = true
                 start()
             }
     }

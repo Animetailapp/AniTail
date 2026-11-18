@@ -1,10 +1,18 @@
 package com.anitail.desktop.ui.screen
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -19,7 +27,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
@@ -30,6 +40,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,20 +85,10 @@ fun PlayerControls(
     onOpenArtist: ((String, String) -> Unit)? = null,
     onOpenAlbum: ((String, String) -> Unit)? = null,
     onShowMore: (() -> Unit)? = null,
+    moreMenuExpanded: Boolean = false,
+    onDismissMoreMenu: () -> Unit = {},
+    moreMenuContent: (@Composable () -> Unit)? = null,
 ) {
-    val totalDurationMs = if (playerState.duration > 0L) {
-        playerState.duration
-    } else {
-        item?.durationMs ?: 0L
-    }
-    var dragFraction by remember(item?.id) { mutableStateOf<Float?>(null) }
-    val activeProgress = (dragFraction ?: playerState.progress).coerceIn(0f, 1f)
-    val displayedPositionMs = if (dragFraction != null && totalDurationMs > 0L) {
-        (activeProgress * totalDurationMs).toLong()
-    } else {
-        playerState.position
-    }
-
     val likeScale by animateFloatAsState(
         targetValue = if (isLiked) 1.08f else 1f,
         animationSpec = spring(
@@ -255,69 +256,57 @@ fun PlayerControls(
                 }
 
                 if (onShowMore != null) {
-                    FilledTonalIconButton(
-                        onClick = onShowMore,
-                        enabled = item != null,
-                        shapes = IconButtonShapes(
-                            shape = RoundedCornerShape(
-                                topStart = 8.dp,
-                                bottomStart = 8.dp,
-                                topEnd = 20.dp,
-                                bottomEnd = 20.dp,
+                    Box {
+                        FilledTonalIconButton(
+                            onClick = onShowMore,
+                            enabled = item != null,
+                            shapes = IconButtonShapes(
+                                shape = RoundedCornerShape(
+                                    topStart = 8.dp,
+                                    bottomStart = 8.dp,
+                                    topEnd = 20.dp,
+                                    bottomEnd = 20.dp,
+                                ),
+                                pressedShape = RoundedCornerShape(10.dp),
                             ),
-                            pressedShape = RoundedCornerShape(10.dp),
-                        ),
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = textColor.copy(alpha = 0.12f),
-                            contentColor = textColor,
-                        ),
-                        modifier = Modifier.size(width = 44.dp, height = 40.dp),
-                    ) {
-                        Icon(
-                            imageVector = IconAssets.moreVert(),
-                            contentDescription = stringResource("more_options"),
-                            modifier = Modifier.size(20.dp),
-                        )
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = textColor.copy(alpha = 0.12f),
+                                contentColor = textColor,
+                            ),
+                            modifier = Modifier.size(width = 44.dp, height = 40.dp),
+                        ) {
+                            Icon(
+                                imageVector = IconAssets.moreVert(),
+                                contentDescription = stringResource("more_options"),
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+
+                        if (moreMenuContent != null) {
+                            DropdownMenu(
+                                expanded = moreMenuExpanded,
+                                onDismissRequest = onDismissMoreMenu,
+                                modifier = Modifier
+                                    .widthIn(min = 320.dp, max = 360.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainer),
+                            ) {
+                                moreMenuContent()
+                            }
+                        }
                     }
                 }
             }
         }
 
         // Expressive timeline slider + formatted timestamps
-        Column(modifier = Modifier.fillMaxWidth()) {
-            PlayerProgressSlider(
-                value = activeProgress,
-                onValueChange = { fraction -> dragFraction = fraction },
-                onValueChangeFinished = {
-                    val target = dragFraction
-                    dragFraction = null
-                    if (target != null && totalDurationMs > 0L) {
-                        playerState.seekToProgress(target)
-                    }
-                },
-                style = sliderStyle,
-                activeColor = iconButtonColor,
-                inactiveColor = mutedTextColor,
-                isPlaying = playerState.isPlaying,
-            )
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
-            ) {
-                Text(
-                    text = formatTime(displayedPositionMs),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = mutedTextColor,
-                )
-                Text(
-                    text = formatTime(totalDurationMs),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = mutedTextColor,
-                )
-            }
-        }
+        PlayerTimelineSection(
+            item = item,
+            playerState = playerState,
+            sliderStyle = sliderStyle,
+            activeColor = iconButtonColor,
+            inactiveColor = mutedTextColor,
+        )
 
         // Responsive Material 3 Expressive transport bar
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -397,26 +386,45 @@ fun PlayerControls(
                         ),
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            when {
-                                playerState.isBuffering -> {
-                                    LoadingIndicator(
-                                        modifier = Modifier.size(sizes.playIconSize * 0.72f),
-                                        color = textButtonColor,
-                                    )
-                                }
-                                playerState.isPlaying -> {
-                                    Icon(
-                                        imageVector = ExpressiveIcons.Pause,
-                                        contentDescription = stringResource("pause"),
-                                        modifier = Modifier.size(sizes.playIconSize),
-                                    )
-                                }
-                                else -> {
-                                    Icon(
-                                        imageVector = ExpressiveIcons.PlayArrow,
-                                        contentDescription = stringResource("play"),
-                                        modifier = Modifier.size(sizes.playIconSize),
-                                    )
+                            val visualState = when {
+                                playerState.isBuffering -> 0
+                                playerState.isPlaying -> 1
+                                else -> 2
+                            }
+                            AnimatedContent(
+                                targetState = visualState,
+                                transitionSpec = {
+                                    (fadeIn(tween(180)) + scaleIn(
+                                        initialScale = 0.72f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessMedium,
+                                        ),
+                                    )) togetherWith (fadeOut(tween(120)) + scaleOut(targetScale = 0.72f))
+                                },
+                                label = "player_play_icon",
+                            ) { state ->
+                                when (state) {
+                                    0 -> {
+                                        LoadingIndicator(
+                                            modifier = Modifier.size(sizes.playIconSize * 0.72f),
+                                            color = textButtonColor,
+                                        )
+                                    }
+                                    1 -> {
+                                        Icon(
+                                            imageVector = ExpressiveIcons.Pause,
+                                            contentDescription = stringResource("pause"),
+                                            modifier = Modifier.size(sizes.playIconSize),
+                                        )
+                                    }
+                                    else -> {
+                                        Icon(
+                                            imageVector = ExpressiveIcons.PlayArrow,
+                                            contentDescription = stringResource("play"),
+                                            modifier = Modifier.size(sizes.playIconSize),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -449,5 +457,81 @@ fun PlayerControls(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PlayerTimelineSection(
+    item: LibraryItem?,
+    playerState: PlayerState,
+    sliderStyle: SliderStyle,
+    activeColor: Color,
+    inactiveColor: Color,
+) {
+    val totalDurationMs = if (playerState.duration > 0L) {
+        playerState.duration
+    } else {
+        item?.durationMs ?: 0L
+    }
+    var dragFraction by remember(item?.id) { mutableStateOf<Float?>(null) }
+    val activeProgress = (dragFraction ?: playerState.progress).coerceIn(0f, 1f)
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        PlayerProgressSlider(
+            value = activeProgress,
+            onValueChange = { fraction -> dragFraction = fraction },
+            onValueChangeFinished = {
+                val target = dragFraction
+                dragFraction = null
+                if (target != null && totalDurationMs > 0L) {
+                    playerState.seekToProgress(target)
+                }
+            },
+            style = sliderStyle,
+            activeColor = activeColor,
+            inactiveColor = inactiveColor,
+            isPlaying = playerState.isPlaying,
+        )
+        PlayerTimelineLabels(
+            playerState = playerState,
+            dragFraction = dragFraction,
+            totalDurationMs = totalDurationMs,
+            mutedTextColor = inactiveColor,
+        )
+    }
+}
+
+@Composable
+private fun PlayerTimelineLabels(
+    playerState: PlayerState,
+    dragFraction: Float?,
+    totalDurationMs: Long,
+    mutedTextColor: Color,
+) {
+    val positionSecond by remember(playerState) {
+        derivedStateOf { playerState.position / 1000L }
+    }
+    val displayedPositionMs = if (dragFraction != null && totalDurationMs > 0L) {
+        (dragFraction.coerceIn(0f, 1f) * totalDurationMs).toLong()
+    } else {
+        positionSecond * 1000L
+    }
+
+    Row(
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+    ) {
+        Text(
+            text = formatTime(displayedPositionMs),
+            style = MaterialTheme.typography.labelMedium,
+            color = mutedTextColor,
+        )
+        Text(
+            text = formatTime(totalDurationMs),
+            style = MaterialTheme.typography.labelMedium,
+            color = mutedTextColor,
+        )
     }
 }

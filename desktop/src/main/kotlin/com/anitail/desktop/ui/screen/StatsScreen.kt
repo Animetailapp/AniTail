@@ -109,6 +109,7 @@ import java.net.URI
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.launch
 
 private val SectionSpacing = 12.dp
@@ -164,7 +165,7 @@ fun StatsScreen(
     var detailsItem by remember { mutableStateOf<LibraryItem?>(null) }
 
     val firstEvent = remember(events) { events.minByOrNull { it.timestamp } }
-    val currentDate = LocalDateTime.now()
+    val currentDate = remember(events.size) { LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) }
 
     val weeklyDates = remember(currentDate, firstEvent) {
         if (firstEvent == null) {

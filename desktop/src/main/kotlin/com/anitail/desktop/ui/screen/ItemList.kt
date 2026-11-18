@@ -40,7 +40,10 @@ fun ItemList(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        items(items) { item ->
+        items(
+            items = items,
+            key = { it.id },
+        ) { item ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,

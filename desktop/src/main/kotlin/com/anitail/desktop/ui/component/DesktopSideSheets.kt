@@ -80,34 +80,51 @@ fun LyricsSideSheet(
     }.collectAsState(initial = null)
     val songRomanizeLyrics = songEntity?.romanizeLyrics ?: true
 
-    LyricsSideSheet(
+    val subtitle = remember(item?.title, item?.artist) {
+        val title = item?.title.orEmpty()
+        val artist = item?.artist.orEmpty()
+        when {
+            title.isNotBlank() && artist.isNotBlank() -> "$title • $artist"
+            title.isNotBlank() -> title
+            else -> null
+        }
+    }
+
+    DockableSideSheet(
         visible = visible,
-        title = item?.title.orEmpty(),
-        artist = item?.artist.orEmpty(),
-        videoId = item?.id,
-        artworkUrl = item?.artworkUrl,
-        durationSec = ((item?.durationMs ?: playerState.duration) / 1000L).toInt().coerceAtLeast(0),
-        currentPositionMs = playerState.position,
-        isPlaying = playerState.isPlaying,
-        songRomanizeLyrics = songRomanizeLyrics,
-        onSetSongRomanizeLyrics = { enabled ->
-            val current = item ?: return@LyricsSideSheet
-            coroutineScope.launch {
-                val existing = songEntity
-                if (existing == null) {
-                    database.insertSong(current.toSongEntity().copy(romanizeLyrics = enabled))
-                } else {
-                    database.updateSong(existing.copy(romanizeLyrics = enabled))
-                }
-            }
-        },
-        onSeek = { playerState.seekTo(it) },
+        title = stringResource("lyrics"),
+        subtitle = subtitle,
+        icon = IconAssets.lyrics(),
         onClose = onClose,
         modifier = modifier,
-        width = width,
+        baseWidth = width,
         pinned = pinned,
         onTogglePin = onTogglePin,
-    )
+    ) {
+        LyricsPanel(
+            title = item?.title.orEmpty(),
+            artist = item?.artist.orEmpty(),
+            videoId = item?.id,
+            artworkUrl = item?.artworkUrl,
+            durationSec = ((item?.durationMs ?: playerState.duration) / 1000L).toInt().coerceAtLeast(0),
+            currentPositionMs = playerState.position,
+            isPlaying = playerState.isPlaying,
+            songRomanizeLyrics = songRomanizeLyrics,
+            onSetSongRomanizeLyrics = { enabled ->
+                val current = item ?: return@LyricsPanel
+                coroutineScope.launch {
+                    val existing = songEntity
+                    if (existing == null) {
+                        database.insertSong(current.toSongEntity().copy(romanizeLyrics = enabled))
+                    } else {
+                        database.updateSong(existing.copy(romanizeLyrics = enabled))
+                    }
+                }
+            },
+            onSeek = { playerState.seekTo(it) },
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
 }
 
 /**
@@ -393,7 +410,13 @@ private fun DockableSideSheet(
     }
 }
 
+private val PushPinFilledIcon by lazy { buildPushPinIcon(filled = true) }
+private val PushPinOutlinedIcon by lazy { buildPushPinIcon(filled = false) }
+
 private fun pushPinIcon(filled: Boolean): ImageVector =
+    if (filled) PushPinFilledIcon else PushPinOutlinedIcon
+
+private fun buildPushPinIcon(filled: Boolean): ImageVector =
     ImageVector.Builder(
         name = if (filled) "PushPinFilled" else "PushPinOutlined",
         defaultWidth = 24.dp,

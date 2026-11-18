@@ -298,7 +298,7 @@ private fun ActionButtons(
         }
         if (onShortcuts != null) {
             IconButton(onClick = onShortcuts, colors = colors) {
-                Icon(keyboardIcon(), contentDescription = "Ctrl+/")
+                Icon(KeyboardShortcutIcon, contentDescription = "Ctrl+/")
             }
         }
         IconButton(onClick = onHistory, colors = colors) {
@@ -318,7 +318,7 @@ private fun ActionButtons(
     }
 }
 
-private fun keyboardIcon(): ImageVector =
+private val KeyboardShortcutIcon: ImageVector by lazy {
     ImageVector.Builder(
         name = "KeyboardShortcuts",
         defaultWidth = 24.dp,
@@ -400,6 +400,7 @@ private fun keyboardIcon(): ImageVector =
             close()
         }
     }.build()
+}
 
 @Composable
 private fun WindowControls(

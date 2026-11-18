@@ -34,6 +34,8 @@ fun buildLibraryPlaylists(
     }
 }
 
+private val AUTO_PLAYLIST_EPOCH = LocalDateTime.of(1970, 1, 1, 0, 0)
+
 fun buildAutoPlaylist(
     id: String,
     name: String,
@@ -45,8 +47,8 @@ fun buildAutoPlaylist(
         playlist = PlaylistEntity(
             id = id,
             name = name,
-            createdAt = LocalDateTime.now(),
-            lastUpdateTime = LocalDateTime.now(),
+            createdAt = AUTO_PLAYLIST_EPOCH,
+            lastUpdateTime = AUTO_PLAYLIST_EPOCH,
             isEditable = false,
             thumbnailUrl = fallbackThumbnail,
         ),

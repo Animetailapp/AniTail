@@ -80,6 +80,7 @@ class FFmpegFrameGrabber : FrameGrabber {
         }
 
         private val inputStreams = Collections.synchronizedMap(HashMap<Long, InputStream>())
+        private val readScratchBuffer = ThreadLocal<ByteArray>()
 
         private val readCallback by lazy {
             object : Read_packet_Pointer_BytePointer_int() {
@@ -89,7 +90,12 @@ class FFmpegFrameGrabber : FrameGrabber {
                     buf_size: Int,
                 ): Int {
                     return try {
-                        val b = ByteArray(buf_size)
+                        val existing = readScratchBuffer.get()
+                        val b = if (existing != null && existing.size >= buf_size) {
+                            existing
+                        } else {
+                            ByteArray(buf_size).also { readScratchBuffer.set(it) }
+                        }
                         val is_ = inputStreams[opaque?.address()] ?: return -1
                         val size = is_.read(b, 0, buf_size)
                         if (size < 0) {
@@ -259,9 +265,7 @@ class FFmpegFrameGrabber : FrameGrabber {
     private var get_format_callback: AVCodecContext.Get_format_AVCodecContext_IntPointer? = null
 
     override fun release() {
-        synchronized(org.bytedeco.ffmpeg.global.avcodec::class.java) {
-            releaseUnsafe()
-        }
+        releaseUnsafe()
     }
 
     @Synchronized
@@ -311,7 +315,11 @@ class FFmpegFrameGrabber : FrameGrabber {
         planar_target_picture?.let { av_frame_free(it) }
         planar_target_picture = null
 
-        video_c?.let { avcodec_free_context(it) }
+        video_c?.let {
+            synchronized(org.bytedeco.ffmpeg.global.avcodec::class.java) {
+                avcodec_free_context(it)
+            }
+        }
         video_c = null
 
         // Codec shutdown joins its native workers, which may still call get_format.
@@ -327,7 +335,11 @@ class FFmpegFrameGrabber : FrameGrabber {
         samples_frame?.let { av_frame_free(it) }
         samples_frame = null
 
-        audio_c?.let { avcodec_free_context(it) }
+        audio_c?.let {
+            synchronized(org.bytedeco.ffmpeg.global.avcodec::class.java) {
+                avcodec_free_context(it)
+            }
+        }
         audio_c = null
 
         img_convert_ctx?.let { sws_freeContext(it) }
@@ -593,9 +605,7 @@ class FFmpegFrameGrabber : FrameGrabber {
     }
 
     fun start(findStreamInfo: Boolean) {
-        synchronized(org.bytedeco.ffmpeg.global.avcodec::class.java) {
-            startUnsafe(findStreamInfo)
-        }
+        startUnsafe(findStreamInfo)
     }
 
     fun startUnsafe() {
@@ -862,7 +872,10 @@ class FFmpegFrameGrabber : FrameGrabber {
                     video_c!!.thread_type(AVCodecContext.FF_THREAD_FRAME or AVCodecContext.FF_THREAD_SLICE)
                 }
 
-                var openResult = avcodec_open2(video_c, codec, vOptions)
+                var openResult =
+                    synchronized(org.bytedeco.ffmpeg.global.avcodec::class.java) {
+                        avcodec_open2(video_c, codec, vOptions)
+                    }
                 if (openResult < 0 && hwAccelConfigured) {
                     hw_device_ctx?.let {
                         av_buffer_unref(it)
@@ -877,7 +890,10 @@ class FFmpegFrameGrabber : FrameGrabber {
                     video_c!!.get_format(null)
                     video_c!!.thread_count(softwareVideoDecoderThreadCount(Runtime.getRuntime().availableProcessors()))
                     video_c!!.thread_type(AVCodecContext.FF_THREAD_FRAME or AVCodecContext.FF_THREAD_SLICE)
-                    openResult = avcodec_open2(video_c, codec, vOptions)
+                    openResult =
+                        synchronized(org.bytedeco.ffmpeg.global.avcodec::class.java) {
+                            avcodec_open2(video_c, codec, vOptions)
+                        }
                 }
                 if (openResult < 0) throw Exception("avcodec_open2() error $openResult: Could not open video codec.")
                 FFmpegLogCallback.logRejectedOptions(vOptions, "avcodec_open2")
@@ -910,7 +926,11 @@ class FFmpegFrameGrabber : FrameGrabber {
                 val aOptions = AVDictionary(null)
                 for ((key, value) in audioOptions) av_dict_set(aOptions, key, value, 0)
                 audio_c!!.thread_count(1)
-                if (avcodec_open2(audio_c, codec, aOptions) < 0) throw Exception("avcodec_open2() error: Could not open audio codec.")
+                val audioOpenResult =
+                    synchronized(org.bytedeco.ffmpeg.global.avcodec::class.java) {
+                        avcodec_open2(audio_c, codec, aOptions)
+                    }
+                if (audioOpenResult < 0) throw Exception("avcodec_open2() error: Could not open audio codec.")
                 FFmpegLogCallback.logRejectedOptions(aOptions, "avcodec_open2")
                 av_dict_free(aOptions)
 
@@ -1065,15 +1085,17 @@ class FFmpegFrameGrabber : FrameGrabber {
                         null as DoublePointer?,
                     )
                 if (img_convert_ctx == null) return
-                sws_scale(
-                    img_convert_ctx,
-                    PointerPointer<Pointer>(sourceFrame),
-                    sourceFrame.linesize(),
-                    0,
-                    srcH,
-                    PointerPointer<Pointer>(picture_rgb),
-                    picture_rgb!!.linesize(),
-                )
+                PointerScope().use { _ ->
+                    sws_scale(
+                        img_convert_ctx,
+                        PointerPointer<Pointer>(sourceFrame),
+                        sourceFrame.linesize(),
+                        0,
+                        srcH,
+                        PointerPointer<Pointer>(picture_rgb),
+                        picture_rgb!!.linesize(),
+                    )
+                }
                 frame!!.imageStride = picture_rgb!!.linesize(0)
                 frame!!.image = image_buf
                 frame!!.opaque = picture_rgb
@@ -1471,178 +1493,176 @@ class FFmpegFrameGrabber : FrameGrabber {
         keyFrames: Boolean,
         doData: Boolean,
     ): Frame? {
-        PointerScope().use { _ ->
-            if (oc == null || oc!!.isNull) throw Exception("Could not grab: No AVFormatContext. (Has start() been called?)")
-            if ((!doVideo || video_st == null) && (!doAudio || audio_st == null) && !doData) return null
-            if (!started) throw Exception("start() was not called successfully!")
+        if (oc == null || oc!!.isNull) throw Exception("Could not grab: No AVFormatContext. (Has start() been called?)")
+        if ((!doVideo || video_st == null) && (!doAudio || audio_st == null) && !doData) return null
+        if (!started) throw Exception("start() was not called successfully!")
 
-            val videoFrameGrabbed = frameGrabbed && frame!!.type == Frame.Type.VIDEO
-            val audioFrameGrabbed = frameGrabbed && frame!!.samples != null
-            val dataFrameGrabbed = frameGrabbed && frame!!.data != null
-            frameGrabbed = false
+        val videoFrameGrabbed = frameGrabbed && frame!!.type == Frame.Type.VIDEO
+        val audioFrameGrabbed = frameGrabbed && frame!!.samples != null
+        val dataFrameGrabbed = frameGrabbed && frame!!.data != null
+        frameGrabbed = false
 
-            if (doVideo && videoFrameGrabbed) {
-                if (doProcessing) processImage()
-                frame!!.keyFrame = (picture!!.flags() and AVFrame.AV_FRAME_FLAG_KEY) != 0
-                return frame
-            } else if (doAudio && audioFrameGrabbed) {
-                if (doProcessing) processSamples()
-                frame!!.keyFrame = (samples_frame!!.flags() and AVFrame.AV_FRAME_FLAG_KEY) != 0
-                return frame
-            } else if (doData && dataFrameGrabbed) {
-                return frame
-            }
-
-            frame!!.keyFrame = false
-            frame!!.imageWidth = 0
-            frame!!.imageHeight = 0
-            frame!!.imageDepth = 0
-            frame!!.imageChannels = 0
-            frame!!.imageStride = 0
-            frame!!.image = null
-            frame!!.sampleRate = 0
-            frame!!.audioChannels = 0
-            frame!!.samples = null
-            frame!!.data = null
-            frame!!.opaque = null
-            frame!!.type = null
-
-            var done = false
-            var readPacket = pkt!!.stream_index() == -1
-            while (!done) {
-                if (readPacket) {
-                    if (pkt!!.stream_index() != -1) {
-                        av_packet_unref(pkt)
-                        pkt!!.stream_index(-1)
-                    }
-                    var ret = av_read_frame(oc, pkt)
-                    if (ret < 0) {
-                        if (ret == AVERROR_EAGAIN()) {
-                            try {
-                                Thread.sleep(10)
-                            } catch (ex: InterruptedException) {
-                                Thread.currentThread().interrupt()
-                                return null
-                            }
-                            continue
-                        }
-                        if (Thread.currentThread().isInterrupted) return null
-                        if (ret != AVERROR_EOF()) {
-                            val message = "av_read_frame() error $ret: ${ffmpegErrorDescription(ret)}"
-                            logNativeMessage(AV_LOG_ERROR, message)
-                        }
-                        if ((doVideo && video_st != null) || (doAudio && audio_st != null)) {
-                            pkt!!.stream_index(if (doVideo && video_st != null) video_st!!.index() else audio_st!!.index())
-                            pkt!!.flags(AV_PKT_FLAG_KEY)
-                            pkt!!.data(null as BytePointer?)
-                            pkt!!.size(0)
-                        } else {
-                            pkt!!.stream_index(-1)
-                            return null
-                        }
-                    }
-                }
-
-                frame!!.streamIndex = pkt!!.stream_index()
-
-                if (doVideo && video_st != null && frame!!.streamIndex == video_st!!.index() &&
-                    (!keyFrames || pkt!!.flags() == AV_PKT_FLAG_KEY)
-                ) {
-                    if (readPacket) {
-                        val result = avcodec_send_packet(video_c, pkt)
-                        if (result < 0 && result != AVERROR_EAGAIN() && result != AVERROR_EOF()) {
-                            logNativeMessage(AV_LOG_ERROR, "avcodec_send_packet(video) error $result: ${ffmpegErrorDescription(result)}")
-                        }
-                        if (pkt!!.data() == null && pkt!!.size() == 0) pkt!!.stream_index(-1)
-                    }
-
-                    while (!done) {
-                        hardwarePictureValid = false
-                        var ret = avcodec_receive_frame(video_c, picture)
-                        if (ret == AVERROR_EAGAIN() || ret == AVERROR_EOF()) {
-                            if (pkt!!.data() == null && pkt!!.size() == 0) {
-                                pkt!!.stream_index(-1)
-                                return null
-                            } else {
-                                readPacket = true
-                                break
-                            }
-                        } else if (ret < 0) {
-                            logNativeMessage(AV_LOG_ERROR, "avcodec_receive_frame(video) error $ret: ${ffmpegErrorDescription(ret)}")
-                            readPacket = true
-                            break
-                        }
-
-                        if (!keyFrames || picture!!.pict_type() == AV_PICTURE_TYPE_I) {
-                            val pts = picture!!.best_effort_timestamp()
-                            val tb = video_st!!.time_base()
-                            _timestamp = 1000000L * pts * tb.num() / tb.den()
-                            val ts0 = if (oc!!.start_time() != AV_NOPTS_VALUE) oc!!.start_time() else 0L
-                            _frameNumber =
-                                ((_timestamp - ts0) * frameRate / 1000000L)
-                                    .roundToLong()
-                                    .toInt()
-                            frame!!.image = image_buf
-                            if (doProcessing) processImage()
-                            done = true
-                            frame!!.timestamp = _timestamp
-                            frame!!.keyFrame = (picture!!.flags() and AVFrame.AV_FRAME_FLAG_KEY) != 0
-                            frame!!.pictType = av_get_picture_type_char(picture!!.pict_type()).toInt().toChar()
-                            frame!!.type = Frame.Type.VIDEO
-                        }
-                    }
-                } else if (doAudio && audio_st != null && frame!!.streamIndex == audio_st!!.index()) {
-                    if (readPacket) avcodec_send_packet(audio_c, pkt)
-
-                    while (!done) {
-                        var ret = avcodec_receive_frame(audio_c, samples_frame)
-                        if (ret == AVERROR_EAGAIN() || ret == AVERROR_EOF()) {
-                            if (pkt!!.data() == null && pkt!!.size() == 0) {
-                                pkt!!.stream_index(-1)
-                                return null
-                            } else {
-                                readPacket = true
-                                break
-                            }
-                        } else if (ret < 0) {
-                            readPacket = true
-                            break
-                        }
-
-                        val pts = samples_frame!!.best_effort_timestamp()
-                        val tb = audio_st!!.time_base()
-                        _timestamp = 1000000L * pts * tb.num() / tb.den()
-                        frame!!.samples = samples_buf
-                        if (doProcessing) processSamples()
-                        done = true
-                        frame!!.timestamp = _timestamp
-                        frame!!.keyFrame = (samples_frame!!.flags() and AVFrame.AV_FRAME_FLAG_KEY) != 0
-                        frame!!.type = Frame.Type.AUDIO
-                    }
-                } else if (readPacket && doData && frame!!.streamIndex > -1 && frame!!.streamIndex < streams!!.size &&
-                    streams!![frame!!.streamIndex] != AVMEDIA_TYPE_VIDEO &&
-                    streams!![frame!!.streamIndex] != AVMEDIA_TYPE_AUDIO
-                ) {
-                    frame!!.data =
-                        pkt!!
-                            .data()
-                            .position(0L)
-                            .capacity(pkt!!.size().toLong())
-                            .asByteBuffer()
-                    frame!!.opaque = pkt
-                    done = true
-                    when (streams!![frame!!.streamIndex]) {
-                        AVMEDIA_TYPE_DATA -> frame!!.type = Frame.Type.DATA
-                        AVMEDIA_TYPE_SUBTITLE -> frame!!.type = Frame.Type.SUBTITLE
-                        AVMEDIA_TYPE_ATTACHMENT -> frame!!.type = Frame.Type.ATTACHMENT
-                        else -> frame!!.type = null
-                    }
-                } else {
-                    readPacket = true
-                }
-            }
+        if (doVideo && videoFrameGrabbed) {
+            if (doProcessing) processImage()
+            frame!!.keyFrame = (picture!!.flags() and AVFrame.AV_FRAME_FLAG_KEY) != 0
+            return frame
+        } else if (doAudio && audioFrameGrabbed) {
+            if (doProcessing) processSamples()
+            frame!!.keyFrame = (samples_frame!!.flags() and AVFrame.AV_FRAME_FLAG_KEY) != 0
+            return frame
+        } else if (doData && dataFrameGrabbed) {
             return frame
         }
+
+        frame!!.keyFrame = false
+        frame!!.imageWidth = 0
+        frame!!.imageHeight = 0
+        frame!!.imageDepth = 0
+        frame!!.imageChannels = 0
+        frame!!.imageStride = 0
+        frame!!.image = null
+        frame!!.sampleRate = 0
+        frame!!.audioChannels = 0
+        frame!!.samples = null
+        frame!!.data = null
+        frame!!.opaque = null
+        frame!!.type = null
+
+        var done = false
+        var readPacket = pkt!!.stream_index() == -1
+        while (!done) {
+            if (readPacket) {
+                if (pkt!!.stream_index() != -1) {
+                    av_packet_unref(pkt)
+                    pkt!!.stream_index(-1)
+                }
+                var ret = av_read_frame(oc, pkt)
+                if (ret < 0) {
+                    if (ret == AVERROR_EAGAIN()) {
+                        try {
+                            Thread.sleep(10)
+                        } catch (ex: InterruptedException) {
+                            Thread.currentThread().interrupt()
+                            return null
+                        }
+                        continue
+                    }
+                    if (Thread.currentThread().isInterrupted) return null
+                    if (ret != AVERROR_EOF()) {
+                        val message = "av_read_frame() error $ret: ${ffmpegErrorDescription(ret)}"
+                        logNativeMessage(AV_LOG_ERROR, message)
+                    }
+                    if ((doVideo && video_st != null) || (doAudio && audio_st != null)) {
+                        pkt!!.stream_index(if (doVideo && video_st != null) video_st!!.index() else audio_st!!.index())
+                        pkt!!.flags(AV_PKT_FLAG_KEY)
+                        pkt!!.data(null as BytePointer?)
+                        pkt!!.size(0)
+                    } else {
+                        pkt!!.stream_index(-1)
+                        return null
+                    }
+                }
+            }
+
+            frame!!.streamIndex = pkt!!.stream_index()
+
+            if (doVideo && video_st != null && frame!!.streamIndex == video_st!!.index() &&
+                (!keyFrames || pkt!!.flags() == AV_PKT_FLAG_KEY)
+            ) {
+                if (readPacket) {
+                    val result = avcodec_send_packet(video_c, pkt)
+                    if (result < 0 && result != AVERROR_EAGAIN() && result != AVERROR_EOF()) {
+                        logNativeMessage(AV_LOG_ERROR, "avcodec_send_packet(video) error $result: ${ffmpegErrorDescription(result)}")
+                    }
+                    if (pkt!!.data() == null && pkt!!.size() == 0) pkt!!.stream_index(-1)
+                }
+
+                while (!done) {
+                    hardwarePictureValid = false
+                    var ret = avcodec_receive_frame(video_c, picture)
+                    if (ret == AVERROR_EAGAIN() || ret == AVERROR_EOF()) {
+                        if (pkt!!.data() == null && pkt!!.size() == 0) {
+                            pkt!!.stream_index(-1)
+                            return null
+                        } else {
+                            readPacket = true
+                            break
+                        }
+                    } else if (ret < 0) {
+                        logNativeMessage(AV_LOG_ERROR, "avcodec_receive_frame(video) error $ret: ${ffmpegErrorDescription(ret)}")
+                        readPacket = true
+                        break
+                    }
+
+                    if (!keyFrames || picture!!.pict_type() == AV_PICTURE_TYPE_I) {
+                        val pts = picture!!.best_effort_timestamp()
+                        val tb = video_st!!.time_base()
+                        _timestamp = 1000000L * pts * tb.num() / tb.den()
+                        val ts0 = if (oc!!.start_time() != AV_NOPTS_VALUE) oc!!.start_time() else 0L
+                        _frameNumber =
+                            ((_timestamp - ts0) * frameRate / 1000000L)
+                                .roundToLong()
+                                .toInt()
+                        frame!!.image = image_buf
+                        if (doProcessing) processImage()
+                        done = true
+                        frame!!.timestamp = _timestamp
+                        frame!!.keyFrame = (picture!!.flags() and AVFrame.AV_FRAME_FLAG_KEY) != 0
+                        frame!!.pictType = av_get_picture_type_char(picture!!.pict_type()).toInt().toChar()
+                        frame!!.type = Frame.Type.VIDEO
+                    }
+                }
+            } else if (doAudio && audio_st != null && frame!!.streamIndex == audio_st!!.index()) {
+                if (readPacket) avcodec_send_packet(audio_c, pkt)
+
+                while (!done) {
+                    var ret = avcodec_receive_frame(audio_c, samples_frame)
+                    if (ret == AVERROR_EAGAIN() || ret == AVERROR_EOF()) {
+                        if (pkt!!.data() == null && pkt!!.size() == 0) {
+                            pkt!!.stream_index(-1)
+                            return null
+                        } else {
+                            readPacket = true
+                            break
+                        }
+                    } else if (ret < 0) {
+                        readPacket = true
+                        break
+                    }
+
+                    val pts = samples_frame!!.best_effort_timestamp()
+                    val tb = audio_st!!.time_base()
+                    _timestamp = 1000000L * pts * tb.num() / tb.den()
+                    frame!!.samples = samples_buf
+                    if (doProcessing) processSamples()
+                    done = true
+                    frame!!.timestamp = _timestamp
+                    frame!!.keyFrame = (samples_frame!!.flags() and AVFrame.AV_FRAME_FLAG_KEY) != 0
+                    frame!!.type = Frame.Type.AUDIO
+                }
+            } else if (readPacket && doData && frame!!.streamIndex > -1 && frame!!.streamIndex < streams!!.size &&
+                streams!![frame!!.streamIndex] != AVMEDIA_TYPE_VIDEO &&
+                streams!![frame!!.streamIndex] != AVMEDIA_TYPE_AUDIO
+            ) {
+                frame!!.data =
+                    pkt!!
+                        .data()
+                        .position(0L)
+                        .capacity(pkt!!.size().toLong())
+                        .asByteBuffer()
+                frame!!.opaque = pkt
+                done = true
+                when (streams!![frame!!.streamIndex]) {
+                    AVMEDIA_TYPE_DATA -> frame!!.type = Frame.Type.DATA
+                    AVMEDIA_TYPE_SUBTITLE -> frame!!.type = Frame.Type.SUBTITLE
+                    AVMEDIA_TYPE_ATTACHMENT -> frame!!.type = Frame.Type.ATTACHMENT
+                    else -> frame!!.type = null
+                }
+            } else {
+                readPacket = true
+            }
+        }
+        return frame
     }
 
     override var frameNumber: Int

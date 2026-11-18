@@ -109,12 +109,15 @@ class DesktopDownloadService {
     
     // Jobs activos (para cancelación)
     private val activeJobs = ConcurrentHashMap<String, Job>()
-    
+    private val metadataWriteLock = Any()
+
     init {
-        downloadDir.mkdirs()
-        loadDownloadedSongs()
+        scope.launch {
+            downloadDir.mkdirs()
+            loadDownloadedSongs()
+        }
     }
-    
+
     private fun loadDownloadedSongs() {
         if (metadataFile.exists()) {
             try {
@@ -126,13 +129,15 @@ class DesktopDownloadService {
             }
         }
     }
-    
+
     private fun saveDownloadedSongs() {
-        try {
-            metadataFile.parentFile?.mkdirs()
-            metadataFile.writeText(json.encodeToString(_downloadedSongs.value))
-        } catch (e: Exception) {
-            e.printStackTrace()
+        synchronized(metadataWriteLock) {
+            try {
+                metadataFile.parentFile?.mkdirs()
+                metadataFile.writeText(json.encodeToString(_downloadedSongs.value))
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
     
@@ -269,6 +274,8 @@ class DesktopDownloadService {
                 try {
                     var downloadedBytes = 0L
                     val buffer = ByteArray(8192)
+                    var lastEmitTimeMs = 0L
+                    var lastEmittedProgress = -1f
 
                     while (!channel.isClosedForRead) {
                         val bytesRead = channel.readAvailable(buffer)
@@ -281,13 +288,25 @@ class DesktopDownloadService {
                             throw Exception("Se alcanzó el límite máximo de descargas configurado.")
                         }
 
-                        val progress = if (totalBytes > 0) downloadedBytes.toFloat() / totalBytes else 0f
-                        updateDownloadState(
-                            _downloadStates.value[songId]?.copy(
-                                downloadedBytes = downloadedBytes,
-                                progress = progress.coerceIn(0f, 1f),
-                            ) ?: return@execute
-                        )
+                        val progress = if (totalBytes > 0) {
+                            (downloadedBytes.toFloat() / totalBytes).coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        }
+                        val now = System.currentTimeMillis()
+                        if (now - lastEmitTimeMs >= 120L ||
+                            progress - lastEmittedProgress >= 0.01f ||
+                            (totalBytes > 0L && downloadedBytes >= totalBytes)
+                        ) {
+                            lastEmitTimeMs = now
+                            lastEmittedProgress = progress
+                            updateDownloadState(
+                                _downloadStates.value[songId]?.copy(
+                                    downloadedBytes = downloadedBytes,
+                                    progress = progress,
+                                ) ?: return@execute
+                            )
+                        }
                     }
                 } finally {
                     file.close()
@@ -353,13 +372,15 @@ class DesktopDownloadService {
     fun cancelDownload(songId: String) {
         activeJobs[songId]?.cancel()
         activeJobs.remove(songId)
-        
-        // Eliminar archivo parcial
-        _downloadStates.value[songId]?.filePath?.let { path ->
-            File(path).delete()
-        }
-        
+
+        val partialPath = _downloadStates.value[songId]?.filePath
         _downloadStates.update { it - songId }
+
+        if (partialPath != null) {
+            scope.launch {
+                File(partialPath).delete()
+            }
+        }
     }
     
     /**
@@ -409,19 +430,16 @@ class DesktopDownloadService {
      * Elimina una canción descargada.
      */
     fun deleteDownload(songId: String) {
-        // Cancelar si está en progreso
         cancelDownload(songId)
-        
-        // Eliminar archivo
-        val song = _downloadedSongs.value.find { it.songId == songId }
-        song?.filePath?.let { path ->
-            File(path).delete()
-        }
-        
-        // Remover de la lista
+
+        val filePath = _downloadedSongs.value.find { it.songId == songId }?.filePath
         _downloadedSongs.update { list -> list.filter { it.songId != songId } }
-        saveDownloadedSongs()
         _downloadStates.update { it - songId }
+
+        scope.launch {
+            filePath?.let { File(it).delete() }
+            saveDownloadedSongs()
+        }
     }
     
     /**
@@ -618,16 +636,16 @@ class DesktopDownloadService {
      * Elimina todas las descargas.
      */
     fun clearAllDownloads() {
-        // Cancelar todas las descargas activas
         activeJobs.values.forEach { it.cancel() }
         activeJobs.clear()
-        
-        // Eliminar todos los archivos
-        downloadDir.listFiles()?.forEach { it.delete() }
-        
+
         _downloadedSongs.value = emptyList()
         _downloadStates.value = emptyMap()
-        saveDownloadedSongs()
+
+        scope.launch {
+            downloadDir.listFiles()?.forEach { it.delete() }
+            saveDownloadedSongs()
+        }
     }
     
     fun close() {

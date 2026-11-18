@@ -76,16 +76,17 @@ class LibrarySyncService(
                 YouTube.playlistContinuation(continuation).getOrThrow()
             },
         )
-        allSongs.forEach { song ->
+        val now = LocalDateTime.now()
+        val batch = allSongs.map { song ->
             val base = song.toSongEntity()
             val entity = base.copy(
                 liked = true,
-                likedDate = LocalDateTime.now(),
-                inLibrary = base.inLibrary ?: LocalDateTime.now()
+                likedDate = now,
+                inLibrary = base.inLibrary ?: now,
             )
-            database.insertSong(entity)
-            database.insertSongArtistMaps(song.toSongArtistMaps())
+            entity to song.toSongArtistMaps()
         }
+        database.insertSongsBatch(batch)
     }
 
     /**
@@ -93,6 +94,8 @@ class LibrarySyncService(
      */
     suspend fun syncUserPlaylists() {
         println("LibrarySyncService: Sincronizando playlists del usuario...")
+        database.deletePlaylist("LM")
+        database.deletePlaylist("SE")
         // FEmusic_liked_playlists contiene las playlists en la biblioteca del usuario
         val page = runCatching { YouTube.library("FEmusic_liked_playlists").getOrThrow() }
             .getOrElse {
@@ -103,20 +106,67 @@ class LibrarySyncService(
 
         page.items
             .filterIsInstance<PlaylistItem>()
-            .filterNot { it.id == "SE" }
+            .filterNot { it.id == "SE" || it.id == "LM" }
             .forEach { playlist ->
+                val (playlistPage, remoteSongs) = fetchRemotePlaylistWithSongs(playlist)
                 var entity = mapPlaylistForSync(playlist)
-                if (entity.remoteSongCount == null) {
-                    val headerCount = runCatching {
-                        YouTube.playlist(playlist.id).getOrThrow().playlist.songCountText
-                    }.getOrNull()
-                    val parsed = parseSongCountText(headerCount)
-                    if (parsed != null) {
-                        entity = entity.copy(remoteSongCount = parsed)
-                    }
-                }
+                val resolvedCount = entity.remoteSongCount
+                    ?: parseSongCountText(playlistPage?.playlist?.songCountText)
+                    ?: remoteSongs.size.takeIf { it > 0 }
+                val resolvedThumbnail = entity.thumbnailUrl?.takeIf { it.isNotBlank() }
+                    ?: playlistPage?.playlist?.thumbnail?.takeIf { it.isNotBlank() }
+                    ?: remoteSongs.firstOrNull()?.thumbnail?.takeIf { it.isNotBlank() }
+                entity = entity.copy(
+                    remoteSongCount = resolvedCount,
+                    thumbnailUrl = resolvedThumbnail,
+                )
                 database.insertPlaylist(entity)
+
+                if (remoteSongs.isNotEmpty()) {
+                    val storedId = database.playlist(entity.id).first()?.id ?: entity.id
+                    val batch = remoteSongs.map { song ->
+                        song.toSongEntity(inLibrary = false) to song.toSongArtistMaps()
+                    }
+                    database.insertSongsBatch(batch)
+                    database.replacePlaylistSongs(storedId, remoteSongs.map { it.id })
+                }
             }
+    }
+
+    private suspend fun fetchRemotePlaylistWithSongs(
+        playlist: PlaylistItem,
+    ): Pair<PlaylistPage?, List<SongItem>> {
+        val normalizedId = playlist.id.removePrefix("VL")
+        if (normalizedId == "RDPN" || normalizedId == "FEmusic_new_episodes") {
+            val info = runCatching {
+                com.anitail.innertube.YouTube.newEpisodesPlaylistInfo().getOrNull()
+            }.getOrNull()
+            val episodes = runCatching {
+                com.anitail.innertube.YouTube.newEpisodes().getOrThrow()
+            }.getOrNull().orEmpty().distinctBy { it.id }
+            val syntheticPage = PlaylistPage(
+                playlist = info ?: playlist,
+                songs = episodes,
+                songsContinuation = null,
+                continuation = null,
+            )
+            return syntheticPage to episodes
+        }
+
+        val initialPage = runCatching {
+            YouTube.playlist(playlist.id).getOrThrow()
+        }.getOrNull() ?: return null to emptyList()
+
+        val allSongs = runCatching {
+            collectPlaylistSongs(
+                initial = initialPage,
+                fetchContinuation = { continuation ->
+                    com.anitail.innertube.YouTube.playlistContinuation(continuation).getOrThrow()
+                },
+            )
+        }.getOrElse { initialPage.songs }
+
+        return initialPage to allSongs
     }
 }
 
@@ -180,11 +230,13 @@ internal suspend fun syncHistoryPageToDatabase(
     val newEvents = mutableListOf<EventEntity>()
     var addedCount = 0
 
+    val songBatch = mutableListOf<Pair<com.anitail.desktop.db.entities.SongEntity, List<com.anitail.desktop.db.entities.SongArtistMap>>>()
+
     sections.forEach { section ->
         val sectionDate = parseHistorySectionDate(section.title, today)
         section.songs.forEachIndexed { index, song ->
             val entity = song.toSongEntity(inLibrary = false)
-            database.insertSong(entity, song.toSongArtistMaps())
+            songBatch.add(entity to song.toSongArtistMaps())
 
             val key = song.id to sectionDate.toLocalDate()
             if (key !in existingSongDays) {
@@ -199,6 +251,10 @@ internal suspend fun syncHistoryPageToDatabase(
                 addedCount++
             }
         }
+    }
+
+    if (songBatch.isNotEmpty()) {
+        database.insertSongsBatch(songBatch)
     }
 
     if (newEvents.isNotEmpty()) {

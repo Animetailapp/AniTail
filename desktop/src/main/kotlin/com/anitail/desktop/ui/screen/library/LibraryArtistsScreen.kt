@@ -48,8 +48,8 @@ import com.anitail.desktop.db.entities.ArtistEntity
 import com.anitail.desktop.db.entities.SongArtistMap
 import com.anitail.desktop.db.entities.SongEntity
 import com.anitail.desktop.db.mapper.toLibraryItem
-import com.anitail.desktop.db.relations.primaryArtistIdForSong
-import com.anitail.desktop.db.relations.songHasArtist
+import com.anitail.desktop.db.relations.indexArtistIdsBySongId
+import com.anitail.desktop.db.relations.indexPrimaryArtistIdBySongId
 import com.anitail.desktop.i18n.LocalStrings
 import com.anitail.desktop.i18n.StringResolver
 import com.anitail.desktop.i18n.pluralStringResource
@@ -92,8 +92,10 @@ fun LibraryArtistsScreen(
     val gridItemSize by preferences.gridItemSize.collectAsState()
     val strings = LocalStrings.current
     val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
+    val primaryArtistBySongId = remember(songArtistMaps) { indexPrimaryArtistIdBySongId(songArtistMaps) }
+    val artistIdsBySongId = remember(songArtistMaps) { indexArtistIdsBySongId(songArtistMaps) }
 
-    val effectiveArtists = remember(artists, songs, songArtistMaps) {
+    val effectiveArtists = remember(artists, songs, primaryArtistBySongId) {
         val byId = linkedMapOf<String, ArtistEntity>()
         val seenNames = HashSet<String>()
         artists.forEach { artist ->
@@ -102,7 +104,7 @@ fun LibraryArtistsScreen(
         }
         songs.forEach { song ->
             if (song.inLibrary == null && !song.liked) return@forEach
-            val mappedId = primaryArtistIdForSong(song.id, songArtistMaps)
+            val mappedId = primaryArtistBySongId[song.id]
             val rawName = song.artistName
                 ?.split(",", "&", ";")
                 ?.firstOrNull()
@@ -130,7 +132,7 @@ fun LibraryArtistsScreen(
         byId.values.toList()
     }
 
-    val stats = remember(songs, songArtistMaps) { buildArtistSongStats(songs, songArtistMaps) }
+    val stats = remember(songs, primaryArtistBySongId) { buildArtistSongStats(songs, primaryArtistBySongId) }
     val songCountByArtist = remember(effectiveArtists, stats) {
         effectiveArtists.associate { artist -> artist.id to artistSongCount(artist, stats) }
     }
@@ -236,14 +238,14 @@ fun LibraryArtistsScreen(
                                         artist = artist,
                                         songCount = songCount,
                                         onPlay = {
-                                            val queue = buildArtistQueue(artist, songs, songArtistMaps)
+                                            val queue = buildArtistQueue(artist, songs, artistIdsBySongId)
                                             if (queue.isNotEmpty()) {
                                                 playerState.shuffleEnabled = false
                                                 playerState.playQueue(queue, 0)
                                             }
                                         },
                                         onShuffle = {
-                                            val queue = buildArtistQueue(artist, songs, songArtistMaps).shuffled()
+                                            val queue = buildArtistQueue(artist, songs, artistIdsBySongId).shuffled()
                                             if (queue.isNotEmpty()) {
                                                 playerState.shuffleEnabled = true
                                                 playerState.playQueue(queue, 0)
@@ -342,14 +344,14 @@ fun LibraryArtistsScreen(
                                         artist = artist,
                                         songCount = songCount,
                                         onPlay = {
-                                            val queue = buildArtistQueue(artist, songs, songArtistMaps)
+                                            val queue = buildArtistQueue(artist, songs, artistIdsBySongId)
                                             if (queue.isNotEmpty()) {
                                                 playerState.shuffleEnabled = false
                                                 playerState.playQueue(queue, 0)
                                             }
                                         },
                                         onShuffle = {
-                                            val queue = buildArtistQueue(artist, songs, songArtistMaps).shuffled()
+                                            val queue = buildArtistQueue(artist, songs, artistIdsBySongId).shuffled()
                                             if (queue.isNotEmpty()) {
                                                 playerState.shuffleEnabled = true
                                                 playerState.playQueue(queue, 0)
@@ -621,7 +623,7 @@ private data class ArtistSongStats(
 
 private fun buildArtistSongStats(
     songs: List<SongEntity>,
-    songArtistMaps: List<SongArtistMap>,
+    primaryArtistBySongId: Map<String, String>,
 ): ArtistSongStats {
     val countById = mutableMapOf<String, Int>()
     val countByName = mutableMapOf<String, Int>()
@@ -630,7 +632,7 @@ private fun buildArtistSongStats(
 
     songs.forEach { song ->
         val playTime = song.totalPlayTime
-        val artistId = primaryArtistIdForSong(song.id, songArtistMaps)
+        val artistId = primaryArtistBySongId[song.id]
         val artistName = song.artistName
         if (!artistId.isNullOrBlank()) {
             countById[artistId] = (countById[artistId] ?: 0) + 1
@@ -665,11 +667,11 @@ private fun artistPlayTime(artist: ArtistEntity, stats: ArtistSongStats): Long {
 private fun buildArtistQueue(
     artist: ArtistEntity,
     songs: List<SongEntity>,
-    songArtistMaps: List<SongArtistMap>,
+    artistIdsBySongId: Map<String, List<String>>,
 ): List<com.anitail.shared.model.LibraryItem> {
     val artistSongs = songs.filter { song ->
         when {
-            songHasArtist(song.id, artist.id, songArtistMaps) -> true
+            artistIdsBySongId[song.id]?.contains(artist.id) == true -> true
             !song.artistName.isNullOrBlank() -> song.artistName.equals(artist.name, ignoreCase = true)
             else -> false
         }

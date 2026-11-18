@@ -43,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -531,13 +532,18 @@ fun SettingsDialogOverlay(
                                         onBack = {},
                                     )
 
-                                    SettingsDestination.DISCORD -> DiscordSettingsScreen(
-                                        preferences = preferences,
-                                        previewItem = playerState?.currentItem,
-                                        previewPositionMs = playerState?.position ?: 0L,
-                                        isPreviewPlaying = playerState?.isPlaying == true,
-                                        onBack = {},
-                                    )
+                                    SettingsDestination.DISCORD -> {
+                                        val previewPositionMs by remember(playerState) {
+                                            derivedStateOf { ((playerState?.position ?: 0L) / 1000L) * 1000L }
+                                        }
+                                        DiscordSettingsScreen(
+                                            preferences = preferences,
+                                            previewItem = playerState?.currentItem,
+                                            previewPositionMs = previewPositionMs,
+                                            isPreviewPlaying = playerState?.isPlaying == true,
+                                            onBack = {},
+                                        )
+                                    }
 
                                     SettingsDestination.PLAYER -> PlayerSettingsScreen(
                                         preferences = preferences,

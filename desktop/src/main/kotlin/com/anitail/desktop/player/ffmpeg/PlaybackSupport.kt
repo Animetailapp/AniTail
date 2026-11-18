@@ -235,6 +235,11 @@ internal class ParametricEqualizer(
         return profile != null
     }
 
+    fun hasActiveProcessing(outputGainDb: Double = 0.0): Boolean =
+        activeFilters.isNotEmpty() ||
+            preampGain != 1.0 ||
+            outputGainDb.coerceIn(MIN_AUDIO_PREAMP_DB, MAX_AUDIO_BOOST_DB) != 0.0
+
     fun processPcm16(
         samples: ShortArray,
         count: Int = samples.size,

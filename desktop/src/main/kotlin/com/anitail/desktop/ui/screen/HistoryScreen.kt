@@ -14,11 +14,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -33,6 +36,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +45,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -116,15 +121,14 @@ fun HistoryScreen(
     val listState = rememberLazyListState()
     val preferences = remember { DesktopPreferences.getInstance() }
 
-    val songs by database.songs.collectAsState(initial = emptyList())
+    val songsById by database.songsById.collectAsState()
     val events by database.events.collectAsState(initial = emptyList())
     val playlists by database.allPlaylists().collectAsState(initial = emptyList())
     val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
     val downloadStates by downloadService.downloadStates.collectAsState()
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
 
-    val songsById = remember(songs) { songs.associateBy { it.id } }
-    val downloadedIds = remember(downloadedSongs) { downloadedSongs.map { it.songId }.toSet() }
+    val downloadedIds = remember(downloadedSongs) { downloadedSongs.mapTo(HashSet()) { it.songId } }
     val swipeToSong by preferences.swipeToSong.collectAsState()
 
     var historySource by remember { mutableStateOf(HistorySource.LOCAL) }
@@ -203,15 +207,20 @@ fun HistoryScreen(
         wrappedItemsMap.values.flatten()
     }
 
-    val selectedItems = remember(allWrappedItems, selectionMode) {
-        if (!selectionMode) emptyList() else allWrappedItems.filter { it.isSelected }
+    val selectedItems by remember(allWrappedItems, selectionMode) {
+        derivedStateOf {
+            if (!selectionMode) emptyList() else allWrappedItems.filter { it.isSelected }
+        }
     }
 
-    val selectionDownloadState = resolveSelectionDownloadState(
-        songIds = selectedItems.map { it.entry.song.id },
-        downloadStates = downloadStates,
-        downloadedSongs = downloadedSongs,
-    )
+    val selectedSongIds = remember(selectedItems) { selectedItems.map { it.entry.song.id } }
+    val selectionDownloadState = remember(selectedSongIds, downloadStates, downloadedSongs) {
+        resolveSelectionDownloadState(
+            songIds = selectedSongIds,
+            downloadStates = downloadStates,
+            downloadedSongs = downloadedSongs,
+        )
+    }
 
     val allLiked = selectedItems.isNotEmpty() && selectedItems.all { it.entry.song.liked }
 
@@ -394,6 +403,10 @@ fun HistoryScreen(
                     DropdownMenu(
                         expanded = selectionMenuExpanded,
                         onDismissRequest = { selectionMenuExpanded = false },
+                        modifier = Modifier
+                            .widthIn(min = 240.dp, max = 320.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainer),
                     ) {
                         DropdownMenuItem(
                             text = { Text(stringResource("play")) },

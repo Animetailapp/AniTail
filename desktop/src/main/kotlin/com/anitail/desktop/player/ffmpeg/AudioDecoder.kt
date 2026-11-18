@@ -58,6 +58,8 @@ class AudioDecoder private constructor(
             frameGrabber.videoStream = if (wantVideo) -1 else -2
             frameGrabber.sampleFormat = AV_SAMPLE_FMT_S16
             frameGrabber.pixelFormat = AV_PIX_FMT_RGBA
+            frameGrabber.options.putIfAbsent("probesize", (32 * 1024L).toString())
+            frameGrabber.options.putIfAbsent("analyzeduration", 500_000L.toString())
             frameGrabber.start()
         } catch (error: Throwable) {
             runCatching { frameGrabber.stop() }

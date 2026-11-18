@@ -183,14 +183,16 @@ import com.anitail.desktop.ui.screen.home.loadNextHomePage
 import com.anitail.shared.model.LibraryItem
 import java.net.URI
 import java.time.LocalDateTime
+import androidx.compose.ui.unit.IntOffset
+import com.anitail.desktop.ui.component.ImageCache
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import org.jetbrains.skia.Image
 import com.anitail.desktop.sync.LibrarySyncService
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -654,9 +656,13 @@ private fun FrameWindowScope.AniTailDesktopApp(
         }
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(playerState, database, downloadService, preferences) {
         onDispose {
             DesktopAutoBackupService.stop()
+            playerState.release()
+            downloadService.close()
+            database.flush()
+            preferences.flush()
         }
     }
 
@@ -673,7 +679,6 @@ private fun FrameWindowScope.AniTailDesktopApp(
         lastFmSongStartTimeMs = System.currentTimeMillis()
         hasScrobbledCurrentSong = false
         if (currentItem != null) {
-            DesktopLastFmService.updateNowPlaying(currentItem)
             DesktopLastFmService.retryPendingScrobbles()
         }
     }
@@ -724,13 +729,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
     // Library state from Database
     val songs by database.songsInLibrary().collectAsState(initial = emptyList())
-    val allSongs by database.songs.collectAsState(initial = emptyList())
-    var songsById by remember { mutableStateOf<Map<String, SongEntity>>(emptyMap()) }
-    LaunchedEffect(allSongs) {
-        withContext(Dispatchers.Default) {
-            songsById = allSongs.associateBy { it.id }
-        }
-    }
+    val songsById by database.songsById.collectAsState()
+    val allSongs = remember(songsById) { songsById.values.toList() }
     val albums by database.albums.collectAsState(initial = emptyList())
     val artists by database.artists.collectAsState(initial = emptyList())
     val playlists by database.allPlaylists().collectAsState(initial = emptyList())
@@ -1022,9 +1022,9 @@ private fun FrameWindowScope.AniTailDesktopApp(
                 val relatedEndpoint = nextResult?.relatedEndpoint ?: return@withContext
                 val relatedPage = YouTube.related(relatedEndpoint).getOrNull() ?: return@withContext
                 val relatedSongs = relatedPage.songs
-                relatedSongs.forEach { song ->
-                    database.insertSong(song.toSongEntity(), song.toSongArtistMaps())
-                }
+                database.insertSongsBatch(
+                    relatedSongs.map { song -> song.toSongEntity() to song.toSongArtistMaps() },
+                )
                 database.insertRelatedSongs(item.id, relatedSongs.map { it.id })
             }
         }
@@ -1135,11 +1135,6 @@ private fun FrameWindowScope.AniTailDesktopApp(
             onLoading = { isHomeLoading = it },
             onPage = { page -> homePage = page },
         )
-        loadExplorePage(
-            onLoading = { isExploreLoading = it },
-            onExplore = { page -> explorePage = page },
-            onCharts = { page -> chartsPage = page },
-        )
         
     }
 
@@ -1171,6 +1166,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
     }
 
     LaunchedEffect(
+        isSyncing,
         allSongs,
         albums,
         artists,
@@ -1181,6 +1177,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
         quickPicksMode,
         homeShuffleSeed,
     ) {
+        if (isSyncing) return@LaunchedEffect
         delay(500)
         withContext(Dispatchers.Default) {
             val recommendations = buildHomeRecommendations(
@@ -1241,7 +1238,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
     // Recommendation logic remains similar...
     // [Truncated for brevity, keeping recommendation logic same as before but using updated libraryItems]
-    LaunchedEffect(libraryItems.size, homeShuffleSeed) {
+    LaunchedEffect(isSyncing, libraryItems.size, homeShuffleSeed) {
+        if (isSyncing) return@LaunchedEffect
         delay(1000)
         if (libraryItems.size >= 3) {
             withContext(Dispatchers.Default) {
@@ -1316,16 +1314,18 @@ private fun FrameWindowScope.AniTailDesktopApp(
         }
     }
 
-    LaunchedEffect(allSongs.size, hideExplicit, homeShuffleSeed) {
+    LaunchedEffect(isSyncing, allSongs.size, hideExplicit, homeShuffleSeed) {
+        if (isSyncing) return@LaunchedEffect
         delay(1000)
-        scope.launch(Dispatchers.IO) {
-            val discover = HomeDiscoveryService.loadDailyDiscover(database, hideExplicit)
-            val community = HomeDiscoveryService.loadCommunityPlaylists(database)
-            withContext(Dispatchers.Main) {
-                dailyDiscover = discover
-                communityPlaylists = community
+        val (discover, community) = withContext(Dispatchers.IO) {
+            coroutineScope {
+                val discoverDeferred = async { HomeDiscoveryService.loadDailyDiscover(database, hideExplicit) }
+                val communityDeferred = async { HomeDiscoveryService.loadCommunityPlaylists(database) }
+                discoverDeferred.await() to communityDeferred.await()
             }
         }
+        dailyDiscover = discover
+        communityPlaylists = community
     }
 
     val allYtItems = remember(homePage, accountPlaylists, similarRecommendations) {
@@ -2688,6 +2688,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             )
                             currentScreen = DesktopScreen.ArtistDetail
                         },
+                        database = database,
+                        downloadService = downloadService,
                     )
                 }
 
@@ -2707,6 +2709,16 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             )
                             currentScreen = DesktopScreen.ArtistDetail
                         },
+                        onAlbumClick = { albumId, albumName ->
+                            navigationHistory.add(DesktopScreen.PlaylistDetail)
+                            detailNavigation = detailNavigation.copy(
+                                albumId = albumId,
+                                albumName = albumName,
+                            )
+                            currentScreen = DesktopScreen.AlbumDetail
+                        },
+                        database = database,
+                        downloadService = downloadService,
                     )
                 }
 
@@ -2746,6 +2758,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             playerState.play(item)
                             playerBottomSheetState.collapseSoft()
                         },
+                        downloadService = downloadService,
                     )
                 }
                             }
@@ -2805,6 +2818,24 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                         isQueueSideSheetOpen = showQueueSideSheet,
                                         onOpenAudioSettings = { showMiniPlayerAudioSettings = true },
                                         onToggleMiniPlayer = { playerState.toggleMiniPlayer() },
+                                        database = database,
+                                        downloadService = downloadService,
+                                        onOpenArtist = { artistId, artistName ->
+                                            navigationHistory.add(currentScreen)
+                                            detailNavigation = detailNavigation.copy(
+                                                artistId = artistId,
+                                                artistName = artistName,
+                                            )
+                                            currentScreen = DesktopScreen.ArtistDetail
+                                        },
+                                        onOpenAlbum = { albumId, albumName ->
+                                            navigationHistory.add(currentScreen)
+                                            detailNavigation = detailNavigation.copy(
+                                                albumId = albumId,
+                                                albumName = albumName,
+                                            )
+                                            currentScreen = DesktopScreen.AlbumDetail
+                                        },
                                     )
                                 }
                             },
@@ -2841,7 +2872,12 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .height(navigationBarHeight)
-                        .offset(y = navigationBarHeight * playerBottomSheetState.progress.coerceIn(0f, 1f)),
+                        .offset {
+                            IntOffset(
+                                0,
+                                (navigationBarHeight.toPx() * playerBottomSheetState.progress.coerceIn(0f, 1f)).roundToInt(),
+                            )
+                        },
                     containerColor = if (pureBlackEnabled) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
                     contentColor = if (pureBlackEnabled) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                 ) {
@@ -3049,11 +3085,11 @@ private fun FrameWindowScope.AniTailDesktopApp(
     // El reproductor nativo ahora actualiza la posición automáticamente
 }
 
-private suspend fun fetchThemeColorFromUrl(url: String): Color? = withContext(Dispatchers.IO) {
-    val bytes = runCatching { URI(url).toURL().readBytes() }.getOrNull() ?: return@withContext null
-    val bitmap = runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
-        ?: return@withContext null
-    runCatching { bitmap.extractThemeColor() }.getOrNull()
+private suspend fun fetchThemeColorFromUrl(url: String): Color? {
+    val bitmap = ImageCache.loadOrFetch(url, maxDimensionPx = 768) ?: return null
+    return withContext(Dispatchers.Default) {
+        runCatching { bitmap.extractThemeColor() }.getOrNull()
+    }
 }
 
 private data class DesktopProxyConfig(

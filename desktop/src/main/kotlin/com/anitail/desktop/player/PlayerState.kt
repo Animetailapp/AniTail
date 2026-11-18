@@ -793,15 +793,12 @@ class PlayerState {
             while (isActive) {
                 if (isPlaying) {
                     val currentMs = nativePlayer.getCurrentPosition()
-                    if (currentMs >= 0L) {
+                    if (currentMs >= 0L && position != currentMs) {
                         position = currentMs
                     }
                     val totalMs = nativePlayer.getDuration()
-                    if (totalMs > 0L) {
+                    if (totalMs > 0L && duration != totalMs) {
                         duration = totalMs
-                    }
-                    if (isVideoMode) {
-                        videoPlayer.syncPosition(position, true)
                     }
                     if (
                         crossfadeDurationSec > 0 &&
@@ -841,4 +838,4 @@ fun rememberPlayerState(): PlayerState {
     return remember { PlayerState() }
 }
 
-private const val PositionTrackerIntervalMs = 16L
+private const val PositionTrackerIntervalMs = 50L

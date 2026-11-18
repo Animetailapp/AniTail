@@ -8,22 +8,21 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+val appVersion = "1.1.0"
+
 kotlin {
     jvmToolchain(21)
+}
+
+composeCompiler {
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose_stability.conf"))
 }
 
 tasks.named<ProcessResources>("processResources") {
     from("../app/src/main/res") {
         include("values/**", "values-*/**")
     }
-    val packageVersion = run {
-        val text = file("build.gradle.kts").readText()
-        Regex("packageVersion\\s*=\\s*\"([^\"]+)\"")
-            .find(text)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?: "0.0.0"
-    }
+    val packageVersion = appVersion
     val generatedDir = layout.buildDirectory.dir("generated/version").get().asFile
     val versionFile = generatedDir.resolve("version.properties")
     doFirst {
@@ -112,6 +111,15 @@ dependencies {
 compose.desktop {
     application {
         mainClass = "com.anitail.desktop.MainKt"
+        jvmArgs(
+            "-XX:+UseZGC",
+            "-XX:+ZGenerational",
+            "-Xms128m",
+            "-Xmx1024m",
+            "-XX:SoftMaxHeapSize=512m",
+            "-XX:+UseStringDeduplication",
+            "-Dskiko.vsync.enabled=true",
+        )
         val toolchains = project.extensions.getByType<JavaToolchainService>()
         val launcher = toolchains.launcherFor {
             languageVersion.set(JavaLanguageVersion.of(21))
@@ -127,7 +135,7 @@ compose.desktop {
             }
             targetFormats(*formats.toTypedArray())
             packageName = "AniTail"
-            packageVersion = "1.1.0"
+            packageVersion = appVersion
             macOS {
                 iconFile.set(project.file("src/main/resources/drawable/ic_anitail.icns"))
                 bundleID = "com.anitail.desktop"

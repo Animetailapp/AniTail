@@ -529,37 +529,33 @@ fun LyricsPanel(
     var reportedAtFrameNanos by remember { mutableLongStateOf(0L) }
     var romanizedLineByIndex by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
 
-    LaunchedEffect(currentPositionMs) {
+    val shouldExtrapolateFrames = isPlaying &&
+        lyricsResult?.hasSyncedLyrics == true &&
+        lyricsAnimationStyle == LyricsAnimationStylePreference.KARAOKE
+
+    LaunchedEffect(currentPositionMs, shouldExtrapolateFrames) {
         reportedPlaybackPositionMs = (currentPositionMs + KaraokeLeadMs).toFloat()
         reportedAtFrameNanos = 0L
-        if (!isPlaying) {
+        if (!shouldExtrapolateFrames) {
             renderPlaybackPositionMs = reportedPlaybackPositionMs
         }
     }
 
-    LaunchedEffect(isPlaying) {
+    LaunchedEffect(shouldExtrapolateFrames) {
+        if (!shouldExtrapolateFrames) return@LaunchedEffect
         while (true) {
             androidx.compose.runtime.withFrameNanos { now ->
                 if (reportedAtFrameNanos == 0L) {
                     reportedAtFrameNanos = now
                 }
 
-                val extrapolatedPosition = if (isPlaying) {
-                    val elapsedSinceReportMs = ((now - reportedAtFrameNanos) / 1_000_000f).coerceAtLeast(0f)
-                    reportedPlaybackPositionMs + elapsedSinceReportMs
-                } else {
-                    reportedPlaybackPositionMs
-                }
-
-                if (!isPlaying) {
-                    renderPlaybackPositionMs = extrapolatedPosition
-                } else {
-                    val backwardDelta = renderPlaybackPositionMs - extrapolatedPosition
-                    renderPlaybackPositionMs = when {
-                        extrapolatedPosition >= renderPlaybackPositionMs -> extrapolatedPosition
-                        backwardDelta <= PlaybackJitterToleranceMs -> renderPlaybackPositionMs
-                        else -> extrapolatedPosition
-                    }
+                val elapsedSinceReportMs = ((now - reportedAtFrameNanos) / 1_000_000f).coerceAtLeast(0f)
+                val extrapolatedPosition = reportedPlaybackPositionMs + elapsedSinceReportMs
+                val backwardDelta = renderPlaybackPositionMs - extrapolatedPosition
+                renderPlaybackPositionMs = when {
+                    extrapolatedPosition >= renderPlaybackPositionMs -> extrapolatedPosition
+                    backwardDelta <= PlaybackJitterToleranceMs -> renderPlaybackPositionMs
+                    else -> extrapolatedPosition
                 }
             }
         }
@@ -862,13 +858,24 @@ fun LyricsPanel(
                                 modifier = Modifier.fillMaxSize(),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                itemsIndexed(lines) { index, line ->
+                                itemsIndexed(
+                                    items = lines,
+                                    key = { index, _ -> index },
+                                ) { index, line ->
+                                    val isActiveLine = currentLineIndex == index
                                     val nextTimestamp = lines.getOrNull(index + 1)?.timestampMs
                                         ?: (line.timestampMs + 2500L)
                                     val lineDuration = (nextTimestamp - line.timestampMs).coerceAtLeast(1L)
-                                    val karaokeProgress = if (currentLineIndex == index) {
+                                    val karaokeProgress = if (isActiveLine) {
                                         ((renderPlaybackPositionMs - line.timestampMs) / lineDuration.toFloat())
                                             .coerceIn(0f, 1f)
+                                    } else {
+                                        0f
+                                    }
+                                    val activePlaybackPosition = if (
+                                        isActiveLine && lyricsAnimationStyle == LyricsAnimationStylePreference.KARAOKE
+                                    ) {
+                                        renderPlaybackPositionMs
                                     } else {
                                         0f
                                     }
@@ -877,8 +884,8 @@ fun LyricsPanel(
                                         romanizedText = romanizedLineByIndex[index],
                                         lineIndex = index,
                                         currentLineIndex = currentLineIndex,
-                                        isActive = index == currentLineIndex,
-                                        playbackPositionMs = renderPlaybackPositionMs,
+                                        isActive = isActiveLine,
+                                        playbackPositionMs = activePlaybackPosition,
                                         canSeek = lyricsClick && lyricsResult?.hasSyncedLyrics == true,
                                         animationStyle = lyricsAnimationStyle,
                                         useGlowEffect = useGlowEffect,
@@ -1498,11 +1505,7 @@ private fun LyricLineItem(
         animationSpec = tween(durationMillis = 220, easing = LinearEasing),
         label = LyricOffsetLabel,
     )
-    val animatedKaraokeProgress by animateFloatAsState(
-        targetValue = if (isActive) karaokeProgress else 0f,
-        animationSpec = tween(durationMillis = 16, easing = LinearEasing),
-        label = LyricKaraokeProgressLabel,
-    )
+    val animatedKaraokeProgress = if (isActive) karaokeProgress else 0f
 
     val pulseAnim = remember { Animatable(0f) }
     LaunchedEffect(isActive, animationStyle, useGlowEffect) {
@@ -2165,8 +2168,9 @@ private fun loadRemoteImageBuffered(url: String?): BufferedImage? {
         URI(url).toURL().openStream().use { stream -> ImageIO.read(stream) }
     }.getOrNull() ?: runCatching {
         val bytes = URI(url).toURL().readBytes()
-        val skiaImage = SkiaImage.makeFromEncoded(bytes)
-        val pngData = skiaImage.encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG, 100) ?: return@runCatching null
+        val pngData = SkiaImage.makeFromEncoded(bytes).use { skiaImage ->
+            skiaImage.encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG, 100)
+        } ?: return@runCatching null
         ImageIO.read(ByteArrayInputStream(pngData.bytes))
     }.getOrNull()
 }

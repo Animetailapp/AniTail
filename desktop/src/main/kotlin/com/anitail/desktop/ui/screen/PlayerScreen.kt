@@ -37,7 +37,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
@@ -52,6 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -176,10 +176,9 @@ fun PlayerScreen(
 
     val layoutDirection = LocalLayoutDirection.current
     val coroutineScope = rememberCoroutineScope()
-    val songs by database.songs.collectAsState(initial = emptyList())
+    val songsById by database.songsById.collectAsState()
     val playlists by database.allPlaylists().collectAsState(initial = emptyList())
     val editablePlaylists = remember(playlists) { playlists.filter { it.isEditable } }
-    val songsById = remember(songs) { songs.associateBy { it.id } }
     val downloadStates by downloadService.downloadStates.collectAsState()
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
 
@@ -510,6 +509,76 @@ fun PlayerScreen(
                 .fillMaxSize()
                 .padding(bottom = if (isWide) 16.dp else PlayerQueueCollapsedHeight),
         ) {
+            val overflowMenuContent: @Composable () -> Unit = {
+                PlayerOverflowMenuItems(
+                    item = item,
+                    subtitle = formatBulletSubtitle(
+                        item.artist,
+                        item.durationMs?.takeIf { it > 0L }?.let { formatTime(it) },
+                    ).orEmpty(),
+                    isLiked = isLiked,
+                    isDownloaded = downloadState == SelectionDownloadState.COMPLETED,
+                    isDownloading = downloadState == SelectionDownloadState.DOWNLOADING,
+                    hasArtists = artistsWithId.isNotEmpty(),
+                    hasAlbum = albumInfo != null,
+                    onToggleLike = { toggleLike(!isLiked) },
+                    onDismiss = { showMoreMenu = false },
+                    onAddToPlaylist = {
+                        showMoreMenu = false
+                        showPlaylistDialog = true
+                    },
+                    onStartRadio = {
+                        showMoreMenu = false
+                        startRadio()
+                    },
+                    onDownloadToggle = {
+                        showMoreMenu = false
+                        if (downloadState == SelectionDownloadState.COMPLETED) {
+                            removeDownload()
+                        } else {
+                            downloadItem()
+                        }
+                    },
+                    onOpenArtist = {
+                        showMoreMenu = false
+                        if (artistsWithId.size == 1) {
+                            val first = artistsWithId.first()
+                            openArtist(first.id.orEmpty(), first.name)
+                        } else {
+                            showArtistPickerDialog = true
+                        }
+                    },
+                    onOpenAlbum = {
+                        showMoreMenu = false
+                        albumInfo?.let { (id, name) -> openAlbum(id, name) }
+                    },
+                    onOpenSleepTimer = {
+                        showMoreMenu = false
+                        showSleepTimerDialog = true
+                    },
+                    onOpenAudioSettings = {
+                        showMoreMenu = false
+                        showAudioSettingsDialog = true
+                    },
+                    onOpenTempoPitch = {
+                        showMoreMenu = false
+                        showAdvancedDialog = true
+                    },
+                    onCopyLink = {
+                        showMoreMenu = false
+                        copyLink(shareUrl)
+                    },
+                    onOpenInBrowser = {
+                        showMoreMenu = false
+                        openInBrowser(shareUrl)
+                    },
+                    onShowDetails = {
+                        showMoreMenu = false
+                        showDetailsDialog = true
+                    },
+                )
+            }
+
             // Translucent Expressive top bar
             PlayerTopBar(
                 item = item,
@@ -518,70 +587,6 @@ fun PlayerScreen(
                 textColor = textBackgroundColor,
                 mutedTextColor = mutedTextColor,
                 onCollapse = onCollapsePlayer,
-                onShowMore = { showMoreMenu = true },
-                moreMenuExpanded = showMoreMenu,
-                onDismissMoreMenu = { showMoreMenu = false },
-                dropdownContent = {
-                    PlayerOverflowMenuItems(
-                        isDownloaded = downloadState == SelectionDownloadState.COMPLETED,
-                        isDownloading = downloadState == SelectionDownloadState.DOWNLOADING,
-                        hasArtists = artistsWithId.isNotEmpty(),
-                        hasAlbum = albumInfo != null,
-                        onAddToPlaylist = {
-                            showMoreMenu = false
-                            showPlaylistDialog = true
-                        },
-                        onStartRadio = {
-                            showMoreMenu = false
-                            startRadio()
-                        },
-                        onDownloadToggle = {
-                            showMoreMenu = false
-                            if (downloadState == SelectionDownloadState.COMPLETED) {
-                                removeDownload()
-                            } else {
-                                downloadItem()
-                            }
-                        },
-                        onOpenArtist = {
-                            showMoreMenu = false
-                            if (artistsWithId.size == 1) {
-                                val first = artistsWithId.first()
-                                openArtist(first.id.orEmpty(), first.name)
-                            } else {
-                                showArtistPickerDialog = true
-                            }
-                        },
-                        onOpenAlbum = {
-                            showMoreMenu = false
-                            albumInfo?.let { (id, name) -> openAlbum(id, name) }
-                        },
-                        onOpenSleepTimer = {
-                            showMoreMenu = false
-                            showSleepTimerDialog = true
-                        },
-                        onOpenAudioSettings = {
-                            showMoreMenu = false
-                            showAudioSettingsDialog = true
-                        },
-                        onOpenTempoPitch = {
-                            showMoreMenu = false
-                            showAdvancedDialog = true
-                        },
-                        onCopyLink = {
-                            showMoreMenu = false
-                            copyLink(shareUrl)
-                        },
-                        onOpenInBrowser = {
-                            showMoreMenu = false
-                            openInBrowser(shareUrl)
-                        },
-                        onShowDetails = {
-                            showMoreMenu = false
-                            showDetailsDialog = true
-                        },
-                    )
-                },
             )
 
             if (isWide) {
@@ -653,6 +658,9 @@ fun PlayerScreen(
                                         onOpenArtist = { id, name -> openArtist(id, name) },
                                         onOpenAlbum = { id, name -> openAlbum(id, name) },
                                         onShowMore = { showMoreMenu = true },
+                                        moreMenuExpanded = showMoreMenu,
+                                        onDismissMoreMenu = { showMoreMenu = false },
+                                        moreMenuContent = overflowMenuContent,
                                         modifier = Modifier.fillMaxWidth(),
                                     )
 
@@ -938,6 +946,9 @@ fun PlayerScreen(
                         onOpenArtist = { id, name -> openArtist(id, name) },
                         onOpenAlbum = { id, name -> openAlbum(id, name) },
                         onShowMore = { showMoreMenu = true },
+                        moreMenuExpanded = showMoreMenu,
+                        onDismissMoreMenu = { showMoreMenu = false },
+                        moreMenuContent = overflowMenuContent,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = PlayerHorizontalPadding),
@@ -1020,20 +1031,22 @@ fun PlayerScreen(
         )
     }
 
-    SleepTimerDialog(
-        visible = showSleepTimerDialog,
-        isActive = playerState.isSleepTimerActive,
-        timeLeftMs = playerState.sleepTimerTimeLeftMs,
-        onStartTimer = { durationMs ->
-            playerState.startSleepTimer(durationMs)
-        },
-        onStartEndOfSong = {
-            val remaining = (playerState.duration - playerState.position).coerceAtLeast(0L)
-            playerState.startSleepTimer(remaining)
-        },
-        onCancelTimer = { playerState.cancelSleepTimer() },
-        onDismiss = { showSleepTimerDialog = false },
-    )
+    if (showSleepTimerDialog) {
+        SleepTimerDialog(
+            visible = true,
+            isActive = playerState.isSleepTimerActive,
+            timeLeftMs = playerState.sleepTimerTimeLeftMs,
+            onStartTimer = { durationMs ->
+                playerState.startSleepTimer(durationMs)
+            },
+            onStartEndOfSong = {
+                val remaining = (playerState.duration - playerState.position).coerceAtLeast(0L)
+                playerState.startSleepTimer(remaining)
+            },
+            onCancelTimer = { playerState.cancelSleepTimer() },
+            onDismiss = { showSleepTimerDialog = false },
+        )
+    }
 
     AudioSettingsDialog(
         visible = showAudioSettingsDialog,
@@ -1080,10 +1093,6 @@ private fun PlayerTopBar(
     textColor: Color,
     mutedTextColor: Color,
     onCollapse: () -> Unit,
-    onShowMore: () -> Unit,
-    moreMenuExpanded: Boolean,
-    onDismissMoreMenu: () -> Unit,
-    dropdownContent: @Composable () -> Unit,
 ) {
     val gapPx = with(LocalDensity.current) { 12.dp.roundToPx() }
     Layout(
@@ -1190,34 +1199,6 @@ private fun PlayerTopBar(
                             color = textColor,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         )
-                    }
-                }
-
-                Box {
-                    FilledTonalIconButton(
-                        onClick = onShowMore,
-                        shapes = IconButtonShapes(
-                            shape = CircleShape,
-                            pressedShape = RoundedCornerShape(12.dp),
-                        ),
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = textColor.copy(alpha = 0.12f),
-                            contentColor = textColor,
-                        ),
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            imageVector = IconAssets.moreVert(),
-                            contentDescription = stringResource("more_options"),
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = moreMenuExpanded,
-                        onDismissRequest = onDismissMoreMenu,
-                    ) {
-                        dropdownContent()
                     }
                 }
             }
@@ -1375,7 +1356,7 @@ private fun DockedQueuePanel(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         ) {
-            val totalDurationMs = queue.sumOf { it.durationMs ?: 0L }
+            val totalDurationMs by remember(queue) { derivedStateOf { queue.sumOf { it.durationMs ?: 0L } } }
             val metaText = if (totalDurationMs > 0L) {
                 "${queue.size} • ${formatTime(totalDurationMs)}"
             } else {
@@ -1549,10 +1530,15 @@ private fun DockedQueuePanel(
 
 @Composable
 private fun PlayerOverflowMenuItems(
+    item: LibraryItem,
+    subtitle: String,
+    isLiked: Boolean,
     isDownloaded: Boolean,
     isDownloading: Boolean,
     hasArtists: Boolean,
     hasAlbum: Boolean,
+    onToggleLike: () -> Unit,
+    onDismiss: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onStartRadio: () -> Unit,
     onDownloadToggle: () -> Unit,
@@ -1565,35 +1551,18 @@ private fun PlayerOverflowMenuItems(
     onOpenInBrowser: () -> Unit,
     onShowDetails: () -> Unit,
 ) {
-    DropdownMenuItem(
-        text = { Text(stringResource("add_to_playlist")) },
-        leadingIcon = { Icon(IconAssets.playlistAdd(), contentDescription = null, modifier = Modifier.size(18.dp)) },
-        onClick = onAddToPlaylist,
+    PlayerMenuHeader(
+        title = item.title,
+        subtitle = subtitle,
+        thumbnailUrl = item.artworkUrl,
+        isLiked = isLiked,
+        onToggleLike = onToggleLike,
+        onStartRadio = onStartRadio,
+        onAddToPlaylist = onAddToPlaylist,
+        onCopyLink = onCopyLink,
+        onDismiss = onDismiss,
     )
-    DropdownMenuItem(
-        text = { Text(stringResource("start_radio")) },
-        leadingIcon = { Icon(IconAssets.radio(), contentDescription = null, modifier = Modifier.size(18.dp)) },
-        onClick = onStartRadio,
-    )
-    DropdownMenuItem(
-        text = {
-            Text(
-                when {
-                    isDownloaded -> stringResource("remove_download")
-                    isDownloading -> stringResource("downloading")
-                    else -> stringResource("download")
-                },
-            )
-        },
-        leadingIcon = {
-            Icon(
-                imageVector = if (isDownloaded) IconAssets.delete() else IconAssets.download(),
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-            )
-        },
-        onClick = onDownloadToggle,
-    )
+    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
     if (hasArtists) {
         DropdownMenuItem(
             text = { Text(stringResource("view_artist")) },
@@ -1608,6 +1577,25 @@ private fun PlayerOverflowMenuItems(
             onClick = onOpenAlbum,
         )
     }
+    DropdownMenuItem(
+        text = {
+            Text(
+                when {
+                    isDownloaded -> stringResource("remove_download")
+                    isDownloading -> stringResource("downloading")
+                    else -> stringResource("download")
+                },
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = if (isDownloaded) IconAssets.offline() else IconAssets.download(),
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+        },
+        onClick = onDownloadToggle,
+    )
     HorizontalDivider()
     DropdownMenuItem(
         text = { Text(stringResource("sleep_timer")) },
@@ -1625,11 +1613,6 @@ private fun PlayerOverflowMenuItems(
         onClick = onOpenTempoPitch,
     )
     HorizontalDivider()
-    DropdownMenuItem(
-        text = { Text(stringResource("copy_link")) },
-        leadingIcon = { Icon(IconAssets.link(), contentDescription = null, modifier = Modifier.size(18.dp)) },
-        onClick = onCopyLink,
-    )
     DropdownMenuItem(
         text = { Text(stringResource("share")) },
         leadingIcon = { Icon(IconAssets.openInNew(), contentDescription = null, modifier = Modifier.size(18.dp)) },

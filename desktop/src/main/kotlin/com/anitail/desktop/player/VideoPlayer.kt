@@ -886,13 +886,19 @@ class VideoPlayer(
         val g = grabber ?: return false
         val (currentTargetW, currentTargetH) =
             synchronized(lifecycleLock) {
-                videoOutputSize(
-                    nativeVideoWidth.takeIf { it > 0 } ?: frame.imageWidth.takeIf { it > 0 } ?: g.imageWidth,
-                    nativeVideoHeight.takeIf { it > 0 } ?: frame.imageHeight.takeIf { it > 0 } ?: g.imageHeight,
-                    requestedTargetWidth,
-                    requestedTargetHeight,
-                    requestedFillViewport,
-                )
+                val srcW = nativeVideoWidth.takeIf { it > 0 } ?: frame.imageWidth.takeIf { it > 0 } ?: g.imageWidth
+                val srcH = nativeVideoHeight.takeIf { it > 0 } ?: frame.imageHeight.takeIf { it > 0 } ?: g.imageHeight
+                if (VideoShaderEffects.isYuvShaderAvailable && srcW > 0 && srcH > 0) {
+                    srcW to srcH
+                } else {
+                    videoOutputSize(
+                        srcW,
+                        srcH,
+                        requestedTargetWidth,
+                        requestedTargetHeight,
+                        requestedFillViewport,
+                    )
+                }
             }
         if (currentTargetW <= 0 || currentTargetH <= 0) return false
         cachedW = currentTargetW

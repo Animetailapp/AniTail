@@ -156,8 +156,12 @@ fun LibraryScreenEnhanced(
     val libraryArtists = remember(filteredItems) {
         filteredItems.filter { it.playbackUrl.contains("/channel/") || it.playbackUrl.contains("/artist/") }
     }
-    val librarySongs = remember(filteredItems) {
-        filteredItems.filterNot { it in libraryPlaylists || it in libraryArtists }
+    val librarySongs = remember(filteredItems, libraryPlaylists, libraryArtists) {
+        val excludedIds = HashSet<String>(libraryPlaylists.size + libraryArtists.size).apply {
+            libraryPlaylists.forEach { add(it.id) }
+            libraryArtists.forEach { add(it.id) }
+        }
+        filteredItems.filterNot { it.id in excludedIds }
     }
     val libraryAlbums = remember(filteredItems) {
         filteredItems.filter { it.playbackUrl.contains("/album/") }
@@ -284,6 +288,11 @@ private fun LibraryMixContent(
     onSpecialPlaylistClick: (SpecialPlaylist) -> Unit,
     onCreatePlaylist: () -> Unit,
 ) {
+    val playlistRows = remember(playlists) { playlists.chunked(3) }
+    val artistRows = remember(artists) { artists.chunked(4) }
+    val albumRows = remember(albums) { albums.chunked(4) }
+    val recentSongs = remember(songs) { songs.take(10) }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -324,8 +333,12 @@ private fun LibraryMixContent(
         }
 
         // Playlists del usuario
-        if (playlists.isNotEmpty()) {
-            items(playlists.chunked(3)) { row ->
+        if (playlistRows.isNotEmpty()) {
+            items(
+                items = playlistRows,
+                key = { row -> "pl_row_${row.first().id}" },
+                contentType = { "playlist_row" },
+            ) { row ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -349,15 +362,19 @@ private fun LibraryMixContent(
         }
 
         // Artistas
-        if (artists.isNotEmpty()) {
-            item {
+        if (artistRows.isNotEmpty()) {
+            item(key = "artists_header", contentType = "header") {
                 Text(
                     text = stringResource("artists"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
             }
-            items(artists.chunked(4)) { row ->
+            items(
+                items = artistRows,
+                key = { row -> "ar_row_${row.first().id}" },
+                contentType = { "artist_row" },
+            ) { row ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -380,15 +397,19 @@ private fun LibraryMixContent(
         }
 
         // Álbumes
-        if (albums.isNotEmpty()) {
-            item {
+        if (albumRows.isNotEmpty()) {
+            item(key = "albums_header", contentType = "header") {
                 Text(
                     text = stringResource("albums"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
             }
-            items(albums.chunked(4)) { row ->
+            items(
+                items = albumRows,
+                key = { row -> "al_row_${row.first().id}" },
+                contentType = { "album_row" },
+            ) { row ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -411,15 +432,19 @@ private fun LibraryMixContent(
         }
 
         // Canciones recientes
-        if (songs.isNotEmpty()) {
-            item {
+        if (recentSongs.isNotEmpty()) {
+            item(key = "songs_header", contentType = "header") {
                 Text(
                     text = stringResource("songs"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                 )
             }
-            items(songs.take(10)) { song ->
+            items(
+                items = recentSongs,
+                key = { "song_${it.id}" },
+                contentType = { "song_item" },
+            ) { song ->
                 SongListItem(
                     item = song,
                     onPlay = onPlayItem,
@@ -429,7 +454,7 @@ private fun LibraryMixContent(
 
         // Estado vacío
         if (playlists.isEmpty() && artists.isEmpty() && songs.isEmpty() && albums.isEmpty()) {
-            item {
+            item(key = "empty_library", contentType = "empty") {
                 EmptyLibraryState()
             }
         }
@@ -454,12 +479,15 @@ private fun LibraryPlaylistsContent(
         modifier = Modifier.fillMaxSize(),
     ) {
         // Botón crear
-        item {
+        item(key = "create_playlist") {
             CreatePlaylistCard(onClick = onCreatePlaylist)
         }
         
         // Playlists especiales
-        items(specialPlaylists) { special ->
+        items(
+            items = specialPlaylists,
+            key = { "special_${it.id}" },
+        ) { special ->
             SpecialPlaylistCard(
                 playlist = special,
                 onClick = { onSpecialPlaylistClick(special) },
@@ -467,7 +495,10 @@ private fun LibraryPlaylistsContent(
         }
         
         // Playlists del usuario
-        items(playlists) { item ->
+        items(
+            items = playlists,
+            key = { it.id },
+        ) { item ->
             LibraryGridItem(
                 item = item,
                 onClick = {
@@ -498,7 +529,10 @@ private fun LibrarySongsContent(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            items(songs) { song ->
+            items(
+                items = songs,
+                key = { it.id },
+            ) { song ->
                 SongListItem(item = song, onPlay = onPlayItem)
             }
         }
@@ -526,7 +560,10 @@ private fun LibraryAlbumsContent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
-            items(albums) { album ->
+            items(
+                items = albums,
+                key = { it.id },
+            ) { album ->
                 LibraryGridItem(
                     item = album,
                     onClick = {

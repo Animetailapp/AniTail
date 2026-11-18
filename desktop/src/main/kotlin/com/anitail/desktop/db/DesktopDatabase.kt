@@ -9,10 +9,21 @@ import com.anitail.desktop.db.entities.PlaylistSongMap
 import com.anitail.desktop.db.entities.SearchHistory
 import com.anitail.desktop.db.entities.SongArtistMap
 import com.anitail.desktop.db.entities.SongEntity
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -20,8 +31,10 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.EnumSet
 
 /**
  * Desktop database implementation using JSON file storage.
@@ -30,10 +43,29 @@ import java.time.format.DateTimeFormatter
  *
  * Data is stored in ~/.anitail/database/ directory.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class DesktopDatabase private constructor(
     private val basePath: Path = defaultDatabasePath(),
 ) {
+    private enum class Table {
+        SONGS,
+        ARTISTS,
+        ALBUMS,
+        PLAYLISTS,
+        PLAYLIST_SONG_MAPS,
+        SONG_ARTIST_MAPS,
+        RELATED_SONG_MAPS,
+        EVENTS,
+        SEARCH_HISTORY,
+    }
+
     private val formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
+    private val mutationLock = Any()
+    private val dirtyLock = Any()
+    private val writeLock = Any()
+    private val dirtyTables = EnumSet.noneOf(Table::class.java)
+    private var flushJob: Job? = null
 
     // In-memory caches with StateFlow for reactivity
     private val _songs = MutableStateFlow<Map<String, SongEntity>>(emptyMap())
@@ -46,6 +78,11 @@ class DesktopDatabase private constructor(
     private val _events = MutableStateFlow<List<EventEntity>>(emptyList())
     private val _searchHistory = MutableStateFlow<List<SearchHistory>>(emptyList())
 
+    val songsById: StateFlow<Map<String, SongEntity>> = _songs.asStateFlow()
+    val artistsById: StateFlow<Map<String, ArtistEntity>> = _artists.asStateFlow()
+    val albumsById: StateFlow<Map<String, AlbumEntity>> = _albums.asStateFlow()
+    val playlistsById: StateFlow<Map<String, PlaylistEntity>> = _playlists.asStateFlow()
+
     val songs: Flow<List<SongEntity>> = _songs.map { it.values.toList() }
     val artists: Flow<List<ArtistEntity>> = _artists.map { it.values.toList() }
     val albums: Flow<List<AlbumEntity>> = _albums.map { it.values.toList() }
@@ -56,54 +93,166 @@ class DesktopDatabase private constructor(
     val events: Flow<List<EventEntity>> = _events
     val searchHistory: Flow<List<SearchHistory>> = _searchHistory
 
+    private fun scheduleSave(vararg tables: Table) {
+        synchronized(dirtyLock) {
+            tables.forEach { dirtyTables.add(it) }
+            flushJob?.cancel()
+            flushJob = ioScope.launch {
+                delay(300L)
+                flushDirtyTables()
+            }
+        }
+    }
+
+    fun flush() {
+        synchronized(dirtyLock) {
+            flushJob?.cancel()
+            flushJob = null
+        }
+        flushDirtyTables()
+    }
+
+    private fun flushDirtyTables() {
+        val toWrite = synchronized(dirtyLock) {
+            if (dirtyTables.isEmpty()) return
+            EnumSet.copyOf(dirtyTables).also { dirtyTables.clear() }
+        }
+        synchronized(writeLock) {
+            ensureDirectoryExists()
+            toWrite.forEach { table ->
+                when (table) {
+                    Table.SONGS -> saveSongs()
+                    Table.ARTISTS -> saveArtists()
+                    Table.ALBUMS -> saveAlbums()
+                    Table.PLAYLISTS -> savePlaylists()
+                    Table.PLAYLIST_SONG_MAPS -> savePlaylistSongMaps()
+                    Table.SONG_ARTIST_MAPS -> saveSongArtistMaps()
+                    Table.RELATED_SONG_MAPS -> saveRelatedSongMaps()
+                    Table.EVENTS -> saveEvents()
+                    Table.SEARCH_HISTORY -> saveSearchHistory()
+                }
+            }
+        }
+    }
+
+    private fun writeTableFile(file: Path, content: String) {
+        ensureDirectoryExists()
+        val tempFile = file.resolveSibling("${file.fileName}.tmp")
+        Files.writeString(tempFile, content, StandardCharsets.UTF_8)
+        runCatching {
+            Files.move(tempFile, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        }.getOrElse {
+            Files.move(tempFile, file, StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+
     // === Song Operations ===
 
-    fun song(songId: String): Flow<SongEntity?> = _songs.map { it[songId] }
+    fun song(songId: String): Flow<SongEntity?> = _songs.map { it[songId] }.distinctUntilChanged()
 
     fun songsInLibrary(): Flow<List<SongEntity>> = _songs.map { songs ->
         songs.values.filter { it.inLibrary != null }.sortedByDescending { it.inLibrary }
-    }
+    }.distinctUntilChanged()
 
     fun likedSongs(): Flow<List<SongEntity>> = _songs.map { songs ->
         songs.values.filter { it.liked }.sortedByDescending { it.likedDate }
-    }
+    }.distinctUntilChanged()
 
     suspend fun insertSong(song: SongEntity) = withContext(Dispatchers.IO) {
-        val existing = _songs.value[song.id]
-        val merged = if (existing != null) mergeSong(existing, song) else song
-        _songs.value = _songs.value + (song.id to merged)
-        saveSongs()
+        synchronized(mutationLock) {
+            val existing = _songs.value[song.id]
+            val merged = if (existing != null) mergeSong(existing, song) else song
+            _songs.value = _songs.value + (song.id to merged)
+        }
+        scheduleSave(Table.SONGS)
     }
 
     suspend fun insertSong(song: SongEntity, artistMaps: List<SongArtistMap>) {
-        insertSong(song)
-        insertSongArtistMaps(artistMaps)
+        insertSongsBatch(listOf(song to artistMaps))
+    }
+
+    suspend fun insertSongsBatch(items: List<Pair<SongEntity, List<SongArtistMap>>>) = withContext(Dispatchers.IO) {
+        if (items.isEmpty()) return@withContext
+        var songsChanged = false
+        var artistMapsChanged = false
+        synchronized(mutationLock) {
+            val updatedSongs = _songs.value.toMutableMap()
+            items.forEach { (song, _) ->
+                val existing = updatedSongs[song.id]
+                val merged = if (existing != null) mergeSong(existing, song) else song
+                if (existing != merged) {
+                    updatedSongs[song.id] = merged
+                    songsChanged = true
+                }
+            }
+            if (songsChanged) {
+                _songs.value = updatedSongs
+            }
+
+            val allIncomingMaps = items.flatMap { it.second }
+            if (allIncomingMaps.isNotEmpty()) {
+                val existingMaps = _songArtistMaps.value
+                val existingPairs = existingMaps.mapTo(HashSet(existingMaps.size)) { it.songId to it.artistId }
+                val uniqueMaps = mutableListOf<SongArtistMap>()
+                allIncomingMaps.forEach { map ->
+                    if (existingPairs.add(map.songId to map.artistId)) {
+                        uniqueMaps.add(map)
+                    }
+                }
+                if (uniqueMaps.isNotEmpty()) {
+                    _songArtistMaps.value = existingMaps + uniqueMaps
+                    artistMapsChanged = true
+                }
+            }
+        }
+        if (songsChanged && artistMapsChanged) {
+            scheduleSave(Table.SONGS, Table.SONG_ARTIST_MAPS)
+        } else if (songsChanged) {
+            scheduleSave(Table.SONGS)
+        } else if (artistMapsChanged) {
+            scheduleSave(Table.SONG_ARTIST_MAPS)
+        }
     }
 
     suspend fun updateSong(song: SongEntity) = withContext(Dispatchers.IO) {
-        _songs.value = _songs.value + (song.id to song)
-        saveSongs()
+        synchronized(mutationLock) {
+            _songs.value = _songs.value + (song.id to song)
+        }
+        scheduleSave(Table.SONGS)
     }
 
     suspend fun deleteSong(songId: String) = withContext(Dispatchers.IO) {
-        _songs.value = _songs.value - songId
-        _songArtistMaps.value = _songArtistMaps.value.filterNot { it.songId == songId }
-        saveSongs()
-        saveSongArtistMaps()
+        synchronized(mutationLock) {
+            _songs.value = _songs.value - songId
+            _songArtistMaps.value = _songArtistMaps.value.filterNot { it.songId == songId }
+        }
+        scheduleSave(Table.SONGS, Table.SONG_ARTIST_MAPS)
     }
 
     suspend fun toggleSongLike(songId: String) = withContext(Dispatchers.IO) {
-        val song = _songs.value[songId] ?: return@withContext
-        val updated = song.toggleLike()
-        _songs.value = _songs.value + (songId to updated)
-        saveSongs()
+        var changed = false
+        synchronized(mutationLock) {
+            val song = _songs.value[songId] ?: return@synchronized
+            val updated = song.toggleLike()
+            _songs.value = _songs.value + (songId to updated)
+            changed = true
+        }
+        if (changed) {
+            scheduleSave(Table.SONGS)
+        }
     }
 
     suspend fun toggleSongInLibrary(songId: String) = withContext(Dispatchers.IO) {
-        val song = _songs.value[songId] ?: return@withContext
-        val updated = song.toggleLibrary()
-        _songs.value = _songs.value + (songId to updated)
-        saveSongs()
+        var changed = false
+        synchronized(mutationLock) {
+            val song = _songs.value[songId] ?: return@synchronized
+            val updated = song.toggleLibrary()
+            _songs.value = _songs.value + (songId to updated)
+            changed = true
+        }
+        if (changed) {
+            scheduleSave(Table.SONGS)
+        }
     }
 
     internal fun mergeSong(existing: SongEntity, incoming: SongEntity): SongEntity {
@@ -124,116 +273,157 @@ class DesktopDatabase private constructor(
 
     suspend fun insertSongArtistMaps(maps: List<SongArtistMap>) = withContext(Dispatchers.IO) {
         if (maps.isEmpty()) return@withContext
-        val existing = _songArtistMaps.value
-        val existingPairs = existing.map { it.songId to it.artistId }.toSet()
-        val uniqueMaps = maps.filterNot { (it.songId to it.artistId) in existingPairs }
-        if (uniqueMaps.isEmpty()) return@withContext
-        _songArtistMaps.value = existing + uniqueMaps
-        saveSongArtistMaps()
+        var changed = false
+        synchronized(mutationLock) {
+            val existing = _songArtistMaps.value
+            val existingPairs = existing.mapTo(HashSet(existing.size)) { it.songId to it.artistId }
+            val uniqueMaps = maps.filter { existingPairs.add(it.songId to it.artistId) }
+            if (uniqueMaps.isNotEmpty()) {
+                _songArtistMaps.value = existing + uniqueMaps
+                changed = true
+            }
+        }
+        if (changed) {
+            scheduleSave(Table.SONG_ARTIST_MAPS)
+        }
     }
 
     // === Artist Operations ===
 
-    fun artist(artistId: String): Flow<ArtistEntity?> = _artists.map { it[artistId] }
+    fun artist(artistId: String): Flow<ArtistEntity?> = _artists.map { it[artistId] }.distinctUntilChanged()
 
     fun bookmarkedArtists(): Flow<List<ArtistEntity>> = _artists.map { artists ->
         artists.values.filter { it.bookmarkedAt != null }.sortedByDescending { it.bookmarkedAt }
-    }
+    }.distinctUntilChanged()
 
     suspend fun insertArtist(artist: ArtistEntity) = withContext(Dispatchers.IO) {
-        _artists.value = _artists.value + (artist.id to artist)
-        saveArtists()
+        synchronized(mutationLock) {
+            _artists.value = _artists.value + (artist.id to artist)
+        }
+        scheduleSave(Table.ARTISTS)
     }
 
     suspend fun updateArtist(artist: ArtistEntity) = withContext(Dispatchers.IO) {
-        _artists.value = _artists.value + (artist.id to artist)
-        saveArtists()
+        synchronized(mutationLock) {
+            _artists.value = _artists.value + (artist.id to artist)
+        }
+        scheduleSave(Table.ARTISTS)
     }
 
     suspend fun deleteArtist(artistId: String) = withContext(Dispatchers.IO) {
-        _artists.value = _artists.value - artistId
-        _songArtistMaps.value = _songArtistMaps.value.filterNot { it.artistId == artistId }
-        saveArtists()
-        saveSongArtistMaps()
+        synchronized(mutationLock) {
+            _artists.value = _artists.value - artistId
+            _songArtistMaps.value = _songArtistMaps.value.filterNot { it.artistId == artistId }
+        }
+        scheduleSave(Table.ARTISTS, Table.SONG_ARTIST_MAPS)
     }
 
     suspend fun toggleArtistBookmark(artistId: String) = withContext(Dispatchers.IO) {
-        val artist = _artists.value[artistId] ?: return@withContext
-        val updated = artist.toggleLike()
-        _artists.value = _artists.value + (artistId to updated)
-        saveArtists()
+        var changed = false
+        synchronized(mutationLock) {
+            val artist = _artists.value[artistId] ?: return@synchronized
+            val updated = artist.toggleLike()
+            _artists.value = _artists.value + (artistId to updated)
+            changed = true
+        }
+        if (changed) {
+            scheduleSave(Table.ARTISTS)
+        }
     }
 
     // === Album Operations ===
 
-    fun album(albumId: String): Flow<AlbumEntity?> = _albums.map { it[albumId] }
+    fun album(albumId: String): Flow<AlbumEntity?> = _albums.map { it[albumId] }.distinctUntilChanged()
 
     fun bookmarkedAlbums(): Flow<List<AlbumEntity>> = _albums.map { albums ->
         albums.values.filter { it.bookmarkedAt != null }.sortedByDescending { it.bookmarkedAt }
-    }
+    }.distinctUntilChanged()
 
     fun albumsInLibrary(): Flow<List<AlbumEntity>> = _albums.map { albums ->
         albums.values.filter { it.inLibrary != null }.sortedByDescending { it.inLibrary }
-    }
+    }.distinctUntilChanged()
 
     suspend fun insertAlbum(album: AlbumEntity) = withContext(Dispatchers.IO) {
-        _albums.value = _albums.value + (album.id to album)
-        saveAlbums()
+        synchronized(mutationLock) {
+            _albums.value = _albums.value + (album.id to album)
+        }
+        scheduleSave(Table.ALBUMS)
     }
 
     suspend fun updateAlbum(album: AlbumEntity) = withContext(Dispatchers.IO) {
-        _albums.value = _albums.value + (album.id to album)
-        saveAlbums()
+        synchronized(mutationLock) {
+            _albums.value = _albums.value + (album.id to album)
+        }
+        scheduleSave(Table.ALBUMS)
     }
 
     suspend fun deleteAlbum(albumId: String) = withContext(Dispatchers.IO) {
-        _albums.value = _albums.value - albumId
-        saveAlbums()
+        synchronized(mutationLock) {
+            _albums.value = _albums.value - albumId
+        }
+        scheduleSave(Table.ALBUMS)
     }
 
     suspend fun toggleAlbumBookmark(albumId: String) = withContext(Dispatchers.IO) {
-        val album = _albums.value[albumId] ?: return@withContext
-        val updated = album.toggleLike()
-        _albums.value = _albums.value + (albumId to updated)
-        saveAlbums()
+        var changed = false
+        synchronized(mutationLock) {
+            val album = _albums.value[albumId] ?: return@synchronized
+            val updated = album.toggleLike()
+            _albums.value = _albums.value + (albumId to updated)
+            changed = true
+        }
+        if (changed) {
+            scheduleSave(Table.ALBUMS)
+        }
     }
 
     // === Playlist Operations ===
 
-    fun playlist(playlistId: String): Flow<PlaylistEntity?> = _playlists.map { it[playlistId] }
+    fun playlist(playlistId: String): Flow<PlaylistEntity?> = _playlists.map { playlists ->
+        playlists[playlistId] ?: playlists.values.firstOrNull { it.browseId == playlistId }
+    }.distinctUntilChanged()
 
     fun allPlaylists(): Flow<List<PlaylistEntity>> = _playlists.map { playlists ->
         playlists.values.sortedByDescending { it.createdAt }
-    }
+    }.distinctUntilChanged()
 
     fun bookmarkedPlaylists(): Flow<List<PlaylistEntity>> = _playlists.map { playlists ->
         playlists.values.filter { it.bookmarkedAt != null }.sortedByDescending { it.bookmarkedAt }
-    }
+    }.distinctUntilChanged()
 
     suspend fun insertPlaylist(playlist: PlaylistEntity) = withContext(Dispatchers.IO) {
-        upsertPlaylistResolvingDuplicates(playlist)
-        savePlaylists()
-        savePlaylistSongMaps()
+        synchronized(mutationLock) {
+            upsertPlaylistResolvingDuplicates(playlist)
+        }
+        scheduleSave(Table.PLAYLISTS, Table.PLAYLIST_SONG_MAPS)
     }
 
     suspend fun updatePlaylist(playlist: PlaylistEntity) = withContext(Dispatchers.IO) {
-        upsertPlaylistResolvingDuplicates(playlist)
-        savePlaylists()
-        savePlaylistSongMaps()
+        synchronized(mutationLock) {
+            upsertPlaylistResolvingDuplicates(playlist)
+        }
+        scheduleSave(Table.PLAYLISTS, Table.PLAYLIST_SONG_MAPS)
     }
 
     suspend fun deletePlaylist(playlistId: String) = withContext(Dispatchers.IO) {
-        _playlists.value = _playlists.value - playlistId
-        _playlistSongMaps.value = _playlistSongMaps.value.filter { it.playlistId != playlistId }
-        savePlaylists()
-        savePlaylistSongMaps()
+        synchronized(mutationLock) {
+            _playlists.value = _playlists.value - playlistId
+            _playlistSongMaps.value = _playlistSongMaps.value.filter { it.playlistId != playlistId }
+        }
+        scheduleSave(Table.PLAYLISTS, Table.PLAYLIST_SONG_MAPS)
     }
 
     suspend fun togglePlaylistBookmark(playlistId: String) = withContext(Dispatchers.IO) {
-        val playlist = _playlists.value[playlistId] ?: return@withContext
-        val updated = playlist.toggleLike()
-        _playlists.value = _playlists.value + (playlistId to updated)
-        savePlaylists()
+        var changed = false
+        synchronized(mutationLock) {
+            val playlist = _playlists.value[playlistId] ?: return@synchronized
+            val updated = playlist.toggleLike()
+            _playlists.value = _playlists.value + (playlistId to updated)
+            changed = true
+        }
+        if (changed) {
+            scheduleSave(Table.PLAYLISTS)
+        }
     }
 
     internal fun mergePlaylist(existing: PlaylistEntity, incoming: PlaylistEntity): PlaylistEntity {
@@ -299,15 +489,15 @@ class DesktopDatabase private constructor(
         }?.key
     }
 
-    private fun normalizeDuplicatePlaylistsByBrowseId() {
+    private fun normalizeDuplicatePlaylistsByBrowseId(): Boolean {
         val playlists = _playlists.value
-        if (playlists.size < 2) return
+        if (playlists.size < 2) return false
 
         val grouped = playlists.entries
             .filter { it.value.browseId?.isNotBlank() == true }
             .groupBy { it.value.browseId!!.trim() }
             .filterValues { it.size > 1 }
-        if (grouped.isEmpty()) return
+        if (grouped.isEmpty()) return false
 
         val songCountByPlaylist = _playlistSongMaps.value.groupingBy { it.playlistId }.eachCount()
         val updatedPlaylists = playlists.toMutableMap()
@@ -330,6 +520,7 @@ class DesktopDatabase private constructor(
 
         _playlists.value = updatedPlaylists
         _playlistSongMaps.value = updatedMaps
+        return true
     }
 
     private fun selectCanonicalPlaylist(
@@ -350,34 +541,66 @@ class DesktopDatabase private constructor(
     // === Playlist Song Map Operations ===
 
     fun songsInPlaylist(playlistId: String): Flow<List<SongEntity>> =
-        _playlistSongMaps.map { maps ->
+        combine(_playlistSongMaps, _songs) { maps, songs ->
             val songIds = maps.filter { it.playlistId == playlistId }
                 .sortedBy { it.position }
                 .map { it.songId }
-            songIds.mapNotNull { _songs.value[it] }
+            songIds.mapNotNull { songs[it] }
+        }.distinctUntilChanged()
+
+    suspend fun replacePlaylistSongs(playlistId: String, songIds: List<String>) =
+        withContext(Dispatchers.IO) {
+            var changed = false
+            synchronized(mutationLock) {
+                val currentMaps = _playlistSongMaps.value
+                val existingSongIds = currentMaps
+                    .filter { it.playlistId == playlistId }
+                    .sortedBy { it.position }
+                    .map { it.songId }
+                if (existingSongIds == songIds) return@synchronized
+                val remainingMaps = currentMaps.filterNot { it.playlistId == playlistId }
+                var nextId = (remainingMaps.maxOfOrNull { it.id } ?: 0) + 1
+                val newMaps = songIds.mapIndexed { index, songId ->
+                    PlaylistSongMap(
+                        id = nextId++,
+                        playlistId = playlistId,
+                        songId = songId,
+                        position = index,
+                    )
+                }
+                _playlistSongMaps.value = remainingMaps + newMaps
+                changed = true
+            }
+            if (changed) {
+                scheduleSave(Table.PLAYLIST_SONG_MAPS)
+            }
         }
 
     suspend fun addSongToPlaylist(playlistId: String, songId: String) =
         withContext(Dispatchers.IO) {
-            val existingMaps = _playlistSongMaps.value.filter { it.playlistId == playlistId }
-            val maxPosition = existingMaps.maxOfOrNull { it.position } ?: -1
-            val nextId = (_playlistSongMaps.value.maxOfOrNull { it.id } ?: 0) + 1
-            val newMap = PlaylistSongMap(
-                id = nextId,
-                playlistId = playlistId,
-                songId = songId,
-                position = maxPosition + 1,
-            )
-            _playlistSongMaps.value = _playlistSongMaps.value + newMap
-            savePlaylistSongMaps()
+            synchronized(mutationLock) {
+                val existingMaps = _playlistSongMaps.value.filter { it.playlistId == playlistId }
+                val maxPosition = existingMaps.maxOfOrNull { it.position } ?: -1
+                val nextId = (_playlistSongMaps.value.maxOfOrNull { it.id } ?: 0) + 1
+                val newMap = PlaylistSongMap(
+                    id = nextId,
+                    playlistId = playlistId,
+                    songId = songId,
+                    position = maxPosition + 1,
+                )
+                _playlistSongMaps.value = _playlistSongMaps.value + newMap
+            }
+            scheduleSave(Table.PLAYLIST_SONG_MAPS)
         }
 
     suspend fun removeSongFromPlaylist(playlistId: String, songId: String) =
         withContext(Dispatchers.IO) {
-            _playlistSongMaps.value = _playlistSongMaps.value.filter {
-                !(it.playlistId == playlistId && it.songId == songId)
+            synchronized(mutationLock) {
+                _playlistSongMaps.value = _playlistSongMaps.value.filter {
+                    !(it.playlistId == playlistId && it.songId == songId)
+                }
             }
-            savePlaylistSongMaps()
+            scheduleSave(Table.PLAYLIST_SONG_MAPS)
         }
 
     // === Related Song Map Operations ===
@@ -396,156 +619,172 @@ class DesktopDatabase private constructor(
     suspend fun insertRelatedSongs(songId: String, relatedSongIds: List<String>) =
         withContext(Dispatchers.IO) {
             if (relatedSongIds.isEmpty()) return@withContext
-            val existing = _relatedSongMaps.value
-                .filter { it.songId == songId }
-                .map { it.relatedSongId }
-                .toSet()
-            val uniqueIds = relatedSongIds.filterNot { it in existing }.distinct()
-            if (uniqueIds.isEmpty()) return@withContext
-
-            val startId = (_relatedSongMaps.value.maxOfOrNull { it.id } ?: 0L) + 1L
-            val newMaps = uniqueIds.mapIndexed { index, relatedId ->
-                RelatedSongMap(
-                    id = startId + index,
-                    songId = songId,
-                    relatedSongId = relatedId,
-                )
+            var changed = false
+            synchronized(mutationLock) {
+                val existing = _relatedSongMaps.value
+                    .filter { it.songId == songId }
+                    .mapTo(HashSet()) { it.relatedSongId }
+                val uniqueIds = relatedSongIds.filterNot { it in existing }.distinct()
+                if (uniqueIds.isNotEmpty()) {
+                    val startId = (_relatedSongMaps.value.maxOfOrNull { it.id } ?: 0L) + 1L
+                    val newMaps = uniqueIds.mapIndexed { index, relatedId ->
+                        RelatedSongMap(
+                            id = startId + index,
+                            songId = songId,
+                            relatedSongId = relatedId,
+                        )
+                    }
+                    _relatedSongMaps.value = _relatedSongMaps.value + newMaps
+                    changed = true
+                }
             }
-            _relatedSongMaps.value = _relatedSongMaps.value + newMaps
-            saveRelatedSongMaps()
+            if (changed) {
+                scheduleSave(Table.RELATED_SONG_MAPS)
+            }
         }
 
     // === Event Operations (History) ===
 
     fun recentEvents(limit: Int = 100): Flow<List<EventEntity>> = _events.map { events ->
         events.sortedByDescending { it.timestamp }.take(limit)
-    }
+    }.distinctUntilChanged()
 
     fun eventsForSong(songId: String): Flow<List<EventEntity>> = _events.map { events ->
         events.filter { it.songId == songId }.sortedByDescending { it.timestamp }
-    }
+    }.distinctUntilChanged()
 
     suspend fun insertEvent(event: EventEntity) = withContext(Dispatchers.IO) {
-        val newId = (_events.value.maxOfOrNull { it.id } ?: 0) + 1
-        val eventWithId = event.copy(id = newId)
-        _events.value = _events.value + eventWithId
-        saveEvents()
+        synchronized(mutationLock) {
+            val newId = (_events.value.maxOfOrNull { it.id } ?: 0) + 1
+            val eventWithId = event.copy(id = newId)
+            _events.value = _events.value + eventWithId
+        }
+        scheduleSave(Table.EVENTS)
     }
 
     suspend fun insertEvents(events: List<EventEntity>) = withContext(Dispatchers.IO) {
         if (events.isEmpty()) return@withContext
-        var currentMax = _events.value.maxOfOrNull { it.id } ?: 0L
-        val newEvents = events.map { event ->
-            val id = if (event.id > 0) event.id else ++currentMax
-            event.copy(id = id)
+        synchronized(mutationLock) {
+            var currentMax = _events.value.maxOfOrNull { it.id } ?: 0L
+            val newEvents = events.map { event ->
+                val id = if (event.id > 0) event.id else ++currentMax
+                event.copy(id = id)
+            }
+            _events.value = _events.value + newEvents
         }
-        _events.value = _events.value + newEvents
-        saveEvents()
+        scheduleSave(Table.EVENTS)
     }
 
     suspend fun clearEvents() = withContext(Dispatchers.IO) {
-        _events.value = emptyList()
-        saveEvents()
+        synchronized(mutationLock) {
+            _events.value = emptyList()
+        }
+        scheduleSave(Table.EVENTS)
     }
 
     suspend fun deleteEvent(eventId: Long) = withContext(Dispatchers.IO) {
-        _events.value = _events.value.filterNot { it.id == eventId }
-        saveEvents()
+        synchronized(mutationLock) {
+            _events.value = _events.value.filterNot { it.id == eventId }
+        }
+        scheduleSave(Table.EVENTS)
     }
 
     // === Search History Operations ===
 
     fun recentSearches(limit: Int = 20): Flow<List<SearchHistory>> = _searchHistory.map { history ->
         history.sortedByDescending { it.id }.take(limit)
-    }
+    }.distinctUntilChanged()
 
     suspend fun insertSearch(query: String) = withContext(Dispatchers.IO) {
-        // Remove duplicate if exists
-        _searchHistory.value = _searchHistory.value.filter { it.query != query }
-        val newId = (_searchHistory.value.maxOfOrNull { it.id } ?: 0) + 1
-        val newEntry = SearchHistory(id = newId, query = query)
-        _searchHistory.value = _searchHistory.value + newEntry
-        saveSearchHistory()
+        synchronized(mutationLock) {
+            _searchHistory.value = _searchHistory.value.filter { it.query != query }
+            val newId = (_searchHistory.value.maxOfOrNull { it.id } ?: 0) + 1
+            val newEntry = SearchHistory(id = newId, query = query)
+            _searchHistory.value = _searchHistory.value + newEntry
+        }
+        scheduleSave(Table.SEARCH_HISTORY)
     }
 
     suspend fun deleteSearch(query: String) = withContext(Dispatchers.IO) {
-        _searchHistory.value = _searchHistory.value.filter { it.query != query }
-        saveSearchHistory()
+        synchronized(mutationLock) {
+            _searchHistory.value = _searchHistory.value.filter { it.query != query }
+        }
+        scheduleSave(Table.SEARCH_HISTORY)
     }
 
     suspend fun clearSearchHistory() = withContext(Dispatchers.IO) {
-        _searchHistory.value = emptyList()
-        saveSearchHistory()
+        synchronized(mutationLock) {
+            _searchHistory.value = emptyList()
+        }
+        scheduleSave(Table.SEARCH_HISTORY)
     }
 
     suspend fun clearAllData() = withContext(Dispatchers.IO) {
-        _songs.value = emptyMap()
-        _artists.value = emptyMap()
-        _albums.value = emptyMap()
-        _playlists.value = emptyMap()
-        _playlistSongMaps.value = emptyList()
-        _songArtistMaps.value = emptyList()
-        _relatedSongMaps.value = emptyList()
-        _events.value = emptyList()
-        _searchHistory.value = emptyList()
-
-        saveSongs()
-        saveArtists()
-        saveAlbums()
-        savePlaylists()
-        savePlaylistSongMaps()
-        saveSongArtistMaps()
-        saveRelatedSongMaps()
-        saveEvents()
-        saveSearchHistory()
+        synchronized(mutationLock) {
+            _songs.value = emptyMap()
+            _artists.value = emptyMap()
+            _albums.value = emptyMap()
+            _playlists.value = emptyMap()
+            _playlistSongMaps.value = emptyList()
+            _songArtistMaps.value = emptyList()
+            _relatedSongMaps.value = emptyList()
+            _events.value = emptyList()
+            _searchHistory.value = emptyList()
+        }
+        synchronized(dirtyLock) {
+            flushJob?.cancel()
+            flushJob = null
+            dirtyTables.addAll(Table.entries)
+        }
+        flushDirtyTables()
     }
 
     suspend fun snapshot(): DesktopDatabaseSnapshot = withContext(Dispatchers.IO) {
-        DesktopDatabaseSnapshot(
-            songs = _songs.value.values.toList(),
-            artists = _artists.value.values.toList(),
-            albums = _albums.value.values.toList(),
-            playlists = _playlists.value.values.toList(),
-            playlistSongMaps = _playlistSongMaps.value.toList(),
-            songArtistMaps = _songArtistMaps.value.toList(),
-            relatedSongMaps = _relatedSongMaps.value.toList(),
-            events = _events.value.toList(),
-            searchHistory = _searchHistory.value.toList(),
-        )
+        synchronized(mutationLock) {
+            DesktopDatabaseSnapshot(
+                songs = _songs.value.values.toList(),
+                artists = _artists.value.values.toList(),
+                albums = _albums.value.values.toList(),
+                playlists = _playlists.value.values.toList(),
+                playlistSongMaps = _playlistSongMaps.value.toList(),
+                songArtistMaps = _songArtistMaps.value.toList(),
+                relatedSongMaps = _relatedSongMaps.value.toList(),
+                events = _events.value.toList(),
+                searchHistory = _searchHistory.value.toList(),
+            )
+        }
     }
 
     suspend fun replaceAll(snapshot: DesktopDatabaseSnapshot) = withContext(Dispatchers.IO) {
-        _songs.value = snapshot.songs.associateBy { it.id }
-        _artists.value = snapshot.artists.associateBy { it.id }
-        _albums.value = snapshot.albums.associateBy { it.id }
-        _playlists.value = snapshot.playlists.associateBy { it.id }
-        _playlistSongMaps.value = snapshot.playlistSongMaps
-        normalizeDuplicatePlaylistsByBrowseId()
-        _songArtistMaps.value = snapshot.songArtistMaps
-        _relatedSongMaps.value = snapshot.relatedSongMaps
-        _events.value = snapshot.events
-        _searchHistory.value = snapshot.searchHistory
-
-        saveSongs()
-        saveArtists()
-        saveAlbums()
-        savePlaylists()
-        savePlaylistSongMaps()
-        saveSongArtistMaps()
-        saveRelatedSongMaps()
-        saveEvents()
-        saveSearchHistory()
+        synchronized(mutationLock) {
+            _songs.value = snapshot.songs.associateBy { it.id }
+            _artists.value = snapshot.artists.associateBy { it.id }
+            _albums.value = snapshot.albums.associateBy { it.id }
+            _playlists.value = snapshot.playlists.associateBy { it.id }
+            _playlistSongMaps.value = snapshot.playlistSongMaps
+            normalizeDuplicatePlaylistsByBrowseId()
+            _songArtistMaps.value = snapshot.songArtistMaps
+            _relatedSongMaps.value = snapshot.relatedSongMaps
+            _events.value = snapshot.events
+            _searchHistory.value = snapshot.searchHistory
+        }
+        synchronized(dirtyLock) {
+            flushJob?.cancel()
+            flushJob = null
+            dirtyTables.addAll(Table.entries)
+        }
+        flushDirtyTables()
     }
 
     // === Stats Queries ===
 
     fun mostPlayedSongs(limit: Int = 50): Flow<List<SongEntity>> = _songs.map { songs ->
         songs.values.sortedByDescending { it.totalPlayTime }.take(limit)
-    }
+    }.distinctUntilChanged()
 
     fun totalPlayTimeForSong(songId: String): Flow<Long> = _events.map { events ->
         events.filter { it.songId == songId }.sumOf { it.playTime }
-    }
+    }.distinctUntilChanged()
 
     // === Initialization ===
 
@@ -557,9 +796,9 @@ class DesktopDatabase private constructor(
         loadAlbums()
         loadPlaylists()
         loadPlaylistSongMaps()
-        normalizeDuplicatePlaylistsByBrowseId()
-        savePlaylists()
-        savePlaylistSongMaps()
+        if (normalizeDuplicatePlaylistsByBrowseId()) {
+            scheduleSave(Table.PLAYLISTS, Table.PLAYLIST_SONG_MAPS)
+        }
         loadRelatedSongMaps()
         loadEvents()
         loadSearchHistory()
@@ -643,7 +882,7 @@ class DesktopDatabase private constructor(
                 put("mediaStoreUri", song.mediaStoreUri ?: "")
             })
         }
-        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
+        writeTableFile(file, array.toString())
     }
 
     // === Artist Persistence ===
@@ -686,7 +925,7 @@ class DesktopDatabase private constructor(
                 put("bookmarkedAt", artist.bookmarkedAt.toJsonString())
             })
         }
-        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
+        writeTableFile(file, array.toString())
     }
 
     // === Album Persistence ===
@@ -741,7 +980,7 @@ class DesktopDatabase private constructor(
                 put("inLibrary", album.inLibrary.toJsonString())
             })
         }
-        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
+        writeTableFile(file, array.toString())
     }
 
     // === Playlist Persistence ===
@@ -801,7 +1040,7 @@ class DesktopDatabase private constructor(
                 put("backgroundImageUrl", playlist.backgroundImageUrl ?: "")
             })
         }
-        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
+        writeTableFile(file, array.toString())
     }
 
     // === Playlist Song Map Persistence ===
@@ -848,7 +1087,7 @@ class DesktopDatabase private constructor(
                 put("setVideoId", map.setVideoId ?: "")
             })
         }
-        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
+        writeTableFile(file, array.toString())
     }
 
     // === Song Artist Map Persistence ===
@@ -859,7 +1098,7 @@ class DesktopDatabase private constructor(
             val legacy = loadLegacySongArtistMapsFromSongs()
             _songArtistMaps.value = legacy
             if (legacy.isNotEmpty()) {
-                saveSongArtistMaps()
+                scheduleSave(Table.SONG_ARTIST_MAPS)
             }
             return
         }
@@ -882,7 +1121,7 @@ class DesktopDatabase private constructor(
                 val legacy = loadLegacySongArtistMapsFromSongs()
                 if (legacy.isNotEmpty()) {
                     _songArtistMaps.value = legacy
-                    saveSongArtistMaps()
+                    scheduleSave(Table.SONG_ARTIST_MAPS)
                     return
                 }
             }
@@ -900,7 +1139,7 @@ class DesktopDatabase private constructor(
                 put("position", map.position)
             })
         }
-        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
+        writeTableFile(file, array.toString())
     }
 
     private fun loadLegacySongArtistMapsFromSongs(): List<SongArtistMap> {
@@ -960,7 +1199,7 @@ class DesktopDatabase private constructor(
                 put("relatedSongId", map.relatedSongId)
             })
         }
-        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
+        writeTableFile(file, array.toString())
     }
 
     // === Event Persistence ===
@@ -1000,7 +1239,7 @@ class DesktopDatabase private constructor(
                 put("playTime", event.playTime)
             })
         }
-        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
+        writeTableFile(file, array.toString())
     }
 
     // === Search History Persistence ===
@@ -1041,7 +1280,7 @@ class DesktopDatabase private constructor(
                 put("query", entry.query)
             })
         }
-        Files.writeString(file, array.toString(), StandardCharsets.UTF_8)
+        writeTableFile(file, array.toString())
     }
 
     companion object {

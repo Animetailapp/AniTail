@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -29,9 +29,8 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.ColorMatrix as ComposeColorMatrix
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.dp
 import com.anitail.desktop.storage.PlayerBackgroundStyle
-import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.component.ImageCache
 import com.anitail.desktop.ui.extractGradientColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -45,8 +44,8 @@ import org.jetbrains.skia.Rect as SkiaRect
 import org.jetbrains.skia.RuntimeEffect
 import org.jetbrains.skia.RuntimeShaderBuilder
 import org.jetbrains.skia.SamplingMode
+import org.jetbrains.skia.Shader as SkiaShader
 import org.jetbrains.skia.Surface as SkiaSurface
-import java.net.URI
 import java.util.Collections
 import kotlin.math.PI
 import kotlin.math.cos
@@ -134,7 +133,16 @@ private object LiquidShaderRuntime {
     }
 }
 
-private val artworkMemoryCache: MutableMap<String, ImageBitmap> =
+private val gradientColorCache: MutableMap<String, List<Color>> =
+    Collections.synchronizedMap(
+        object : LinkedHashMap<String, List<Color>>(24, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Color>>?): Boolean {
+                return size > 20
+            }
+        },
+    )
+
+private val blurredArtworkCache: MutableMap<String, ImageBitmap> =
     Collections.synchronizedMap(
         object : LinkedHashMap<String, ImageBitmap>(12, 0.75f, true) {
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?): Boolean {
@@ -168,36 +176,12 @@ fun PlayerBackgroundLayer(
         }
 
         PlayerBackgroundStyle.BLUR -> {
-            Box(
-                modifier = modifier
-                    .fillMaxSize()
-                    .background(Color.Black),
-            ) {
-                if (!artworkUrl.isNullOrBlank()) {
-                    RemoteImage(
-                        url = artworkUrl,
-                        fallbackUrls = artworkFallbackUrls,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .blur(64.dp),
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = if (pureBlack) 0.52f else 0.42f),
-                                    Color.Black.copy(alpha = if (pureBlack) 0.68f else 0.54f),
-                                    Color.Black.copy(alpha = if (pureBlack) 0.82f else 0.68f),
-                                ),
-                            ),
-                        ),
-                )
-            }
+            BlurredArtworkBackground(
+                artworkUrl = artworkUrl,
+                artworkFallbackUrls = artworkFallbackUrls,
+                pureBlack = pureBlack,
+                modifier = modifier,
+            )
         }
 
         PlayerBackgroundStyle.GRADIENT -> {
@@ -222,6 +206,62 @@ fun PlayerBackgroundLayer(
 }
 
 @Composable
+private fun BlurredArtworkBackground(
+    artworkUrl: String?,
+    artworkFallbackUrls: List<String>,
+    pureBlack: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    var blurredBitmap by remember(artworkUrl) {
+        mutableStateOf(artworkUrl?.let { blurredArtworkCache[it] })
+    }
+
+    LaunchedEffect(artworkUrl, artworkFallbackUrls) {
+        val url = artworkUrl
+        if (url.isNullOrBlank()) {
+            blurredBitmap = null
+            return@LaunchedEffect
+        }
+        blurredArtworkCache[url]?.let {
+            blurredBitmap = it
+            return@LaunchedEffect
+        }
+        val bitmap = loadArtworkBitmap(url, artworkFallbackUrls)
+        val blurred = bitmap?.let { createBlurredBackgroundBitmap(url, it) }
+        blurredBitmap = blurred
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black),
+    ) {
+        val image = blurredBitmap
+        if (image != null) {
+            Image(
+                bitmap = image,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = if (pureBlack) 0.52f else 0.42f),
+                            Color.Black.copy(alpha = if (pureBlack) 0.68f else 0.54f),
+                            Color.Black.copy(alpha = if (pureBlack) 0.82f else 0.68f),
+                        ),
+                    ),
+                ),
+        )
+    }
+}
+
+@Composable
 private fun GradientArtworkBackground(
     artworkUrl: String?,
     artworkFallbackUrls: List<String>,
@@ -237,8 +277,16 @@ private fun GradientArtworkBackground(
         if (url.isNullOrBlank()) {
             gradientColors = listOf(fallbackTop, fallbackBottom)
         } else {
-            val bitmap = loadArtworkBitmap(url, artworkFallbackUrls)
-            val extracted = bitmap?.extractGradientColors().orEmpty()
+            val extracted = gradientColorCache[url] ?: run {
+                val bitmap = loadArtworkBitmap(url, artworkFallbackUrls)
+                val colors = withContext(Dispatchers.Default) {
+                    bitmap?.extractGradientColors().orEmpty()
+                }
+                if (colors.size >= 2) {
+                    gradientColorCache[url] = colors
+                }
+                colors
+            }
             gradientColors = if (extracted.size >= 2) {
                 listOf(
                     extracted[0],
@@ -284,8 +332,10 @@ private fun GradientArtworkBackground(
 private class LiquidTextureEntry(
     val key: String,
     val image: SkiaImage,
+    val shader: SkiaShader = image.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP, SamplingMode.LINEAR),
 ) {
     fun close() {
+        runCatching { shader.close() }
         runCatching { image.close() }
     }
 }
@@ -304,13 +354,18 @@ private fun LiquidArtworkBackground(
     var previousTexture by remember { mutableStateOf<LiquidTextureEntry?>(null) }
     val crossfade = remember { Animatable(1f) }
     var rotationTimeMs by remember { mutableLongStateOf(0L) }
+    val effect = LiquidShaderRuntime.effect
+    val shaderBuilder = remember(effect) { effect?.let { RuntimeShaderBuilder(it) } }
+    val shaderPaint = remember { SkiaPaint() }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(shaderBuilder, shaderPaint) {
         onDispose {
             activeTexture?.close()
             previousTexture?.close()
             activeTexture = null
             previousTexture = null
+            runCatching { shaderBuilder?.close() }
+            runCatching { shaderPaint.close() }
         }
     }
 
@@ -395,15 +450,15 @@ private fun LiquidArtworkBackground(
                 val angle1 = (2.0 * PI * (t % 90_000L) / 90_000.0).toFloat()
                 val angle2 = (2.0 * PI * (t % 70_000L) / 70_000.0).toFloat()
 
-                val effect = LiquidShaderRuntime.effect
-                if (effect != null) {
+                if (shaderBuilder != null) {
                     val prev = previousTexture ?: active
                     drawIntoCanvas { canvas ->
                         drawLiquidWithShader(
                             skiaCanvas = canvas.nativeCanvas,
-                            effect = effect,
-                            activeImage = active.image,
-                            previousImage = prev.image,
+                            builder = shaderBuilder,
+                            paint = shaderPaint,
+                            active = active,
+                            previous = prev,
                             width = size.width,
                             height = size.height,
                             angle0 = angle0,
@@ -416,6 +471,7 @@ private fun LiquidArtworkBackground(
                     drawIntoCanvas { canvas ->
                         drawLiquidFallback(
                             skiaCanvas = canvas.nativeCanvas,
+                            paint = shaderPaint,
                             activeImage = active.image,
                             previousImage = previousTexture?.image,
                             width = size.width,
@@ -436,9 +492,10 @@ private fun LiquidArtworkBackground(
 
 private fun drawLiquidWithShader(
     skiaCanvas: org.jetbrains.skia.Canvas,
-    effect: RuntimeEffect,
-    activeImage: SkiaImage,
-    previousImage: SkiaImage,
+    builder: RuntimeShaderBuilder,
+    paint: SkiaPaint,
+    active: LiquidTextureEntry,
+    previous: LiquidTextureEntry,
     width: Float,
     height: Float,
     angle0: Float,
@@ -446,33 +503,29 @@ private fun drawLiquidWithShader(
     angle2: Float,
     crossfade: Float,
 ) {
-    activeImage.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP, SamplingMode.LINEAR).use { activeShader ->
-        previousImage.makeShader(FilterTileMode.CLAMP, FilterTileMode.CLAMP, SamplingMode.LINEAR).use { prevShader ->
-            val builder = RuntimeShaderBuilder(effect).apply {
-                child("artwork", activeShader)
-                child("previous", prevShader)
-                uniform("viewport", width, height)
-                uniform("ratios", 1f, 1f)
-                uniform("cosines", cos(angle0), cos(angle1), cos(angle2))
-                uniform("sines", sin(angle0), sin(angle1), sin(angle2))
-                uniform("crossfade", crossfade)
-                uniform("liquid", 1f)
-                uniform("crop", 0f, 0f, activeImage.width.toFloat(), activeImage.height.toFloat())
-                uniform("treatment", 0f, 0f, 0f, 0f)
-                uniform("mirror", 0f, 0f)
-            }
-            builder.makeShader().use { shader ->
-                SkiaPaint().use { paint ->
-                    paint.shader = shader
-                    skiaCanvas.drawRect(SkiaRect.makeWH(width, height), paint)
-                }
-            }
-        }
+    builder.apply {
+        child("artwork", active.shader)
+        child("previous", previous.shader)
+        uniform("viewport", width, height)
+        uniform("ratios", 1f, 1f)
+        uniform("cosines", cos(angle0), cos(angle1), cos(angle2))
+        uniform("sines", sin(angle0), sin(angle1), sin(angle2))
+        uniform("crossfade", crossfade)
+        uniform("liquid", 1f)
+        uniform("crop", 0f, 0f, active.image.width.toFloat(), active.image.height.toFloat())
+        uniform("treatment", 0f, 0f, 0f, 0f)
+        uniform("mirror", 0f, 0f)
+    }
+    builder.makeShader().use { shader ->
+        paint.shader = shader
+        skiaCanvas.drawRect(SkiaRect.makeWH(width, height), paint)
+        paint.shader = null
     }
 }
 
 private fun drawLiquidFallback(
     skiaCanvas: org.jetbrains.skia.Canvas,
+    paint: SkiaPaint,
     activeImage: SkiaImage,
     previousImage: SkiaImage?,
     width: Float,
@@ -496,16 +549,16 @@ private fun drawLiquidFallback(
             (angle2 * 180f / PI.toFloat()),
         )
         val alphas = floatArrayOf(1f, 0.45f, 0.30f)
+        paint.shader = null
         for (i in anglesDeg.indices) {
-            SkiaPaint().use { paint ->
-                paint.alpha = (alphas[i] * layerWeight * 255f).roundToInt().coerceIn(0, 255)
-                skiaCanvas.save()
-                skiaCanvas.translate(cx, cy)
-                skiaCanvas.rotate(anglesDeg[i])
-                skiaCanvas.drawImageRect(image, srcRect, dstRect, SamplingMode.LINEAR, paint, true)
-                skiaCanvas.restore()
-            }
+            paint.alpha = (alphas[i] * layerWeight * 255f).roundToInt().coerceIn(0, 255)
+            skiaCanvas.save()
+            skiaCanvas.translate(cx, cy)
+            skiaCanvas.rotate(anglesDeg[i])
+            skiaCanvas.drawImageRect(image, srcRect, dstRect, SamplingMode.LINEAR, paint, true)
+            skiaCanvas.restore()
         }
+        paint.alpha = 255
     }
 
     skiaCanvas.save()
@@ -517,6 +570,36 @@ private fun drawLiquidFallback(
         drawRotatedLayers(activeImage, 1f)
     }
     skiaCanvas.restore()
+}
+
+private suspend fun createBlurredBackgroundBitmap(
+    key: String,
+    bitmap: ImageBitmap,
+): ImageBitmap? = withContext(Dispatchers.Default) {
+    blurredArtworkCache[key]?.let { return@withContext it }
+    runCatching {
+        val skiaBitmap = bitmap.asSkiaBitmap()
+        SkiaImage.makeFromBitmap(skiaBitmap).use { srcImage ->
+            SkiaSurface.makeRasterN32Premul(LIQUID_PADDED_SIZE, LIQUID_PADDED_SIZE).use { surface ->
+                ImageFilter.makeBlur(LIQUID_BLUR_RADIUS, LIQUID_BLUR_RADIUS, FilterTileMode.CLAMP).use { blurFilter ->
+                    SkiaPaint().use { paint ->
+                        paint.imageFilter = blurFilter
+                        surface.canvas.drawImageRect(
+                            srcImage,
+                            SkiaRect.makeWH(srcImage.width.toFloat(), srcImage.height.toFloat()),
+                            SkiaRect.makeWH(LIQUID_PADDED_SIZE.toFloat(), LIQUID_PADDED_SIZE.toFloat()),
+                            SamplingMode.LINEAR,
+                            paint,
+                            true,
+                        )
+                    }
+                }
+                surface.makeImageSnapshot().use { snapshot ->
+                    snapshot.toComposeImageBitmap().also { blurredArtworkCache[key] = it }
+                }
+            }
+        }
+    }.getOrNull()
 }
 
 private suspend fun createBlurredLiquidTexture(
@@ -553,7 +636,7 @@ private suspend fun createBlurredLiquidTexture(
 private suspend fun loadArtworkBitmap(
     url: String,
     fallbackUrls: List<String> = emptyList(),
-): ImageBitmap? = withContext(Dispatchers.IO) {
+): ImageBitmap? {
     val candidates = buildList {
         add(url)
         fallbackUrls.forEach { fallback ->
@@ -564,19 +647,10 @@ private suspend fun loadArtworkBitmap(
     }
 
     for (candidate in candidates) {
-        artworkMemoryCache[candidate]?.let { return@withContext it }
-        val decoded = runCatching {
-            val bytes = URI(candidate).toURL().openConnection().run {
-                connectTimeout = 5_000
-                readTimeout = 5_000
-                getInputStream().use { it.readBytes() }
-            }
-            SkiaImage.makeFromEncoded(bytes).use { it.toComposeImageBitmap() }
-        }.getOrNull()
-        if (decoded != null) {
-            artworkMemoryCache[candidate] = decoded
-            return@withContext decoded
+        val loaded = ImageCache.loadOrFetch(candidate, maxDimensionPx = 768)
+        if (loaded != null) {
+            return loaded
         }
     }
-    null
+    return null
 }

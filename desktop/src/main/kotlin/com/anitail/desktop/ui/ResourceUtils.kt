@@ -9,7 +9,7 @@ internal fun loadBitmapResource(path: String): ImageBitmap? {
         ?: return null
     return stream.use { resource ->
         runCatching {
-            SkiaImage.makeFromEncoded(resource.readBytes()).toComposeImageBitmap()
+            SkiaImage.makeFromEncoded(resource.readBytes()).use { it.toComposeImageBitmap() }
         }.getOrNull()
     }
 }

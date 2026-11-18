@@ -5,8 +5,8 @@ import com.anitail.desktop.db.entities.ArtistEntity
 import com.anitail.desktop.db.entities.EventEntity
 import com.anitail.desktop.db.entities.SongArtistMap
 import com.anitail.desktop.db.entities.SongEntity
-import com.anitail.desktop.db.relations.artistIdsForSong
-import com.anitail.desktop.db.relations.primaryArtistIdForSong
+import com.anitail.desktop.db.relations.indexArtistIdsBySongId
+import com.anitail.desktop.db.relations.indexPrimaryArtistIdBySongId
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -101,11 +101,12 @@ internal fun computeArtistStats(
     fromTimeMs: Long,
     toTimeMs: Long,
 ): List<ArtistStatsEntry> {
+    val primaryArtistBySongId = indexPrimaryArtistIdBySongId(songArtistMaps)
     val totals = mutableMapOf<String, StatsAccumulator>()
     events.forEach { event ->
         if (!eventInRange(event, fromTimeMs, toTimeMs)) return@forEach
         val song = songsById[event.songId] ?: return@forEach
-        val artistId = primaryArtistIdForSong(song.id, songArtistMaps) ?: return@forEach
+        val artistId = primaryArtistBySongId[song.id] ?: return@forEach
         val acc = totals.getOrPut(artistId) { StatsAccumulator() }
         acc.count += 1
         acc.timeMs += event.playTime
@@ -192,6 +193,7 @@ internal fun computePeriodInsights(
         )
     }
 
+    val artistIdsBySongId = indexArtistIdsBySongId(songArtistMaps)
     var totalTimeMs = 0L
     val uniqueSongs = HashSet<String>()
     val uniqueArtists = HashSet<String>()
@@ -205,7 +207,7 @@ internal fun computePeriodInsights(
         totalTimeMs += playTime
         uniqueSongs.add(event.songId)
 
-        val artistIds = artistIdsForSong(event.songId, songArtistMaps)
+        val artistIds = artistIdsBySongId[event.songId].orEmpty()
         if (artistIds.isNotEmpty()) {
             uniqueArtists.addAll(artistIds)
         } else {
@@ -377,6 +379,7 @@ internal fun buildSoundCapsuleOverview(
     val startMonth = if (now.isBefore(firstMonth)) firstMonth else now
     val eventsByMonth = events.groupBy { YearMonth.of(it.timestamp.year, it.timestamp.monthValue) }
     val monthsDescending = generateMonthsDescending(start = startMonth, end = firstMonth)
+    val artistIdsBySongId = indexArtistIdsBySongId(songArtistMaps)
 
     val monthTopArtistIds = mutableMapOf<YearMonth, List<String>>()
     val monthTopSongIds = mutableMapOf<YearMonth, String?>()
@@ -390,8 +393,8 @@ internal fun buildSoundCapsuleOverview(
         }
 
         val totalPlayTimeMs = monthEvents.sumOf { effectivePlayTimeMs(it, songsById[it.songId]) }
-        val rankedSongsRaw = computeRankedSongsForMonth(monthEvents, songsById, songArtistMaps, artistsById, limit = 20)
-        val rankedArtistsRaw = computeRankedArtistsForMonth(monthEvents, songsById, songArtistMaps, artistsById, limit = 20)
+        val rankedSongsRaw = computeRankedSongsForMonth(monthEvents, songsById, artistIdsBySongId, artistsById, limit = 20)
+        val rankedArtistsRaw = computeRankedArtistsForMonth(monthEvents, songsById, artistIdsBySongId, artistsById, limit = 20)
 
         monthTopArtistIds[month] = rankedArtistsRaw.take(5).map { it.id }
         monthTopSongIds[month] = rankedSongsRaw.firstOrNull()?.id
@@ -457,7 +460,7 @@ internal fun buildSoundCapsuleOverview(
     val uniqueSongs = events.mapNotNull { event -> songsById[event.songId]?.id }.toSet().size
     val uniqueArtists = events.flatMap { event ->
         val song = songsById[event.songId] ?: return@flatMap emptyList()
-        val ids = artistIdsForSong(song.id, songArtistMaps)
+        val ids = artistIdsBySongId[song.id].orEmpty()
         if (ids.isNotEmpty()) ids else listOfNotNull(song.artistName?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.isNotBlank() })
     }.toSet().size
 
@@ -481,7 +484,7 @@ private data class CapsuleArtistAccumulator(
 private fun computeRankedSongsForMonth(
     monthEvents: List<EventEntity>,
     songsById: Map<String, SongEntity>,
-    songArtistMaps: List<SongArtistMap>,
+    artistIdsBySongId: Map<String, List<String>>,
     artistsById: Map<String, ArtistEntity>,
     limit: Int,
 ): List<TopSongUi> {
@@ -495,7 +498,7 @@ private fun computeRankedSongsForMonth(
     return totals.entries
         .mapNotNull { (songId, acc) ->
             val song = songsById[songId] ?: return@mapNotNull null
-            val primaryArtistName = primaryArtistIdForSong(song.id, songArtistMaps)
+            val primaryArtistName = artistIdsBySongId[song.id]?.firstOrNull()
                 ?.let { artistsById[it]?.name }
                 ?: song.artistName
             TopSongUi(
@@ -515,7 +518,7 @@ private fun computeRankedSongsForMonth(
 private fun computeRankedArtistsForMonth(
     monthEvents: List<EventEntity>,
     songsById: Map<String, SongEntity>,
-    songArtistMaps: List<SongArtistMap>,
+    artistIdsBySongId: Map<String, List<String>>,
     artistsById: Map<String, ArtistEntity>,
     limit: Int,
 ): List<CapsuleArtistAccumulator> {
@@ -523,7 +526,7 @@ private fun computeRankedArtistsForMonth(
     monthEvents.forEach { event ->
         val song = songsById[event.songId] ?: return@forEach
         val playTimeMs = effectivePlayTimeMs(event, song)
-        val mappedArtistIds = artistIdsForSong(song.id, songArtistMaps)
+        val mappedArtistIds = artistIdsBySongId[song.id].orEmpty()
         if (mappedArtistIds.isNotEmpty()) {
             mappedArtistIds.forEach { artistId ->
                 val artist = artistsById[artistId]
