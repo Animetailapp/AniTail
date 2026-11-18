@@ -1136,4 +1136,27 @@
     <string name="hide_status_bar_fullscreen">Ocultar barra de estado en pantalla completa</string>
     <string name="hide_status_bar_fullscreen_desc">Ocultar la barra de estado cuando el modo de letras a pantalla completa esté activo</string>
     <string name="drag_to_reorder">Arrastra para reordenar</string>
+    <string name="show_more">Mostrar más</string>
+    <string name="show_less">Mostrar menos</string>
+    <string name="artist_lastfm_listeners">Oyentes en Last.fm</string>
+    <string name="artist_lastfm_scrobbles">Scrobbles en Last.fm</string>
+    <string name="artist_monthly_audience">Audiencia mensual</string>
+    <string name="artist_lastfm_biography">Biografía de Last.fm</string>
+    <string name="artist_lastfm_read_more">Leer más en Last.fm</string>
+    <string name="artist_similar_artists">Artistas similares</string>
+    <string name="genres">Géneros</string>
+    <string name="no_bio_title">Sin biografía disponible</string>
+    <string name="no_bio_hint">No se encontró una biografía para este artista. Puedes consultar su perfil en Last.fm para más información.</string>
+    <string name="could_not_load_info">No se pudo cargar la información</string>
+    <string name="lastfm_profile_hint">No se pudieron obtener los detalles del artista desde Last.fm en este momento. Puedes abrir su perfil directamente.</string>
+    <string name="lastfm_link_text">Abrir en Last.fm</string>
+    <string name="save_photo">Guardar foto</string>
+    <string name="photo_saved">Foto guardada</string>
+    <string name="total_views">Reproducciones totales</string>
+    <string name="artist_photo_details_unavailable">Los detalles de la foto no están disponibles</string>
+    <string name="artist_photo_uploaded">Subida el %1$s</string>
+    <string name="artist_photo_view_on_lastfm">Ver en Last.fm</string>
+    <string name="brand_lastfm">Last.fm</string>
+    <string name="latest_release">Última versión</string>
+    <string name="latest_episode">Último episodio</string>
 </resources>

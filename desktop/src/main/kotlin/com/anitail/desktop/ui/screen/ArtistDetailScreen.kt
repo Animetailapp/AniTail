@@ -96,6 +96,17 @@ import java.net.URI
 import java.time.LocalDateTime
 import kotlinx.coroutines.launch
 
+data class ArtistAboutArgs(
+    val artistId: String,
+    val artistName: String,
+    val thumbnailUrl: String?,
+    val description: String?,
+    val subscriberCountText: String?,
+    val monthlyListenerCount: String?,
+    val viewCount: String? = null,
+    val catalogTitles: List<String>,
+)
+
 /**
  * Pantalla de detalle de artista para Desktop - Idéntica a Android.
  */
@@ -114,6 +125,7 @@ fun ArtistDetailScreen(
     onArtistClick: (String, String) -> Unit,
     onPlaylistClick: (String, String) -> Unit,
     onSongClick: (LibraryItem) -> Unit,
+    onOpenAbout: (ArtistAboutArgs) -> Unit = {},
 ) {
     var artistPage by remember { mutableStateOf<ArtistPage?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -395,8 +407,45 @@ fun ArtistDetailScreen(
                     }
 
                     // Secciones dinámicas
+                    val hasDedicatedLatestRelease = page.sections.any { it.items.singleOrNull() is AlbumItem }
+                    val synthesizedLatestRelease = if (!hasDedicatedLatestRelease) {
+                        page.sections
+                            .flatMap { it.items.filterIsInstance<AlbumItem>() }
+                            .maxByOrNull { it.year ?: Int.MIN_VALUE }
+                    } else {
+                        null
+                    }
+                    var latestReleaseShown = false
+
                     page.sections.forEach { section ->
                         if (section.items.isNotEmpty()) {
+                            val firstItem = section.items.firstOrNull()
+                            val isSongList = firstItem is SongItem && firstItem.album != null
+
+                            if (!isSongList && synthesizedLatestRelease != null && !latestReleaseShown) {
+                                latestReleaseShown = true
+                                item(key = "section_title_latest_release") {
+                                    NavigationTitle(title = stringResource("latest_release"))
+                                }
+                                item(key = "section_latest_synthesized_${synthesizedLatestRelease.browseId}") {
+                                    LatestReleaseCard(
+                                        album = synthesizedLatestRelease,
+                                        onClick = { onAlbumClick(synthesizedLatestRelease.browseId, synthesizedLatestRelease.title) },
+                                        onPlay = {
+                                            scope.launch {
+                                                YouTube.album(synthesizedLatestRelease.browseId).onSuccess { albumPage ->
+                                                    val queue = albumPage.songs.map { songItemToLibraryItem(it) }
+                                                    if (queue.isNotEmpty()) {
+                                                        playerState.playQueue(queue, startIndex = 0)
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                    )
+                                }
+                            }
+
                             // Título de sección con navegación
                             item(key = "section_title_${section.title}") {
                                 NavigationTitle(
@@ -408,8 +457,7 @@ fun ArtistDetailScreen(
                             }
 
                             // Si son canciones con álbum, mostrar como lista
-                            val firstItem = section.items.firstOrNull()
-                            if (firstItem is SongItem && firstItem.album != null) {
+                            if (isSongList) {
                                 items(
                                     items = section.items.filterIsInstance<SongItem>(),
                                     key = { "song_${it.id}" }
@@ -529,22 +577,61 @@ fun ArtistDetailScreen(
                         }
                     }
 
-                    if (!page.description.isNullOrBlank() ||
-                        !page.subscriberCountText.isNullOrBlank() ||
-                        !page.monthlyListenerCount.isNullOrBlank()
-                    ) {
-                        item(key = "about_artist") {
-                            AboutArtistSection(
-                                artistName = page.artist.title,
-                                thumbnailUrl = page.artist.thumbnail,
-                                description = page.description,
-                                subscriberCountText = page.subscriberCountText,
-                                monthlyListenerCount = page.monthlyListenerCount,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                    if (synthesizedLatestRelease != null && !latestReleaseShown) {
+                        item(key = "section_title_latest_release_end") {
+                            NavigationTitle(title = stringResource("latest_release"))
+                        }
+                        item(key = "section_latest_synthesized_end_${synthesizedLatestRelease.browseId}") {
+                            LatestReleaseCard(
+                                album = synthesizedLatestRelease,
+                                onClick = { onAlbumClick(synthesizedLatestRelease.browseId, synthesizedLatestRelease.title) },
+                                onPlay = {
+                                    scope.launch {
+                                        YouTube.album(synthesizedLatestRelease.browseId).onSuccess { albumPage ->
+                                            val queue = albumPage.songs.map { songItemToLibraryItem(it) }
+                                            if (queue.isNotEmpty()) {
+                                                playerState.playQueue(queue, startIndex = 0)
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                             )
                         }
+                    }
+
+                    item(key = "about_artist") {
+                        val catalogTitles = remember(page.sections) {
+                            page.sections
+                                .flatMap { it.items }
+                                .mapNotNull { it.title.takeIf(String::isNotBlank) }
+                                .distinct()
+                                .take(50)
+                        }
+                        AboutArtistSection(
+                            artistName = page.artist.title,
+                            thumbnailUrl = page.artist.thumbnail,
+                            description = page.description,
+                            subscriberCountText = page.subscriberCountText,
+                            monthlyListenerCount = page.monthlyListenerCount,
+                            onClick = {
+                                onOpenAbout(
+                                    ArtistAboutArgs(
+                                        artistId = page.artist.id,
+                                        artistName = page.artist.title,
+                                        thumbnailUrl = page.artist.thumbnail,
+                                        description = page.description,
+                                        subscriberCountText = page.subscriberCountText,
+                                        monthlyListenerCount = page.monthlyListenerCount,
+                                        viewCount = page.viewCount,
+                                        catalogTitles = catalogTitles,
+                                    )
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 16.dp),
+                        )
                     }
 
                     item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -1028,9 +1115,9 @@ private fun AboutArtistSection(
     description: String?,
     subscriberCountText: String?,
     monthlyListenerCount: String?,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var showFullDialog by remember { mutableStateOf(false) }
     val bannerUrl = remember(thumbnailUrl) {
         thumbnailUrl?.let { url ->
             if (url.contains("lh3.googleusercontent.com")) {
@@ -1046,47 +1133,12 @@ private fun AboutArtistSection(
         subscriberCountText?.takeIf { it.isNotBlank() },
     ).joinToString(" • ")
 
-    if (showFullDialog) {
-        AlertDialog(
-            onDismissRequest = { showFullDialog = false },
-            title = {
-                Text(
-                    text = artistName,
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (audienceText.isNotBlank()) {
-                        Text(
-                            text = audienceText,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    if (!description.isNullOrBlank()) {
-                        Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showFullDialog = false }) {
-                    Text(stringResource("close"))
-                }
-            },
-        )
-    }
-
     Column(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = modifier,
     ) {
         Text(
-            text = stringResource("about_artist"),
+            text = stringResource("about"),
             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -1101,7 +1153,7 @@ private fun AboutArtistSection(
                 .fillMaxWidth()
                 .height(290.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .clickable { showFullDialog = true },
+                .clickable(onClick = onClick),
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 if (!bannerUrl.isNullOrBlank()) {

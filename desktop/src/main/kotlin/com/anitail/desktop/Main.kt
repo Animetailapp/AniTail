@@ -140,7 +140,9 @@ import com.anitail.desktop.ui.component.YouTubeChannelPickerDialog
 import com.anitail.desktop.ui.window.MiniplayerWindow
 import androidx.compose.ui.window.WindowPlacement
 import com.anitail.desktop.ui.component.rememberBottomSheetState
+import com.anitail.desktop.ui.screen.AboutArtistScreen
 import com.anitail.desktop.ui.screen.AlbumDetailScreen
+import com.anitail.desktop.ui.screen.ArtistAboutArgs
 import com.anitail.desktop.ui.screen.ArtistDetailScreen
 import com.anitail.desktop.ui.screen.ArtistItemsScreen
 import com.anitail.desktop.ui.screen.ChartsScreen
@@ -217,6 +219,7 @@ private enum class DesktopScreen {
     Stats,
     Settings,
     ArtistDetail,
+    AboutArtist,
     ArtistItems,
     AlbumDetail,
     PlaylistDetail,
@@ -430,6 +433,7 @@ private data class DetailNavigation(
     val browseId: String? = null,
     val browseParams: String? = null,
     val searchQuery: String? = null,
+    val artistAboutArgs: ArtistAboutArgs? = null,
 )
 
 fun main(args: Array<String>) {
@@ -2602,6 +2606,28 @@ private fun FrameWindowScope.AniTailDesktopApp(
                         onSongClick = { item ->
                             playerState.play(item)
                             playerBottomSheetState.collapseSoft()
+                        },
+                        onOpenAbout = { args ->
+                            navigationHistory.add(DesktopScreen.ArtistDetail)
+                            detailNavigation = detailNavigation.copy(artistAboutArgs = args)
+                            currentScreen = DesktopScreen.AboutArtist
+                        },
+                    )
+                }
+
+                DesktopScreen.AboutArtist -> {
+                    val args = detailNavigation.artistAboutArgs
+                    AboutArtistScreen(
+                        artistId = args?.artistId ?: detailNavigation.artistId.orEmpty(),
+                        artistName = args?.artistName ?: detailNavigation.artistName.orEmpty(),
+                        thumbnailUrl = args?.thumbnailUrl,
+                        description = args?.description,
+                        subscriberCountText = args?.subscriberCountText,
+                        monthlyListenerCount = args?.monthlyListenerCount,
+                        viewCount = args?.viewCount,
+                        catalogTitles = args?.catalogTitles.orEmpty(),
+                        onBack = {
+                            currentScreen = navigationHistory.removeLastOrNull() ?: DesktopScreen.ArtistDetail
                         },
                     )
                 }

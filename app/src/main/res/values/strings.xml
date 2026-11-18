@@ -1206,4 +1206,27 @@
     <string name="hide_status_bar_fullscreen">Hide status bar on fullscreen</string>
     <string name="hide_status_bar_fullscreen_desc">Hide the status bar when lyrics fullscreen mode is active</string>
     <string name="drag_to_reorder">Drag to reorder</string>
+    <string name="show_more">Show more</string>
+    <string name="show_less">Show less</string>
+    <string name="artist_lastfm_listeners">Last.fm listeners</string>
+    <string name="artist_lastfm_scrobbles">Last.fm scrobbles</string>
+    <string name="artist_monthly_audience">Monthly audience</string>
+    <string name="artist_lastfm_biography">Last.fm biography</string>
+    <string name="artist_lastfm_read_more">Read more on Last.fm</string>
+    <string name="artist_similar_artists">Similar artists</string>
+    <string name="genres">Genres</string>
+    <string name="no_bio_title">No biography available</string>
+    <string name="no_bio_hint">No biography was found for this artist. You can check their Last.fm profile for more info.</string>
+    <string name="could_not_load_info">Could not load info</string>
+    <string name="lastfm_profile_hint">Unable to fetch artist details from Last.fm right now. You can open their Last.fm profile directly.</string>
+    <string name="lastfm_link_text">Open on Last.fm</string>
+    <string name="save_photo">Save photo</string>
+    <string name="photo_saved">Photo saved</string>
+    <string name="total_views">Total views</string>
+    <string name="artist_photo_details_unavailable">Photo details are unavailable</string>
+    <string name="artist_photo_uploaded">Uploaded on %1$s</string>
+    <string name="artist_photo_view_on_lastfm">View on Last.fm</string>
+    <string name="brand_lastfm">Last.fm</string>
+    <string name="latest_release">Latest release</string>
+    <string name="latest_episode">Latest episode</string>
 </resources>

@@ -383,16 +383,18 @@ object YouTube {
             )
         }
 
-        val descriptionRuns = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+        val descriptionShelf = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
             ?.tabRenderer?.content?.sectionListRenderer?.contents
             ?.firstOrNull { it.musicDescriptionShelfRenderer != null }
-            ?.musicDescriptionShelfRenderer?.description?.runs
-            ?.let(::mapRuns)
+            ?.musicDescriptionShelfRenderer
             ?: response.contents?.sectionListRenderer?.contents
                 ?.firstOrNull { it.musicDescriptionShelfRenderer != null }
-                ?.musicDescriptionShelfRenderer?.description?.runs
-                ?.let(::mapRuns)
+                ?.musicDescriptionShelfRenderer
+
+        val descriptionRuns = descriptionShelf?.description?.runs?.let(::mapRuns)
             ?: response.header?.musicImmersiveHeaderRenderer?.description?.runs?.let(::mapRuns)
+
+        val viewCount = descriptionShelf?.subheader?.runs?.firstOrNull()?.text?.takeIf { it.isNotBlank() }
 
         ArtistPage(
             artist = ArtistItem(
@@ -424,7 +426,8 @@ object YouTube {
                     ?: response.header?.musicImmersiveHeaderRenderer?.subscriptionButton?.subscribeButtonRenderer
                         ?.shortSubscriberCountText?.runs?.firstOrNull()?.text,
             monthlyListenerCount = response.header?.musicImmersiveHeaderRenderer?.monthlyListenerCount?.runs?.firstOrNull()?.text,
-            descriptionRuns = descriptionRuns
+            descriptionRuns = descriptionRuns,
+            viewCount = viewCount,
         )
     }
 
@@ -808,6 +811,17 @@ object YouTube {
 
         logD("Parsed episodes: ${episodes.size}")
 
+        val description = header?.extractDescriptionText()
+            ?: response.header?.musicDetailHeaderRenderer?.description?.runs?.joinToString("") { it.text }?.takeIf { it.isNotBlank() }
+            ?: response.contents?.twoColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+                ?.tabRenderer?.content?.sectionListRenderer?.contents
+                ?.firstNotNullOfOrNull { it.musicDescriptionShelfRenderer?.description?.runs }
+                ?.joinToString("") { it.text }?.takeIf { it.isNotBlank() }
+            ?: response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+                ?.tabRenderer?.content?.sectionListRenderer?.contents
+                ?.firstNotNullOfOrNull { it.musicDescriptionShelfRenderer?.description?.runs }
+                ?.joinToString("") { it.text }?.takeIf { it.isNotBlank() }
+
         PodcastPage(
             podcast = podcastItem,
             episodes = episodes,
@@ -815,7 +829,8 @@ object YouTube {
                 ?.contents?.firstOrNull()?.musicShelfRenderer?.continuations?.getContinuation()
                 ?: response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
                     ?.tabRenderer?.content?.sectionListRenderer?.contents
-                    ?.find { it.musicShelfRenderer != null }?.musicShelfRenderer?.continuations?.getContinuation()
+                    ?.find { it.musicShelfRenderer != null }?.musicShelfRenderer?.continuations?.getContinuation(),
+            description = description,
         )
     }
 

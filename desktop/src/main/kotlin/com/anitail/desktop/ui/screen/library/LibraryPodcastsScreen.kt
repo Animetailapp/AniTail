@@ -30,6 +30,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -68,6 +69,7 @@ import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.ChipsRow
 import com.anitail.desktop.ui.component.ContextMenuAction
+import com.anitail.desktop.ui.component.ExpandableText
 import com.anitail.desktop.ui.component.HideOnScrollFAB
 import com.anitail.desktop.ui.component.ItemContextMenu
 import com.anitail.desktop.ui.component.LibrarySongListItem
@@ -639,6 +641,7 @@ private fun OnlinePodcastDetailView(
     val strings = LocalStrings.current
     val scope = rememberCoroutineScope()
     var podcast by remember(podcastId) { mutableStateOf<PodcastItem?>(null) }
+    var podcastDescription by remember(podcastId) { mutableStateOf<String?>(null) }
     var episodes by remember(podcastId) { mutableStateOf<List<EpisodeItem>>(emptyList()) }
     var isLoading by remember(podcastId) { mutableStateOf(true) }
     var error by remember(podcastId) { mutableStateOf<String?>(null) }
@@ -653,6 +656,7 @@ private fun OnlinePodcastDetailView(
             InnertubeYouTube.podcast(podcastId)
                 .onSuccess { page ->
                     podcast = page.podcast
+                    podcastDescription = page.description
                     episodes = page.episodes
                 }
                 .onFailure { throwable ->
@@ -738,88 +742,196 @@ private fun OnlinePodcastDetailView(
         } else if (podcast != null) {
             val loaded = podcast!!
             item(key = "podcast-detail-header") {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
-                    RemoteImage(
-                        url = loaded.thumbnail,
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.size(120.dp).clip(RoundedCornerShape(16.dp)),
-                    )
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.weight(1f),
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(
-                            text = loaded.title,
-                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
+                        RemoteImage(
+                            url = loaded.thumbnail,
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.size(120.dp).clip(RoundedCornerShape(16.dp)),
                         )
-                        loaded.author?.let { author ->
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.weight(1f),
+                        ) {
                             Text(
-                                text = author.name,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.clickable {
-                                    author.id?.let { id -> onOpenArtist(id, author.name) }
-                                },
+                                text = loaded.title,
+                                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
                             )
-                        }
-                        Text(
-                            text = loaded.episodeCountText
-                                ?: pluralStringResource("n_episode", episodes.size, episodes.size),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = {
-                                    if (episodeLibraryItems.isNotEmpty()) {
-                                        playerState.playQueue(episodeLibraryItems, startIndex = 0)
-                                    }
-                                },
-                            ) {
-                                Icon(
-                                    imageVector = IconAssets.play(),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text(stringResource("play"))
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    if (episodeLibraryItems.isNotEmpty()) {
-                                        playerState.shuffleEnabled = true
-                                        playerState.playQueue(episodeLibraryItems.shuffled(), startIndex = 0)
-                                    }
-                                },
-                            ) {
-                                Icon(
-                                    imageVector = IconAssets.shuffle(),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text(stringResource("shuffle"))
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    val next = !isSubscribed
-                                    isSubscribed = next
-                                    onToggleSaved(loaded, next)
-                                },
-                            ) {
+                            loaded.author?.let { author ->
                                 Text(
-                                    text = if (isSubscribed) {
-                                        stringResource("subscribed")
-                                    } else {
-                                        stringResource("subscribe")
+                                    text = author.name,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.clickable {
+                                        author.id?.let { id -> onOpenArtist(id, author.name) }
                                     },
                                 )
+                            }
+                            Text(
+                                text = loaded.episodeCountText
+                                    ?: pluralStringResource("n_episode", episodes.size, episodes.size),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = {
+                                        if (episodeLibraryItems.isNotEmpty()) {
+                                            playerState.playQueue(episodeLibraryItems, startIndex = 0)
+                                        }
+                                    },
+                                ) {
+                                    Icon(
+                                        imageVector = IconAssets.play(),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(stringResource("play"))
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        if (episodeLibraryItems.isNotEmpty()) {
+                                            playerState.shuffleEnabled = true
+                                            playerState.playQueue(episodeLibraryItems.shuffled(), startIndex = 0)
+                                        }
+                                    },
+                                ) {
+                                    Icon(
+                                        imageVector = IconAssets.shuffle(),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(stringResource("shuffle"))
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        val next = !isSubscribed
+                                        isSubscribed = next
+                                        onToggleSaved(loaded, next)
+                                    },
+                                ) {
+                                    Text(
+                                        text = if (isSubscribed) {
+                                            stringResource("subscribed")
+                                        } else {
+                                            stringResource("subscribe")
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    podcastDescription?.takeIf { it.isNotBlank() }?.let { desc ->
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            ) {
+                                Text(
+                                    text = stringResource("about"),
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                                )
+                                ExpandableText(
+                                    text = desc,
+                                    collapsedMaxLines = 3,
+                                    showMoreText = stringResource("show_more"),
+                                    showLessText = stringResource("show_less"),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (searchQuery.isBlank() && episodes.isNotEmpty() && episodeLibraryItems.isNotEmpty()) {
+                val latestEpisode = episodes.first()
+                item(key = "podcast-latest-episode-${latestEpisode.id}") {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            text = stringResource("latest_episode"),
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(18.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(18.dp))
+                                .clickable {
+                                    playerState.playQueue(episodeLibraryItems, startIndex = 0)
+                                },
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                modifier = Modifier.padding(14.dp),
+                            ) {
+                                RemoteImage(
+                                    url = latestEpisode.thumbnail,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.size(104.dp).clip(RoundedCornerShape(12.dp)),
+                                )
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    Text(
+                                        text = latestEpisode.title,
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    val subtitle = listOfNotNull(
+                                        latestEpisode.publishDateText?.takeIf { it.isNotBlank() },
+                                        latestEpisode.duration?.takeIf { it > 0 }?.let { formatTime(it * 1000L) },
+                                    ).joinToString(" • ")
+                                    if (subtitle.isNotBlank()) {
+                                        Text(
+                                            text = subtitle,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    FilledTonalButton(
+                                        onClick = { playerState.playQueue(episodeLibraryItems, startIndex = 0) },
+                                        shape = RoundedCornerShape(50),
+                                        modifier = Modifier.height(36.dp),
+                                    ) {
+                                        Icon(
+                                            imageVector = IconAssets.play(),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = stringResource("play"),
+                                            style = MaterialTheme.typography.labelLarge,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

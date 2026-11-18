@@ -71,6 +71,8 @@ object DesktopLastFmService {
 
     fun isConfigured(): Boolean = apiConfig.hasCredentials
 
+    internal fun currentApiKey(): String = apiConfig.apiKey
+
     fun isLoggedIn(): Boolean {
         return preferences.lastFmEnabled.value && preferences.lastFmSessionKey.value.isNotBlank()
     }
