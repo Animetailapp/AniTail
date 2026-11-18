@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -25,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,7 +54,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.constants.PlayerQueueCollapsedHeight
@@ -68,6 +69,8 @@ import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.component.BottomSheet
 import com.anitail.desktop.ui.component.BottomSheetState
+import com.anitail.desktop.ui.component.ContextMenuAction
+import com.anitail.desktop.ui.component.ItemContextMenu
 import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.component.RemoteImage
 import com.anitail.shared.model.LibraryItem
@@ -126,22 +129,26 @@ fun PlayerQueueSheet(
 
     val queue = playerState.queue
 
-    val songs by database.songs.collectAsState(initial = emptyList())
+    val songsById by database.songsById.collectAsState()
     val playlists by database.allPlaylists().collectAsState(initial = emptyList())
     val editablePlaylists = remember(playlists) { playlists.filter { it.isEditable } }
-    val songsById = remember(songs) { songs.associateBy { it.id } }
     val downloadStates by downloadService.downloadStates.collectAsState()
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
+    val downloadedSongIds = remember(downloadedSongs) {
+        downloadedSongs.mapTo(HashSet(downloadedSongs.size)) { it.songId }
+    }
     val shareUrl = if (currentItem.id.isNotBlank()) {
         "https://music.youtube.com/watch?v=${currentItem.id}"
     } else {
         currentItem.playbackUrl
     }
-    val currentDownloadState = computeSelectionDownloadState(
-        selectedIds = listOf(currentItem.id),
-        downloadStates = downloadStates,
-        downloadedSongs = downloadedSongs,
-    )
+    val currentDownloadState = remember(currentItem.id, downloadStates, downloadedSongIds) {
+        computeSingleDownloadState(
+            songId = currentItem.id,
+            downloadStates = downloadStates,
+            downloadedIds = downloadedSongIds,
+        )
+    }
 
     fun copyLink(url: String) {
         Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(url), null)
@@ -299,52 +306,37 @@ fun PlayerQueueSheet(
                             modifier = Modifier.size(24.dp),
                         )
                     }
+                    val currentIsLiked = songsById[currentItem.id]?.liked == true
+                    val currentSubtitle = formatBulletSubtitle(
+                        currentItem.artist,
+                        currentItem.durationMs?.takeIf { it > 0L }?.let { formatTime(it) },
+                    ).orEmpty()
                     DropdownMenu(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false },
+                        modifier = Modifier
+                            .widthIn(min = 320.dp, max = 360.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainer),
                     ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                                .fillMaxWidth(),
-                        ) {
-                            PlayerMenuQuickAction(
-                                icon = IconAssets.radio(),
-                                label = stringResource("start_radio"),
-                                onClick = {
-                                    onStartRadio()
-                                    showMenu = false
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
-                            PlayerMenuQuickAction(
-                                icon = IconAssets.playlistAdd(),
-                                label = stringResource("add_to_playlist"),
-                                onClick = {
-                                    playlistTargetItems = listOf(currentItem)
-                                    showPlaylistDialog = true
-                                    showMenu = false
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
-                            PlayerMenuQuickAction(
-                                icon = IconAssets.link(),
-                                label = stringResource("copy_link"),
-                                onClick = {
-                                    copyLink(shareUrl)
-                                    showMenu = false
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
+                        PlayerMenuHeader(
+                            title = currentItem.title,
+                            subtitle = currentSubtitle,
+                            thumbnailUrl = currentItem.artworkUrl,
+                            isLiked = currentIsLiked,
+                            onToggleLike = {
+                                toggleLikesForItems(listOf(currentItem), like = !currentIsLiked)
+                            },
+                            onStartRadio = onStartRadio,
+                            onAddToPlaylist = {
+                                playlistTargetItems = listOf(currentItem)
+                                showPlaylistDialog = true
+                            },
+                            onCopyLink = { copyLink(shareUrl) },
+                            onDismiss = { showMenu = false },
+                        )
 
-                        Surface(
-                            color = mutedTextColor.copy(alpha = 0.2f),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(1.dp),
-                        ) { }
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                         if (artistsWithId.isNotEmpty()) {
                             DropdownMenuItem(
@@ -621,11 +613,13 @@ fun PlayerQueueSheet(
                             val content: @Composable () -> Unit = {
                                 val isSelected = selectionMode && selectedIds.contains(item.id)
                                 val isLiked = songsById[item.id]?.liked == true
-                                val itemDownloadState = computeSelectionDownloadState(
-                                    selectedIds = listOf(item.id),
-                                    downloadStates = downloadStates,
-                                    downloadedSongs = downloadedSongs,
-                                )
+                                val itemDownloadState = remember(item.id, downloadStates, downloadedSongIds) {
+                                    computeSingleDownloadState(
+                                        songId = item.id,
+                                        downloadStates = downloadStates,
+                                        downloadedIds = downloadedSongIds,
+                                    )
+                                }
                                 QueueItemRow(
                                     item = item,
                                     isActive = index == currentIndex,
@@ -706,19 +700,29 @@ fun PlayerQueueSheet(
                 }
             }
 
-            val selectedItems = selectedItemsInQueue(queue)
-            val allLiked = selectedItems.isNotEmpty() &&
-                selectedItems.all { songsById[it.id]?.liked == true }
-            val downloadState = computeSelectionDownloadState(
-                selectedIds = selectedItems.map { it.id },
-                downloadStates = downloadStates,
-                downloadedSongs = downloadedSongs,
-            )
+            val selectedItems by remember(queue) {
+                androidx.compose.runtime.derivedStateOf { selectedItemsInQueue(queue) }
+            }
+            val allLiked by remember(selectedItems, songsById) {
+                androidx.compose.runtime.derivedStateOf {
+                    selectedItems.isNotEmpty() && selectedItems.all { songsById[it.id]?.liked == true }
+                }
+            }
+            val downloadState = remember(selectedItems, downloadStates, downloadedSongIds) {
+                computeSelectionDownloadState(
+                    selectedIds = selectedItems.map { it.id },
+                    downloadStates = downloadStates,
+                    downloadedIds = downloadedSongIds,
+                )
+            }
+            val totalDurationMs by remember(queue) {
+                androidx.compose.runtime.derivedStateOf { queue.sumOf { it.durationMs ?: 0L } }
+            }
 
             QueueHeader(
                 title = stringResource("queue"),
                 count = queue.size,
-                totalDurationMs = queue.sumOf { it.durationMs ?: 0L },
+                totalDurationMs = totalDurationMs,
                 locked = queueEditLocked,
                 showLock = !selectionMode,
                 onToggleLock = { preferences.setQueueEditLocked(!queueEditLocked) },
@@ -887,41 +891,6 @@ private fun QueueActionButton(
 }
 
 @Composable
-private fun PlayerMenuQuickAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val shape = RoundedCornerShape(8.dp)
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 10.dp),
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(22.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-@Composable
 private fun QueueHeader(
     title: String,
     count: Int,
@@ -1065,6 +1034,10 @@ private fun QueueSelectionBar(
             DropdownMenu(
                 expanded = showMenu,
                 onDismissRequest = { showMenu = false },
+                modifier = Modifier
+                    .widthIn(min = 240.dp, max = 320.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer),
             ) {
                 DropdownMenuItem(
                     text = { Text(stringResource("remove_from_queue")) },
@@ -1330,6 +1303,75 @@ private fun QueueItemRow(
         }
 
         if (showItemMenu) {
+            val strings = LocalStrings.current
+            val menuSubtitle = formatBulletSubtitle(
+                item.artist,
+                item.durationMs?.takeIf { it > 0L }?.let { formatTime(it) },
+            ).orEmpty()
+            val menuActions = remember(
+                item.id,
+                downloadState,
+                strings,
+                onDownload,
+                onRemoveDownload,
+                onCopyLink,
+                onOpenInBrowser,
+                onRemove,
+            ) {
+                buildList {
+                    when (downloadState) {
+                        SelectionDownloadState.NONE -> Unit
+                        SelectionDownloadState.COMPLETED -> {
+                            add(
+                                ContextMenuAction(
+                                    label = strings.get("remove_download"),
+                                    icon = IconAssets.offline(),
+                                    onClick = onRemoveDownload,
+                                )
+                            )
+                        }
+                        SelectionDownloadState.DOWNLOADING -> {
+                            add(
+                                ContextMenuAction(
+                                    label = strings.get("downloading"),
+                                    icon = IconAssets.download(),
+                                    onClick = onRemoveDownload,
+                                )
+                            )
+                        }
+                        SelectionDownloadState.NOT_DOWNLOADED -> {
+                            add(
+                                ContextMenuAction(
+                                    label = strings.get("download"),
+                                    icon = IconAssets.download(),
+                                    onClick = onDownload,
+                                )
+                            )
+                        }
+                    }
+                    add(
+                        ContextMenuAction(
+                            label = strings.get("copy_link"),
+                            icon = IconAssets.link(),
+                            onClick = onCopyLink,
+                        )
+                    )
+                    add(
+                        ContextMenuAction(
+                            label = strings.get("open_in_browser"),
+                            icon = IconAssets.arrowTopLeft(),
+                            onClick = onOpenInBrowser,
+                        )
+                    )
+                    add(
+                        ContextMenuAction(
+                            label = strings.get("remove_from_queue"),
+                            icon = IconAssets.delete(),
+                            onClick = onRemove,
+                        )
+                    )
+                }
+            }
             Box {
                 IconButton(
                     onClick = { itemMenuExpanded = true },
@@ -1343,140 +1385,25 @@ private fun QueueItemRow(
                     )
                 }
 
-                DropdownMenu(
+                ItemContextMenu(
                     expanded = itemMenuExpanded,
-                    onDismissRequest = { itemMenuExpanded = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource("play_next")) },
-                        onClick = {
-                            onPlayNext()
-                            itemMenuExpanded = false
-                        },
-                        enabled = !isActive,
-                        leadingIcon = {
-                            Icon(
-                                imageVector = IconAssets.play(),
-                                contentDescription = null,
-                            )
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource("add_to_playlist")) },
-                        onClick = {
-                            onAddToPlaylist()
-                            itemMenuExpanded = false
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = IconAssets.playlistAdd(),
-                                contentDescription = null,
-                            )
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Text(if (isLiked) stringResource("action_remove_like") else stringResource("action_like"))
-                        },
-                        onClick = {
-                            onToggleLike()
-                            itemMenuExpanded = false
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = if (isLiked) IconAssets.favorite() else IconAssets.favoriteBorder(),
-                                contentDescription = null,
-                            )
-                        },
-                    )
-                    when (downloadState) {
-                        SelectionDownloadState.NONE -> Unit
-                        SelectionDownloadState.COMPLETED -> {
-                            DropdownMenuItem(
-                                text = { Text(stringResource("remove_download")) },
-                                onClick = {
-                                    onRemoveDownload()
-                                    itemMenuExpanded = false
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = IconAssets.offline(),
-                                        contentDescription = null,
-                                    )
-                                },
-                            )
-                        }
-                        SelectionDownloadState.DOWNLOADING -> {
-                            DropdownMenuItem(
-                                text = { Text(stringResource("downloading")) },
-                                onClick = {
-                                    onRemoveDownload()
-                                    itemMenuExpanded = false
-                                },
-                                leadingIcon = {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp,
-                                    )
-                                },
-                            )
-                        }
-                        SelectionDownloadState.NOT_DOWNLOADED -> {
-                            DropdownMenuItem(
-                                text = { Text(stringResource("download")) },
-                                onClick = {
-                                    onDownload()
-                                    itemMenuExpanded = false
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = IconAssets.download(),
-                                        contentDescription = null,
-                                    )
-                                },
-                            )
-                        }
-                    }
-                    DropdownMenuItem(
-                        text = { Text(stringResource("copy_link")) },
-                        onClick = {
-                            onCopyLink()
-                            itemMenuExpanded = false
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = IconAssets.link(),
-                                contentDescription = null,
-                            )
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource("open_in_browser")) },
-                        onClick = {
-                            onOpenInBrowser()
-                            itemMenuExpanded = false
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = IconAssets.arrowTopLeft(),
-                                contentDescription = null,
-                            )
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource("remove_from_queue")) },
-                        onClick = {
-                            onRemove()
-                            itemMenuExpanded = false
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = IconAssets.delete(),
-                                contentDescription = null,
-                            )
-                        },
-                    )
-                }
+                    onDismiss = { itemMenuExpanded = false },
+                    item = item,
+                    actions = menuActions,
+                    headerContent = {
+                        SongMenuHeader(
+                            title = item.title,
+                            subtitle = menuSubtitle,
+                            thumbnailUrl = item.artworkUrl,
+                            isLiked = isLiked,
+                            onToggleLike = onToggleLike,
+                            onPlayNext = { if (!isActive) onPlayNext() },
+                            onAddToPlaylist = onAddToPlaylist,
+                            onShare = onCopyLink,
+                            onDismiss = { itemMenuExpanded = false },
+                        )
+                    },
+                )
             }
         }
 

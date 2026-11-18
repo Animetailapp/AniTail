@@ -6,9 +6,11 @@ import com.anitail.innertube.models.Artist
 import com.anitail.innertube.models.ArtistItem
 import com.anitail.innertube.models.BrowseEndpoint
 import com.anitail.innertube.models.EpisodeItem
+import com.anitail.innertube.models.GridRenderer
 import com.anitail.innertube.models.MusicCarouselShelfRenderer
 import com.anitail.innertube.models.MusicMultiRowListItemRenderer
 import com.anitail.innertube.models.MusicResponsiveListItemRenderer
+import com.anitail.innertube.models.MusicShelfRenderer
 import com.anitail.innertube.models.MusicTwoRowItemRenderer
 import com.anitail.innertube.models.PlaylistItem
 import com.anitail.innertube.models.PodcastItem
@@ -102,6 +104,47 @@ data class HomePage(
                     endpoint = renderer.header?.musicCarouselShelfBasicHeaderRenderer?.moreContentButton?.buttonRenderer?.navigationEndpoint?.browseEndpoint,
                     items = items
                 )
+            }
+
+            fun fromGridRenderer(renderer: GridRenderer): Section? {
+                val title = renderer.header?.gridHeaderRenderer?.title?.runs?.firstOrNull()?.text ?: return null
+                val items = renderer.items.mapNotNull { it.musicTwoRowItemRenderer }
+                    .mapNotNull { fromMusicTwoRowItemRenderer(it) }
+                if (items.isEmpty()) return null
+                return Section(
+                    title = title,
+                    label = null,
+                    thumbnail = null,
+                    endpoint = null,
+                    items = items,
+                )
+            }
+
+            fun fromMusicShelfRenderer(renderer: MusicShelfRenderer): Section? {
+                val title = renderer.title?.runs?.firstOrNull()?.text ?: return null
+                val contents = renderer.contents ?: return null
+                val items = mutableListOf<YTItem>()
+                contents.mapNotNull { it.musicResponsiveListItemRenderer }
+                    .mapNotNull { fromMusicResponsiveListItemRenderer(it) }
+                    .let { items.addAll(it) }
+                contents.mapNotNull { it.musicMultiRowListItemRenderer }
+                    .mapNotNull { fromMusicMultiRowListItemRenderer(it) }
+                    .let { items.addAll(it) }
+                if (items.isEmpty()) return null
+                return Section(
+                    title = title,
+                    label = null,
+                    thumbnail = null,
+                    endpoint = renderer.bottomEndpoint?.browseEndpoint
+                        ?: renderer.moreContentButton?.buttonRenderer?.navigationEndpoint?.browseEndpoint,
+                    items = items,
+                )
+            }
+
+            fun fromContent(content: SectionListRenderer.Content): Section? {
+                return content.musicCarouselShelfRenderer?.let { fromMusicCarouselShelfRenderer(it) }
+                    ?: content.gridRenderer?.let { fromGridRenderer(it) }
+                    ?: content.musicShelfRenderer?.let { fromMusicShelfRenderer(it) }
             }
 
             fun fromMusicMultiRowListItemRenderer(renderer: MusicMultiRowListItemRenderer): EpisodeItem? {

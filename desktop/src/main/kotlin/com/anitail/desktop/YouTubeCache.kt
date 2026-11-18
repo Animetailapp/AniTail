@@ -9,7 +9,12 @@ import com.anitail.innertube.pages.*
 import java.net.Proxy
 
 object YouTube {
-    private val cache = mutableMapOf<String, Pair<Long, Any>>()
+    private const val MAX_CACHE_ENTRIES = 256
+    private val cache = object : LinkedHashMap<String, Pair<Long, Any>>(MAX_CACHE_ENTRIES, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<Long, Any>>?): Boolean {
+            return size > MAX_CACHE_ENTRIES
+        }
+    }
     private val lock = Any()
 
     // TTLs in milliseconds
@@ -57,8 +62,10 @@ object YouTube {
         }
         val result: Result<T> = loader()
 
-        synchronized(lock) {
-            cache[key] = Pair(System.currentTimeMillis() + ttl, result as Any)
+        if (result.isSuccess) {
+            synchronized(lock) {
+                cache[key] = Pair(System.currentTimeMillis() + ttl, result as Any)
+            }
         }
         @Suppress("UNCHECKED_CAST")
         return result as Result<T>
@@ -139,4 +146,5 @@ object YouTube {
     suspend fun visitorData() = InnertubeYouTube.visitorData()
     suspend fun accountInfo() = InnertubeYouTube.accountInfo()
     suspend fun getMediaInfo(videoId: String) = InnertubeYouTube.getMediaInfo(videoId)
+    suspend fun feedback(tokens: List<String>) = InnertubeYouTube.feedback(tokens)
 }

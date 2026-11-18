@@ -11,12 +11,13 @@ import androidx.compose.ui.graphics.vector.PathNode
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import java.io.InputStream
+import java.util.concurrent.ConcurrentHashMap
 import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
 import org.w3c.dom.Node
 
 internal object VectorResource {
-    private val cache = mutableMapOf<String, ImageVector>()
+    private val cache = ConcurrentHashMap<String, ImageVector>()
 
     fun load(resourceName: String): ImageVector {
         return cache.getOrPut(resourceName) {

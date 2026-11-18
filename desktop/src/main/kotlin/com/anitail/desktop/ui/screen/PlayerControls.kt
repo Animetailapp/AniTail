@@ -1,29 +1,46 @@
 package com.anitail.desktop.ui.screen
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconButtonShapes
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,21 +48,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.anitail.desktop.constants.PlayerHorizontalPadding
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.player.RepeatMode
 import com.anitail.desktop.storage.SliderStyle
 import com.anitail.desktop.ui.IconAssets
+import com.anitail.desktop.ui.component.ExpressiveIcons
 import com.anitail.shared.model.LibraryItem
 
+/**
+ * Material 3 Expressive player controls featuring clickable metadata header,
+ * connected favorite/playlist/more pills, expressive progress slider,
+ * and morphing transport controls.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PlayerControls(
-    item: LibraryItem,
+    item: LibraryItem?,
     playerState: PlayerState,
     isLiked: Boolean,
     textColor: Color,
@@ -56,270 +80,458 @@ fun PlayerControls(
     onToggleLike: () -> Unit,
     onAddToPlaylist: () -> Unit,
     modifier: Modifier = Modifier,
+    artistsWithId: List<Pair<String, String?>> = emptyList(),
+    albumInfo: Pair<String, String>? = null,
+    onOpenArtist: ((String, String) -> Unit)? = null,
+    onOpenAlbum: ((String, String) -> Unit)? = null,
+    onShowMore: (() -> Unit)? = null,
+    moreMenuExpanded: Boolean = false,
+    onDismissMoreMenu: () -> Unit = {},
+    moreMenuContent: (@Composable () -> Unit)? = null,
 ) {
-    var sliderPosition by remember { mutableStateOf<Float?>(null) }
-    val durationMs = playerState.duration
-    val sliderValue = sliderPosition ?: playerState.progress
-    val displayPosition = if (sliderPosition != null) {
-        (durationMs * sliderValue).toLong()
-    } else {
-        playerState.position
-    }
+    val likeScale by animateFloatAsState(
+        targetValue = if (isLiked) 1.08f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium,
+        ),
+        label = "player_like_scale",
+    )
+    val likeColor by animateColorAsState(
+        targetValue = if (isLiked) Color(0xFFFF4D6D) else textColor,
+        label = "player_like_color",
+    )
 
-    Column(modifier = modifier) {
-        playerState.errorMessage?.let { error ->
-            Surface(
-                color = MaterialTheme.colorScheme.errorContainer,
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
-                    .padding(horizontal = PlayerHorizontalPadding)
-                    .padding(bottom = 12.dp)
-                    .fillMaxWidth(),
-            ) {
-                Text(
-                    text = error,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.padding(12.dp),
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
-
-        val addToPlaylistShape = RoundedCornerShape(
-            topStart = 5.dp,
-            bottomStart = 5.dp,
-            topEnd = 50.dp,
-            bottomEnd = 50.dp,
-        )
-        val favShape = RoundedCornerShape(
-            topStart = 50.dp,
-            bottomStart = 50.dp,
-            topEnd = 5.dp,
-            bottomEnd = 5.dp,
-        )
-
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // Track title, clickable artist/album links, and connected utility pills
         Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = PlayerHorizontalPadding),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
                 Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleLarge,
+                    text = item?.title ?: stringResource("nothing_playing"),
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                     color = textColor,
-                    modifier = Modifier.basicMarquee(),
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = item.artist,
-                    style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = mutedTextColor,
                     modifier = Modifier.basicMarquee(),
                 )
+
+                if (artistsWithId.isNotEmpty() || albumInfo != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .basicMarquee(),
+                    ) {
+                        val artistEntries = artistsWithId.ifEmpty {
+                            item?.artist?.takeIf { it.isNotBlank() }?.let { listOf(it to null) }.orEmpty()
+                        }
+                        artistEntries.forEachIndexed { index, (artistName, artistId) ->
+                            val clickable = !artistId.isNullOrBlank() && onOpenArtist != null
+                            Text(
+                                text = artistName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = mutedTextColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = if (clickable) {
+                                    Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable { onOpenArtist?.invoke(artistId!!, artistName) }
+                                        .padding(horizontal = 2.dp, vertical = 1.dp)
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            if (index < artistEntries.lastIndex) {
+                                Text(
+                                    text = ", ",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = mutedTextColor,
+                                )
+                            }
+                        }
+
+                        if (albumInfo != null && albumInfo.second.isNotBlank()) {
+                            Text(
+                                text = " • ",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = mutedTextColor.copy(alpha = 0.7f),
+                            )
+                            Text(
+                                text = albumInfo.second,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = mutedTextColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable(enabled = onOpenAlbum != null) {
+                                        onOpenAlbum?.invoke(albumInfo.first, albumInfo.second)
+                                    }
+                                    .padding(horizontal = 2.dp, vertical = 1.dp),
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = item?.artist.orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = mutedTextColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.basicMarquee(),
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
+            // Connected Like + Add to Playlist + optional More pill actions
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                BoxWithConstraints(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(favShape)
-                        .background(textButtonColor)
-                        .clickable(onClick = onToggleLike),
-                    contentAlignment = Alignment.Center,
+                FilledTonalIconButton(
+                    onClick = onToggleLike,
+                    enabled = item != null,
+                    shapes = IconButtonShapes(
+                        shape = RoundedCornerShape(
+                            topStart = 20.dp,
+                            bottomStart = 20.dp,
+                            topEnd = 8.dp,
+                            bottomEnd = 8.dp,
+                        ),
+                        pressedShape = RoundedCornerShape(10.dp),
+                    ),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = textColor.copy(alpha = 0.12f),
+                        contentColor = likeColor,
+                    ),
+                    modifier = Modifier.size(width = 44.dp, height = 40.dp),
                 ) {
                     Icon(
                         imageVector = if (isLiked) IconAssets.favorite() else IconAssets.favoriteBorder(),
-                        contentDescription = null,
-                        tint = iconButtonColor,
-                        modifier = Modifier.size(24.dp),
+                        contentDescription = stringResource(
+                            if (isLiked) "action_remove_like" else "action_like",
+                        ),
+                        modifier = Modifier
+                            .size(20.dp)
+                            .scale(likeScale),
                     )
                 }
-                BoxWithConstraints(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(addToPlaylistShape)
-                        .background(textButtonColor)
-                        .clickable(onClick = onAddToPlaylist),
-                    contentAlignment = Alignment.Center,
+
+                val trailingCorner = if (onShowMore != null) 8.dp else 20.dp
+                FilledTonalIconButton(
+                    onClick = onAddToPlaylist,
+                    enabled = item != null,
+                    shapes = IconButtonShapes(
+                        shape = RoundedCornerShape(
+                            topStart = 8.dp,
+                            bottomStart = 8.dp,
+                            topEnd = trailingCorner,
+                            bottomEnd = trailingCorner,
+                        ),
+                        pressedShape = RoundedCornerShape(10.dp),
+                    ),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = textColor.copy(alpha = 0.12f),
+                        contentColor = textColor,
+                    ),
+                    modifier = Modifier.size(width = 44.dp, height = 40.dp),
                 ) {
                     Icon(
                         imageVector = IconAssets.playlistAdd(),
-                        contentDescription = null,
-                        tint = iconButtonColor,
-                        modifier = Modifier.size(24.dp),
+                        contentDescription = stringResource("add_to_playlist"),
+                        modifier = Modifier.size(20.dp),
                     )
+                }
+
+                if (onShowMore != null) {
+                    Box {
+                        FilledTonalIconButton(
+                            onClick = onShowMore,
+                            enabled = item != null,
+                            shapes = IconButtonShapes(
+                                shape = RoundedCornerShape(
+                                    topStart = 8.dp,
+                                    bottomStart = 8.dp,
+                                    topEnd = 20.dp,
+                                    bottomEnd = 20.dp,
+                                ),
+                                pressedShape = RoundedCornerShape(10.dp),
+                            ),
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = textColor.copy(alpha = 0.12f),
+                                contentColor = textColor,
+                            ),
+                            modifier = Modifier.size(width = 44.dp, height = 40.dp),
+                        ) {
+                            Icon(
+                                imageVector = IconAssets.moreVert(),
+                                contentDescription = stringResource("more_options"),
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+
+                        if (moreMenuContent != null) {
+                            DropdownMenu(
+                                expanded = moreMenuExpanded,
+                                onDismissRequest = onDismissMoreMenu,
+                                modifier = Modifier
+                                    .widthIn(min = 320.dp, max = 360.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainer),
+                            ) {
+                                moreMenuContent()
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-
-        PlayerProgressSlider(
-            value = sliderValue,
-            onValueChange = { sliderPosition = it },
-            onValueChangeFinished = {
-                sliderPosition?.let { playerState.seekToProgress(it) }
-                sliderPosition = null
-            },
-            style = sliderStyle,
-            activeColor = textButtonColor,
-            inactiveColor = Color.White.copy(alpha = 0.15f),
-            isPlaying = playerState.isPlaying,
-            modifier = Modifier.padding(horizontal = PlayerHorizontalPadding),
+        // Expressive timeline slider + formatted timestamps
+        PlayerTimelineSection(
+            item = item,
+            playerState = playerState,
+            sliderStyle = sliderStyle,
+            activeColor = iconButtonColor,
+            inactiveColor = mutedTextColor,
         )
 
-        Spacer(Modifier.height(4.dp))
-
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = PlayerHorizontalPadding + 4.dp),
-        ) {
-            Text(
-                text = formatTime(displayPosition),
-                style = MaterialTheme.typography.labelMedium,
-                color = textColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = formatTime(durationMs),
-                style = MaterialTheme.typography.labelMedium,
-                color = textColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-
-        Spacer(Modifier.height(12.dp))
-
+        // Responsive Material 3 Expressive transport bar
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val sizes = calculatePlayerControlSizes(maxWidth)
+            val playInteractionSource = remember { MutableInteractionSource() }
+            val isPlayPressed by playInteractionSource.collectIsPressedAsState()
+
+            val playCorner by animateDpAsState(
+                targetValue = if (playerState.isPlaying) 18.dp else sizes.playButtonHeight / 2f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium,
+                ),
+                label = "player_play_corner",
+            )
+            val playWidth by animateDpAsState(
+                targetValue = if (isPlayPressed) sizes.playButtonWidth + 8.dp else sizes.playButtonWidth,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium,
+                ),
+                label = "player_play_width",
+            )
 
             Row(
-                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                IconButton(
-                    onClick = { playerState.toggleRepeat() },
-                    modifier = Modifier.size(48.dp),
+                // Previous + Morphing Play/Pause + Next cluster
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    val repeatIcon = if (playerState.repeatMode == com.anitail.desktop.player.RepeatMode.ONE) {
-                        IconAssets.repeatOne()
-                    } else {
-                        IconAssets.repeat()
-                    }
-                    val repeatTint = if (playerState.repeatMode == com.anitail.desktop.player.RepeatMode.OFF) {
-                        mutedTextColor.copy(alpha = 0.4f)
-                    } else {
-                        textColor
-                    }
-                    Icon(
-                        imageVector = repeatIcon,
-                        contentDescription = stringResource("repeat"),
-                        tint = repeatTint,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                FilledTonalIconButton(
-                    onClick = { playerState.skipToPrevious() },
-                    enabled = playerState.canSkipPrevious,
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = textButtonColor,
-                        contentColor = iconButtonColor,
-                    ),
-                    modifier = Modifier
-                        .size(width = sizes.sideButtonWidth, height = sizes.sideButtonHeight)
-                        .clip(RoundedCornerShape(32.dp)),
-                ) {
-                    Icon(
-                        imageVector = IconAssets.previous(),
-                        contentDescription = null,
-                        modifier = Modifier.size(sizes.sideIconSize),
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                FilledIconButton(
-                    onClick = { playerState.togglePlayPause() },
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = textButtonColor,
-                        contentColor = iconButtonColor,
-                    ),
-                    modifier = Modifier
-                        .size(width = sizes.playButtonWidth, height = sizes.playButtonHeight)
-                        .clip(RoundedCornerShape(32.dp)),
-                ) {
-                    if (playerState.isBuffering) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(sizes.playIconSize * 0.67f),
-                            color = iconButtonColor,
-                            strokeWidth = 3.dp,
-                        )
-                    } else {
+                    FilledTonalIconButton(
+                        onClick = { playerState.skipToPrevious() },
+                        enabled = playerState.canSkipPrevious,
+                        shapes = IconButtonShapes(
+                            shape = RoundedCornerShape(sizes.sideButtonHeight / 2f),
+                            pressedShape = RoundedCornerShape(12.dp),
+                        ),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = textColor.copy(alpha = 0.14f),
+                            contentColor = textColor,
+                            disabledContainerColor = textColor.copy(alpha = 0.06f),
+                            disabledContentColor = textColor.copy(alpha = 0.35f),
+                        ),
+                        modifier = Modifier.size(
+                            width = sizes.sideButtonWidth,
+                            height = sizes.sideButtonHeight,
+                        ),
+                    ) {
                         Icon(
-                            imageVector = if (playerState.isPlaying) IconAssets.pause() else IconAssets.play(),
-                            contentDescription = null,
-                            modifier = Modifier.size(sizes.playIconSize),
+                            imageVector = ExpressiveIcons.SkipPrevious,
+                            contentDescription = stringResource("previous"),
+                            modifier = Modifier.size(sizes.sideIconSize),
                         )
                     }
-                }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                    FilledIconButton(
+                        onClick = { playerState.togglePlayPause() },
+                        enabled = item != null,
+                        interactionSource = playInteractionSource,
+                        shapes = IconButtonShapes(
+                            shape = RoundedCornerShape(playCorner),
+                            pressedShape = RoundedCornerShape(14.dp),
+                        ),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = iconButtonColor,
+                            contentColor = textButtonColor,
+                            disabledContainerColor = iconButtonColor.copy(alpha = 0.35f),
+                            disabledContentColor = textButtonColor.copy(alpha = 0.5f),
+                        ),
+                        modifier = Modifier.size(
+                            width = playWidth,
+                            height = sizes.playButtonHeight,
+                        ),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            val visualState = when {
+                                playerState.isBuffering -> 0
+                                playerState.isPlaying -> 1
+                                else -> 2
+                            }
+                            AnimatedContent(
+                                targetState = visualState,
+                                transitionSpec = {
+                                    (fadeIn(tween(180)) + scaleIn(
+                                        initialScale = 0.72f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessMedium,
+                                        ),
+                                    )) togetherWith (fadeOut(tween(120)) + scaleOut(targetScale = 0.72f))
+                                },
+                                label = "player_play_icon",
+                            ) { state ->
+                                when (state) {
+                                    0 -> {
+                                        LoadingIndicator(
+                                            modifier = Modifier.size(sizes.playIconSize * 0.72f),
+                                            color = textButtonColor,
+                                        )
+                                    }
+                                    1 -> {
+                                        Icon(
+                                            imageVector = ExpressiveIcons.Pause,
+                                            contentDescription = stringResource("pause"),
+                                            modifier = Modifier.size(sizes.playIconSize),
+                                        )
+                                    }
+                                    else -> {
+                                        Icon(
+                                            imageVector = ExpressiveIcons.PlayArrow,
+                                            contentDescription = stringResource("play"),
+                                            modifier = Modifier.size(sizes.playIconSize),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
 
-                FilledTonalIconButton(
-                    onClick = { playerState.skipToNext() },
-                    enabled = playerState.canSkipNext,
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = textButtonColor,
-                        contentColor = iconButtonColor,
-                    ),
-                    modifier = Modifier
-                        .size(width = sizes.sideButtonWidth, height = sizes.sideButtonHeight)
-                        .clip(RoundedCornerShape(32.dp)),
-                ) {
-                    Icon(
-                        imageVector = IconAssets.next(),
-                        contentDescription = null,
-                        modifier = Modifier.size(sizes.sideIconSize),
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                IconButton(
-                    onClick = { playerState.toggleShuffle() },
-                    modifier = Modifier.size(48.dp),
-                ) {
-                    Icon(
-                        imageVector = IconAssets.shuffle(),
-                        contentDescription = stringResource("shuffle"),
-                        tint = if (playerState.shuffleEnabled) textColor else mutedTextColor.copy(alpha = 0.4f),
-                        modifier = Modifier.size(24.dp),
-                    )
+                    FilledTonalIconButton(
+                        onClick = { playerState.skipToNext() },
+                        enabled = playerState.canSkipNext,
+                        shapes = IconButtonShapes(
+                            shape = RoundedCornerShape(sizes.sideButtonHeight / 2f),
+                            pressedShape = RoundedCornerShape(12.dp),
+                        ),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = textColor.copy(alpha = 0.14f),
+                            contentColor = textColor,
+                            disabledContainerColor = textColor.copy(alpha = 0.06f),
+                            disabledContentColor = textColor.copy(alpha = 0.35f),
+                        ),
+                        modifier = Modifier.size(
+                            width = sizes.sideButtonWidth,
+                            height = sizes.sideButtonHeight,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = ExpressiveIcons.SkipNext,
+                            contentDescription = stringResource("next"),
+                            modifier = Modifier.size(sizes.sideIconSize),
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PlayerTimelineSection(
+    item: LibraryItem?,
+    playerState: PlayerState,
+    sliderStyle: SliderStyle,
+    activeColor: Color,
+    inactiveColor: Color,
+) {
+    val totalDurationMs = if (playerState.duration > 0L) {
+        playerState.duration
+    } else {
+        item?.durationMs ?: 0L
+    }
+    var dragFraction by remember(item?.id) { mutableStateOf<Float?>(null) }
+    val activeProgress = (dragFraction ?: playerState.progress).coerceIn(0f, 1f)
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        PlayerProgressSlider(
+            value = activeProgress,
+            onValueChange = { fraction -> dragFraction = fraction },
+            onValueChangeFinished = {
+                val target = dragFraction
+                dragFraction = null
+                if (target != null && totalDurationMs > 0L) {
+                    playerState.seekToProgress(target)
+                }
+            },
+            style = sliderStyle,
+            activeColor = activeColor,
+            inactiveColor = inactiveColor,
+            isPlaying = playerState.isPlaying,
+        )
+        PlayerTimelineLabels(
+            playerState = playerState,
+            dragFraction = dragFraction,
+            totalDurationMs = totalDurationMs,
+            mutedTextColor = inactiveColor,
+        )
+    }
+}
+
+@Composable
+private fun PlayerTimelineLabels(
+    playerState: PlayerState,
+    dragFraction: Float?,
+    totalDurationMs: Long,
+    mutedTextColor: Color,
+) {
+    val positionSecond by remember(playerState) {
+        derivedStateOf { playerState.position / 1000L }
+    }
+    val displayedPositionMs = if (dragFraction != null && totalDurationMs > 0L) {
+        (dragFraction.coerceIn(0f, 1f) * totalDurationMs).toLong()
+    } else {
+        positionSecond * 1000L
+    }
+
+    Row(
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+    ) {
+        Text(
+            text = formatTime(displayedPositionMs),
+            style = MaterialTheme.typography.labelMedium,
+            color = mutedTextColor,
+        )
+        Text(
+            text = formatTime(totalDurationMs),
+            style = MaterialTheme.typography.labelMedium,
+            color = mutedTextColor,
+        )
     }
 }

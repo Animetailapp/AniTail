@@ -33,7 +33,12 @@ class StringResolver(
 }
 
 val LocalStrings = staticCompositionLocalOf<StringResolver> {
-    error("LocalStrings not provided")
+    runCatching {
+        val appLanguage = com.anitail.desktop.storage.DesktopPreferences.getInstance().appLanguage.value
+        AndroidStringLoader.load(appLanguage)
+    }.getOrElse {
+        AndroidStringLoader.load("es")
+    }
 }
 
 @Composable

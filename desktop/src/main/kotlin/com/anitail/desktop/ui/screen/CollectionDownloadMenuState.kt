@@ -33,6 +33,20 @@ fun resolveCollectionDownloadMenuState(
     showWhenEmpty = showWhenEmpty,
 )
 
+@Composable
+fun resolveCollectionDownloadMenuState(
+    songIds: List<String>,
+    downloadStates: Map<String, DownloadState>,
+    downloadedSongIds: Set<String>,
+    showWhenEmpty: Boolean,
+): CollectionDownloadMenuState? = resolveCollectionDownloadMenuState(
+    strings = LocalStrings.current,
+    songIds = songIds,
+    downloadStates = downloadStates,
+    downloadedSongIds = downloadedSongIds,
+    showWhenEmpty = showWhenEmpty,
+)
+
 fun resolveCollectionDownloadMenuState(
     strings: StringResolver,
     songIds: List<String>,
@@ -48,10 +62,34 @@ fun resolveCollectionDownloadMenuState(
         }
     }
 
-    val downloadedIds = downloadedSongs.map { it.songId }.toSet()
-    val statuses = songIds.mapNotNull { id -> downloadStates[id]?.status }
-    val allDownloaded = songIds.all { id -> downloadedIds.contains(id) }
-    val anyActive = statuses.any { status ->
+    val downloadedIds = downloadedSongs.mapTo(HashSet(downloadedSongs.size)) { it.songId }
+    return resolveCollectionDownloadMenuState(
+        strings = strings,
+        songIds = songIds,
+        downloadStates = downloadStates,
+        downloadedSongIds = downloadedIds,
+        showWhenEmpty = showWhenEmpty,
+    )
+}
+
+fun resolveCollectionDownloadMenuState(
+    strings: StringResolver,
+    songIds: List<String>,
+    downloadStates: Map<String, DownloadState>,
+    downloadedSongIds: Set<String>,
+    showWhenEmpty: Boolean,
+): CollectionDownloadMenuState? {
+    if (songIds.isEmpty()) {
+        return if (showWhenEmpty) {
+            CollectionDownloadMenuState(label = strings.get("download"), action = CollectionDownloadAction.DOWNLOAD)
+        } else {
+            null
+        }
+    }
+
+    val allDownloaded = songIds.all { id -> downloadedSongIds.contains(id) }
+    val anyActive = songIds.any { id ->
+        val status = downloadStates[id]?.status
         status == DownloadStatus.QUEUED || status == DownloadStatus.DOWNLOADING
     }
 

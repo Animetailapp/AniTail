@@ -36,6 +36,7 @@ import com.anitail.desktop.ui.component.ContextMenuAction
 import com.anitail.desktop.ui.component.ItemContextMenu
 import com.anitail.desktop.ui.component.PlayingIndicatorBox
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.component.rememberExpressiveAvatarShape
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.ArtistItem
 import com.anitail.innertube.models.PlaylistItem
@@ -96,7 +97,11 @@ fun BrowseGridItem(
                 .padding(4.dp),
         ) {
             Box(modifier = Modifier.size(BrowseGridSize)) {
-                val shape = if (item is ArtistItem) CircleShape else RoundedCornerShape(BrowseThumbnailCornerRadius)
+                val shape = if (item is ArtistItem) {
+                    rememberExpressiveAvatarShape(item.id)
+                } else {
+                    RoundedCornerShape(BrowseThumbnailCornerRadius)
+                }
                 RemoteImage(
                     url = item.thumbnail,
                     modifier = Modifier

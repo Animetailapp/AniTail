@@ -52,6 +52,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -183,13 +185,18 @@ fun SettingsScreen(
                 onBack = { currentDestination = SettingsDestination.MAIN },
             )
 
-            SettingsDestination.DISCORD -> DiscordSettingsScreen(
-                preferences = preferences,
-                previewItem = playerState?.currentItem,
-                previewPositionMs = playerState?.position ?: 0L,
-                isPreviewPlaying = playerState?.isPlaying == true,
-                onBack = { currentDestination = SettingsDestination.MAIN },
-            )
+            SettingsDestination.DISCORD -> {
+                val previewPositionMs by remember(playerState) {
+                    derivedStateOf { ((playerState?.position ?: 0L) / 1000L) * 1000L }
+                }
+                DiscordSettingsScreen(
+                    preferences = preferences,
+                    previewItem = playerState?.currentItem,
+                    previewPositionMs = previewPositionMs,
+                    isPreviewPlaying = playerState?.isPlaying == true,
+                    onBack = { currentDestination = SettingsDestination.MAIN },
+                )
+            }
 
             SettingsDestination.SPOTIFY_IMPORT -> SpotifyImportSettingsScreen(
                 preferences = preferences,
@@ -361,7 +368,7 @@ internal fun LegacyAccountSettingsScreen(
     val canUseDiscordAvatar = isLoggedIn || discordToken.isNotBlank()
     val discordStatusErrorText = stringResource("discord_status_error")
     val openUrl: (String) -> Unit = { url ->
-        runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url.trim())) }
+        val _ = runCatching { java.awt.Desktop.getDesktop().browse(java.net.URI(url.trim())) }
     }
 
     fun refreshDiscordProfile(token: String) {
@@ -881,11 +888,10 @@ internal fun LegacyAppearanceSettingsScreen(
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-        val backgroundStyleOptions = mutableListOf<String>()
-        for (style in PlayerBackgroundStyle.entries) {
-            backgroundStyleOptions.add(stringResource(style.labelKey))
+        val backgroundStyleOptions = PlayerBackgroundStyle.entries.map { style ->
+            playerBackgroundStyleLabel(style)
         }
-        val backgroundStyleSubtitle = stringResource(playerBackgroundStyle.labelKey)
+        val backgroundStyleSubtitle = playerBackgroundStyleLabel(playerBackgroundStyle)
         SettingsDropdown(
             title = stringResource("player_background_style"),
             subtitle = backgroundStyleSubtitle,
@@ -1060,6 +1066,7 @@ internal fun LegacyAppearanceSettingsScreen(
                 LibraryFilter.ALBUMS -> stringResource("albums")
                 LibraryFilter.PLAYLISTS -> stringResource("playlists")
                 LibraryFilter.LIBRARY -> stringResource("filter_library")
+                LibraryFilter.PODCASTS -> stringResource("filter_podcasts")
                 LibraryFilter.DOWNLOADED -> stringResource("filter_downloaded")
             }
         }
@@ -2165,39 +2172,48 @@ private fun AboutTeamMemberCard(
 
 // === Helper Components ===
 
+internal val LocalSettingsEmbeddedInDialog = compositionLocalOf { false }
+
 @Composable
 internal fun SettingsSubScreen(
     title: String,
     onBack: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val embeddedInDialog = LocalSettingsEmbeddedInDialog.current
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = IconAssets.arrowBack(),
-                    contentDescription = stringResource("back"),
+        if (!embeddedInDialog) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = IconAssets.arrowBack(),
+                        contentDescription = stringResource("back"),
+                    )
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineMedium,
                 )
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineMedium,
-            )
         }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            contentPadding = PaddingValues(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(if (embeddedInDialog) 8.dp else 4.dp),
+            contentPadding = if (embeddedInDialog) {
+                PaddingValues(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 24.dp)
+            } else {
+                PaddingValues(horizontal = 12.dp)
+            },
         ) {
             item {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(if (embeddedInDialog) 8.dp else 4.dp),
                     content = content,
                 )
             }
@@ -2422,6 +2438,7 @@ internal fun SettingsSlider(
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
+            @Suppress("DEPRECATION")
             Slider(
                 value = value,
                 onValueChange = onValueChange,
@@ -2526,19 +2543,45 @@ internal fun SettingsInfoItem(
         shape = RoundedCornerShape(12.dp),
         tonalElevation = 2.dp,
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        val stackVertically = title.length > 34 || value.length > 28
+        if (stackVertically) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                if (value.isNotBlank()) {
+                    Text(
+                        text = value,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

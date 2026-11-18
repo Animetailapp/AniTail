@@ -8,6 +8,7 @@ enum class LibraryFilter {
     SONGS,
     ALBUMS,
     ARTISTS,
+    PODCASTS,
     DOWNLOADED,
 }
 
@@ -74,6 +75,12 @@ enum class AlbumFilter {
 enum class ArtistFilter {
     LIKED,
     LIBRARY,
+}
+
+enum class PodcastFilter {
+    EPISODES,
+    CHANNELS,
+    DOWNLOADED,
 }
 
 val SmallGridThumbnailHeight = 104.dp

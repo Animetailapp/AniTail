@@ -1,11 +1,23 @@
 package com.anitail.desktop
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -28,16 +40,29 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -90,19 +115,34 @@ import com.anitail.desktop.update.DesktopUpdateInstaller
 import com.anitail.desktop.update.DesktopUpdater
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.PlatformTextInputInterceptor
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.anitail.desktop.ui.AnitailTheme
 import com.anitail.desktop.ui.DefaultThemeColor
 import com.anitail.desktop.ui.IconAssets
 import com.anitail.desktop.ui.extractThemeColor
 import com.anitail.desktop.ui.loadBitmapResource
+import com.anitail.desktop.ui.component.AudioSettingsDialog
 import com.anitail.desktop.ui.component.BottomSheet
 import com.anitail.desktop.ui.component.DesktopTopBar
+import com.anitail.desktop.ui.component.DesktopCastDialog
+import com.anitail.desktop.ui.component.FloatingSearchOverlay
+import com.anitail.desktop.ui.component.LyricsSideSheet
 import com.anitail.desktop.ui.component.MiniPlayer
+import com.anitail.desktop.ui.component.QueueSideSheet
+import com.anitail.desktop.ui.component.ShortcutsOverlay
 import com.anitail.desktop.ui.component.SongRecognitionDialog
+import com.anitail.desktop.ui.component.VideoFullscreenOverlay
+import com.anitail.desktop.ui.component.VideoMiniViewer
+import com.anitail.desktop.ui.component.YouTubeChannelPickerDialog
+import com.anitail.desktop.ui.window.MiniplayerWindow
+import androidx.compose.ui.window.WindowPlacement
 import com.anitail.desktop.ui.component.rememberBottomSheetState
+import com.anitail.desktop.ui.screen.AboutArtistScreen
 import com.anitail.desktop.ui.screen.AlbumDetailScreen
+import com.anitail.desktop.ui.screen.ArtistAboutArgs
 import com.anitail.desktop.ui.screen.ArtistDetailScreen
 import com.anitail.desktop.ui.screen.ArtistItemsScreen
 import com.anitail.desktop.ui.screen.ChartsScreen
@@ -114,8 +154,11 @@ import com.anitail.desktop.ui.screen.library.LibraryScreen
 import com.anitail.desktop.ui.screen.MoodAndGenresScreen
 import com.anitail.desktop.ui.screen.NewReleaseScreen
 import com.anitail.desktop.ui.screen.PlayerScreen
+import com.anitail.desktop.player.PlayerState
+import com.anitail.desktop.player.rememberPlayerState
 import com.anitail.desktop.ui.screen.PlaylistDetailScreen
 import com.anitail.desktop.ui.screen.SearchScreen
+import com.anitail.desktop.ui.screen.SettingsDialogOverlay
 import com.anitail.desktop.ui.screen.SettingsScreen
 import com.anitail.desktop.ui.screen.StatsScreen
 import com.anitail.desktop.ui.screen.songItemToLibraryItem
@@ -134,17 +177,22 @@ import com.anitail.innertube.pages.ChartsPage
 import com.anitail.innertube.pages.ExplorePage
 import com.anitail.innertube.pages.HomePage
 import com.anitail.innertube.models.WatchEndpoint
+import com.anitail.innertube.utils.sanitizeCookieString
+import com.anitail.desktop.ui.screen.home.HomeInfinitePaginationState
+import com.anitail.desktop.ui.screen.home.loadNextHomePage
 import com.anitail.shared.model.LibraryItem
 import java.net.URI
 import java.time.LocalDateTime
+import androidx.compose.ui.unit.IntOffset
+import com.anitail.desktop.ui.component.ImageCache
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import org.jetbrains.skia.Image
 import com.anitail.desktop.sync.LibrarySyncService
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -152,6 +200,7 @@ import androidx.compose.ui.window.FrameWindowScope
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.rememberWindowState
 import com.sun.jna.platform.win32.User32
+import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import java.awt.Toolkit
 import java.awt.event.ComponentAdapter
@@ -172,6 +221,7 @@ private enum class DesktopScreen {
     Stats,
     Settings,
     ArtistDetail,
+    AboutArtist,
     ArtistItems,
     AlbumDetail,
     PlaylistDetail,
@@ -385,6 +435,7 @@ private data class DetailNavigation(
     val browseId: String? = null,
     val browseParams: String? = null,
     val searchQuery: String? = null,
+    val artistAboutArgs: ArtistAboutArgs? = null,
 )
 
 fun main(args: Array<String>) {
@@ -431,6 +482,8 @@ private fun realMain(args: Array<String>) {
     application {
         val windowState = rememberWindowState(width = 1400.dp, height = 900.dp)
         val windowIcon = remember { loadBitmapResource("drawable/ic_anitail.png") }
+        val playerState = rememberPlayerState()
+
         Window(
             onCloseRequest = ::exitApplication,
             title = "AniTail Desktop",
@@ -440,7 +493,18 @@ private fun realMain(args: Array<String>) {
         ) {
             AniTailDesktopApp(
                 windowState = windowState,
+                playerState = playerState,
                 onCloseRequest = ::exitApplication,
+            )
+        }
+
+        if (playerState.showMiniPlayer) {
+            MiniplayerWindow(
+                playerState = playerState,
+                onCloseRequest = { playerState.showMiniPlayer = false },
+                onRestoreMainWindow = {
+                    windowState.isMinimized = false
+                },
             )
         }
     }
@@ -450,6 +514,7 @@ private fun realMain(args: Array<String>) {
 @Composable
 private fun FrameWindowScope.AniTailDesktopApp(
     windowState: WindowState,
+    playerState: PlayerState,
     onCloseRequest: () -> Unit,
 ) {
     // Replace legacy store with Database and Preferences
@@ -459,7 +524,6 @@ private fun FrameWindowScope.AniTailDesktopApp(
     val authService = remember { DesktopAuthService() }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val playerState = rememberPlayerState()
     val appLanguage by preferences.appLanguage.collectAsState()
     val strings = remember(appLanguage) { AndroidStringLoader.load(appLanguage) }
     val darkMode by preferences.darkMode.collectAsState()
@@ -592,9 +656,13 @@ private fun FrameWindowScope.AniTailDesktopApp(
         }
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(playerState, database, downloadService, preferences) {
         onDispose {
             DesktopAutoBackupService.stop()
+            playerState.release()
+            downloadService.close()
+            database.flush()
+            preferences.flush()
         }
     }
 
@@ -611,7 +679,6 @@ private fun FrameWindowScope.AniTailDesktopApp(
         lastFmSongStartTimeMs = System.currentTimeMillis()
         hasScrobbledCurrentSong = false
         if (currentItem != null) {
-            DesktopLastFmService.updateNowPlaying(currentItem)
             DesktopLastFmService.retryPendingScrobbles()
         }
     }
@@ -662,13 +729,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
     // Library state from Database
     val songs by database.songsInLibrary().collectAsState(initial = emptyList())
-    val allSongs by database.songs.collectAsState(initial = emptyList())
-    var songsById by remember { mutableStateOf<Map<String, SongEntity>>(emptyMap()) }
-    LaunchedEffect(allSongs) {
-        withContext(Dispatchers.Default) {
-            songsById = allSongs.associateBy { it.id }
-        }
-    }
+    val songsById by database.songsById.collectAsState()
+    val allSongs = remember(songsById) { songsById.values.toList() }
     val albums by database.albums.collectAsState(initial = emptyList())
     val artists by database.artists.collectAsState(initial = emptyList())
     val playlists by database.allPlaylists().collectAsState(initial = emptyList())
@@ -688,19 +750,29 @@ private fun FrameWindowScope.AniTailDesktopApp(
         }
     }
 
-    LaunchedEffect(enableDiscordRPC, playerState.isPlaying, playerState.currentItem == null) {
-        val shouldBeRunning = enableDiscordRPC &&
-            playerState.isPlaying && playerState.currentItem != null
-        if (shouldBeRunning) {
+    LaunchedEffect(enableDiscordRPC) {
+        if (enableDiscordRPC) {
             if (discordRPC == null) {
-                discordRPC = DesktopDiscordRPC()
-                discordRpcController = com.anitail.desktop.rpc.DesktopPlayerRpcController(discordRPC!!)
+                val rpc = DesktopDiscordRPC(
+                    tokenProvider = { preferences.discordToken.value },
+                    refreshTokenProvider = { preferences.discordRefreshToken.value },
+                    onTokenRefreshed = { access, refresh ->
+                        preferences.setDiscordToken(access)
+                        if (refresh.isNotBlank()) preferences.setDiscordRefreshToken(refresh)
+                    },
+                )
+                discordRPC = rpc
+                discordRpcController = com.anitail.desktop.rpc.DesktopPlayerRpcController(rpc)
             }
         } else {
-            discordRpcController?.close()
+            val controller = discordRpcController
+            val rpc = discordRPC
             discordRpcController = null
-            discordRPC?.closeRPC()
             discordRPC = null
+            kotlinx.coroutines.withContext(Dispatchers.IO) {
+                controller?.close()
+                rpc?.closeRPC()
+            }
         }
     }
 
@@ -718,9 +790,20 @@ private fun FrameWindowScope.AniTailDesktopApp(
         currentSongId?.let { id -> songsById[id]?.duration }
     }
 
-    LaunchedEffect(currentSongId, currentArtistThumbnail, currentAlbumName, discordRpcController) {
+    LaunchedEffect(
+        enableDiscordRPC,
+        playerState.isPlaying,
+        currentSongId,
+        currentArtistThumbnail,
+        currentAlbumName,
+        discordRpcController,
+    ) {
         val controller = discordRpcController ?: return@LaunchedEffect
-        val item = playerState.currentItem ?: return@LaunchedEffect
+        val item = playerState.currentItem
+        if (!enableDiscordRPC || !playerState.isPlaying || item == null) {
+            controller.clearActivity()
+            return@LaunchedEffect
+        }
 
         val timeStart = System.currentTimeMillis()
         val durationMs = item.durationMs
@@ -746,6 +829,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
     var isHomeLoading by remember { mutableStateOf(false) }
     var isHomeRefreshing by remember { mutableStateOf(false) }
     var isLoadingMore by remember { mutableStateOf(false) }
+    var homePaginationState by remember { mutableStateOf(HomeInfinitePaginationState()) }
     var explorePage by remember { mutableStateOf<ExplorePage?>(null) }
     var chartsPage by remember { mutableStateOf<ChartsPage?>(null) }
     var isExploreLoading by remember { mutableStateOf(false) }
@@ -789,6 +873,20 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             playTime = playTimeMs,
                         ),
                     )
+                }
+            }
+            // Registrar la reproducción en el historial remoto de YouTube Music
+            if (!pauseListenHistory && !YouTube.cookie.isNullOrBlank()) {
+                scope.launch(Dispatchers.IO) {
+                    runCatching {
+                        val trackingUrl = YouTube.player(
+                            videoId = item.id,
+                            client = com.anitail.innertube.models.YouTubeClient.WEB_REMIX,
+                        ).getOrNull()?.playbackTracking?.videostatsPlaybackUrl?.baseUrl
+                        if (trackingUrl != null) {
+                            YouTube.registerPlayback(null, trackingUrl)
+                        }
+                    }.onFailure { System.err.println("Main: registerPlayback failed: ${it.message}") }
                 }
             }
         }
@@ -924,9 +1022,9 @@ private fun FrameWindowScope.AniTailDesktopApp(
                 val relatedEndpoint = nextResult?.relatedEndpoint ?: return@withContext
                 val relatedPage = YouTube.related(relatedEndpoint).getOrNull() ?: return@withContext
                 val relatedSongs = relatedPage.songs
-                relatedSongs.forEach { song ->
-                    database.insertSong(song.toSongEntity(), song.toSongArtistMaps())
-                }
+                database.insertSongsBatch(
+                    relatedSongs.map { song -> song.toSongEntity() to song.toSongArtistMaps() },
+                )
                 database.insertRelatedSongs(item.id, relatedSongs.map { it.id })
             }
         }
@@ -981,7 +1079,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
             username = proxyUsername,
             password = proxyPassword,
         )
-        YouTube.cookie = credentials?.cookie ?: youtubeCookie
+        val activeCookie = sanitizeCookieString(credentials?.cookie ?: youtubeCookie)
+        YouTube.cookie = activeCookie
         YouTube.visitorData = credentials?.visitorData
         YouTube.dataSyncId = normalizeDataSyncId(credentials?.dataSyncId)
         YouTube.proxy = proxyConfig.proxy
@@ -991,7 +1090,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
             hl = resolveContentLanguage(contentLanguage),
             gl = resolveContentCountry(contentCountry)
         )
-        println("Anitail: YouTube API initialized with Cookie: ${youtubeCookie?.take(20)}..., Locale: $contentLanguage-$contentCountry")
+        println("Anitail: YouTube API initialized with Cookie: ${activeCookie?.take(20)}..., Locale: $contentLanguage-$contentCountry")
     }
 
     // Initial page loading and reload on auth changes
@@ -1016,7 +1115,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
             username = proxyUsername,
             password = proxyPassword,
         )
-        YouTube.cookie = credentials?.cookie ?: youtubeCookie
+        val activeCookie = sanitizeCookieString(credentials?.cookie ?: youtubeCookie)
+        YouTube.cookie = activeCookie
         YouTube.visitorData = credentials?.visitorData
         YouTube.dataSyncId = normalizeDataSyncId(credentials?.dataSyncId)
         YouTube.proxy = proxyConfig.proxy
@@ -1035,11 +1135,6 @@ private fun FrameWindowScope.AniTailDesktopApp(
             onLoading = { isHomeLoading = it },
             onPage = { page -> homePage = page },
         )
-        loadExplorePage(
-            onLoading = { isExploreLoading = it },
-            onExplore = { page -> explorePage = page },
-            onCharts = { page -> chartsPage = page },
-        )
         
     }
 
@@ -1056,7 +1151,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
     // Trigger library sync when enabled and cookie available
     LaunchedEffect(ytmSync, authCredentials?.cookie, youtubeCookie) {
-        val activeCookie = authCredentials?.cookie ?: youtubeCookie
+        val activeCookie = sanitizeCookieString(authCredentials?.cookie ?: youtubeCookie)
         if (!shouldStartSync(ytmSync, activeCookie)) return@LaunchedEffect
 
         YouTube.cookie = activeCookie
@@ -1071,6 +1166,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
     }
 
     LaunchedEffect(
+        isSyncing,
         allSongs,
         albums,
         artists,
@@ -1079,7 +1175,9 @@ private fun FrameWindowScope.AniTailDesktopApp(
         events,
         hideExplicit,
         quickPicksMode,
+        homeShuffleSeed,
     ) {
+        if (isSyncing) return@LaunchedEffect
         delay(500)
         withContext(Dispatchers.Default) {
             val recommendations = buildHomeRecommendations(
@@ -1140,7 +1238,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
 
     // Recommendation logic remains similar...
     // [Truncated for brevity, keeping recommendation logic same as before but using updated libraryItems]
-    LaunchedEffect(libraryItems.size) {
+    LaunchedEffect(isSyncing, libraryItems.size, homeShuffleSeed) {
+        if (isSyncing) return@LaunchedEffect
         delay(1000)
         if (libraryItems.size >= 3) {
             withContext(Dispatchers.Default) {
@@ -1215,16 +1314,18 @@ private fun FrameWindowScope.AniTailDesktopApp(
         }
     }
 
-    LaunchedEffect(allSongs.size, hideExplicit) {
+    LaunchedEffect(isSyncing, allSongs.size, hideExplicit, homeShuffleSeed) {
+        if (isSyncing) return@LaunchedEffect
         delay(1000)
-        scope.launch(Dispatchers.IO) {
-            val discover = HomeDiscoveryService.loadDailyDiscover(database, hideExplicit)
-            val community = HomeDiscoveryService.loadCommunityPlaylists(database)
-            withContext(Dispatchers.Main) {
-                dailyDiscover = discover
-                communityPlaylists = community
+        val (discover, community) = withContext(Dispatchers.IO) {
+            coroutineScope {
+                val discoverDeferred = async { HomeDiscoveryService.loadDailyDiscover(database, hideExplicit) }
+                val communityDeferred = async { HomeDiscoveryService.loadCommunityPlaylists(database) }
+                discoverDeferred.await() to communityDeferred.await()
             }
         }
+        dailyDiscover = discover
+        communityPlaylists = community
     }
 
     val allYtItems = remember(homePage, accountPlaylists, similarRecommendations) {
@@ -1240,10 +1341,25 @@ private fun FrameWindowScope.AniTailDesktopApp(
         homeShuffleSeed = System.currentTimeMillis()
         scope.launch {
             isHomeRefreshing = true
-            loadHomePage(
-                onLoading = { isHomeLoading = it },
-                onPage = { page -> homePage = page },
-            )
+            homePaginationState = HomeInfinitePaginationState()
+            YouTube.clear("home:")
+            YouTube.clear("library:")
+            val activeChip = selectedChip
+            if (activeChip != null) {
+                isHomeLoading = true
+                try {
+                    YouTube.home(params = activeChip.endpoint?.params).onSuccess { page ->
+                        homePage = page.copy(chips = homePage?.chips ?: page.chips)
+                    }
+                } finally {
+                    isHomeLoading = false
+                }
+            } else {
+                loadHomePage(
+                    onLoading = { isHomeLoading = it },
+                    onPage = { page -> homePage = page },
+                )
+            }
             if (authCredentials?.cookie?.isNotBlank() == true) {
                 accountInfo = authService.refreshAccountInfo()
                 YouTube.library("FEmusic_liked_playlists").onSuccess { page ->
@@ -1360,6 +1476,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
             }
 
             fun updateSnapModeFromBounds() {
+                if (windowState.placement == WindowPlacement.Fullscreen) return
                 if (windowState.isMinimized) return
                 val workArea = getWorkAreaForWindow(window)
                 val resolved = resolveSnapModeFromBounds(getVisualBoundsForSnap(window), workArea)
@@ -1369,33 +1486,40 @@ private fun FrameWindowScope.AniTailDesktopApp(
             }
 
             fun updateWindowShape() {
-                if (snapMode != WindowSnapMode.FLOATING || isWindowAtWorkArea(window)) {
+                val isFullScreen = windowState.placement == WindowPlacement.Fullscreen ||
+                    runCatching { GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.fullScreenWindow == window }.getOrDefault(false)
+                if (isFullScreen) return
+
+                val _ = runCatching {
+                    if (snapMode != WindowSnapMode.FLOATING || isWindowAtWorkArea(window)) {
+                        val bounds = window.bounds
+                        val width = bounds.width.coerceAtLeast(1)
+                        val height = bounds.height.coerceAtLeast(1)
+                        window.shape = Rectangle2D.Double(
+                            0.0,
+                            0.0,
+                            width.toDouble(),
+                            height.toDouble(),
+                        )
+                        return
+                    }
+                    val radiusPx = with(density) { windowCornerRadius.toPx() }
                     val bounds = window.bounds
                     val width = bounds.width.coerceAtLeast(1)
                     val height = bounds.height.coerceAtLeast(1)
-                    window.shape = Rectangle2D.Double(
+                    window.shape = RoundRectangle2D.Double(
                         0.0,
                         0.0,
                         width.toDouble(),
                         height.toDouble(),
+                        (radiusPx * 2).toDouble(),
+                        (radiusPx * 2).toDouble(),
                     )
-                    return
                 }
-                val radiusPx = with(density) { windowCornerRadius.toPx() }
-                val bounds = window.bounds
-                val width = bounds.width.coerceAtLeast(1)
-                val height = bounds.height.coerceAtLeast(1)
-                window.shape = RoundRectangle2D.Double(
-                    0.0,
-                    0.0,
-                    width.toDouble(),
-                    height.toDouble(),
-                    (radiusPx * 2).toDouble(),
-                    (radiusPx * 2).toDouble(),
-                )
             }
 
             fun updateLastFloatingBounds() {
+                if (windowState.placement == WindowPlacement.Fullscreen) return
                 if (snapMode != WindowSnapMode.FLOATING) return
                 if (isWindowAtWorkArea(window)) return
                 val bounds = window.bounds
@@ -1405,6 +1529,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
             }
 
             fun applyMaximizedBounds() {
+                if (windowState.placement == WindowPlacement.Fullscreen) return
                 if (snapMode == WindowSnapMode.FLOATING) return
                 if (windowState.isMinimized) return
                 applySnapBounds(window, getWorkAreaForWindow(window), snapMode)
@@ -1473,9 +1598,296 @@ private fun FrameWindowScope.AniTailDesktopApp(
                 }
             }
 
-            var showSongRecognitionDialog by remember { mutableStateOf(false) }
+            LaunchedEffect(playerBottomSheetState.isExpanded) {
+                playerState.isPlayerExpanded = playerBottomSheetState.isExpanded
+            }
 
-            Box(modifier = Modifier.fillMaxSize()) {
+            LaunchedEffect(playerState.isFullscreenOverlay) {
+                if (playerState.isFullscreenOverlay) {
+                    val _ = runCatching {
+                        window.shape = null
+                    }
+                    if (windowState.placement != WindowPlacement.Fullscreen) {
+                        windowState.placement = WindowPlacement.Fullscreen
+                    }
+                } else {
+                    if (windowState.placement == WindowPlacement.Fullscreen) {
+                        windowState.placement = WindowPlacement.Floating
+                    }
+                }
+            }
+
+            var showSongRecognitionDialog by remember { mutableStateOf(false) }
+            var showFloatingSearch by remember { mutableStateOf(false) }
+            var showShortcutsOverlay by remember { mutableStateOf(false) }
+            var showLyricsSideSheet by remember { mutableStateOf(false) }
+            var showQueueSideSheet by remember { mutableStateOf(false) }
+            var sideSheetPinned by remember { mutableStateOf(false) }
+            var showMiniPlayerAudioSettings by remember { mutableStateOf(false) }
+            var showSettingsDialog by remember { mutableStateOf(false) }
+            var showChannelPickerDialog by remember { mutableStateOf(false) }
+            var activeTextInputs by remember { mutableIntStateOf(0) }
+            @OptIn(ExperimentalComposeUiApi::class)
+            val textInputInterceptor = remember {
+                PlatformTextInputInterceptor { request, next ->
+                    activeTextInputs++
+                    try {
+                        next.startInputMethod(request)
+                    } finally {
+                        activeTextInputs = (activeTextInputs - 1).coerceAtLeast(0)
+                    }
+                }
+            }
+
+            val rootFocusRequester = remember { FocusRequester() }
+            LaunchedEffect(Unit) {
+                rootFocusRequester.requestFocus()
+            }
+            LaunchedEffect(showShortcutsOverlay, showFloatingSearch) {
+                if (!showShortcutsOverlay && !showFloatingSearch) {
+                    rootFocusRequester.requestFocus()
+                }
+            }
+
+            @OptIn(ExperimentalComposeUiApi::class)
+            InterceptPlatformTextInput(interceptor = textInputInterceptor) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .focusRequester(rootFocusRequester)
+                        .focusable()
+                        .onPreviewKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            val ctrlOrMeta = event.isCtrlPressed || event.isMetaPressed
+                            val isAlt = event.isAltPressed
+                            when {
+                                (ctrlOrMeta && event.key == Key.K) ||
+                                    (!ctrlOrMeta && !isAlt && activeTextInputs == 0 && event.key == Key.Slash) -> {
+                                    showShortcutsOverlay = false
+                                    showFloatingSearch = !showFloatingSearch
+                                    true
+                                }
+
+                                (ctrlOrMeta && event.key == Key.Slash) || event.key == Key.F1 -> {
+                                    showFloatingSearch = false
+                                    showShortcutsOverlay = !showShortcutsOverlay
+                                    true
+                                }
+
+                                ctrlOrMeta && event.key == Key.Comma -> {
+                                    showSettingsDialog = !showSettingsDialog
+                                    true
+                                }
+
+                                event.key == Key.Escape -> {
+                                    when {
+                                        showSettingsDialog -> {
+                                            showSettingsDialog = false
+                                            true
+                                        }
+                                        showFloatingSearch -> {
+                                            showFloatingSearch = false
+                                            true
+                                        }
+                                        showShortcutsOverlay -> {
+                                            showShortcutsOverlay = false
+                                            true
+                                        }
+                                        playerState.showCastDialog -> {
+                                            playerState.showCastDialog = false
+                                            true
+                                        }
+                                        showMiniPlayerAudioSettings -> {
+                                            showMiniPlayerAudioSettings = false
+                                            true
+                                        }
+                                        showSongRecognitionDialog -> {
+                                            showSongRecognitionDialog = false
+                                            true
+                                        }
+                                        !playerBottomSheetState.isCollapsed && !playerBottomSheetState.isDismissed -> {
+                                            playerBottomSheetState.collapseSoft()
+                                            true
+                                        }
+                                        else -> false
+                                    }
+                                }
+
+                                activeTextInputs == 0 &&
+                                    !showFloatingSearch &&
+                                    !showShortcutsOverlay &&
+                                    !showSongRecognitionDialog &&
+                                    !showMiniPlayerAudioSettings &&
+                                    !showSettingsDialog &&
+                                    !playerState.showCastDialog -> {
+                                    when {
+                                        // Play / Pause (Space)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.Spacebar -> {
+                                            if (playerState.currentItem != null) {
+                                                playerState.togglePlayPause()
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+
+                                        // Siguiente cancion (Ctrl + -> o N)
+                                        (ctrlOrMeta && event.key == Key.DirectionRight) ||
+                                            (!ctrlOrMeta && !isAlt && event.key == Key.N) -> {
+                                            if (playerState.canSkipNext) {
+                                                playerState.skipToNext()
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+
+                                        // Cancion anterior (Ctrl + <- o P)
+                                        (ctrlOrMeta && event.key == Key.DirectionLeft) ||
+                                            (!ctrlOrMeta && !isAlt && event.key == Key.P) -> {
+                                            playerState.skipToPrevious()
+                                            true
+                                        }
+
+                                        // Avanzar / Retroceder en la pista (<- o ->)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.DirectionRight -> {
+                                            if (playerState.currentItem != null) {
+                                                val target = (playerState.position + 5000L).coerceAtMost(playerState.duration)
+                                                playerState.seekTo(target)
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+
+                                        !ctrlOrMeta && !isAlt && event.key == Key.DirectionLeft -> {
+                                            if (playerState.currentItem != null) {
+                                                val target = (playerState.position - 5000L).coerceAtLeast(0L)
+                                                playerState.seekTo(target)
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+
+                                        // Saltar a porcentaje de la pista (0 - 9)
+                                        !ctrlOrMeta && !isAlt && (
+                                            event.key == Key.Zero || event.key == Key.NumPad0 ||
+                                            event.key == Key.One || event.key == Key.NumPad1 ||
+                                            event.key == Key.Two || event.key == Key.NumPad2 ||
+                                            event.key == Key.Three || event.key == Key.NumPad3 ||
+                                            event.key == Key.Four || event.key == Key.NumPad4 ||
+                                            event.key == Key.Five || event.key == Key.NumPad5 ||
+                                            event.key == Key.Six || event.key == Key.NumPad6 ||
+                                            event.key == Key.Seven || event.key == Key.NumPad7 ||
+                                            event.key == Key.Eight || event.key == Key.NumPad8 ||
+                                            event.key == Key.Nine || event.key == Key.NumPad9
+                                        ) -> {
+                                            if (playerState.currentItem != null) {
+                                                val fraction = when (event.key) {
+                                                    Key.Zero, Key.NumPad0 -> 0.0f
+                                                    Key.One, Key.NumPad1 -> 0.1f
+                                                    Key.Two, Key.NumPad2 -> 0.2f
+                                                    Key.Three, Key.NumPad3 -> 0.3f
+                                                    Key.Four, Key.NumPad4 -> 0.4f
+                                                    Key.Five, Key.NumPad5 -> 0.5f
+                                                    Key.Six, Key.NumPad6 -> 0.6f
+                                                    Key.Seven, Key.NumPad7 -> 0.7f
+                                                    Key.Eight, Key.NumPad8 -> 0.8f
+                                                    Key.Nine, Key.NumPad9 -> 0.9f
+                                                    else -> 0.0f
+                                                }
+                                                playerState.seekToProgress(fraction)
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+
+                                        // Reproduccion aleatoria (S)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.S -> {
+                                            playerState.toggleShuffle()
+                                            true
+                                        }
+
+                                        // Cambiar modo de repeticion (R)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.R -> {
+                                            playerState.toggleRepeat()
+                                            true
+                                        }
+
+                                        // Subir / Bajar volumen (Arriba o Abajo)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.DirectionUp -> {
+                                            playerState.stepVolume(0.05)
+                                            true
+                                        }
+
+                                        !ctrlOrMeta && !isAlt && event.key == Key.DirectionDown -> {
+                                            playerState.stepVolume(-0.05)
+                                            true
+                                        }
+
+                                        // Ajuste fino de volumen (+ o -)
+                                        !ctrlOrMeta && !isAlt && (
+                                            event.key == Key.Plus || event.key == Key.Equals || event.key == Key.NumPadAdd
+                                        ) -> {
+                                            playerState.stepVolume(0.02)
+                                            true
+                                        }
+
+                                        !ctrlOrMeta && !isAlt && (
+                                            event.key == Key.Minus || event.key == Key.NumPadSubtract
+                                        ) -> {
+                                            playerState.stepVolume(-0.02)
+                                            true
+                                        }
+
+                                        // Silenciar / Activar sonido (M)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.M -> {
+                                            playerState.toggleMute()
+                                            true
+                                        }
+
+                                        // Panel de letras (L)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.L -> {
+                                            showLyricsSideSheet = !showLyricsSideSheet
+                                            if (showLyricsSideSheet && !sideSheetPinned) {
+                                                showQueueSideSheet = false
+                                            }
+                                            true
+                                        }
+
+                                        // Panel de cola (Q)
+                                        !ctrlOrMeta && !isAlt && event.key == Key.Q -> {
+                                            showQueueSideSheet = !showQueueSideSheet
+                                            if (showQueueSideSheet && !sideSheetPinned) {
+                                                showLyricsSideSheet = false
+                                            }
+                                            true
+                                        }
+
+                                        // Reproductor en pantalla completa (F o T)
+                                        !ctrlOrMeta && !isAlt && (event.key == Key.F || event.key == Key.T) -> {
+                                            if (playerState.currentItem != null) {
+                                                if (playerBottomSheetState.isExpanded) {
+                                                    playerBottomSheetState.collapseSoft()
+                                                } else {
+                                                    playerBottomSheetState.expandSoft()
+                                                }
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        }
+
+                                        else -> false
+                                    }
+                                }
+
+                                else -> false
+                            }
+                        },
+                ) {
                 Scaffold(
                     topBar = {
                         DesktopTopBar(
@@ -1491,7 +1903,14 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                 currentScreen = DesktopScreen.Stats
                             },
                             onSettings = {
-                                currentScreen = DesktopScreen.Settings
+                                showSettingsDialog = true
+                            },
+                            onAccountClick = {
+                                if (!authCredentials?.cookie.isNullOrBlank()) {
+                                    showChannelPickerDialog = true
+                                } else {
+                                    showSettingsDialog = true
+                                }
                             },
                             accountDisplayName = topBarAccountName,
                             accountAvatarUrl = topBarAccountAvatar,
@@ -1539,6 +1958,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             onWindowClose = onCloseRequest,
                             onRefreshHome = if (currentScreen == DesktopScreen.Home) refreshHome else null,
                             onSongRecognition = { showSongRecognitionDialog = true },
+                            onShortcuts = { showShortcutsOverlay = !showShortcutsOverlay },
                             showUpdateBadge = showUpdateBadge,
                         )
                     },
@@ -1549,13 +1969,60 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             .padding(padding)
                             .fillMaxSize()
                     ) {
-                        Column(
+                        Row(
                             modifier = Modifier
                                 .padding(bottom = contentBottomPadding)
-                                .fillMaxSize()
+                                .fillMaxSize(),
+                        ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
                                 .padding(16.dp),
                         ) {
-                            when (currentScreen) {
+                            AnimatedContent(
+                                targetState = currentScreen,
+                                transitionSpec = {
+                                    val tabOrder = mapOf(
+                                        DesktopScreen.Home to 0,
+                                        DesktopScreen.Explore to 1,
+                                        DesktopScreen.Library to 2,
+                                        DesktopScreen.History to 3,
+                                        DesktopScreen.Stats to 4,
+                                        DesktopScreen.Search to 5,
+                                    )
+                                    val fromTab = tabOrder[initialState]
+                                    val toTab = tabOrder[targetState]
+                                    val direction = when {
+                                        fromTab != null && toTab != null -> if (toTab >= fromTab) 1 else -1
+                                        fromTab != null && toTab == null -> 1
+                                        fromTab == null && toTab != null -> -1
+                                        else -> 1
+                                    }
+                                    val spatialSpec = spring<androidx.compose.ui.unit.IntOffset>(
+                                        dampingRatio = 0.84f,
+                                        stiffness = 400f,
+                                    )
+                                    val scaleSpec = spring<Float>(
+                                        dampingRatio = 0.86f,
+                                        stiffness = 440f,
+                                    )
+                                    (fadeIn(animationSpec = tween(200)) +
+                                        slideInHorizontally(animationSpec = spatialSpec) { fullWidth ->
+                                            direction * (fullWidth / 14)
+                                        } +
+                                        scaleIn(initialScale = 0.97f, animationSpec = scaleSpec))
+                                        .togetherWith(
+                                            fadeOut(animationSpec = tween(140)) +
+                                                slideOutHorizontally(animationSpec = spatialSpec) { fullWidth ->
+                                                    -direction * (fullWidth / 18)
+                                                } +
+                                                scaleOut(targetScale = 0.985f, animationSpec = scaleSpec),
+                                        )
+                                },
+                                label = "DesktopScreenTransition",
+                            ) { screen ->
+                            when (screen) {
                         DesktopScreen.Home -> {
                         HomeScreen(
                             homePage = homePage,
@@ -1598,6 +2065,7 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             songArtistMaps = songArtistMaps,
                             onChipSelected = { chip ->
                                 scope.launch {
+                                    homePaginationState = HomeInfinitePaginationState()
                                     handleChipSelection(
                                         chip = chip,
                                         selectedChip = selectedChip,
@@ -1612,15 +2080,23 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             },
                             onLoadMore = {
                                 if (isLoadingMore) return@HomeScreen
-                                val continuation = homePage?.continuation ?: return@HomeScreen
+                                val currentPage = homePage ?: return@HomeScreen
+                                if (currentPage.continuation == null && selectedChip != null) return@HomeScreen
+                                if (currentPage.continuation == null && homePaginationState.exhausted) return@HomeScreen
                                 scope.launch {
                                     isLoadingMore = true
-                                    val nextPage = YouTube.home(continuation).getOrNull()
-                                    if (nextPage != null) {
-                                        homePage = homePage?.copy(
-                                            sections = homePage?.sections.orEmpty() + nextPage.sections,
-                                            continuation = nextPage.continuation,
-                                        )
+                                    val result = loadNextHomePage(
+                                        currentHomePage = currentPage,
+                                        selectedChip = selectedChip,
+                                        paginationState = homePaginationState,
+                                    ) { cont, params ->
+                                        YouTube.home(continuation = cont, params = params).getOrNull()
+                                    }
+                                    if (result != null) {
+                                        homePage = result.first
+                                        homePaginationState = result.second
+                                    } else if (currentPage.continuation == null && selectedChip == null) {
+                                        homePaginationState = homePaginationState.copy(exhausted = true)
                                     }
                                     isLoadingMore = false
                                 }
@@ -2131,6 +2607,28 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             playerState.play(item)
                             playerBottomSheetState.collapseSoft()
                         },
+                        onOpenAbout = { args ->
+                            navigationHistory.add(DesktopScreen.ArtistDetail)
+                            detailNavigation = detailNavigation.copy(artistAboutArgs = args)
+                            currentScreen = DesktopScreen.AboutArtist
+                        },
+                    )
+                }
+
+                DesktopScreen.AboutArtist -> {
+                    val args = detailNavigation.artistAboutArgs
+                    AboutArtistScreen(
+                        artistId = args?.artistId ?: detailNavigation.artistId.orEmpty(),
+                        artistName = args?.artistName ?: detailNavigation.artistName.orEmpty(),
+                        thumbnailUrl = args?.thumbnailUrl,
+                        description = args?.description,
+                        subscriberCountText = args?.subscriberCountText,
+                        monthlyListenerCount = args?.monthlyListenerCount,
+                        viewCount = args?.viewCount,
+                        catalogTitles = args?.catalogTitles.orEmpty(),
+                        onBack = {
+                            currentScreen = navigationHistory.removeLastOrNull() ?: DesktopScreen.ArtistDetail
+                        },
                     )
                 }
 
@@ -2190,6 +2688,8 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             )
                             currentScreen = DesktopScreen.ArtistDetail
                         },
+                        database = database,
+                        downloadService = downloadService,
                     )
                 }
 
@@ -2209,6 +2709,16 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             )
                             currentScreen = DesktopScreen.ArtistDetail
                         },
+                        onAlbumClick = { albumId, albumName ->
+                            navigationHistory.add(DesktopScreen.PlaylistDetail)
+                            detailNavigation = detailNavigation.copy(
+                                albumId = albumId,
+                                albumName = albumName,
+                            )
+                            currentScreen = DesktopScreen.AlbumDetail
+                        },
+                        database = database,
+                        downloadService = downloadService,
                     )
                 }
 
@@ -2248,9 +2758,33 @@ private fun FrameWindowScope.AniTailDesktopApp(
                             playerState.play(item)
                             playerBottomSheetState.collapseSoft()
                         },
+                        downloadService = downloadService,
                     )
                 }
                             }
+                            }
+                        }
+                        LyricsSideSheet(
+                            visible = showLyricsSideSheet &&
+                                playerState.currentItem != null &&
+                                !playerBottomSheetState.isExpanded,
+                            playerState = playerState,
+                            database = database,
+                            onClose = { showLyricsSideSheet = false },
+                            pinned = sideSheetPinned,
+                            onTogglePin = { sideSheetPinned = !sideSheetPinned },
+                            modifier = Modifier.padding(top = 12.dp, bottom = 12.dp, end = 12.dp),
+                        )
+                        QueueSideSheet(
+                            visible = showQueueSideSheet &&
+                                playerState.currentItem != null &&
+                                !playerBottomSheetState.isExpanded,
+                            playerState = playerState,
+                            onClose = { showQueueSideSheet = false },
+                            pinned = sideSheetPinned,
+                            onTogglePin = { sideSheetPinned = !sideSheetPinned },
+                            modifier = Modifier.padding(top = 12.dp, bottom = 12.dp, end = 12.dp),
+                        )
                         }
 
                         BottomSheet(
@@ -2268,6 +2802,40 @@ private fun FrameWindowScope.AniTailDesktopApp(
                                     MiniPlayer(
                                         playerState = playerState,
                                         onOpenFullPlayer = { playerBottomSheetState.expandSoft() },
+                                        onToggleLyricsSideSheet = {
+                                            showLyricsSideSheet = !showLyricsSideSheet
+                                            if (showLyricsSideSheet && !sideSheetPinned) {
+                                                showQueueSideSheet = false
+                                            }
+                                        },
+                                        onToggleQueueSideSheet = {
+                                            showQueueSideSheet = !showQueueSideSheet
+                                            if (showQueueSideSheet && !sideSheetPinned) {
+                                                showLyricsSideSheet = false
+                                            }
+                                        },
+                                        isLyricsSideSheetOpen = showLyricsSideSheet,
+                                        isQueueSideSheetOpen = showQueueSideSheet,
+                                        onOpenAudioSettings = { showMiniPlayerAudioSettings = true },
+                                        onToggleMiniPlayer = { playerState.toggleMiniPlayer() },
+                                        database = database,
+                                        downloadService = downloadService,
+                                        onOpenArtist = { artistId, artistName ->
+                                            navigationHistory.add(currentScreen)
+                                            detailNavigation = detailNavigation.copy(
+                                                artistId = artistId,
+                                                artistName = artistName,
+                                            )
+                                            currentScreen = DesktopScreen.ArtistDetail
+                                        },
+                                        onOpenAlbum = { albumId, albumName ->
+                                            navigationHistory.add(currentScreen)
+                                            detailNavigation = detailNavigation.copy(
+                                                albumId = albumId,
+                                                albumName = albumName,
+                                            )
+                                            currentScreen = DesktopScreen.AlbumDetail
+                                        },
                                     )
                                 }
                             },
@@ -2304,7 +2872,12 @@ private fun FrameWindowScope.AniTailDesktopApp(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .height(navigationBarHeight)
-                        .offset(y = navigationBarHeight * playerBottomSheetState.progress.coerceIn(0f, 1f)),
+                        .offset {
+                            IntOffset(
+                                0,
+                                (navigationBarHeight.toPx() * playerBottomSheetState.progress.coerceIn(0f, 1f)).roundToInt(),
+                            )
+                        },
                     containerColor = if (pureBlackEnabled) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
                     contentColor = if (pureBlackEnabled) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                 ) {
@@ -2376,6 +2949,134 @@ private fun FrameWindowScope.AniTailDesktopApp(
                         }
                     }
                 )
+
+                FloatingSearchOverlay(
+                    visible = showFloatingSearch,
+                    database = database,
+                    onDismiss = { showFloatingSearch = false },
+                    onSubmitSearch = { query ->
+                        showFloatingSearch = false
+                        navigationHistory.add(currentScreen)
+                        detailNavigation = detailNavigation.copy(searchQuery = query)
+                        currentScreen = DesktopScreen.Search
+                    },
+                    onPlayItem = { item ->
+                        showFloatingSearch = false
+                        playerState.play(item)
+                        playerBottomSheetState.collapseSoft()
+                    },
+                    onOpenArtist = { id, name ->
+                        showFloatingSearch = false
+                        openArtist(id, name)
+                    },
+                    onOpenAlbum = { id, name ->
+                        showFloatingSearch = false
+                        openAlbum(id, name)
+                    },
+                    onOpenPlaylist = { id, name ->
+                        showFloatingSearch = false
+                        openPlaylist(id, name)
+                    },
+                )
+
+                ShortcutsOverlay(
+                    visible = showShortcutsOverlay,
+                    onDismiss = { showShortcutsOverlay = false },
+                )
+
+                AudioSettingsDialog(
+                    visible = showMiniPlayerAudioSettings,
+                    volume = playerState.volume,
+                    onVolumeChange = { playerState.updateVolume(it) },
+                    onDismiss = { showMiniPlayerAudioSettings = false },
+                )
+
+                SettingsDialogOverlay(
+                    visible = showSettingsDialog,
+                    onDismiss = { showSettingsDialog = false },
+                    preferences = preferences,
+                    downloadService = downloadService,
+                    authService = authService,
+                    authCredentials = authCredentials,
+                    accountInfo = accountInfo,
+                    playerState = playerState,
+                    onOpenLogin = {},
+                    onAuthChanged = { authCredentials = it },
+                )
+
+                YouTubeChannelPickerDialog(
+                    visible = showChannelPickerDialog,
+                    authService = authService,
+                    onDismiss = { showChannelPickerDialog = false },
+                    onChannelSwitched = {
+                        authCredentials = authService.credentials
+                        refreshHome()
+                    },
+                    onSignInAgain = {
+                        showSettingsDialog = true
+                    },
+                )
+
+                // Floating PiP Video Viewer (visible when player is collapsed)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(
+                            end = 24.dp,
+                            bottom = if (playerState.currentItem != null) 96.dp else 24.dp,
+                        ),
+                ) {
+                    VideoMiniViewer(
+                        playerState = playerState,
+                        onOpenFullPlayer = { playerBottomSheetState.expandSoft() },
+                    )
+                }
+
+                // Immersive Fullscreen Theater Overlay
+                if (playerState.isFullscreenOverlay) {
+                    val currentFullscreenItem = playerState.currentItem
+                    val currentFullscreenSong = currentFullscreenItem?.id?.let { songsById[it] }
+                    VideoFullscreenOverlay(
+                        playerState = playerState,
+                        isLiked = currentFullscreenSong?.liked == true,
+                        onToggleLike = {
+                            val current = currentFullscreenItem ?: return@VideoFullscreenOverlay
+                            scope.launch {
+                                if (currentFullscreenSong == null) {
+                                    database.insertSong(current.toSongEntity().copy(liked = true))
+                                } else {
+                                    database.toggleSongLike(current.id)
+                                }
+                            }
+                        },
+                        songRomanizeLyrics = currentFullscreenSong?.romanizeLyrics ?: true,
+                        onSetSongRomanizeLyrics = { enabled ->
+                            val current = currentFullscreenItem ?: return@VideoFullscreenOverlay
+                            scope.launch {
+                                if (currentFullscreenSong == null) {
+                                    database.insertSong(current.toSongEntity().copy(romanizeLyrics = enabled))
+                                } else {
+                                    database.updateSong(currentFullscreenSong.copy(romanizeLyrics = enabled))
+                                }
+                            }
+                        },
+                        onExitFullscreen = {
+                            playerState.isFullscreenOverlay = false
+                            if (windowState.placement == WindowPlacement.Fullscreen) {
+                                windowState.placement = WindowPlacement.Floating
+                            }
+                        },
+                    )
+                }
+
+                // Cast to TV & Speakers Dialog
+                if (playerState.showCastDialog) {
+                    DesktopCastDialog(
+                        playerState = playerState,
+                        onDismissRequest = { playerState.showCastDialog = false },
+                    )
+                }
+            }
             }
         }
         }
@@ -2384,11 +3085,11 @@ private fun FrameWindowScope.AniTailDesktopApp(
     // El reproductor nativo ahora actualiza la posición automáticamente
 }
 
-private suspend fun fetchThemeColorFromUrl(url: String): Color? = withContext(Dispatchers.IO) {
-    val bytes = runCatching { URI(url).toURL().readBytes() }.getOrNull() ?: return@withContext null
-    val bitmap = runCatching { Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
-        ?: return@withContext null
-    runCatching { bitmap.extractThemeColor() }.getOrNull()
+private suspend fun fetchThemeColorFromUrl(url: String): Color? {
+    val bitmap = ImageCache.loadOrFetch(url, maxDimensionPx = 768) ?: return null
+    return withContext(Dispatchers.Default) {
+        runCatching { bitmap.extractThemeColor() }.getOrNull()
+    }
 }
 
 private data class DesktopProxyConfig(

@@ -14,6 +14,7 @@ data class PodcastPage(
     val episodes: List<EpisodeItem>,
     val continuation: String?,
     val isChannelSubscribed: Boolean = false,
+    val description: String? = null,
 ) {
     companion object {
         fun fromMusicMultiRowListItemRenderer(

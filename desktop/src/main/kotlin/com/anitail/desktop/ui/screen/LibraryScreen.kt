@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,9 +53,15 @@ fun LibraryScreen(
         )
         Spacer(modifier = Modifier.height(12.dp))
 
-        val playlists = items.filter { it.playbackUrl.contains("playlist?list=") }
-        val artists = items.filter { it.playbackUrl.contains("/channel/") }
-        val songs = items.filterNot { it in playlists || it in artists }
+        val playlists = remember(items) { items.filter { it.playbackUrl.contains("playlist?list=") } }
+        val artists = remember(items) { items.filter { it.playbackUrl.contains("/channel/") } }
+        val songs = remember(items, playlists, artists) {
+            val excludedIds = HashSet<String>(playlists.size + artists.size).apply {
+                playlists.forEach { add(it.id) }
+                artists.forEach { add(it.id) }
+            }
+            items.filterNot { it.id in excludedIds }
+        }
 
         when (filterState.value) {
             LibraryFilter.TODOS -> {
@@ -119,7 +126,10 @@ private fun HorizontalItemRow(
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(items) { item ->
+        items(
+            items = items,
+            key = { it.id },
+        ) { item ->
             Column(
                 modifier = Modifier
                     .width(160.dp)

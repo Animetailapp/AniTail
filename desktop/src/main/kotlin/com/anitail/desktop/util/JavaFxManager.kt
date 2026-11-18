@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object JavaFxManager {
     private val initialized = AtomicBoolean(false)
+    @Volatile
     private var available = true
     
     /**

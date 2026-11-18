@@ -1,17 +1,36 @@
 package com.anitail.desktop.ui
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.Shapes
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asSkiaBitmap
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalLocaleList
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.intl.LocaleList
+import androidx.compose.ui.unit.dp
 import com.anitail.desktop.storage.DarkModePreference
 import com.anitail.shared.ui.theme.AppTypography
 import com.materialkolor.MaterialKolors
@@ -20,9 +39,18 @@ import com.materialkolor.hct.Hct
 import com.materialkolor.scheme.DynamicScheme
 import com.materialkolor.scheme.SchemeTonalSpot
 import com.materialkolor.score.Score
+import org.jetbrains.skia.FontMgr
+import org.jetbrains.skia.FontStyle
+import org.jetbrains.skia.Image as SkiaImage
+import org.jetbrains.skia.Paint as SkiaPaint
+import org.jetbrains.skia.Rect as SkiaRect
+import org.jetbrains.skia.SamplingMode
+import org.jetbrains.skia.Surface as SkiaSurface
 import java.util.Calendar
+import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 fun isNight(): Boolean {
     val calendar = Calendar.getInstance()
@@ -31,6 +59,143 @@ fun isNight(): Boolean {
 }
 
 val DefaultThemeColor = Color(0xFFED5564)
+
+val AnitailShapes = Shapes(
+    extraSmall = RoundedCornerShape(16.dp),
+    small = RoundedCornerShape(20.dp),
+    medium = RoundedCornerShape(24.dp),
+    large = RoundedCornerShape(28.dp),
+    extraLarge = RoundedCornerShape(32.dp),
+)
+
+@Composable
+private fun rememberExpressiveTypography(
+    localeList: LocaleList = LocalLocaleList.current,
+): Typography {
+    val primaryTag = localeList.firstOrNull()?.toLanguageTag() ?: Locale.getDefault().toLanguageTag()
+    val resolvedFamily = remember(primaryTag) {
+        resolveLocaleAwareSystemFontFamily(primaryTag)
+    }
+    return remember(resolvedFamily, localeList) {
+        buildExpressiveTypography(
+            fontFamily = resolvedFamily,
+            localeList = localeList,
+        )
+    }
+}
+
+private fun buildExpressiveTypography(
+    fontFamily: FontFamily,
+    localeList: LocaleList,
+): Typography = Typography(
+    fontFamily = fontFamily,
+    displayLarge = AppTypography.displayLarge.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.Bold,
+        localeList = localeList,
+    ),
+    displayMedium = AppTypography.displayMedium.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.Bold,
+        localeList = localeList,
+    ),
+    displaySmall = AppTypography.displaySmall.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.Bold,
+        localeList = localeList,
+    ),
+    headlineLarge = AppTypography.headlineLarge.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.Bold,
+        localeList = localeList,
+    ),
+    headlineMedium = AppTypography.headlineMedium.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.Bold,
+        localeList = localeList,
+    ),
+    headlineSmall = AppTypography.headlineSmall.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.Bold,
+        localeList = localeList,
+    ),
+    titleLarge = AppTypography.titleLarge.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.SemiBold,
+        localeList = localeList,
+    ),
+    titleMedium = AppTypography.titleMedium.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.SemiBold,
+        localeList = localeList,
+    ),
+    titleSmall = AppTypography.titleSmall.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.SemiBold,
+        localeList = localeList,
+    ),
+    bodyLarge = AppTypography.bodyLarge.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.Normal,
+        localeList = localeList,
+    ),
+    bodyMedium = AppTypography.bodyMedium.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.Normal,
+        localeList = localeList,
+    ),
+    bodySmall = AppTypography.bodySmall.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.Normal,
+        localeList = localeList,
+    ),
+    labelLarge = AppTypography.labelLarge.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.Medium,
+        localeList = localeList,
+    ),
+    labelMedium = AppTypography.labelMedium.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.Medium,
+        localeList = localeList,
+    ),
+    labelSmall = AppTypography.labelSmall.copy(
+        fontFamily = fontFamily,
+        fontWeight = FontWeight.Medium,
+        localeList = localeList,
+    ),
+)
+
+@OptIn(ExperimentalTextApi::class)
+private fun resolveLocaleAwareSystemFontFamily(languageTag: String): FontFamily =
+    runCatching {
+        val locale = Locale.forLanguageTag(languageTag)
+        val sample = locale.getDisplayName(locale)
+        val manager = FontMgr.default
+        val base = manager.matchFamilyStyle(null, FontStyle.NORMAL)
+            ?: return@runCatching FontFamily.Default
+        try {
+            val missingCodePoint = sample.codePoints().toArray().firstOrNull {
+                base.getUTF32Glyph(it).toInt() == 0
+            } ?: return@runCatching FontFamily.Default
+
+            val matched = manager.matchFamilyStyleCharacter(
+                base.familyName,
+                FontStyle.NORMAL,
+                arrayOf(languageTag),
+                missingCodePoint,
+            ) ?: return@runCatching FontFamily.Default
+
+            try {
+                val familyName = matched.familyName
+                if (familyName.isNotBlank()) FontFamily(familyName) else FontFamily.Default
+            } finally {
+                matched.close()
+            }
+        } finally {
+            base.close()
+        }
+    }.getOrDefault(FontFamily.Default)
 
 @Composable
 fun AnitailTheme(
@@ -64,9 +229,14 @@ fun AnitailTheme(
         }
     }
 
+    val motionScheme = remember { MotionScheme.expressive() }
+    val typography = rememberExpressiveTypography()
+
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = AppTypography,
+        motionScheme = motionScheme,
+        shapes = AnitailShapes,
+        typography = typography,
         content = content,
     )
 }
@@ -200,9 +370,34 @@ internal fun ImageBitmap.extractGradientColors(): List<Color> {
     }
 }
 
+private fun ImageBitmap.downsampleForColorSampling(maxSize: Int = 64): ImageBitmap {
+    if (width <= maxSize && height <= maxSize) return this
+    val scale = maxSize.toFloat() / max(width, height).toFloat()
+    val dstW = (width * scale).roundToInt().coerceAtLeast(1)
+    val dstH = (height * scale).roundToInt().coerceAtLeast(1)
+    return runCatching {
+        SkiaImage.makeFromBitmap(asSkiaBitmap()).use { src ->
+            SkiaSurface.makeRasterN32Premul(dstW, dstH).use { surface ->
+                SkiaPaint().use { paint ->
+                    surface.canvas.drawImageRect(
+                        src,
+                        SkiaRect.makeWH(width.toFloat(), height.toFloat()),
+                        SkiaRect.makeWH(dstW.toFloat(), dstH.toFloat()),
+                        SamplingMode.LINEAR,
+                        paint,
+                        true,
+                    )
+                }
+                surface.makeImageSnapshot().use { it.toComposeImageBitmap() }
+            }
+        }
+    }.getOrDefault(this)
+}
+
 private fun ImageBitmap.sampleColorPopulation(): Map<Int, Int> {
-    val pixelMap = toPixelMap()
-    val step = max(1, min(width, height) / 64)
+    val sampled = downsampleForColorSampling(64)
+    val pixelMap = sampled.toPixelMap()
+    val step = max(1, min(sampled.width, sampled.height) / 64)
     val buckets = mutableMapOf<Int, Int>()
 
     var y = 0

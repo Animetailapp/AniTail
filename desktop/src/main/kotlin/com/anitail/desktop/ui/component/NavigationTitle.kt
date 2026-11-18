@@ -28,6 +28,7 @@ fun NavigationTitle(
     label: String? = null,
     thumbnail: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
+    onPlayAllClick: (() -> Unit)? = null,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -61,6 +62,16 @@ fun NavigationTitle(
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 1,
             )
+        }
+
+        if (onPlayAllClick != null) {
+            androidx.compose.material3.IconButton(onClick = onPlayAllClick) {
+                Icon(
+                    imageVector = IconAssets.play(),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
 
         if (onClick != null) {

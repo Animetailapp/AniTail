@@ -61,7 +61,12 @@ object DesktopLastFmService {
     }
 
     private val apiConfig: ApiConfig by lazy { loadApiConfig() }
+    private val pendingLock = Any()
+
+    @Volatile
     private var session: Session? = null
+
+    @Volatile
     private var lastNowPlayingSignature: String? = null
 
     init {
@@ -70,6 +75,8 @@ object DesktopLastFmService {
     }
 
     fun isConfigured(): Boolean = apiConfig.hasCredentials
+
+    internal fun currentApiKey(): String = apiConfig.apiKey
 
     fun isLoggedIn(): Boolean {
         return preferences.lastFmEnabled.value && preferences.lastFmSessionKey.value.isNotBlank()
@@ -367,22 +374,24 @@ object DesktopLastFmService {
         val safeTitle = title.trim()
         if (safeArtist.isBlank() || safeTitle.isBlank()) return@withContext
         val nowMs = System.currentTimeMillis()
-        val current = readPendingScrobbles().toMutableList()
-        val duplicateExists = current.any { pending ->
-            pending.artist == safeArtist &&
-                pending.title == safeTitle &&
-                ((pending.timestamp == timestamp) || (nowMs - pending.addedAt) < 120_000L)
+        synchronized(pendingLock) {
+            val current = readPendingScrobbles().toMutableList()
+            val duplicateExists = current.any { pending ->
+                pending.artist == safeArtist &&
+                    pending.title == safeTitle &&
+                    ((pending.timestamp == timestamp) || (nowMs - pending.addedAt) < 120_000L)
+            }
+            if (duplicateExists) return@withContext
+            current += PendingScrobble(
+                artist = safeArtist,
+                title = safeTitle,
+                album = album?.trim()?.takeIf { it.isNotBlank() },
+                timestamp = timestamp,
+                duration = duration,
+                addedAt = nowMs,
+            )
+            writePendingScrobbles(current)
         }
-        if (duplicateExists) return@withContext
-        current += PendingScrobble(
-            artist = safeArtist,
-            title = safeTitle,
-            album = album?.trim()?.takeIf { it.isNotBlank() },
-            timestamp = timestamp,
-            duration = duration,
-            addedAt = nowMs,
-        )
-        writePendingScrobbles(current)
     }
 
     suspend fun loveTrack(artist: String, title: String): LastFmServiceResult<Unit> = withContext(Dispatchers.IO) {
@@ -489,7 +498,7 @@ object DesktopLastFmService {
         }.getOrDefault(null to null)
     }
 
-    private fun readPendingScrobbles(): List<PendingScrobble> {
+    private fun readPendingScrobbles(): List<PendingScrobble> = synchronized(pendingLock) {
         if (!pendingFile.exists()) return emptyList()
         return runCatching {
             val content = Files.readString(pendingFile.toPath(), StandardCharsets.UTF_8)
@@ -519,7 +528,7 @@ object DesktopLastFmService {
         }.getOrDefault(emptyList())
     }
 
-    private fun writePendingScrobbles(items: List<PendingScrobble>) {
+    private fun writePendingScrobbles(items: List<PendingScrobble>) = synchronized(pendingLock) {
         runCatching {
             pendingFile.parentFile?.mkdirs()
             val json = JSONArray()

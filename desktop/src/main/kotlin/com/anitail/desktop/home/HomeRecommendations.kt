@@ -6,7 +6,7 @@ import com.anitail.desktop.db.entities.EventEntity
 import com.anitail.desktop.db.entities.RelatedSongMap
 import com.anitail.desktop.db.entities.SongArtistMap
 import com.anitail.desktop.db.entities.SongEntity
-import com.anitail.desktop.db.relations.primaryArtistIdForSong
+import com.anitail.desktop.db.relations.indexPrimaryArtistIdBySongId
 import java.time.LocalDateTime
 
 sealed interface HomeListenItem {
@@ -155,9 +155,10 @@ private fun buildKeepListening(
         .take(5)
         .map { HomeListenAlbum(it) }
 
+    val primaryArtistBySongId = indexPrimaryArtistIdBySongId(songArtistMaps)
     val artistIds = recentEvents
         .mapNotNull { event ->
-            val artistId = primaryArtistIdForSong(event.songId, songArtistMaps)
+            val artistId = primaryArtistBySongId[event.songId]
             artistId?.let { it to event.playTime }
         }
         .groupBy { it.first }

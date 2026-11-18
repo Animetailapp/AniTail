@@ -1,5 +1,7 @@
 package com.anitail.desktop.auth
 
+import com.anitail.innertube.utils.sanitizeCookieString
+
 data class ParsedAccountToken(
     val cookie: String? = null,
     val visitorData: String? = null,
@@ -32,8 +34,8 @@ object DesktopAccountTokenParser {
             val trimmed = line.trim()
             if (trimmed.isEmpty()) return@forEach
             when {
-                trimmed.contains(COOKIE_PREFIX) -> {
-                    parsed = parsed.copy(cookie = extractValue(trimmed, COOKIE_PREFIX).ifBlank { null })
+                trimmed.contains("INNERTUBE COOKIE", ignoreCase = true) -> {
+                    parsed = parsed.copy(cookie = sanitizeCookieString(trimmed))
                 }
                 trimmed.contains(VISITOR_PREFIX) -> {
                     parsed = parsed.copy(visitorData = extractValue(trimmed, VISITOR_PREFIX).ifBlank { null })
@@ -62,10 +64,10 @@ object DesktopAccountTokenParser {
                         it.contains("__Secure-3PAPISID")
                 }
             if (!cookieLine.isNullOrBlank()) {
-                parsed = parsed.copy(cookie = cookieLine)
+                parsed = parsed.copy(cookie = sanitizeCookieString(cookieLine))
             }
         }
-        return parsed
+        return parsed.copy(cookie = sanitizeCookieString(parsed.cookie))
     }
 
     fun buildTokenText(credentials: AuthCredentials): String {

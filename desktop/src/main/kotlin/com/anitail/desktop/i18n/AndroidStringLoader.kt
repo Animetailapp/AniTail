@@ -2,6 +2,7 @@ package com.anitail.desktop.i18n
 
 import java.io.InputStream
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
 import org.w3c.dom.Node
@@ -17,15 +18,26 @@ object AndroidStringLoader {
         isIgnoringComments = true
         isNamespaceAware = false
     }
+    private val bundlesCache = ConcurrentHashMap<String, StringsBundle>()
+    private val resolverCache = ConcurrentHashMap<String, StringResolver>()
 
     fun load(appLanguage: String): StringResolver {
-        val classLoader = AndroidStringLoader::class.java.classLoader
-        val base = loadBundle("values/strings.xml", classLoader)
         val locale = resolveLocale(appLanguage)
-        val localized = resolveCandidatePath(appLanguage, locale, classLoader)
-            ?.let { loadBundle(it, classLoader) }
-        val merged = mergeBundles(base, localized)
-        return StringResolver(locale, merged, base)
+        val cacheKey = "$appLanguage|${locale.toLanguageTag()}"
+        return resolverCache.computeIfAbsent(cacheKey) {
+            val classLoader = AndroidStringLoader::class.java.classLoader
+            val base = loadBundleCached("values/strings.xml", classLoader)
+            val localized = resolveCandidatePath(appLanguage, locale, classLoader)
+                ?.let { loadBundleCached(it, classLoader) }
+            val merged = mergeBundles(base, localized)
+            StringResolver(locale, merged, base)
+        }
+    }
+
+    private fun loadBundleCached(path: String, classLoader: ClassLoader?): StringsBundle {
+        return bundlesCache.computeIfAbsent(path) {
+            loadBundle(path, classLoader)
+        }
     }
 
     private fun resolveLocale(appLanguage: String): Locale {
@@ -163,6 +175,7 @@ object AndroidStringLoader {
         }
 
     private fun unescapeAndroidString(value: String): String {
+        if ('\\' !in value) return value
         return value
             .replace("\\n", "\n")
             .replace("\\t", "\t")

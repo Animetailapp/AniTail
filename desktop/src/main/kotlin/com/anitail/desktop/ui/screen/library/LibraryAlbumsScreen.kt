@@ -114,10 +114,12 @@ fun LibraryAlbumsScreen(
         }
     }
 
-    val filteredAlbums = remember(albums, filter) {
+    val filteredAlbums = remember(albums, filter, songsByAlbumId) {
         when (filter) {
             AlbumFilter.LIKED -> albums.filter { it.bookmarkedAt != null }
-            AlbumFilter.LIBRARY -> albums.filter { it.inLibrary != null }
+            AlbumFilter.LIBRARY -> albums.filter {
+                it.inLibrary != null || !songsByAlbumId[it.id].isNullOrEmpty()
+            }
         }
     }
     val sortedAlbums = remember(filteredAlbums, sortType, sortDescending, artistNamesByAlbum, playTimeByAlbum) {

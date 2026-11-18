@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -67,6 +68,7 @@ import com.anitail.desktop.db.mapper.toAlbumEntity
 import com.anitail.desktop.db.mapper.toLibraryItem
 import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.db.mapper.toSongArtistMaps
+import com.anitail.desktop.db.relations.indexPrimaryArtistIdBySongId
 import com.anitail.desktop.db.relations.primaryArtistIdForSong
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadState
@@ -82,6 +84,7 @@ import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.PlayingIndicatorBox
 import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.component.rememberExpressiveAvatarShape
 import com.anitail.desktop.ui.component.ShimmerBox
 import com.anitail.desktop.ui.component.ShimmerGridItem
 import com.anitail.desktop.ui.component.ShimmerQuickPicksGrid
@@ -115,7 +118,13 @@ private val MoodAndGenresButtonHeight = 48.dp
 private const val ActiveBoxAlpha = 0.6f
 private val OverlayButtonSize = 36.dp
 private val OverlayIconSize = 20.dp
-private const val TopMusicVideosTitle = "Top music videos"
+private fun isTopMusicVideosSection(title: String): Boolean {
+    val lower = title.lowercase()
+    return lower == "top music videos" ||
+        lower.contains("music video") ||
+        lower.contains("vídeos más populares") ||
+        lower.contains("videos más populares")
+}
 private const val QuickPicksTitle = "Quick picks"
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -140,8 +149,15 @@ fun ExploreScreen(
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
+    val downloadedSongIds = remember(downloadedSongs) {
+        downloadedSongs.mapTo(HashSet(downloadedSongs.size)) { it.songId }
+    }
     val downloadStates by downloadService.downloadStates.collectAsState()
+    val albumsById by database.albumsById.collectAsState()
     val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
+    val primaryArtistBySongId = remember(songArtistMaps) {
+        indexPrimaryArtistIdBySongId(songArtistMaps)
+    }
     var pendingPlaylistItem by remember { mutableStateOf<ExploreSongTarget?>(null) }
     var pendingAlbumPlaylist by remember { mutableStateOf<AlbumItem?>(null) }
     var detailsItem by remember { mutableStateOf<LibraryItem?>(null) }
@@ -210,9 +226,8 @@ fun ExploreScreen(
                 action = AlbumDownloadAction.DOWNLOAD,
             )
         }
-        val downloadedIds = downloadedSongs.map { it.songId }.toSet()
         val statuses = albumSongs.mapNotNull { song -> downloadStates[song.id]?.status }
-        val allDownloaded = albumSongs.all { song -> downloadedIds.contains(song.id) }
+        val allDownloaded = albumSongs.all { song -> downloadedSongIds.contains(song.id) }
         val anyActive = statuses.any { status ->
             status == DownloadStatus.QUEUED || status == DownloadStatus.DOWNLOADING
         }
@@ -336,7 +351,7 @@ fun ExploreScreen(
         val artistCandidates = songItem?.artists
             ?.mapNotNull { artist -> artist.id?.let { Artist(artist.name, it) } }
             .orEmpty()
-        val libraryArtistId = songEntity?.let { primaryArtistIdForSong(it.id, songArtistMaps) }
+        val libraryArtistId = songEntity?.let { primaryArtistBySongId[it.id] }
         val hasArtist = if (songItem != null) {
             artistCandidates.isNotEmpty()
         } else {
@@ -359,7 +374,7 @@ fun ExploreScreen(
             strings = strings,
             songId = libraryItem.id,
             downloadStates = downloadStates,
-            downloadedSongs = downloadedSongs,
+            downloadedSongIds = downloadedSongIds,
         )
         val isInLibrary = songEntity?.inLibrary != null
         val shareUrl = songItem?.shareLink ?: libraryItem.playbackUrl
@@ -457,92 +472,130 @@ fun ExploreScreen(
                 retryLabel = strings.get("retry"),
             )
         } else {
-            val chartSections = chartsPage?.sections?.filter { it.title != TopMusicVideosTitle }.orEmpty()
+            val chartSections = chartsPage?.sections?.filter { !isTopMusicVideosSection(it.title) }.orEmpty()
             chartSections.forEach { section ->
+                if (section.items.isEmpty()) return@forEach
+                val chartSongs = section.items.filterIsInstance<SongItem>()
+                val nonSongItems = section.items.filter { it !is SongItem }
+
                 NavigationTitle(
                     title = mapExploreChartsTitle(section.title, strings),
                 )
-                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                    val horizontalLazyGridItemWidthFactor =
-                        if (maxWidth * 0.475f >= 320.dp) 0.475f else 0.9f
-                    val horizontalLazyGridItemWidth = maxWidth * horizontalLazyGridItemWidthFactor
-                    val lazyGridState = rememberLazyGridState()
-                    val snapLayoutInfoProvider = remember(lazyGridState, horizontalLazyGridItemWidthFactor) {
-                        SnapLayoutInfoProvider(
-                            lazyGridState = lazyGridState,
-                            positionInLayout = { layoutSize, itemSize ->
-                                (layoutSize * horizontalLazyGridItemWidthFactor / 2f - itemSize / 2f)
-                            },
-                        )
-                    }
 
-                    LazyHorizontalGrid(
-                        state = lazyGridState,
-                        rows = GridCells.Fixed(4),
-                        flingBehavior = rememberSnapFlingBehavior(snapLayoutInfoProvider),
+                if (chartSongs.isNotEmpty()) {
+                    val rowCount = minOf(4, chartSongs.size)
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        val horizontalLazyGridItemWidthFactor =
+                            if (maxWidth * 0.475f >= 320.dp) 0.475f else 0.9f
+                        val horizontalLazyGridItemWidth = maxWidth * horizontalLazyGridItemWidthFactor
+                        val lazyGridState = rememberLazyGridState()
+                        val snapLayoutInfoProvider = remember(lazyGridState, horizontalLazyGridItemWidthFactor) {
+                            SnapLayoutInfoProvider(
+                                lazyGridState = lazyGridState,
+                                positionInLayout = { layoutSize, itemSize ->
+                                    (layoutSize * horizontalLazyGridItemWidthFactor / 2f - itemSize / 2f)
+                                },
+                            )
+                        }
+
+                        LazyHorizontalGrid(
+                            state = lazyGridState,
+                            rows = GridCells.Fixed(rowCount),
+                            flingBehavior = rememberSnapFlingBehavior(snapLayoutInfoProvider),
+                            contentPadding = WindowInsets.systemBars
+                                .only(WindowInsetsSides.Horizontal)
+                                .asPaddingValues(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(ListItemHeight * rowCount),
+                        ) {
+                            items(
+                                items = chartSongs,
+                                key = { it.id },
+                            ) { song ->
+                                val libraryItem = songItemToLibraryItem(song)
+                                val isActive = playerState.currentItem?.id == song.id
+                                val songEntity = songsById[song.id]
+                                val downloadState = downloadStates[song.id]
+                                val isDownloaded = song.id in downloadedSongIds
+                                ExploreChartListItem(
+                                    song = song,
+                                    libraryItem = libraryItem,
+                                    itemWidth = horizontalLazyGridItemWidth,
+                                    isActive = isActive,
+                                    isPlaying = isActive && playerState.isPlaying,
+                                    songEntity = songEntity,
+                                    downloadState = downloadState,
+                                    isDownloaded = isDownloaded,
+                                    menuActions = menuActionsForSong(libraryItem, song),
+                                    menuHeader = { onDismiss ->
+                                        SongMenuHeader(
+                                            title = song.title,
+                                            subtitle = joinByBullet(
+                                                song.artists.joinToString { it.name },
+                                                song.duration?.let { formatTime(it * 1000L) },
+                                            ).orEmpty(),
+                                            thumbnailUrl = song.thumbnail,
+                                            isLiked = songEntity?.liked == true,
+                                            onToggleLike = {
+                                                coroutineScope.launch {
+                                                    if (songEntity == null) {
+                                                        database.insertSong(
+                                                            song.toSongEntity(inLibrary = true).toggleLike(),
+                                                            song.toSongArtistMaps(),
+                                                        )
+                                                    } else {
+                                                        database.toggleSongLike(song.id)
+                                                    }
+                                                }
+                                                onDismiss()
+                                            },
+                                            onPlayNext = {
+                                                playerState.addToQueue(libraryItem, playNext = true)
+                                            },
+                                            onAddToPlaylist = {
+                                                pendingPlaylistItem = ExploreSongTarget(libraryItem, song)
+                                            },
+                                            onShare = { copyToClipboard(song.shareLink) },
+                                            onDismiss = onDismiss,
+                                        )
+                                    },
+                                    onClick = {
+                                        if (isActive) {
+                                            playerState.togglePlayPause()
+                                        } else {
+                                            onPlay(libraryItem)
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                } else if (nonSongItems.isNotEmpty()) {
+                    LazyRow(
                         contentPadding = WindowInsets.systemBars
                             .only(WindowInsetsSides.Horizontal)
                             .asPaddingValues(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(ListItemHeight * 4),
                     ) {
                         items(
-                            items = section.items.filterIsInstance<SongItem>(),
+                            items = nonSongItems,
                             key = { it.id },
-                        ) { song ->
-                            val libraryItem = songItemToLibraryItem(song)
-                            val isActive = playerState.currentItem?.id == song.id
-                            val songEntity = songsById[song.id]
-                            val downloadState = downloadStates[song.id]
-                            val isDownloaded = downloadedSongs.any { it.songId == song.id }
-                            ExploreChartListItem(
-                                song = song,
-                                libraryItem = libraryItem,
-                                itemWidth = horizontalLazyGridItemWidth,
-                                isActive = isActive,
-                                isPlaying = isActive && playerState.isPlaying,
-                                songEntity = songEntity,
-                                downloadState = downloadState,
-                                isDownloaded = isDownloaded,
-                                menuActions = menuActionsForSong(libraryItem, song),
-                                menuHeader = { onDismiss ->
-                                    SongMenuHeader(
-                                        title = song.title,
-                                        subtitle = joinByBullet(
-                                            song.artists.joinToString { it.name },
-                                            song.duration?.let { formatTime(it * 1000L) },
-                                        ).orEmpty(),
-                                        thumbnailUrl = song.thumbnail,
-                                        isLiked = songEntity?.liked == true,
-                                        onToggleLike = {
-                                            coroutineScope.launch {
-                                                if (songEntity == null) {
-                                                    database.insertSong(
-                                                        song.toSongEntity(inLibrary = true).toggleLike(),
-                                                        song.toSongArtistMaps(),
-                                                    )
-                                                } else {
-                                                    database.toggleSongLike(song.id)
-                                                }
-                                            }
-                                            onDismiss()
-                                        },
-                                        onPlayNext = {
-                                            playerState.addToQueue(libraryItem, playNext = true)
-                                        },
-                                        onAddToPlaylist = {
-                                            pendingPlaylistItem = ExploreSongTarget(libraryItem, song)
-                                        },
-                                        onShare = { copyToClipboard(song.shareLink) },
-                                        onDismiss = onDismiss,
-                                    )
-                                },
+                        ) { item ->
+                            ExploreGridItem(
+                                item = item,
+                                isActive = false,
+                                isPlaying = false,
+                                libraryItem = null,
+                                menuActions = emptyList(),
+                                songEntity = null,
+                                downloadState = null,
+                                isDownloaded = false,
                                 onClick = {
-                                    if (isActive) {
-                                        playerState.togglePlayPause()
-                                    } else {
-                                        onPlay(libraryItem)
+                                    when (item) {
+                                        is ArtistItem -> onOpenArtist(item.id, item.title)
+                                        is AlbumItem -> onOpenAlbum(item.browseId, item.title)
+                                        is PlaylistItem -> onBrowse(item.id, null)
+                                        else -> Unit
                                     }
                                 },
                             )
@@ -566,7 +619,7 @@ fun ExploreScreen(
                         key = { it.id },
                     ) { album ->
                         val albumLibraryItem = albumItemToLibraryItem(album)
-                        val albumEntity by database.album(album.browseId).collectAsState(initial = null)
+                        val albumEntity = albumsById[album.browseId]
                         val albumMenuState = albumMenuStates[album.browseId]
                         val albumSongs = albumMenuState?.songs.orEmpty()
                         ExploreGridItem(
@@ -607,71 +660,98 @@ fun ExploreScreen(
                     }
                 }
             }
-            chartsPage?.sections?.find { it.title == TopMusicVideosTitle }?.let { topVideos ->
+            chartsPage?.sections?.find { isTopMusicVideosSection(it.title) }?.let { topVideos ->
                 NavigationTitle(title = stringResource("top_music_videos"))
+                val videoSongs = remember(topVideos.items) { topVideos.items.filterIsInstance<SongItem>() }
                 LazyRow(
                     contentPadding = WindowInsets.systemBars
                         .only(WindowInsetsSides.Horizontal)
                         .asPaddingValues(),
                 ) {
-                    items(
-                        items = topVideos.items.filterIsInstance<SongItem>(),
-                        key = { it.id },
-                    ) { video ->
-                        val libraryItem = songItemToLibraryItem(video)
-                        val isActive = playerState.currentItem?.id == video.id
-                        val songEntity = songsById[video.id]
-                        val downloadState = downloadStates[video.id]
-                        val isDownloaded = downloadedSongs.any { it.songId == video.id }
-                        ExploreGridItem(
-                            item = video,
-                            isActive = isActive,
-                            isPlaying = isActive && playerState.isPlaying,
-                            libraryItem = libraryItem,
-                            menuActions = menuActionsForSong(libraryItem, video),
-                            songEntity = songEntity,
-                            downloadState = downloadState,
-                            isDownloaded = isDownloaded,
-                            onClick = {
-                                if (isActive) {
-                                    playerState.togglePlayPause()
-                                } else {
-                                    onPlay(libraryItem)
-                                }
-                            },
-                            menuHeader = { onDismiss ->
-                                SongMenuHeader(
-                                    title = video.title,
-                                    subtitle = joinByBullet(
-                                        video.artists.joinToString { it.name },
-                                        video.duration?.let { formatTime(it * 1000L) },
-                                    ).orEmpty(),
-                                    thumbnailUrl = video.thumbnail,
-                                    isLiked = songEntity?.liked == true,
-                                    onToggleLike = {
-                                        coroutineScope.launch {
-                                            if (songEntity == null) {
-                                                database.insertSong(
-                                                    video.toSongEntity(inLibrary = true).toggleLike(),
-                                                    video.toSongArtistMaps(),
-                                                )
-                                            } else {
-                                                database.toggleSongLike(video.id)
+                    if (videoSongs.isNotEmpty()) {
+                        items(
+                            items = videoSongs,
+                            key = { it.id },
+                        ) { video ->
+                            val libraryItem = songItemToLibraryItem(video)
+                            val isActive = playerState.currentItem?.id == video.id
+                            val songEntity = songsById[video.id]
+                            val downloadState = downloadStates[video.id]
+                            val isDownloaded = video.id in downloadedSongIds
+                            ExploreGridItem(
+                                item = video,
+                                isActive = isActive,
+                                isPlaying = isActive && playerState.isPlaying,
+                                libraryItem = libraryItem,
+                                menuActions = menuActionsForSong(libraryItem, video),
+                                songEntity = songEntity,
+                                downloadState = downloadState,
+                                isDownloaded = isDownloaded,
+                                onClick = {
+                                    if (isActive) {
+                                        playerState.togglePlayPause()
+                                    } else {
+                                        onPlay(libraryItem)
+                                    }
+                                },
+                                menuHeader = { onDismiss ->
+                                    SongMenuHeader(
+                                        title = video.title,
+                                        subtitle = joinByBullet(
+                                            video.artists.joinToString { it.name },
+                                            video.duration?.let { formatTime(it * 1000L) },
+                                        ).orEmpty(),
+                                        thumbnailUrl = video.thumbnail,
+                                        isLiked = songEntity?.liked == true,
+                                        onToggleLike = {
+                                            coroutineScope.launch {
+                                                if (songEntity == null) {
+                                                    database.insertSong(
+                                                        video.toSongEntity(inLibrary = true).toggleLike(),
+                                                        video.toSongArtistMaps(),
+                                                    )
+                                                } else {
+                                                    database.toggleSongLike(video.id)
+                                                }
                                             }
-                                        }
-                                        onDismiss()
-                                    },
-                                    onPlayNext = {
-                                        playerState.addToQueue(libraryItem, playNext = true)
-                                    },
-                                    onAddToPlaylist = {
-                                        pendingPlaylistItem = ExploreSongTarget(libraryItem, video)
-                                    },
-                                    onShare = { copyToClipboard(video.shareLink) },
-                                    onDismiss = onDismiss,
-                                )
-                            },
-                        )
+                                            onDismiss()
+                                        },
+                                        onPlayNext = {
+                                            playerState.addToQueue(libraryItem, playNext = true)
+                                        },
+                                        onAddToPlaylist = {
+                                            pendingPlaylistItem = ExploreSongTarget(libraryItem, video)
+                                        },
+                                        onShare = { copyToClipboard(video.shareLink) },
+                                        onDismiss = onDismiss,
+                                    )
+                                },
+                            )
+                        }
+                    } else {
+                        items(
+                            items = topVideos.items,
+                            key = { it.id },
+                        ) { item ->
+                            ExploreGridItem(
+                                item = item,
+                                isActive = false,
+                                isPlaying = false,
+                                libraryItem = null,
+                                menuActions = emptyList(),
+                                songEntity = null,
+                                downloadState = null,
+                                isDownloaded = false,
+                                onClick = {
+                                    when (item) {
+                                        is PlaylistItem -> onBrowse(item.id, null)
+                                        is AlbumItem -> onOpenAlbum(item.browseId, item.title)
+                                        is ArtistItem -> onOpenArtist(item.id, item.title)
+                                        else -> Unit
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -686,7 +766,12 @@ fun ExploreScreen(
                     contentPadding = PaddingValues(6.dp),
                     modifier = Modifier.height((MoodAndGenresButtonHeight + 12.dp) * 4 + 12.dp),
                 ) {
-                    items(moodAndGenres) { item ->
+                    gridItemsIndexed(
+                        items = moodAndGenres,
+                        key = { index, item ->
+                            "${item.endpoint.browseId.orEmpty()}_${item.endpoint.params.orEmpty()}_$index"
+                        },
+                    ) { _, item ->
                         MoodAndGenresButton(
                             title = item.title,
                             onClick = {
@@ -953,7 +1038,7 @@ private fun ExploreGridItem(
                 .padding(4.dp),
         ) {
             Box(modifier = Modifier.size(GridThumbnailSize)) {
-                val shape = if (item is ArtistItem) CircleShape else RoundedCornerShape(8.dp)
+                val shape = if (item is ArtistItem) rememberExpressiveAvatarShape(item.id) else RoundedCornerShape(8.dp)
                 RemoteImage(
                     url = item.thumbnail,
                     modifier = Modifier

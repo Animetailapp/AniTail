@@ -30,6 +30,7 @@ workRuntimeKtx = "2.12.0"
 kuromojiIpadic = "0.9.0"
 tinypinyin = "2.0.3"
 innertubex = "0.11.7"
+jmdns = "3.6.5"
 
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version = "1.8.0" }
@@ -128,6 +129,7 @@ compose-multiplatform-media-player = { module = "network.chaintech:compose-multi
 kuromoji-ipadic = { group = "com.atilika.kuromoji", name = "kuromoji-ipadic", version.ref = "kuromojiIpadic" }
 tinypinyin = { group = "com.github.promeG", name = "tinypinyin", version.ref = "tinypinyin" }
 innertubex = { module = "com.github.MetrolistGroup.innertubex:innertubex", version.ref = "innertubex" }
+jmdns = { module = "org.jmdns:jmdns", version.ref = "jmdns" }
 
 [plugins]
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

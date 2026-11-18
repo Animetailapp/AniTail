@@ -1,7 +1,9 @@
 package com.anitail.desktop.ui.screen
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,14 +57,28 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.db.DesktopDatabase
+import com.anitail.desktop.db.entities.SongEntity
+import com.anitail.desktop.db.mapper.toSongArtistMaps
+import com.anitail.desktop.db.mapper.toSongEntity
+import com.anitail.desktop.db.relations.indexPrimaryArtistIdBySongId
+import com.anitail.desktop.download.DesktopDownloadService
+import com.anitail.desktop.download.DownloadState
+import com.anitail.desktop.i18n.LocalStrings
+import com.anitail.desktop.i18n.StringResolver
 import com.anitail.desktop.i18n.stringResource
 import com.anitail.desktop.player.PlayerState
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.desktop.ui.IconAssets
+import com.anitail.desktop.ui.component.ContextMenuAction
+import com.anitail.desktop.ui.component.ItemContextMenu
+import com.anitail.desktop.ui.component.PlayingIndicatorBox
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.component.rememberExpressiveAvatarShape
 import com.anitail.desktop.ui.component.ShimmerListItem
+import com.anitail.desktop.ui.screen.library.isSpecialRemotePlaylist
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.AlbumItem
+import com.anitail.innertube.models.Artist
 import com.anitail.innertube.models.ArtistItem
 import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.PlaylistItem
@@ -79,7 +95,7 @@ import kotlinx.coroutines.launch
  * Pantalla de búsqueda para Desktop - Idéntica a Android.
  * Incluye: barra de búsqueda, sugerencias, historial, resultados con filtros.
  */
-@OptIn(FlowPreview::class)
+@OptIn(FlowPreview::class, ExperimentalFoundationApi::class)
 @Composable
 fun SearchScreen(
     database: DesktopDatabase,
@@ -90,6 +106,7 @@ fun SearchScreen(
     onAlbumClick: (String, String) -> Unit,
     onPlaylistClick: (String, String) -> Unit,
     onSongClick: (LibraryItem) -> Unit,
+    downloadService: DesktopDownloadService = DesktopDownloadService(),
 ) {
     var query by remember(initialQuery) { mutableStateOf(initialQuery.orEmpty()) }
     var isSearching by remember { mutableStateOf(false) }
@@ -103,9 +120,25 @@ fun SearchScreen(
     var filteredResults by remember { mutableStateOf<List<YTItem>>(emptyList()) }
 
     val preferences = remember { DesktopPreferences.getInstance() }
+    val strings = LocalStrings.current
     val pauseSearchHistory by preferences.pauseSearchHistory.collectAsState()
     val searchHistoryEntries by database.recentSearches(limit = 20).collectAsState(initial = emptyList())
     val searchHistory = remember(searchHistoryEntries) { searchHistoryEntries.map { it.query } }
+
+    val songsById by database.songsById.collectAsState()
+    val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
+    val primaryArtistBySongId = remember(songArtistMaps) { indexPrimaryArtistIdBySongId(songArtistMaps) }
+    val playlists by database.allPlaylists().collectAsState(initial = emptyList())
+    val visiblePlaylists = remember(playlists) { playlists.filterNot { isSpecialRemotePlaylist(it) } }
+    val downloadStates by downloadService.downloadStates.collectAsState()
+    val downloadedSongs by downloadService.downloadedSongs.collectAsState()
+    val downloadedSongIds = remember(downloadedSongs) {
+        downloadedSongs.mapTo(HashSet(downloadedSongs.size)) { it.songId }
+    }
+
+    var pendingPlaylistItem by remember { mutableStateOf<BrowseSongTarget?>(null) }
+    var pendingArtists by remember { mutableStateOf<List<Artist>>(emptyList()) }
+    var detailsItem by remember { mutableStateOf<LibraryItem?>(null) }
 
     val focusRequester = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
@@ -196,7 +229,19 @@ fun SearchScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    val openResult: (YTItem) -> Unit = { item ->
+        when (item) {
+            is SongItem -> onSongClick(songItemToLibraryItem(item))
+            is EpisodeItem -> onSongClick(songItemToLibraryItem(item.asSongItem()))
+            is AlbumItem -> onAlbumClick(item.browseId, item.title)
+            is ArtistItem -> onArtistClick(item.id, item.title)
+            is PlaylistItem -> onPlaylistClick(item.id, item.title)
+            is PodcastItem -> onPlaylistClick(item.id, item.title)
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
         // Barra de búsqueda
         SearchBar(
             query = query,
@@ -292,20 +337,23 @@ fun SearchScreen(
                 if (query.isNotEmpty() && suggestionItems.isNotEmpty()) {
                     item { HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp)) }
                     items(suggestionItems, key = { it.id }) { item ->
-                        SearchResultItem(
+                        SearchResultEntry(
                             item = item,
-                            isActive = playerState.currentItem?.id == item.id,
-                            isPlaying = playerState.isPlaying,
-                            onClick = {
-                                when (item) {
-                                    is SongItem -> onSongClick(songItemToLibraryItem(item))
-                                    is EpisodeItem -> onSongClick(songItemToLibraryItem(item.asSongItem()))
-                                    is AlbumItem -> onAlbumClick(item.browseId, item.title)
-                                    is ArtistItem -> onArtistClick(item.id, item.title)
-                                    is PlaylistItem -> onPlaylistClick(item.id, item.title)
-                                    is PodcastItem -> onPlaylistClick(item.id, item.title)
-                                }
-                            },
+                            strings = strings,
+                            playerState = playerState,
+                            database = database,
+                            downloadService = downloadService,
+                            songsById = songsById,
+                            primaryArtistBySongId = primaryArtistBySongId,
+                            downloadStates = downloadStates,
+                            downloadedSongIds = downloadedSongIds,
+                            coroutineScope = coroutineScope,
+                            onOpenItem = openResult,
+                            onArtistClick = onArtistClick,
+                            onAlbumClick = onAlbumClick,
+                            onRequestPlaylist = { pendingPlaylistItem = it },
+                            onRequestArtists = { pendingArtists = it },
+                            onShowDetails = { detailsItem = it },
                         )
                     }
                 }
@@ -330,20 +378,23 @@ fun SearchScreen(
                         }
                     } else {
                         items(filteredResults, key = { it.id }) { item ->
-                            SearchResultItem(
+                            SearchResultEntry(
                                 item = item,
-                                isActive = playerState.currentItem?.id == item.id,
-                                isPlaying = playerState.isPlaying,
-                                onClick = {
-                                    when (item) {
-                                        is SongItem -> onSongClick(songItemToLibraryItem(item))
-                                        is EpisodeItem -> onSongClick(songItemToLibraryItem(item.asSongItem()))
-                                        is AlbumItem -> onAlbumClick(item.browseId, item.title)
-                                        is ArtistItem -> onArtistClick(item.id, item.title)
-                                        is PlaylistItem -> onPlaylistClick(item.id, item.title)
-                                        is PodcastItem -> onPlaylistClick(item.id, item.title)
-                                    }
-                                },
+                                strings = strings,
+                                playerState = playerState,
+                                database = database,
+                                downloadService = downloadService,
+                                songsById = songsById,
+                                primaryArtistBySongId = primaryArtistBySongId,
+                                downloadStates = downloadStates,
+                                downloadedSongIds = downloadedSongIds,
+                                coroutineScope = coroutineScope,
+                                onOpenItem = openResult,
+                                onArtistClick = onArtistClick,
+                                onAlbumClick = onAlbumClick,
+                                onRequestPlaylist = { pendingPlaylistItem = it },
+                                onRequestArtists = { pendingArtists = it },
+                                onShowDetails = { detailsItem = it },
                             )
                         }
                     }
@@ -359,20 +410,23 @@ fun SearchScreen(
                             )
                         }
                         items(summary.items, key = { "${summary.title}_${it.id}" }) { item ->
-                            SearchResultItem(
+                            SearchResultEntry(
                                 item = item,
-                                isActive = playerState.currentItem?.id == item.id,
-                                isPlaying = playerState.isPlaying,
-                                onClick = {
-                                    when (item) {
-                                        is SongItem -> onSongClick(songItemToLibraryItem(item))
-                                        is EpisodeItem -> onSongClick(songItemToLibraryItem(item.asSongItem()))
-                                        is AlbumItem -> onAlbumClick(item.browseId, item.title)
-                                        is ArtistItem -> onArtistClick(item.id, item.title)
-                                        is PlaylistItem -> onPlaylistClick(item.id, item.title)
-                                        is PodcastItem -> onPlaylistClick(item.id, item.title)
-                                    }
-                                },
+                                strings = strings,
+                                playerState = playerState,
+                                database = database,
+                                downloadService = downloadService,
+                                songsById = songsById,
+                                primaryArtistBySongId = primaryArtistBySongId,
+                                downloadStates = downloadStates,
+                                downloadedSongIds = downloadedSongIds,
+                                coroutineScope = coroutineScope,
+                                onOpenItem = openResult,
+                                onArtistClick = onArtistClick,
+                                onAlbumClick = onAlbumClick,
+                                onRequestPlaylist = { pendingPlaylistItem = it },
+                                onRequestArtists = { pendingArtists = it },
+                                onShowDetails = { detailsItem = it },
                             )
                         }
                     }
@@ -384,20 +438,23 @@ fun SearchScreen(
                     }
                 } else if (filteredResults.isNotEmpty()) {
                     items(filteredResults, key = { it.id }) { item ->
-                        SearchResultItem(
+                        SearchResultEntry(
                             item = item,
-                            isActive = playerState.currentItem?.id == item.id,
-                            isPlaying = playerState.isPlaying,
-                            onClick = {
-                                when (item) {
-                                    is SongItem -> onSongClick(songItemToLibraryItem(item))
-                                    is EpisodeItem -> onSongClick(songItemToLibraryItem(item.asSongItem()))
-                                    is AlbumItem -> onAlbumClick(item.browseId, item.title)
-                                    is ArtistItem -> onArtistClick(item.id, item.title)
-                                    is PlaylistItem -> onPlaylistClick(item.id, item.title)
-                                    is PodcastItem -> onPlaylistClick(item.id, item.title)
-                                }
-                            },
+                            strings = strings,
+                            playerState = playerState,
+                            database = database,
+                            downloadService = downloadService,
+                            songsById = songsById,
+                            primaryArtistBySongId = primaryArtistBySongId,
+                            downloadStates = downloadStates,
+                            downloadedSongIds = downloadedSongIds,
+                            coroutineScope = coroutineScope,
+                            onOpenItem = openResult,
+                            onArtistClick = onArtistClick,
+                            onAlbumClick = onAlbumClick,
+                            onRequestPlaylist = { pendingPlaylistItem = it },
+                            onRequestArtists = { pendingArtists = it },
+                            onShowDetails = { detailsItem = it },
                         )
                     }
                 } else {
@@ -410,6 +467,23 @@ fun SearchScreen(
             item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }
+
+    CollectionSongDialogs(
+        pendingPlaylistItem = pendingPlaylistItem,
+        pendingCollectionTargets = null,
+        pendingArtists = pendingArtists,
+        detailsItem = detailsItem,
+        playlists = visiblePlaylists,
+        songsById = songsById,
+        database = database,
+        coroutineScope = coroutineScope,
+        onDismissPendingPlaylistItem = { pendingPlaylistItem = null },
+        onDismissPendingCollectionTargets = {},
+        onSelectArtist = onArtistClick,
+        onDismissArtists = { pendingArtists = emptyList() },
+        onDismissDetails = { detailsItem = null },
+    )
+}
 
     // Auto-focus en la barra de búsqueda
     LaunchedEffect(Unit) {
@@ -571,18 +645,213 @@ private fun SuggestionItem(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SearchResultEntry(
+    item: YTItem,
+    strings: StringResolver,
+    playerState: PlayerState,
+    database: DesktopDatabase,
+    downloadService: DesktopDownloadService,
+    songsById: Map<String, SongEntity>,
+    primaryArtistBySongId: Map<String, String?>,
+    downloadStates: Map<String, DownloadState>,
+    downloadedSongIds: Set<String>,
+    coroutineScope: kotlinx.coroutines.CoroutineScope,
+    onOpenItem: (YTItem) -> Unit,
+    onArtistClick: (String, String) -> Unit,
+    onAlbumClick: (String, String) -> Unit,
+    onRequestPlaylist: (BrowseSongTarget) -> Unit,
+    onRequestArtists: (List<Artist>) -> Unit,
+    onShowDetails: (LibraryItem) -> Unit,
+) {
+    val songItem = when (item) {
+        is SongItem -> item
+        is EpisodeItem -> item.asSongItem()
+        else -> null
+    }
+    val libraryItem = remember(item) {
+        when (item) {
+            is SongItem -> songItemToLibraryItem(item)
+            is EpisodeItem -> songItemToLibraryItem(item.asSongItem())
+            is AlbumItem -> LibraryItem(
+                id = item.browseId,
+                title = item.title,
+                artist = item.artists?.joinToString { it.name }.orEmpty(),
+                artworkUrl = item.thumbnail,
+                playbackUrl = item.shareLink,
+            )
+            is ArtistItem -> LibraryItem(
+                id = item.id,
+                title = item.title,
+                artist = item.title,
+                artworkUrl = item.thumbnail,
+                playbackUrl = item.shareLink,
+            )
+            is PlaylistItem -> LibraryItem(
+                id = item.id,
+                title = item.title,
+                artist = item.author?.name.orEmpty(),
+                artworkUrl = item.thumbnail,
+                playbackUrl = item.shareLink,
+            )
+            is PodcastItem -> LibraryItem(
+                id = item.id,
+                title = item.title,
+                artist = item.author?.name.orEmpty(),
+                artworkUrl = item.thumbnail,
+                playbackUrl = item.shareLink,
+            )
+        }
+    }
+
+    val isActive = playerState.currentItem?.id == item.id
+    val isPlaying = playerState.isPlaying
+    val songEntity = songItem?.let { songsById[it.id] }
+    val songDownloadState = songItem?.let { downloadStates[it.id] }
+    val isSongDownloaded = songItem?.let { it.id in downloadedSongIds } ?: false
+
+    val menuActions = if (songItem != null) {
+        remember(
+            songItem.id,
+            songEntity,
+            primaryArtistBySongId[songItem.id],
+            songDownloadState,
+            isSongDownloaded,
+            strings,
+        ) {
+            buildBrowseSongMenuActions(
+                strings = strings,
+                libraryItem = libraryItem,
+                songItem = songItem,
+                songsById = songsById,
+                primaryArtistBySongId = primaryArtistBySongId,
+                downloadStates = downloadStates,
+                downloadedSongIds = downloadedSongIds,
+                database = database,
+                downloadService = downloadService,
+                playerState = playerState,
+                coroutineScope = coroutineScope,
+                onOpenArtist = { id, name -> onArtistClick(id, name.orEmpty()) },
+                onOpenAlbum = { id, name -> onAlbumClick(id, name.orEmpty()) },
+                onRequestPlaylist = onRequestPlaylist,
+                onRequestArtists = onRequestArtists,
+                onShowDetails = onShowDetails,
+                copyToClipboard = ::copyTextToClipboard,
+            )
+        }
+    } else {
+        remember(item, strings) {
+            buildList {
+                add(
+                    ContextMenuAction(
+                        label = strings.get("open"),
+                        icon = IconAssets.play(),
+                        onClick = { onOpenItem(item) },
+                    )
+                )
+                if (item is AlbumItem) {
+                    val albumArtists = item.artists.orEmpty().filter { !it.id.isNullOrBlank() }
+                    if (albumArtists.isNotEmpty()) {
+                        add(
+                            ContextMenuAction(
+                                label = strings.get("view_artist"),
+                                icon = IconAssets.artist(),
+                                onClick = {
+                                    if (albumArtists.size == 1) {
+                                        val artist = albumArtists.first()
+                                        onArtistClick(artist.id.orEmpty(), artist.name)
+                                    } else {
+                                        onRequestArtists(albumArtists)
+                                    }
+                                },
+                            )
+                        )
+                    }
+                }
+                add(
+                    ContextMenuAction(
+                        label = strings.get("share"),
+                        icon = IconAssets.share(),
+                        onClick = { copyTextToClipboard(item.shareLink) },
+                    )
+                )
+            }
+        }
+    }
+
+    val menuHeader: (@Composable (onDismiss: () -> Unit) -> Unit)? = if (songItem != null) {
+        { onDismiss ->
+            SongMenuHeader(
+                title = songItem.title,
+                subtitle = formatBulletSubtitle(
+                    songItem.artists.joinToString { it.name }.ifBlank { libraryItem.artist },
+                    songItem.duration?.takeIf { it > 0 }?.let { formatTime(it * 1000L) },
+                ).orEmpty(),
+                thumbnailUrl = songItem.thumbnail,
+                isLiked = songEntity?.liked == true,
+                onToggleLike = {
+                    coroutineScope.launch {
+                        if (songEntity == null) {
+                            database.insertSong(
+                                songItem.toSongEntity(inLibrary = true).toggleLike(),
+                                songItem.toSongArtistMaps(),
+                            )
+                        } else {
+                            database.toggleSongLike(songItem.id)
+                        }
+                    }
+                },
+                onPlayNext = { playerState.addToQueue(libraryItem, playNext = true) },
+                onAddToPlaylist = { onRequestPlaylist(BrowseSongTarget(libraryItem, songItem)) },
+                onShare = { copyTextToClipboard(songItem.shareLink) },
+                onDismiss = onDismiss,
+            )
+        }
+    } else {
+        null
+    }
+
+    SearchResultItem(
+        item = item,
+        libraryItem = libraryItem,
+        isActive = isActive,
+        isPlaying = isPlaying,
+        menuActions = menuActions,
+        menuHeader = menuHeader,
+        downloadState = songDownloadState,
+        isDownloaded = isSongDownloaded,
+        onClick = { onOpenItem(item) },
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SearchResultItem(
     item: YTItem,
+    libraryItem: LibraryItem,
     isActive: Boolean,
     isPlaying: Boolean,
+    menuActions: List<ContextMenuAction>,
+    menuHeader: (@Composable (onDismiss: () -> Unit) -> Unit)?,
+    downloadState: DownloadState?,
+    isDownloaded: Boolean,
     onClick: () -> Unit,
 ) {
+    val menuExpanded = remember(item.id) { mutableStateOf(false) }
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    if (menuActions.isNotEmpty() || menuHeader != null) {
+                        menuExpanded.value = true
+                    }
+                },
+            )
             .background(
                 if (isActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                 else Color.Transparent
@@ -591,27 +860,24 @@ private fun SearchResultItem(
     ) {
         // Thumbnail
         Box(modifier = Modifier.size(56.dp)) {
+            val itemShape = when (item) {
+                is ArtistItem -> rememberExpressiveAvatarShape(item.id)
+                else -> RoundedCornerShape(6.dp)
+            }
             RemoteImage(
                 url = item.thumbnail,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(
-                        when (item) {
-                            is ArtistItem -> CircleShape
-                            else -> RoundedCornerShape(6.dp)
-                        }
-                    ),
+                    .clip(itemShape),
             )
-            if (isActive && isPlaying) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(6.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(stringResource("playing_indicator"), color = Color.White)
-                }
-            }
+            PlayingIndicatorBox(
+                isActive = isActive,
+                isPlaying = isPlaying,
+                color = Color.White,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f), itemShape),
+            )
         }
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -627,25 +893,32 @@ private fun SearchResultItem(
             )
 
             val subtitle = when (item) {
-                is SongItem -> {
-                    val songLabel = stringResource("song")
-                    val artistsText = item.artists.joinToString { it.name }
-                    val albumText = item.album?.name?.let { " • $it" } ?: ""
-                    "$songLabel • $artistsText$albumText"
-                }
-                is AlbumItem -> {
-                    val albumLabel = stringResource("album")
-                    val artistsText = item.artists?.joinToString { it.name } ?: ""
-                    val yearText = item.year?.let { " • $it" } ?: ""
-                    "$albumLabel • $artistsText$yearText"
-                }
+                is SongItem -> listOfNotNull(
+                    stringResource("song"),
+                    item.artists.joinToString { it.name }.takeIf { it.isNotBlank() },
+                    item.album?.name?.takeIf { it.isNotBlank() },
+                ).joinToString(" • ")
+                is EpisodeItem -> listOfNotNull(
+                    stringResource("filter_episodes"),
+                    item.author?.name?.takeIf { it.isNotBlank() },
+                    item.podcast?.name?.takeIf { it.isNotBlank() },
+                    item.duration?.takeIf { it > 0 }?.let { formatTime(it * 1000L) },
+                ).joinToString(" • ")
+                is AlbumItem -> listOfNotNull(
+                    stringResource("album"),
+                    item.artists?.joinToString { it.name }?.takeIf { it.isNotBlank() },
+                    item.year?.toString(),
+                ).joinToString(" • ")
                 is ArtistItem -> stringResource("artist")
-                is PlaylistItem -> {
-                    val playlistLabel = stringResource("playlist")
-                    val authorText = item.author?.name ?: ""
-                    "$playlistLabel • $authorText"
-                }
-                else -> ""
+                is PlaylistItem -> listOfNotNull(
+                    stringResource("playlist"),
+                    item.author?.name?.takeIf { it.isNotBlank() },
+                ).joinToString(" • ")
+                is PodcastItem -> listOfNotNull(
+                    stringResource("filter_podcasts"),
+                    item.author?.name?.takeIf { it.isNotBlank() },
+                    item.episodeCountText?.takeIf { it.isNotBlank() },
+                ).joinToString(" • ")
             }
 
             Text(
@@ -657,11 +930,27 @@ private fun SearchResultItem(
             )
         }
 
-        IconButton(onClick = { /* TODO: Context menu */ }) {
-            Icon(
-                IconAssets.moreVert(),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+        DownloadStatusTrailingIcon(
+            downloadState = downloadState,
+            isDownloaded = isDownloaded,
+        )
+
+        Box {
+            IconButton(onClick = { menuExpanded.value = true }) {
+                Icon(
+                    IconAssets.moreVert(),
+                    contentDescription = stringResource("more_options"),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            ItemContextMenu(
+                expanded = menuExpanded.value,
+                onDismiss = { menuExpanded.value = false },
+                item = libraryItem,
+                actions = menuActions,
+                headerContent = menuHeader?.let { header ->
+                    { header { menuExpanded.value = false } }
+                },
             )
         }
     }

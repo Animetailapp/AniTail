@@ -8,22 +8,21 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+val appVersion = "1.1.0"
+
 kotlin {
     jvmToolchain(21)
+}
+
+composeCompiler {
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose_stability.conf"))
 }
 
 tasks.named<ProcessResources>("processResources") {
     from("../app/src/main/res") {
         include("values/**", "values-*/**")
     }
-    val packageVersion = run {
-        val text = file("build.gradle.kts").readText()
-        Regex("packageVersion\\s*=\\s*\"([^\"]+)\"")
-            .find(text)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?: "0.0.0"
-    }
+    val packageVersion = appVersion
     val generatedDir = layout.buildDirectory.dir("generated/version").get().asFile
     val versionFile = generatedDir.resolve("version.properties")
     doFirst {
@@ -42,6 +41,15 @@ val javafxPlatform = when {
     else -> "linux"
 }
 
+val ffmpegVersion = "8.1.2-1.5.14"
+val osArch = System.getProperty("os.arch").lowercase()
+val isArm64 = osArch.contains("aarch64") || osArch.contains("arm64")
+val javacppPlatform = when {
+    OperatingSystem.current().isWindows -> if (isArm64) "windows-arm64" else "windows-x86_64"
+    OperatingSystem.current().isMacOsX -> if (isArm64) "macosx-arm64" else "macosx-x86_64"
+    else -> if (isArm64) "linux-arm64" else "linux-x86_64"
+}
+
 dependencies {
     implementation(project(":common"))
     implementation(project(":innertube"))
@@ -51,7 +59,7 @@ dependencies {
 
 
     implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.compose.material3:material3:1.13.10-alpha01+dev5176")
+    implementation("org.jetbrains.compose.material3:material3:1.13.0-beta02")
     implementation(libs.materialKolor) {
         exclude(group = "org.jetbrains.compose.material3")
         exclude(group = "org.jetbrains.compose.foundation")
@@ -67,6 +75,7 @@ dependencies {
     implementation(libs.commons.codec)
     implementation(libs.jna)
     implementation(libs.jna.platform)
+    implementation(libs.jmdns)
     implementation("org.xerial:sqlite-jdbc:3.54.1.0")
     implementation("com.google.api-client:google-api-client:2.9.2")
     implementation("com.google.oauth-client:google-oauth-client-jetty:1.39.0")
@@ -82,12 +91,18 @@ dependencies {
     implementation(libs.ktor.client.encoding)
 
     implementation("org.openjfx:javafx-base:$javafxVersion:$javafxPlatform")
+    implementation("org.openjfx:javafx-controls:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-graphics:$javafxVersion:$javafxPlatform")
+    implementation("org.openjfx:javafx-media:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-swing:$javafxVersion:$javafxPlatform")
     implementation("org.openjfx:javafx-web:$javafxVersion:$javafxPlatform")
 
-    // VLC-based player
+    // VLC-based player (fallback) & Bytedeco FFmpeg native engine
     implementation(libs.vlcj)
+    implementation("org.bytedeco:ffmpeg:$ffmpegVersion")
+    if (javacppPlatform != "windows-arm64") {
+        implementation("org.bytedeco:ffmpeg:$ffmpegVersion:$javacppPlatform")
+    }
 
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
@@ -96,6 +111,15 @@ dependencies {
 compose.desktop {
     application {
         mainClass = "com.anitail.desktop.MainKt"
+        jvmArgs(
+            "-XX:+UseZGC",
+            "-XX:+ZGenerational",
+            "-Xms128m",
+            "-Xmx1024m",
+            "-XX:SoftMaxHeapSize=512m",
+            "-XX:+UseStringDeduplication",
+            "-Dskiko.vsync.enabled=true",
+        )
         val toolchains = project.extensions.getByType<JavaToolchainService>()
         val launcher = toolchains.launcherFor {
             languageVersion.set(JavaLanguageVersion.of(21))
@@ -111,7 +135,7 @@ compose.desktop {
             }
             targetFormats(*formats.toTypedArray())
             packageName = "AniTail"
-            packageVersion = "1.1.0"
+            packageVersion = appVersion
             macOS {
                 iconFile.set(project.file("src/main/resources/drawable/ic_anitail.icns"))
                 bundleID = "com.anitail.desktop"

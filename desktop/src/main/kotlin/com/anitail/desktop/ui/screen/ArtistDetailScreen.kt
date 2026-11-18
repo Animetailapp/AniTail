@@ -1,5 +1,6 @@
 package com.anitail.desktop.ui.screen
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,18 +17,26 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -60,6 +69,7 @@ import com.anitail.desktop.db.mapper.toSongArtistMaps
 import com.anitail.desktop.db.mapper.toSongEntity
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.component.rememberExpressiveAvatarShape
 import com.anitail.desktop.ui.component.ArtistPickerDialog
 import com.anitail.desktop.ui.component.ContextMenuAction
 import com.anitail.desktop.ui.component.ItemContextMenu
@@ -86,6 +96,17 @@ import java.net.URI
 import java.time.LocalDateTime
 import kotlinx.coroutines.launch
 
+data class ArtistAboutArgs(
+    val artistId: String,
+    val artistName: String,
+    val thumbnailUrl: String?,
+    val description: String?,
+    val subscriberCountText: String?,
+    val monthlyListenerCount: String?,
+    val viewCount: String? = null,
+    val catalogTitles: List<String>,
+)
+
 /**
  * Pantalla de detalle de artista para Desktop - Idéntica a Android.
  */
@@ -104,6 +125,7 @@ fun ArtistDetailScreen(
     onArtistClick: (String, String) -> Unit,
     onPlaylistClick: (String, String) -> Unit,
     onSongClick: (LibraryItem) -> Unit,
+    onOpenAbout: (ArtistAboutArgs) -> Unit = {},
 ) {
     var artistPage by remember { mutableStateOf<ArtistPage?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -169,19 +191,27 @@ fun ArtistDetailScreen(
                     // Header: Imagen grande con fading edge
                     item(key = "header") {
                         Column {
-                            // Imagen del artista con aspect ratio como Android
+                            // Banner del artista / canal estilo Metrolist
                             page.artist.thumbnail?.let { thumbnail ->
+                                val bannerUrl = remember(thumbnail) {
+                                    if (thumbnail.contains("lh3.googleusercontent.com")) {
+                                        thumbnail.replace(Regex("=w\\d+-h\\d+.*$"), "=w1200-h1000-p-l90-rj")
+                                            .replace(Regex("=s\\d+.*$"), "=w1200-h1000-p-l90-rj")
+                                    } else {
+                                        thumbnail
+                                    }
+                                }
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .aspectRatio(1.2f / 1f),
+                                        .height(320.dp),
                                 ) {
                                     RemoteImage(
-                                        url = thumbnail,
+                                        url = bannerUrl,
                                         modifier = Modifier
-                                            .fillMaxWidth()
+                                            .fillMaxSize()
                                             .align(Alignment.TopCenter)
-                                            .fadingEdge(bottom = 200.dp),
+                                            .fadingEdge(bottom = 160.dp),
                                         contentScale = ContentScale.Crop,
                                     )
                                 }
@@ -201,8 +231,23 @@ fun ArtistDetailScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     fontSize = 32.sp,
-                                    modifier = Modifier.padding(bottom = 16.dp)
+                                    modifier = Modifier.padding(bottom = 4.dp)
                                 )
+
+                                val metaText = listOfNotNull(
+                                    page.subscriberCountText?.takeIf { it.isNotBlank() },
+                                    page.monthlyListenerCount?.takeIf { it.isNotBlank() },
+                                ).joinToString(" • ")
+                                if (metaText.isNotBlank()) {
+                                    Text(
+                                        text = metaText,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(bottom = 12.dp),
+                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                }
 
                                 // Fila de botones
                                 Row(
@@ -250,9 +295,48 @@ fun ArtistDetailScreen(
                                     Spacer(modifier = Modifier.weight(1f))
 
                                     Row(
-                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
+                                        val playableItems = remember(page.sections) {
+                                            page.sections.flatMap { it.items }.mapNotNull { item ->
+                                                when (item) {
+                                                    is SongItem -> songItemToLibraryItem(item)
+                                                    is EpisodeItem -> songItemToLibraryItem(item.asSongItem())
+                                                    else -> null
+                                                }
+                                            }
+                                        }
+
+                                        // Botón Play
+                                        if (page.artist.playEndpoint != null || playableItems.isNotEmpty()) {
+                                            Button(
+                                                onClick = {
+                                                    val endpoint = page.artist.playEndpoint
+                                                    if (endpoint != null) {
+                                                        scope.launch {
+                                                            val result = YouTube.next(endpoint).getOrNull() ?: return@launch
+                                                            val seedSong = result.items.firstOrNull() ?: return@launch
+                                                            val plan = buildRadioQueuePlan(songItemToLibraryItem(seedSong), result)
+                                                            playerState.playQueue(plan.items, plan.startIndex)
+                                                        }
+                                                    } else if (playableItems.isNotEmpty()) {
+                                                        playerState.playQueue(playableItems, startIndex = 0)
+                                                    }
+                                                },
+                                                shape = RoundedCornerShape(50),
+                                                modifier = Modifier.height(40.dp),
+                                            ) {
+                                                Icon(
+                                                    IconAssets.play(),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp),
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(text = stringResource("play"), fontSize = 14.sp)
+                                            }
+                                        }
+
                                         // Botón Radio
                                         page.artist.radioEndpoint?.let {
                                             OutlinedButton(
@@ -282,17 +366,22 @@ fun ArtistDetailScreen(
                                         }
 
                                         // Botón Shuffle circular
-                                        page.artist.shuffleEndpoint?.let {
+                                        if (page.artist.shuffleEndpoint != null || playableItems.isNotEmpty()) {
                                             IconButton(
                                                 onClick = {
-                                                    val endpoint = page.artist.shuffleEndpoint ?: return@IconButton
-                                                    scope.launch {
-                                                        val result = YouTube.next(endpoint).getOrNull() ?: return@launch
-                                                        val items = result.items.map { songItemToLibraryItem(it) }
-                                                        if (items.isNotEmpty()) {
-                                                            playerState.shuffleEnabled = true
-                                                            playerState.playQueue(items, startIndex = 0)
+                                                    val endpoint = page.artist.shuffleEndpoint
+                                                    if (endpoint != null) {
+                                                        scope.launch {
+                                                            val result = YouTube.next(endpoint).getOrNull() ?: return@launch
+                                                            val items = result.items.map { songItemToLibraryItem(it) }
+                                                            if (items.isNotEmpty()) {
+                                                                playerState.shuffleEnabled = true
+                                                                playerState.playQueue(items, startIndex = 0)
+                                                            }
                                                         }
+                                                    } else if (playableItems.isNotEmpty()) {
+                                                        playerState.shuffleEnabled = true
+                                                        playerState.playQueue(playableItems.shuffled(), startIndex = 0)
                                                     }
                                                 },
                                                 modifier = Modifier
@@ -318,8 +407,45 @@ fun ArtistDetailScreen(
                     }
 
                     // Secciones dinámicas
+                    val hasDedicatedLatestRelease = page.sections.any { it.items.singleOrNull() is AlbumItem }
+                    val synthesizedLatestRelease = if (!hasDedicatedLatestRelease) {
+                        page.sections
+                            .flatMap { it.items.filterIsInstance<AlbumItem>() }
+                            .maxByOrNull { it.year ?: Int.MIN_VALUE }
+                    } else {
+                        null
+                    }
+                    var latestReleaseShown = false
+
                     page.sections.forEach { section ->
                         if (section.items.isNotEmpty()) {
+                            val firstItem = section.items.firstOrNull()
+                            val isSongList = firstItem is SongItem && firstItem.album != null
+
+                            if (!isSongList && synthesizedLatestRelease != null && !latestReleaseShown) {
+                                latestReleaseShown = true
+                                item(key = "section_title_latest_release") {
+                                    NavigationTitle(title = stringResource("latest_release"))
+                                }
+                                item(key = "section_latest_synthesized_${synthesizedLatestRelease.browseId}") {
+                                    LatestReleaseCard(
+                                        album = synthesizedLatestRelease,
+                                        onClick = { onAlbumClick(synthesizedLatestRelease.browseId, synthesizedLatestRelease.title) },
+                                        onPlay = {
+                                            scope.launch {
+                                                YouTube.album(synthesizedLatestRelease.browseId).onSuccess { albumPage ->
+                                                    val queue = albumPage.songs.map { songItemToLibraryItem(it) }
+                                                    if (queue.isNotEmpty()) {
+                                                        playerState.playQueue(queue, startIndex = 0)
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                    )
+                                }
+                            }
+
                             // Título de sección con navegación
                             item(key = "section_title_${section.title}") {
                                 NavigationTitle(
@@ -331,8 +457,7 @@ fun ArtistDetailScreen(
                             }
 
                             // Si son canciones con álbum, mostrar como lista
-                            val firstItem = section.items.firstOrNull()
-                            if (firstItem is SongItem && firstItem.album != null) {
+                            if (isSongList) {
                                 items(
                                     items = section.items.filterIsInstance<SongItem>(),
                                     key = { "song_${it.id}" }
@@ -394,40 +519,119 @@ fun ArtistDetailScreen(
                                     )
                                 }
                             } else {
-                                // Mostrar en grid horizontal
-                                item(key = "section_row_${section.title}") {
-                                    LazyRow(
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                        modifier = Modifier.padding(horizontal = 16.dp)
-                                    ) {
-                                        items(
-                                            items = section.items,
-                                            key = { it.id }
-                                        ) { item ->
-                                            YouTubeGridItem(
-                                                item = item,
-                                                isActive = when (item) {
-                                                    is SongItem -> playerState.currentItem?.id == item.id
-                                                    is AlbumItem -> false
-                                                    else -> false
-                                                },
-                                                isPlaying = playerState.isPlaying,
-                                                onClick = {
-                                                    when (item) {
-                                                        is SongItem -> onSongClick(songItemToLibraryItem(item))
-                                                        is EpisodeItem -> onSongClick(songItemToLibraryItem(item.asSongItem()))
-                                                        is AlbumItem -> onAlbumClick(item.browseId, item.title)
-                                                        is ArtistItem -> onArtistClick(item.id, item.title)
-                                                        is PlaylistItem -> onPlaylistClick(item.id, item.title)
-                                                        is PodcastItem -> onPlaylistClick(item.id, item.title)
+                                // Última versión / single AlbumItem card
+                                val singleAlbum = section.items.singleOrNull() as? AlbumItem
+                                if (singleAlbum != null) {
+                                    item(key = "section_latest_${section.title}_${singleAlbum.browseId}") {
+                                        LatestReleaseCard(
+                                            album = singleAlbum,
+                                            onClick = { onAlbumClick(singleAlbum.browseId, singleAlbum.title) },
+                                            onPlay = {
+                                                scope.launch {
+                                                    YouTube.album(singleAlbum.browseId).onSuccess { albumPage ->
+                                                        val queue = albumPage.songs.map { songItemToLibraryItem(it) }
+                                                        if (queue.isNotEmpty()) {
+                                                            playerState.playQueue(queue, startIndex = 0)
+                                                        }
                                                     }
                                                 }
-                                            )
+                                            },
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                        )
+                                    }
+                                } else {
+                                    // Mostrar en grid horizontal
+                                    item(key = "section_row_${section.title}") {
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                            modifier = Modifier.padding(horizontal = 16.dp)
+                                        ) {
+                                            items(
+                                                items = section.items,
+                                                key = { it.id }
+                                            ) { item ->
+                                                YouTubeGridItem(
+                                                    item = item,
+                                                    isActive = when (item) {
+                                                        is SongItem -> playerState.currentItem?.id == item.id
+                                                        is AlbumItem -> false
+                                                        else -> false
+                                                    },
+                                                    isPlaying = playerState.isPlaying,
+                                                    onClick = {
+                                                        when (item) {
+                                                            is SongItem -> onSongClick(songItemToLibraryItem(item))
+                                                            is EpisodeItem -> onSongClick(songItemToLibraryItem(item.asSongItem()))
+                                                            is AlbumItem -> onAlbumClick(item.browseId, item.title)
+                                                            is ArtistItem -> onArtistClick(item.id, item.title)
+                                                            is PlaylistItem -> onPlaylistClick(item.id, item.title)
+                                                            is PodcastItem -> onPlaylistClick(item.id, item.title)
+                                                        }
+                                                    }
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
+                    }
+
+                    if (synthesizedLatestRelease != null && !latestReleaseShown) {
+                        item(key = "section_title_latest_release_end") {
+                            NavigationTitle(title = stringResource("latest_release"))
+                        }
+                        item(key = "section_latest_synthesized_end_${synthesizedLatestRelease.browseId}") {
+                            LatestReleaseCard(
+                                album = synthesizedLatestRelease,
+                                onClick = { onAlbumClick(synthesizedLatestRelease.browseId, synthesizedLatestRelease.title) },
+                                onPlay = {
+                                    scope.launch {
+                                        YouTube.album(synthesizedLatestRelease.browseId).onSuccess { albumPage ->
+                                            val queue = albumPage.songs.map { songItemToLibraryItem(it) }
+                                            if (queue.isNotEmpty()) {
+                                                playerState.playQueue(queue, startIndex = 0)
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
+
+                    item(key = "about_artist") {
+                        val catalogTitles = remember(page.sections) {
+                            page.sections
+                                .flatMap { it.items }
+                                .mapNotNull { it.title.takeIf(String::isNotBlank) }
+                                .distinct()
+                                .take(50)
+                        }
+                        AboutArtistSection(
+                            artistName = page.artist.title,
+                            thumbnailUrl = page.artist.thumbnail,
+                            description = page.description,
+                            subscriberCountText = page.subscriberCountText,
+                            monthlyListenerCount = page.monthlyListenerCount,
+                            onClick = {
+                                onOpenAbout(
+                                    ArtistAboutArgs(
+                                        artistId = page.artist.id,
+                                        artistName = page.artist.title,
+                                        thumbnailUrl = page.artist.thumbnail,
+                                        description = page.description,
+                                        subscriberCountText = page.subscriberCountText,
+                                        monthlyListenerCount = page.monthlyListenerCount,
+                                        viewCount = page.viewCount,
+                                        catalogTitles = catalogTitles,
+                                    )
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 16.dp),
+                        )
                     }
 
                     item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -465,7 +669,19 @@ fun ArtistDetailScreen(
                     style = MaterialTheme.typography.titleLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+            IconButton(
+                onClick = {
+                    val shareUrl = artistPage?.artist?.shareLink
+                        ?: "https://music.youtube.com/channel/$artistId"
+                    copyToClipboard(shareUrl)
+                },
+            ) {
+                Icon(IconAssets.share(), contentDescription = stringResource("share"))
             }
         }
     }
@@ -725,16 +941,15 @@ private fun YouTubeGridItem(
             .padding(4.dp),
     ) {
         Box(modifier = Modifier.size(size)) {
+            val itemShape = when (item) {
+                is ArtistItem -> rememberExpressiveAvatarShape(item.id)
+                else -> RoundedCornerShape(8.dp)
+            }
             RemoteImage(
                 url = item.thumbnail,
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(
-                        when (item) {
-                            is ArtistItem -> CircleShape
-                            else -> RoundedCornerShape(8.dp)
-                        }
-                    ),
+                    .clip(itemShape),
             )
             if (isActive && isPlaying) {
                 Box(
@@ -788,7 +1003,225 @@ private fun YouTubeGridItem(
                     )
                 }
             }
+            is PodcastItem -> {
+                val meta = listOfNotNull(
+                    item.author?.name?.takeIf { it.isNotBlank() },
+                    item.episodeCountText?.takeIf { it.isNotBlank() },
+                ).joinToString(" • ")
+                if (meta.isNotBlank()) {
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                }
+            }
+            is EpisodeItem -> {
+                val meta = listOfNotNull(
+                    item.author?.name?.takeIf { it.isNotBlank() },
+                    item.publishDateText?.takeIf { it.isNotBlank() },
+                ).joinToString(" • ")
+                if (meta.isNotBlank()) {
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                }
+            }
             else -> {}
+        }
+    }
+}
+
+@Composable
+private fun LatestReleaseCard(
+    album: AlbumItem,
+    onClick: () -> Unit,
+    onPlay: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(14.dp),
+        ) {
+            RemoteImage(
+                url = album.thumbnail,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.size(104.dp).clip(RoundedCornerShape(12.dp)),
+            )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(
+                    text = album.title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val subtitle = listOfNotNull(
+                    album.artists?.firstOrNull()?.name?.takeIf { it.isNotBlank() },
+                    album.year?.toString(),
+                ).joinToString(" • ")
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                FilledTonalButton(
+                    onClick = onPlay,
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.height(36.dp),
+                ) {
+                    Icon(
+                        imageVector = IconAssets.play(),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource("play"),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutArtistSection(
+    artistName: String,
+    thumbnailUrl: String?,
+    description: String?,
+    subscriberCountText: String?,
+    monthlyListenerCount: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val bannerUrl = remember(thumbnailUrl) {
+        thumbnailUrl?.let { url ->
+            if (url.contains("lh3.googleusercontent.com")) {
+                url.replace(Regex("=w\\d+-h\\d+.*$"), "=w1200-h1000-p-l90-rj")
+                    .replace(Regex("=s\\d+.*$"), "=w1200-h1000-p-l90-rj")
+            } else {
+                url
+            }
+        }
+    }
+    val audienceText = listOfNotNull(
+        monthlyListenerCount?.takeIf { it.isNotBlank() },
+        subscriberCountText?.takeIf { it.isNotBlank() },
+    ).joinToString(" • ")
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = modifier,
+    ) {
+        Text(
+            text = stringResource("about"),
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ),
+            modifier = Modifier
+                .widthIn(max = 560.dp)
+                .fillMaxWidth()
+                .height(290.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .clickable(onClick = onClick),
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (!bannerUrl.isNullOrBlank()) {
+                    RemoteImage(
+                        url = bannerUrl,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.45f),
+                                    Color.Black.copy(alpha = 0.88f),
+                                ),
+                            ),
+                        ),
+                )
+                Row(
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                ) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            text = artistName,
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (audienceText.isNotBlank()) {
+                            Text(
+                                text = audienceText,
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        if (!description.isNullOrBlank()) {
+                            Text(
+                                text = description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.86f),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    Icon(
+                        imageVector = IconAssets.arrowForward(),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
         }
     }
 }

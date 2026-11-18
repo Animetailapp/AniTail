@@ -108,8 +108,17 @@ fun ArtistItemsScreen(
 ) {
     val scope = rememberCoroutineScope()
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
+    val downloadedSongIds = remember(downloadedSongs) {
+        downloadedSongs.mapTo(HashSet(downloadedSongs.size)) { it.songId }
+    }
     val downloadStates by downloadService.downloadStates.collectAsState()
+    val albumsById by database.albumsById.collectAsState()
+    val playlistsById by database.playlistsById.collectAsState()
+    val artistsById by database.artistsById.collectAsState()
     val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
+    val primaryArtistBySongId = remember(songArtistMaps) {
+        com.anitail.desktop.db.relations.indexPrimaryArtistIdBySongId(songArtistMaps)
+    }
     var title by remember { mutableStateOf("") }
     var items by remember { mutableStateOf<List<YTItem>>(emptyList()) }
     var continuation by remember { mutableStateOf<String?>(null) }
@@ -309,12 +318,13 @@ fun ArtistItemsScreen(
                 }
             }
         } else if (showSongList) {
+            val songItems = remember(items) { items.filterIsInstance<SongItem>() }
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
             ) {
                 items(
-                    items = items.filterIsInstance<SongItem>(),
+                    items = songItems,
                     key = { it.id },
                 ) { song ->
                     val libraryItem = songItemToLibraryItem(song)
@@ -323,9 +333,9 @@ fun ArtistItemsScreen(
                         libraryItem = libraryItem,
                         songItem = song,
                         songsById = songsById,
-                        songArtistMaps = songArtistMaps,
+                        primaryArtistBySongId = primaryArtistBySongId,
                         downloadStates = downloadStates,
-                        downloadedSongs = downloadedSongs,
+                        downloadedSongIds = downloadedSongIds,
                         database = database,
                         downloadService = downloadService,
                         playerState = playerState,
@@ -419,9 +429,9 @@ fun ArtistItemsScreen(
                                 libraryItem = libraryItem,
                                 songItem = item,
                                 songsById = songsById,
-                                songArtistMaps = songArtistMaps,
+                                primaryArtistBySongId = primaryArtistBySongId,
                                 downloadStates = downloadStates,
-                                downloadedSongs = downloadedSongs,
+                                downloadedSongIds = downloadedSongIds,
                                     database = database,
                                     downloadService = downloadService,
                                     playerState = playerState,
@@ -462,12 +472,12 @@ fun ArtistItemsScreen(
                                 }
                             }
                             is AlbumItem -> {
-                                val albumEntity by database.album(item.browseId).collectAsState(initial = null)
+                                val albumEntity = albumsById[item.browseId]
                                 val albumSongs = albumMenuStates[item.browseId]?.songs.orEmpty()
                                 val downloadMenu = resolveCollectionDownloadMenuState(
                                     songIds = albumSongs.map { it.id },
                                     downloadStates = downloadStates,
-                                    downloadedSongs = downloadedSongs,
+                                    downloadedSongIds = downloadedSongIds,
                                     showWhenEmpty = true,
                                 ) ?: CollectionDownloadMenuState(
                                     label = stringResource("download"),
@@ -562,12 +572,12 @@ fun ArtistItemsScreen(
                                 onMenuOpened = { ensureAlbumMenuState(item) }
                             }
                             is PlaylistItem -> {
-                                val playlistEntity by database.playlist(item.id).collectAsState(initial = null)
+                                val playlistEntity = playlistsById[item.id]
                                 val playlistSongs = playlistMenuStates[item.id]?.songs.orEmpty()
                                 val downloadMenu = resolveCollectionDownloadMenuState(
                                     songIds = playlistSongs.map { it.id },
                                     downloadStates = downloadStates,
-                                    downloadedSongs = downloadedSongs,
+                                    downloadedSongIds = downloadedSongIds,
                                     showWhenEmpty = false,
                                 )
                                 val canLike = item.id != "LM" && !item.isEditable
@@ -679,7 +689,7 @@ fun ArtistItemsScreen(
                                 onMenuOpened = { ensurePlaylistMenuState(item) }
                             }
                             is ArtistItem -> {
-                                val artistEntity by database.artist(item.id).collectAsState(initial = null)
+                                val artistEntity = artistsById[item.id]
                                 menuActions = buildBrowseArtistMenuActions(
                                     isSubscribed = artistEntity?.bookmarkedAt != null,
                                     onToggleSubscribe = {
@@ -734,7 +744,7 @@ fun ArtistItemsScreen(
                             menuActions = menuActions,
                             songEntity = if (item is SongItem) songsById[item.id] else null,
                             downloadState = if (item is SongItem) downloadStates[item.id] else null,
-                            isDownloaded = if (item is SongItem) downloadedSongs.any { it.songId == item.id } else false,
+                            isDownloaded = if (item is SongItem) item.id in downloadedSongIds else false,
                             menuHeader = menuHeader,
                             onClick = {
                                 when (item) {

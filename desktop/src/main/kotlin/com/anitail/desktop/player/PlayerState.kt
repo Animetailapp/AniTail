@@ -6,18 +6,21 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.shared.model.LibraryItem
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
  * Estado global del reproductor para Desktop.
- * Ahora usa NativeAudioPlayer para reproducción real de audio.
+ * Usa NativeAudioPlayer (FFmpeg primario + VLCJ fallback) y VideoPlayer (FFmpeg + Skia).
  */
 class PlayerState {
     var currentItem by mutableStateOf<LibraryItem?>(null)
@@ -50,6 +53,37 @@ class PlayerState {
     var pitchSemitone by mutableStateOf(0)
         private set
 
+    var skipSilence by mutableStateOf(false)
+
+    var crossfadeDurationSec by mutableStateOf(0)
+
+    @set:JvmName("assignVideoModeState")
+    var isVideoMode by mutableStateOf(false)
+        private set
+
+    var showMiniPlayer by mutableStateOf(false)
+    var miniplayerFocusMode by mutableStateOf(false)
+    var showVideoViewer by mutableStateOf(false)
+    var isFullscreenOverlay by mutableStateOf(false)
+    var showCastDialog by mutableStateOf(false)
+    var isCasting by mutableStateOf(false)
+    var isPlayerExpanded by mutableStateOf(false)
+
+    fun toggleMiniPlayer() {
+        showMiniPlayer = !showMiniPlayer
+    }
+
+    fun toggleVideoViewer() {
+        showVideoViewer = !showVideoViewer
+        if (showVideoViewer && !isVideoMode) {
+            setVideoMode(true)
+        }
+    }
+
+    fun toggleFullscreenOverlay() {
+        isFullscreenOverlay = !isFullscreenOverlay
+    }
+
     var onPlaybackEvent: ((LibraryItem, Long) -> Unit)? = null
     var onQueueEnded: ((LibraryItem) -> Unit)? = null
     var onPlaybackErrorEvent: ((LibraryItem, String) -> Unit)? = null
@@ -61,6 +95,15 @@ class PlayerState {
     private var sleepTimerJob: Job? = null
     private var sleepTimerTick by mutableStateOf(0L)
     private var positionTrackerJob: Job? = null
+    private var playJob: Job? = null
+    private var videoLoadJob: Job? = null
+    private var audioRestoreJob: Job? = null
+    private var videoLoadGeneration = 0L
+    private var currentAudioSwitchedForVideo = false
+    private var crossfadeTriggeredForCurrentTrack = false
+    private var prematureEndRecoveryCount = 0
+    private var videoStreamRefreshCount = 0
+    private var lastVideoStartTimeMs = 0L
 
     // Cola de reproducción
     private val _queue = mutableStateListOf<LibraryItem>()
@@ -69,13 +112,56 @@ class PlayerState {
     var currentQueueIndex by mutableStateOf(-1)
         private set
 
-    // Reproductor nativo de audio
+    // Reproductor nativo de audio y video
+    private val preferences = DesktopPreferences.getInstance()
     private val nativePlayer = NativeAudioPlayer()
+    val videoPlayer: VideoPlayer = VideoPlayer().apply {
+        audioPtsProvider = { nativePlayer.getCurrentAudioPtsMs() }
+        onStreamExpired = { status ->
+            scope.launch {
+                val item = currentItem ?: return@launch
+                val videoId = extractVideoId(item.playbackUrl) ?: return@launch
+                if (!isVideoMode || videoStreamRefreshCount >= 5) return@launch
+                val elapsedSinceStart = System.currentTimeMillis() - lastVideoStartTimeMs
+                if (videoStreamRefreshCount > 0 && elapsedSinceStart < 5_000L) {
+                    DesktopInnerTubeXPlayer.markStreamClientFailed(videoId, "WEB_EMBEDDED_PLAYER")
+                }
+                videoStreamRefreshCount++
+                println("Anitail VideoPlayer: stream expired (HTTP $status), refreshing video (attempt $videoStreamRefreshCount)")
+                startVideoForCurrentItem(item, videoId, preserveExistingAudio = true)
+            }
+        }
+    }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     init {
+        skipSilence = preferences.skipSilence.value
+        nativePlayer.setSkipSilence(skipSilence)
+        crossfadeDurationSec = preferences.crossfadeDuration.value.coerceIn(0, 12)
+        nativePlayer.setCrossfadeDuration(crossfadeDurationSec)
         setupNativePlayerCallbacks()
         applyPlaybackRate()
+        observePlaybackPreferences()
+    }
+
+    private fun observePlaybackPreferences() {
+        scope.launch {
+            preferences.skipSilence.collect { enabled ->
+                if (skipSilence != enabled) {
+                    skipSilence = enabled
+                }
+                nativePlayer.setSkipSilence(enabled)
+            }
+        }
+        scope.launch {
+            preferences.crossfadeDuration.collect { seconds ->
+                val clamped = seconds.coerceIn(0, 12)
+                if (crossfadeDurationSec != clamped) {
+                    crossfadeDurationSec = clamped
+                }
+                nativePlayer.setCrossfadeDuration(clamped)
+            }
+        }
     }
 
     private fun setupNativePlayerCallbacks() {
@@ -85,10 +171,16 @@ class PlayerState {
                     isPlaying = true
                     isBuffering = false
                     errorMessage = null
+                    if (isVideoMode) {
+                        videoPlayer.syncPosition(position, true)
+                    }
                     startPositionTracker()
                 }
                 NativeAudioPlayer.PlaybackStatus.PAUSED -> {
                     isPlaying = false
+                    if (isVideoMode) {
+                        videoPlayer.syncPosition(position, false)
+                    }
                     stopPositionTracker()
                 }
                 NativeAudioPlayer.PlaybackStatus.BUFFERING -> {
@@ -96,16 +188,25 @@ class PlayerState {
                 }
                 NativeAudioPlayer.PlaybackStatus.ENDED -> {
                     isPlaying = false
+                    if (isVideoMode) {
+                        videoPlayer.syncPosition(position, false)
+                    }
                     stopPositionTracker()
                     handlePlaybackEnded()
                 }
                 NativeAudioPlayer.PlaybackStatus.ERROR -> {
                     isPlaying = false
                     isBuffering = false
+                    if (isVideoMode) {
+                        videoPlayer.syncPosition(position, false)
+                    }
                     stopPositionTracker()
                 }
                 NativeAudioPlayer.PlaybackStatus.STOPPED -> {
                     isPlaying = false
+                    if (isVideoMode) {
+                        videoPlayer.syncPosition(position, false)
+                    }
                     stopPositionTracker()
                 }
                 else -> { /* Ignorar otros estados */ }
@@ -129,6 +230,31 @@ class PlayerState {
     }
 
     private fun handlePlaybackEnded() {
+        val item = currentItem
+        val videoId = item?.let { extractVideoId(it.playbackUrl) }
+        val endedPrematurely =
+            item != null &&
+                videoId != null &&
+                duration > 20_000L &&
+                position in 1_000L until (duration - 10_000L) &&
+                prematureEndRecoveryCount < 2
+
+        if (endedPrematurely) {
+            prematureEndRecoveryCount++
+            val resumePosition = position
+            println("Anitail WARN: Stream ended prematurely at ${resumePosition}ms / ${duration}ms for ${item.title}; recovering...")
+            playJob?.cancel()
+            playJob = scope.launch {
+                isBuffering = true
+                val result = nativePlayer.playAtPosition(videoId, resumePosition, true)
+                if (result.isSuccess && isVideoMode && currentItem?.id == item.id) {
+                    videoPlayer.syncPosition(resumePosition, true)
+                }
+                isBuffering = false
+            }
+            return
+        }
+
         val shouldRecord = repeatMode == RepeatMode.ONE || !canSkipNext
         if (shouldRecord) {
             reportPlaybackIfNeeded(force = true)
@@ -137,6 +263,9 @@ class PlayerState {
             RepeatMode.ONE -> {
                 seekTo(0L)
                 nativePlayer.resume()
+                if (isVideoMode) {
+                    videoPlayer.syncPosition(0L, true)
+                }
             }
             RepeatMode.ALL, RepeatMode.OFF -> {
                 if (canSkipNext) {
@@ -157,6 +286,9 @@ class PlayerState {
     val canSkipNext: Boolean
         get() = currentQueueIndex < _queue.size - 1 || repeatMode == RepeatMode.ALL
 
+    val hasVideoStream: Boolean
+        get() = currentItem?.let { extractVideoId(it.playbackUrl) != null } == true
+
     val progress: Float
         get() = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f
 
@@ -170,6 +302,17 @@ class PlayerState {
         if (currentItem?.id != item.id) {
             reportPlaybackIfNeeded()
         }
+        playJob?.cancel()
+        audioRestoreJob?.cancel()
+        audioRestoreJob = null
+        videoLoadJob?.cancel()
+        videoLoadJob = null
+        videoLoadGeneration++
+        currentAudioSwitchedForVideo = false
+        videoPlayer.stop()
+        crossfadeTriggeredForCurrentTrack = false
+        prematureEndRecoveryCount = 0
+
         currentItem = item
         position = 0L
         duration = item.durationMs ?: 180_000L
@@ -184,14 +327,26 @@ class PlayerState {
 
         // Extraer videoId para intentar reproducción nativa vía extracción de NativeAudioPlayer
         val videoId = extractVideoId(item.playbackUrl)
+        if (videoId == null && isVideoMode) {
+            isVideoMode = false
+        }
         println("Anitail DEBUG: Play called for item: ${item.title}, videoId: $videoId")
 
-        scope.launch {
-            if (videoId != null) {
+        playJob = scope.launch {
+            val result = if (videoId != null) {
                 isBuffering = true
-                nativePlayer.play(videoId).onFailure { handlePlaybackError(it) }
+                nativePlayer.play(videoId)
             } else {
-                nativePlayer.playStream(item.playbackUrl).onFailure { handlePlaybackError(it) }
+                nativePlayer.playStream(item.playbackUrl)
+            }
+            if (!isActive || currentItem?.id != item.id) return@launch
+            result.onSuccess {
+                if (isVideoMode && videoId != null && currentItem?.id == item.id) {
+                    startVideoForCurrentItem(item, videoId)
+                }
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                handlePlaybackError(error)
             }
         }
     }
@@ -323,33 +478,56 @@ class PlayerState {
     fun togglePlayPause() {
         isPlaying = !isPlaying
         nativePlayer.togglePlayPause()
+        if (isVideoMode) {
+            videoPlayer.syncPosition(position, isPlaying)
+        }
     }
 
     fun pause() {
         isPlaying = false
         nativePlayer.pause()
+        if (isVideoMode) {
+            videoPlayer.syncPosition(position, false)
+        }
     }
 
     fun resume() {
         if (currentItem != null) {
             isPlaying = true
             nativePlayer.resume()
+            if (isVideoMode) {
+                videoPlayer.syncPosition(position, true)
+            }
         }
     }
 
     fun stop() {
         reportPlaybackIfNeeded()
+        playJob?.cancel()
+        playJob = null
+        audioRestoreJob?.cancel()
+        audioRestoreJob = null
+        videoLoadJob?.cancel()
+        videoLoadJob = null
+        videoLoadGeneration++
+        currentAudioSwitchedForVideo = false
+        isVideoMode = false
+        crossfadeTriggeredForCurrentTrack = false
         isPlaying = false
         stopPositionTracker()
         cancelSleepTimer()
         position = 0L
         currentItem = null
+        videoPlayer.stop()
         nativePlayer.stop()
     }
 
     fun seekTo(positionMs: Long) {
         position = positionMs.coerceIn(0L, duration)
         nativePlayer.seekTo(position)
+        if (isVideoMode) {
+            videoPlayer.seekTo(position)
+        }
     }
 
     fun seekToProgress(progress: Float) {
@@ -402,9 +580,27 @@ class PlayerState {
         }
     }
 
+    private var lastNonZeroVolume: Double = 1.0
+
     fun updateVolume(newVolume: Double) {
-        volume = newVolume.coerceIn(0.0, 1.0)
+        val clamped = newVolume.coerceIn(0.0, 1.0)
+        if (clamped > 0.01) {
+            lastNonZeroVolume = clamped
+        }
+        volume = clamped
         nativePlayer.setVolume(volume)
+    }
+
+    fun stepVolume(delta: Double) {
+        updateVolume(volume + delta)
+    }
+
+    fun toggleMute() {
+        if (volume > 0.01) {
+            updateVolume(0.0)
+        } else {
+            updateVolume(if (lastNonZeroVolume > 0.01) lastNonZeroVolume else 1.0)
+        }
     }
 
     fun updateTempo(newTempo: Float) {
@@ -423,9 +619,103 @@ class PlayerState {
         applyPlaybackRate()
     }
 
+    fun updateSkipSilence(enabled: Boolean) {
+        skipSilence = enabled
+        nativePlayer.setSkipSilence(enabled)
+        preferences.setSkipSilence(enabled)
+    }
+
+    fun updateCrossfadeDuration(seconds: Int) {
+        val clamped = seconds.coerceIn(0, 12)
+        crossfadeDurationSec = clamped
+        nativePlayer.setCrossfadeDuration(clamped)
+        preferences.setCrossfadeDuration(clamped)
+    }
+
+    fun toggleVideoMode() {
+        setVideoMode(!isVideoMode)
+    }
+
+    fun setVideoMode(enabled: Boolean) {
+        audioRestoreJob?.cancel()
+        audioRestoreJob = null
+        videoLoadJob?.cancel()
+        videoLoadJob = null
+        videoLoadGeneration++
+        if (!enabled) {
+            isVideoMode = false
+            isBuffering = false
+            currentAudioSwitchedForVideo = false
+            videoPlayer.stop()
+            return
+        }
+        val item = currentItem
+        val videoId = item?.let { extractVideoId(it.playbackUrl) }
+        if (item == null || videoId == null) {
+            isVideoMode = false
+            videoPlayer.stop()
+            return
+        }
+        isVideoMode = true
+        startVideoForCurrentItem(item, videoId)
+    }
+
+    private fun startVideoForCurrentItem(
+        item: LibraryItem,
+        videoId: String,
+        preserveExistingAudio: Boolean = false,
+    ) {
+        if (!preserveExistingAudio) {
+            videoStreamRefreshCount = 0
+        }
+        lastVideoStartTimeMs = System.currentTimeMillis()
+        val generation = ++videoLoadGeneration
+        videoLoadJob?.cancel()
+        videoLoadJob = scope.launch {
+            val result = nativePlayer.extractVideoStream(videoId, item.title, item.artist)
+            if (!isActive || generation != videoLoadGeneration || !isVideoMode || currentItem?.id != item.id) {
+                return@launch
+            }
+            result.onSuccess { info ->
+                val targetPositionMs = nativePlayer.getCurrentPosition().takeIf { it > 0L } ?: position
+                val shouldPlay = isPlaying
+                if (!preserveExistingAudio && info.targetVideoId.isNotBlank() && info.targetVideoId != videoId && !info.audioUrl.isNullOrBlank()) {
+                    val switched = nativePlayer.switchAudioStreamPreservingPosition(
+                        url = info.audioUrl,
+                        headers = info.audioHeaders,
+                        contentLengthBytes = info.audioContentLengthBytes,
+                        targetPositionMs = targetPositionMs,
+                        playWhenReady = shouldPlay,
+                    )
+                    if (!isActive || generation != videoLoadGeneration || !isVideoMode || currentItem?.id != item.id) {
+                        return@launch
+                    }
+                    if (switched) {
+                        currentAudioSwitchedForVideo = true
+                    }
+                }
+                val startPositionMs = nativePlayer.getCurrentPosition().takeIf { it > 0L } ?: targetPositionMs
+                videoPlayer.setPlaybackSpeed(tempo)
+                videoPlayer.start(
+                    url = info.url,
+                    headers = info.headers,
+                    positionMs = startPositionMs,
+                    contentLengthBytes = info.contentLengthBytes,
+                    positionProvider = { nativePlayer.getCurrentPosition() },
+                )
+                videoPlayer.syncPosition(startPositionMs, isPlaying)
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                println("Anitail ERROR: Video stream extraction failed for $videoId: ${error.message}")
+                isVideoMode = false
+                videoPlayer.stop()
+            }
+        }
+    }
+
     private fun applyPlaybackRate() {
-        val rate = PlaybackRateCalculator.toRate(tempo, pitchSemitone)
-        nativePlayer.setPlaybackRate(rate)
+        nativePlayer.setTempoAndPitch(tempo, pitchSemitone)
+        videoPlayer.setPlaybackSpeed(tempo)
     }
 
     private fun reportPlaybackIfNeeded(force: Boolean = false) {
@@ -486,9 +776,15 @@ class PlayerState {
     }
 
     fun release() {
+        playJob?.cancel()
+        playJob = null
+        videoLoadJob?.cancel()
+        videoLoadJob = null
         stopPositionTracker()
         cancelSleepTimer()
+        videoPlayer.dispose()
         nativePlayer.release()
+        scope.cancel()
     }
 
     private fun startPositionTracker() {
@@ -497,12 +793,27 @@ class PlayerState {
             while (isActive) {
                 if (isPlaying) {
                     val currentMs = nativePlayer.getCurrentPosition()
-                    if (currentMs >= 0L) {
+                    if (currentMs >= 0L && position != currentMs) {
                         position = currentMs
                     }
                     val totalMs = nativePlayer.getDuration()
-                    if (totalMs > 0L) {
+                    if (totalMs > 0L && duration != totalMs) {
                         duration = totalMs
+                    }
+                    if (
+                        crossfadeDurationSec > 0 &&
+                        !crossfadeTriggeredForCurrentTrack &&
+                        canSkipNext &&
+                        repeatMode != RepeatMode.ONE
+                    ) {
+                        val fadeMs = crossfadeDurationSec * 1000L
+                        if (duration > maxOf(fadeMs * 2L, 8_000L) && position > 1_000L) {
+                            val remaining = duration - position
+                            if (remaining in 1L..fadeMs) {
+                                crossfadeTriggeredForCurrentTrack = true
+                                skipToNext()
+                            }
+                        }
                     }
                 }
                 delay(PositionTrackerIntervalMs)
@@ -527,4 +838,4 @@ fun rememberPlayerState(): PlayerState {
     return remember { PlayerState() }
 }
 
-private const val PositionTrackerIntervalMs = 16L
+private const val PositionTrackerIntervalMs = 50L

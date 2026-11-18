@@ -71,6 +71,24 @@ class DesktopAccountTokenParserTest {
     }
 
     @Test
+    fun parseSanitizesSingleAsteriskOrMalformedCookiePrefix() {
+        val raw = "*INNERTUBE COOKIE* =SAPISID=abc; SID=def"
+
+        val parsed = DesktopAccountTokenParser.parse(raw)
+
+        assertEquals("SAPISID=abc; SID=def", parsed.cookie)
+    }
+
+    @Test
+    fun parseSanitizesDevToolsHeaderCookie() {
+        val raw = "Cookie: SAPISID=abc; SID=def"
+
+        val parsed = DesktopAccountTokenParser.parse(raw)
+
+        assertEquals("SAPISID=abc; SID=def", parsed.cookie)
+    }
+
+    @Test
     fun buildTokenTextContainsAllFields() {
         val credentials = AuthCredentials(
             visitorData = "visitor",

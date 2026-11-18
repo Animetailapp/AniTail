@@ -1,12 +1,20 @@
 package com.anitail.desktop.storage
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import com.anitail.desktop.security.DesktopSecureStore
 import com.anitail.desktop.security.DesktopPaths
 import com.anitail.desktop.security.SecureSecretsStore
@@ -23,16 +31,21 @@ import com.anitail.desktop.ui.screen.library.PlaylistSortType
 import com.anitail.desktop.ui.screen.library.SongFilter
 import com.anitail.desktop.ui.screen.library.SongSortType
 import com.anitail.desktop.i18n.SYSTEM_DEFAULT
+import com.anitail.innertube.utils.sanitizeCookieString
 
 /**
  * Desktop preferences storage system.
  * Provides persistent settings storage using JSON file.
  * Mirrors Android's DataStore/SharedPreferences functionality.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class DesktopPreferences private constructor(
     private val filePath: Path = defaultPreferencesPath(),
     private val secureStore: SecureSecretsStore = DesktopSecureStore.instance,
 ) {
+    private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
+    private val saveLock = Any()
+    private var saveJob: Job? = null
     // === Appearance Settings ===
     private val _darkMode = MutableStateFlow(DarkModePreference.AUTO)
     val darkMode: StateFlow<DarkModePreference> = _darkMode.asStateFlow()
@@ -283,7 +296,7 @@ class DesktopPreferences private constructor(
     private val _albumFilter = MutableStateFlow(AlbumFilter.LIKED)
     val albumFilter: StateFlow<AlbumFilter> = _albumFilter.asStateFlow()
 
-    private val _artistFilter = MutableStateFlow(ArtistFilter.LIKED)
+    private val _artistFilter = MutableStateFlow(ArtistFilter.LIBRARY)
     val artistFilter: StateFlow<ArtistFilter> = _artistFilter.asStateFlow()
 
     private val _showLikedPlaylist = MutableStateFlow(true)
@@ -308,6 +321,9 @@ class DesktopPreferences private constructor(
     private val _discordToken = MutableStateFlow("")
     val discordToken: StateFlow<String> = _discordToken.asStateFlow()
 
+    private val _discordRefreshToken = MutableStateFlow("")
+    val discordRefreshToken: StateFlow<String> = _discordRefreshToken.asStateFlow()
+
     private val _discordName = MutableStateFlow("")
     val discordName: StateFlow<String> = _discordName.asStateFlow()
 
@@ -328,6 +344,42 @@ class DesktopPreferences private constructor(
 
     private val _discordLastErrorMessage = MutableStateFlow("")
     val discordLastErrorMessage: StateFlow<String> = _discordLastErrorMessage.asStateFlow()
+
+    private val _discordAdvancedMode = MutableStateFlow(false)
+    val discordAdvancedMode: StateFlow<Boolean> = _discordAdvancedMode.asStateFlow()
+
+    private val _discordUserStatus = MutableStateFlow("online")
+    val discordUserStatus: StateFlow<String> = _discordUserStatus.asStateFlow()
+
+    private val _discordActivityType = MutableStateFlow(2)
+    val discordActivityType: StateFlow<Int> = _discordActivityType.asStateFlow()
+
+    private val _discordActivityName = MutableStateFlow("")
+    val discordActivityName: StateFlow<String> = _discordActivityName.asStateFlow()
+
+    private val _discordDetailsTemplate = MutableStateFlow("{song.name}")
+    val discordDetailsTemplate: StateFlow<String> = _discordDetailsTemplate.asStateFlow()
+
+    private val _discordStateTemplate = MutableStateFlow("{artist.name}")
+    val discordStateTemplate: StateFlow<String> = _discordStateTemplate.asStateFlow()
+
+    private val _discordButton1Enabled = MutableStateFlow(true)
+    val discordButton1Enabled: StateFlow<Boolean> = _discordButton1Enabled.asStateFlow()
+
+    private val _discordButton1Label = MutableStateFlow("Listen on YouTube Music")
+    val discordButton1Label: StateFlow<String> = _discordButton1Label.asStateFlow()
+
+    private val _discordButton1Url = MutableStateFlow("https://music.youtube.com/watch?v={song.id}")
+    val discordButton1Url: StateFlow<String> = _discordButton1Url.asStateFlow()
+
+    private val _discordButton2Enabled = MutableStateFlow(true)
+    val discordButton2Enabled: StateFlow<Boolean> = _discordButton2Enabled.asStateFlow()
+
+    private val _discordButton2Label = MutableStateFlow("Join our discord")
+    val discordButton2Label: StateFlow<String> = _discordButton2Label.asStateFlow()
+
+    private val _discordButton2Url = MutableStateFlow("https://discord.gg/H8x3yNbc67")
+    val discordButton2Url: StateFlow<String> = _discordButton2Url.asStateFlow()
 
     private val _spotifyAccessToken = MutableStateFlow("")
     val spotifyAccessToken: StateFlow<String> = _spotifyAccessToken.asStateFlow()
@@ -441,630 +493,318 @@ class DesktopPreferences private constructor(
 
     // === Setters ===
 
-    fun setDarkMode(value: DarkModePreference) {
-        _darkMode.value = value
-        save()
+    private fun <T> updatePref(flow: MutableStateFlow<T>, value: T) {
+        if (flow.value == value) return
+        flow.value = value
+        scheduleSave()
     }
 
-    fun setPureBlack(value: Boolean) {
-        _pureBlack.value = value
-        save()
-    }
+    fun setDarkMode(value: DarkModePreference) = updatePref(_darkMode, value)
 
-    fun setDynamicColor(value: Boolean) {
-        _dynamicColor.value = value
-        save()
-    }
+    fun setPureBlack(value: Boolean) = updatePref(_pureBlack, value)
 
-    fun setPlayerBackgroundStyle(value: PlayerBackgroundStyle) {
-        _playerBackgroundStyle.value = value
-        save()
-    }
+    fun setDynamicColor(value: Boolean) = updatePref(_dynamicColor, value)
 
-    fun setPlayerButtonsStyle(value: PlayerButtonsStyle) {
-        _playerButtonsStyle.value = value
-        save()
-    }
+    fun setPlayerBackgroundStyle(value: PlayerBackgroundStyle) = updatePref(_playerBackgroundStyle, value)
 
-    fun setSliderStyle(value: SliderStyle) {
-        _sliderStyle.value = value
-        save()
-    }
+    fun setPlayerButtonsStyle(value: PlayerButtonsStyle) = updatePref(_playerButtonsStyle, value)
 
-    fun setDensityScale(value: Float) {
-        _densityScale.value = value.coerceIn(0.5f, 1.2f)
-        save()
-    }
+    fun setSliderStyle(value: SliderStyle) = updatePref(_sliderStyle, value)
 
-    fun setCustomDensityValue(value: Float) {
-        _customDensityValue.value = value.coerceIn(0.5f, 1.2f)
-        save()
-    }
+    fun setDensityScale(value: Float) = updatePref(_densityScale, value.coerceIn(0.5f, 1.2f))
 
-    fun setDefaultOpenTab(value: NavigationTabPreference) {
-        _defaultOpenTab.value = value
-        save()
-    }
+    fun setCustomDensityValue(value: Float) = updatePref(_customDensityValue, value.coerceIn(0.5f, 1.2f))
 
-    fun setDefaultLibChip(value: LibraryFilter) {
-        _defaultLibChip.value = value
-        save()
-    }
+    fun setDefaultOpenTab(value: NavigationTabPreference) = updatePref(_defaultOpenTab, value)
 
-    fun setSlimNavBar(value: Boolean) {
-        _slimNavBar.value = value
-        save()
-    }
+    fun setDefaultLibChip(value: LibraryFilter) = updatePref(_defaultLibChip, value)
 
-    fun setSwipeToSong(value: Boolean) {
-        _swipeToSong.value = value
-        save()
-    }
+    fun setSlimNavBar(value: Boolean) = updatePref(_slimNavBar, value)
 
-    fun setSwipeThumbnail(value: Boolean) {
-        _swipeThumbnail.value = value
-        save()
-    }
+    fun setSwipeToSong(value: Boolean) = updatePref(_swipeToSong, value)
 
-    fun setSwipeSensitivity(value: Float) {
-        _swipeSensitivity.value = value.coerceIn(0f, 1f)
-        save()
-    }
+    fun setSwipeThumbnail(value: Boolean) = updatePref(_swipeThumbnail, value)
 
-    fun setLyricsTextPosition(value: LyricsPositionPreference) {
-        _lyricsTextPosition.value = value
-        save()
-    }
+    fun setSwipeSensitivity(value: Float) = updatePref(_swipeSensitivity, value.coerceIn(0f, 1f))
 
-    fun setLyricsClick(value: Boolean) {
-        _lyricsClick.value = value
-        save()
-    }
+    fun setLyricsTextPosition(value: LyricsPositionPreference) = updatePref(_lyricsTextPosition, value)
 
-    fun setLyricsScroll(value: Boolean) {
-        _lyricsScroll.value = value
-        save()
-    }
+    fun setLyricsClick(value: Boolean) = updatePref(_lyricsClick, value)
 
-    fun setLyricsFontSize(value: Float) {
-        _lyricsFontSize.value = value.coerceIn(12f, 36f)
-        save()
-    }
+    fun setLyricsScroll(value: Boolean) = updatePref(_lyricsScroll, value)
 
-    fun setLyricsCustomFontPath(value: String) {
-        _lyricsCustomFontPath.value = value
-        save()
-    }
+    fun setLyricsFontSize(value: Float) = updatePref(_lyricsFontSize, value.coerceIn(12f, 36f))
 
-    fun setLyricsSmoothScroll(value: Boolean) {
-        _lyricsSmoothScroll.value = value
-        save()
-    }
+    fun setLyricsCustomFontPath(value: String) = updatePref(_lyricsCustomFontPath, value)
 
-    fun setLyricsAnimationStyle(value: LyricsAnimationStylePreference) {
-        _lyricsAnimationStyle.value = value
-        save()
-    }
+    fun setLyricsSmoothScroll(value: Boolean) = updatePref(_lyricsSmoothScroll, value)
 
-    fun setAudioQuality(value: AudioQuality) {
-        _audioQuality.value = value
-        save()
-    }
+    fun setLyricsAnimationStyle(value: LyricsAnimationStylePreference) = updatePref(_lyricsAnimationStyle, value)
 
-    fun setNormalizeAudio(value: Boolean) {
-        _normalizeAudio.value = value
-        save()
-    }
+    fun setAudioQuality(value: AudioQuality) = updatePref(_audioQuality, value)
 
-    fun setSkipSilence(value: Boolean) {
-        _skipSilence.value = value
-        save()
-    }
+    fun setNormalizeAudio(value: Boolean) = updatePref(_normalizeAudio, value)
 
-    fun setCrossfadeDuration(value: Int) {
-        _crossfadeDuration.value = value.coerceIn(0, 12)
-        save()
-    }
+    fun setSkipSilence(value: Boolean) = updatePref(_skipSilence, value)
 
-    fun setHistoryDuration(value: Float) {
-        _historyDuration.value = value.coerceIn(0f, 120f)
-        save()
-    }
+    fun setCrossfadeDuration(value: Int) = updatePref(_crossfadeDuration, value.coerceIn(0, 12))
 
-    fun setPersistentQueue(value: Boolean) {
-        _persistentQueue.value = value
-        save()
-    }
+    fun setHistoryDuration(value: Float) = updatePref(_historyDuration, value.coerceIn(0f, 120f))
 
-    fun setAudioOffload(value: Boolean) {
-        _audioOffload.value = value
-        save()
-    }
+    fun setPersistentQueue(value: Boolean) = updatePref(_persistentQueue, value)
 
-    fun setAutoLoadMore(value: Boolean) {
-        _autoLoadMore.value = value
-        save()
-    }
+    fun setAudioOffload(value: Boolean) = updatePref(_audioOffload, value)
 
-    fun setSimilarContentEnabled(value: Boolean) {
-        _similarContentEnabled.value = value
-        save()
-    }
+    fun setAutoLoadMore(value: Boolean) = updatePref(_autoLoadMore, value)
 
-    fun setAutoSkipNextOnError(value: Boolean) {
-        _autoSkipNextOnError.value = value
-        save()
-    }
+    fun setSimilarContentEnabled(value: Boolean) = updatePref(_similarContentEnabled, value)
 
-    fun setStopMusicOnTaskClear(value: Boolean) {
-        _stopMusicOnTaskClear.value = value
-        save()
-    }
+    fun setAutoSkipNextOnError(value: Boolean) = updatePref(_autoSkipNextOnError, value)
 
-    fun setAutoDownloadOnLike(value: Boolean) {
-        _autoDownloadOnLike.value = value
-        save()
-    }
+    fun setStopMusicOnTaskClear(value: Boolean) = updatePref(_stopMusicOnTaskClear, value)
 
-    fun setAutoDownloadLyrics(value: Boolean) {
-        _autoDownloadLyrics.value = value
-        save()
-    }
+    fun setAutoDownloadOnLike(value: Boolean) = updatePref(_autoDownloadOnLike, value)
 
-    fun setEnableCast(value: Boolean) {
-        _enableCast.value = value
-        save()
-    }
+    fun setAutoDownloadLyrics(value: Boolean) = updatePref(_autoDownloadLyrics, value)
 
-    fun setNotificationButtonType(value: NotificationButtonTypePreference) {
-        _notificationButtonType.value = value
-        save()
-    }
+    fun setEnableCast(value: Boolean) = updatePref(_enableCast, value)
 
-    fun setAutoStartRadio(value: Boolean) {
-        _autoStartRadio.value = value
-        save()
-    }
+    fun setNotificationButtonType(value: NotificationButtonTypePreference) = updatePref(_notificationButtonType, value)
 
-    fun setQueueEditLocked(value: Boolean) {
-        _queueEditLocked.value = value
-        save()
-    }
+    fun setAutoStartRadio(value: Boolean) = updatePref(_autoStartRadio, value)
 
-    fun setContentLanguage(value: String) {
-        _contentLanguage.value = value
-        save()
-    }
+    fun setQueueEditLocked(value: Boolean) = updatePref(_queueEditLocked, value)
 
-    fun setContentCountry(value: String) {
-        _contentCountry.value = value
-        save()
-    }
+    fun setContentLanguage(value: String) = updatePref(_contentLanguage, value)
 
-    fun setAppLanguage(value: String) {
-        _appLanguage.value = value
-        save()
-    }
+    fun setContentCountry(value: String) = updatePref(_contentCountry, value)
 
-    fun setHideExplicit(value: Boolean) {
-        _hideExplicit.value = value
-        save()
-    }
+    fun setAppLanguage(value: String) = updatePref(_appLanguage, value)
 
-    fun setQuickPicks(value: QuickPicks) {
-        _quickPicks.value = value
-        save()
-    }
+    fun setHideExplicit(value: Boolean) = updatePref(_hideExplicit, value)
 
-    fun setTopLength(value: String) {
-        _topLength.value = value
-        save()
-    }
+    fun setQuickPicks(value: QuickPicks) = updatePref(_quickPicks, value)
 
-    fun setProxyEnabled(value: Boolean) {
-        _proxyEnabled.value = value
-        save()
-    }
+    fun setTopLength(value: String) = updatePref(_topLength, value)
 
-    fun setProxyType(value: ProxyTypePreference) {
-        _proxyType.value = value
-        save()
-    }
+    fun setProxyEnabled(value: Boolean) = updatePref(_proxyEnabled, value)
 
-    fun setProxyUrl(value: String) {
-        _proxyUrl.value = value
-        save()
-    }
+    fun setProxyType(value: ProxyTypePreference) = updatePref(_proxyType, value)
 
-    fun setProxyUsername(value: String) {
-        _proxyUsername.value = value
-        save()
-    }
+    fun setProxyUrl(value: String) = updatePref(_proxyUrl, value)
+
+    fun setProxyUsername(value: String) = updatePref(_proxyUsername, value)
 
     fun setProxyPassword(value: String) {
+        if (_proxyPassword.value == value) return
         _proxyPassword.value = value
-        persistSensitiveValue(SensitiveKeys.PROXY_PASSWORD, value)
-        save()
+        persistSensitiveValueAsync(SensitiveKeys.PROXY_PASSWORD, value)
+        scheduleSave()
     }
 
-    fun setEnableBetterLyrics(value: Boolean) {
-        _enableBetterLyrics.value = value
-        save()
-    }
+    fun setEnableBetterLyrics(value: Boolean) = updatePref(_enableBetterLyrics, value)
 
-    fun setEnableSimpMusic(value: Boolean) {
-        _enableSimpMusic.value = value
-        save()
-    }
+    fun setEnableSimpMusic(value: Boolean) = updatePref(_enableSimpMusic, value)
 
-    fun setEnableLrcLib(value: Boolean) {
-        _enableLrcLib.value = value
-        save()
-    }
+    fun setEnableLrcLib(value: Boolean) = updatePref(_enableLrcLib, value)
 
-    fun setEnableKuGou(value: Boolean) {
-        _enableKuGou.value = value
-        save()
-    }
+    fun setEnableKuGou(value: Boolean) = updatePref(_enableKuGou, value)
 
-    fun setPreferredLyricsProvider(value: PreferredLyricsProvider) {
-        _preferredLyricsProvider.value = value
-        save()
-    }
+    fun setPreferredLyricsProvider(value: PreferredLyricsProvider) = updatePref(_preferredLyricsProvider, value)
 
-    fun setLyricsGlowEffect(value: Boolean) {
-        _lyricsGlowEffect.value = value
-        save()
-    }
+    fun setLyricsGlowEffect(value: Boolean) = updatePref(_lyricsGlowEffect, value)
 
-    fun setLyricsRomanizeJapanese(value: Boolean) {
-        _lyricsRomanizeJapanese.value = value
-        save()
-    }
+    fun setLyricsRomanizeJapanese(value: Boolean) = updatePref(_lyricsRomanizeJapanese, value)
 
-    fun setLyricsRomanizeKorean(value: Boolean) {
-        _lyricsRomanizeKorean.value = value
-        save()
-    }
+    fun setLyricsRomanizeKorean(value: Boolean) = updatePref(_lyricsRomanizeKorean, value)
 
-    fun setLyricsRomanizeRussian(value: Boolean) {
-        _lyricsRomanizeRussian.value = value
-        save()
-    }
+    fun setLyricsRomanizeRussian(value: Boolean) = updatePref(_lyricsRomanizeRussian, value)
 
-    fun setLyricsRomanizeUkrainian(value: Boolean) {
-        _lyricsRomanizeUkrainian.value = value
-        save()
-    }
+    fun setLyricsRomanizeUkrainian(value: Boolean) = updatePref(_lyricsRomanizeUkrainian, value)
 
-    fun setLyricsRomanizeSerbian(value: Boolean) {
-        _lyricsRomanizeSerbian.value = value
-        save()
-    }
+    fun setLyricsRomanizeSerbian(value: Boolean) = updatePref(_lyricsRomanizeSerbian, value)
 
-    fun setLyricsRomanizeBulgarian(value: Boolean) {
-        _lyricsRomanizeBulgarian.value = value
-        save()
-    }
+    fun setLyricsRomanizeBulgarian(value: Boolean) = updatePref(_lyricsRomanizeBulgarian, value)
 
-    fun setLyricsRomanizeBelarusian(value: Boolean) {
-        _lyricsRomanizeBelarusian.value = value
-        save()
-    }
+    fun setLyricsRomanizeBelarusian(value: Boolean) = updatePref(_lyricsRomanizeBelarusian, value)
 
-    fun setLyricsRomanizeKyrgyz(value: Boolean) {
-        _lyricsRomanizeKyrgyz.value = value
-        save()
-    }
+    fun setLyricsRomanizeKyrgyz(value: Boolean) = updatePref(_lyricsRomanizeKyrgyz, value)
 
-    fun setLyricsRomanizeCyrillicByLine(value: Boolean) {
-        _lyricsRomanizeCyrillicByLine.value = value
-        save()
-    }
+    fun setLyricsRomanizeCyrillicByLine(value: Boolean) = updatePref(_lyricsRomanizeCyrillicByLine, value)
 
-    fun setLibraryFilter(value: LibraryFilter) {
-        _libraryFilter.value = value
-        save()
-    }
+    fun setLibraryFilter(value: LibraryFilter) = updatePref(_libraryFilter, value)
 
-    fun setMixViewType(value: LibraryViewType) {
-        _mixViewType.value = value
-        save()
-    }
+    fun setMixViewType(value: LibraryViewType) = updatePref(_mixViewType, value)
 
-    fun setPlaylistViewType(value: LibraryViewType) {
-        _playlistViewType.value = value
-        save()
-    }
+    fun setPlaylistViewType(value: LibraryViewType) = updatePref(_playlistViewType, value)
 
-    fun setAlbumViewType(value: LibraryViewType) {
-        _albumViewType.value = value
-        save()
-    }
+    fun setAlbumViewType(value: LibraryViewType) = updatePref(_albumViewType, value)
 
-    fun setArtistViewType(value: LibraryViewType) {
-        _artistViewType.value = value
-        save()
-    }
+    fun setArtistViewType(value: LibraryViewType) = updatePref(_artistViewType, value)
 
-    fun setGridItemSize(value: GridItemSize) {
-        _gridItemSize.value = value
-        save()
-    }
+    fun setGridItemSize(value: GridItemSize) = updatePref(_gridItemSize, value)
 
-    fun setMixSortType(value: MixSortType) {
-        _mixSortType.value = value
-        save()
-    }
+    fun setMixSortType(value: MixSortType) = updatePref(_mixSortType, value)
 
-    fun setMixSortDescending(value: Boolean) {
-        _mixSortDescending.value = value
-        save()
-    }
+    fun setMixSortDescending(value: Boolean) = updatePref(_mixSortDescending, value)
 
-    fun setPlaylistSortType(value: PlaylistSortType) {
-        _playlistSortType.value = value
-        save()
-    }
+    fun setPlaylistSortType(value: PlaylistSortType) = updatePref(_playlistSortType, value)
 
-    fun setPlaylistSortDescending(value: Boolean) {
-        _playlistSortDescending.value = value
-        save()
-    }
+    fun setPlaylistSortDescending(value: Boolean) = updatePref(_playlistSortDescending, value)
 
-    fun setAlbumSortType(value: AlbumSortType) {
-        _albumSortType.value = value
-        save()
-    }
+    fun setAlbumSortType(value: AlbumSortType) = updatePref(_albumSortType, value)
 
-    fun setAlbumSortDescending(value: Boolean) {
-        _albumSortDescending.value = value
-        save()
-    }
+    fun setAlbumSortDescending(value: Boolean) = updatePref(_albumSortDescending, value)
 
-    fun setArtistSortType(value: ArtistSortType) {
-        _artistSortType.value = value
-        save()
-    }
+    fun setArtistSortType(value: ArtistSortType) = updatePref(_artistSortType, value)
 
-    fun setArtistSortDescending(value: Boolean) {
-        _artistSortDescending.value = value
-        save()
-    }
+    fun setArtistSortDescending(value: Boolean) = updatePref(_artistSortDescending, value)
 
-    fun setSongSortType(value: SongSortType) {
-        _songSortType.value = value
-        save()
-    }
+    fun setSongSortType(value: SongSortType) = updatePref(_songSortType, value)
 
-    fun setSongSortDescending(value: Boolean) {
-        _songSortDescending.value = value
-        save()
-    }
+    fun setSongSortDescending(value: Boolean) = updatePref(_songSortDescending, value)
 
-    fun setSongFilter(value: SongFilter) {
-        _songFilter.value = value
-        save()
-    }
+    fun setSongFilter(value: SongFilter) = updatePref(_songFilter, value)
 
-    fun setAlbumFilter(value: AlbumFilter) {
-        _albumFilter.value = value
-        save()
-    }
+    fun setAlbumFilter(value: AlbumFilter) = updatePref(_albumFilter, value)
 
-    fun setArtistFilter(value: ArtistFilter) {
-        _artistFilter.value = value
-        save()
-    }
+    fun setArtistFilter(value: ArtistFilter) = updatePref(_artistFilter, value)
 
-    fun setShowLikedPlaylist(value: Boolean) {
-        _showLikedPlaylist.value = value
-        save()
-    }
+    fun setShowLikedPlaylist(value: Boolean) = updatePref(_showLikedPlaylist, value)
 
-    fun setShowDownloadedPlaylist(value: Boolean) {
-        _showDownloadedPlaylist.value = value
-        save()
-    }
+    fun setShowDownloadedPlaylist(value: Boolean) = updatePref(_showDownloadedPlaylist, value)
 
-    fun setShowTopPlaylist(value: Boolean) {
-        _showTopPlaylist.value = value
-        save()
-    }
+    fun setShowTopPlaylist(value: Boolean) = updatePref(_showTopPlaylist, value)
 
-    fun setShowCachedPlaylist(value: Boolean) {
-        _showCachedPlaylist.value = value
-        save()
-    }
+    fun setShowCachedPlaylist(value: Boolean) = updatePref(_showCachedPlaylist, value)
 
-    fun setUseLoginForBrowse(value: Boolean) {
-        _useLoginForBrowse.value = value
-        save()
-    }
+    fun setUseLoginForBrowse(value: Boolean) = updatePref(_useLoginForBrowse, value)
 
-    fun setYtmSync(value: Boolean) {
-        _ytmSync.value = value
-        save()
-    }
+    fun setYtmSync(value: Boolean) = updatePref(_ytmSync, value)
 
     fun setDiscordToken(value: String) {
+        if (_discordToken.value == value) return
         _discordToken.value = value
-        persistSensitiveValue(SensitiveKeys.DISCORD_TOKEN, value)
-        save()
+        persistSensitiveValueAsync(SensitiveKeys.DISCORD_TOKEN, value)
+        scheduleSave()
     }
 
-    fun setDiscordName(value: String) {
-        _discordName.value = value
-        save()
+    fun setDiscordRefreshToken(value: String) {
+        if (_discordRefreshToken.value == value) return
+        _discordRefreshToken.value = value
+        persistSensitiveValueAsync(SensitiveKeys.DISCORD_REFRESH_TOKEN, value)
+        scheduleSave()
     }
 
-    fun setDiscordUsername(value: String) {
-        _discordUsername.value = value
-        save()
-    }
+    fun setDiscordName(value: String) = updatePref(_discordName, value)
 
-    fun setDiscordAvatarUrl(value: String) {
-        _discordAvatarUrl.value = value
-        save()
-    }
+    fun setDiscordUsername(value: String) = updatePref(_discordUsername, value)
 
-    fun setPreferredAvatarSource(value: AvatarSourcePreference) {
-        _preferredAvatarSource.value = value
-        save()
-    }
+    fun setDiscordAvatarUrl(value: String) = updatePref(_discordAvatarUrl, value)
 
-    fun setDiscordInfoDismissed(value: Boolean) {
-        _discordInfoDismissed.value = value
-        save()
-    }
+    fun setPreferredAvatarSource(value: AvatarSourcePreference) = updatePref(_preferredAvatarSource, value)
 
-    fun setEnableDiscordRPC(value: Boolean) {
-        _enableDiscordRPC.value = value
-        save()
-    }
+    fun setDiscordInfoDismissed(value: Boolean) = updatePref(_discordInfoDismissed, value)
 
-    fun setDiscordLastSyncEpochMillis(value: Long) {
-        _discordLastSyncEpochMillis.value = value
-        save()
-    }
+    fun setDiscordAdvancedMode(value: Boolean) = updatePref(_discordAdvancedMode, value)
 
-    fun setDiscordLastErrorMessage(value: String) {
-        _discordLastErrorMessage.value = value
-        save()
-    }
+    fun setDiscordUserStatus(value: String) = updatePref(_discordUserStatus, value)
+
+    fun setDiscordActivityType(value: Int) = updatePref(_discordActivityType, value)
+
+    fun setDiscordActivityName(value: String) = updatePref(_discordActivityName, value)
+
+    fun setDiscordDetailsTemplate(value: String) = updatePref(_discordDetailsTemplate, value)
+
+    fun setDiscordStateTemplate(value: String) = updatePref(_discordStateTemplate, value)
+
+    fun setDiscordButton1Enabled(value: Boolean) = updatePref(_discordButton1Enabled, value)
+
+    fun setDiscordButton1Label(value: String) = updatePref(_discordButton1Label, value)
+
+    fun setDiscordButton1Url(value: String) = updatePref(_discordButton1Url, value)
+
+    fun setDiscordButton2Enabled(value: Boolean) = updatePref(_discordButton2Enabled, value)
+
+    fun setDiscordButton2Label(value: String) = updatePref(_discordButton2Label, value)
+
+    fun setDiscordButton2Url(value: String) = updatePref(_discordButton2Url, value)
+
+    fun setEnableDiscordRPC(value: Boolean) = updatePref(_enableDiscordRPC, value)
+
+    fun setDiscordLastSyncEpochMillis(value: Long) = updatePref(_discordLastSyncEpochMillis, value)
+
+    fun setDiscordLastErrorMessage(value: String) = updatePref(_discordLastErrorMessage, value)
 
     fun setSpotifyAccessToken(value: String) {
+        if (_spotifyAccessToken.value == value) return
         _spotifyAccessToken.value = value
-        persistSensitiveValue(SensitiveKeys.SPOTIFY_ACCESS_TOKEN, value)
-        save()
+        persistSensitiveValueAsync(SensitiveKeys.SPOTIFY_ACCESS_TOKEN, value)
+        scheduleSave()
     }
 
     fun setSpotifyRefreshToken(value: String) {
+        if (_spotifyRefreshToken.value == value) return
         _spotifyRefreshToken.value = value
-        persistSensitiveValue(SensitiveKeys.SPOTIFY_REFRESH_TOKEN, value)
-        save()
+        persistSensitiveValueAsync(SensitiveKeys.SPOTIFY_REFRESH_TOKEN, value)
+        scheduleSave()
     }
 
-    fun setSpotifyUserName(value: String) {
-        _spotifyUserName.value = value
-        save()
-    }
+    fun setSpotifyUserName(value: String) = updatePref(_spotifyUserName, value)
 
-    fun setSpotifyTokenExpiryEpochMillis(value: Long) {
-        _spotifyTokenExpiryEpochMillis.value = value
-        save()
-    }
+    fun setSpotifyTokenExpiryEpochMillis(value: Long) = updatePref(_spotifyTokenExpiryEpochMillis, value)
 
-    fun setLastFmEnabled(value: Boolean) {
-        _lastFmEnabled.value = value
-        save()
-    }
+    fun setLastFmEnabled(value: Boolean) = updatePref(_lastFmEnabled, value)
 
-    fun setLastFmUsername(value: String) {
-        _lastFmUsername.value = value
-        save()
-    }
+    fun setLastFmUsername(value: String) = updatePref(_lastFmUsername, value)
 
     fun setLastFmSessionKey(value: String) {
+        if (_lastFmSessionKey.value == value) return
         _lastFmSessionKey.value = value
-        persistSensitiveValue(SensitiveKeys.LASTFM_SESSION_KEY, value)
-        save()
+        persistSensitiveValueAsync(SensitiveKeys.LASTFM_SESSION_KEY, value)
+        scheduleSave()
     }
 
-    fun setLastFmScrobbleEnabled(value: Boolean) {
-        _lastFmScrobbleEnabled.value = value
-        save()
-    }
+    fun setLastFmScrobbleEnabled(value: Boolean) = updatePref(_lastFmScrobbleEnabled, value)
 
-    fun setLastFmLoveTracks(value: Boolean) {
-        _lastFmLoveTracks.value = value
-        save()
-    }
+    fun setLastFmLoveTracks(value: Boolean) = updatePref(_lastFmLoveTracks, value)
 
-    fun setLastFmShowAvatar(value: Boolean) {
-        _lastFmShowAvatar.value = value
-        save()
-    }
+    fun setLastFmShowAvatar(value: Boolean) = updatePref(_lastFmShowAvatar, value)
 
-    fun setPauseListenHistory(value: Boolean) {
-        _pauseListenHistory.value = value
-        save()
-    }
+    fun setPauseListenHistory(value: Boolean) = updatePref(_pauseListenHistory, value)
 
-    fun setPauseSearchHistory(value: Boolean) {
-        _pauseSearchHistory.value = value
-        save()
-    }
+    fun setPauseSearchHistory(value: Boolean) = updatePref(_pauseSearchHistory, value)
 
-    fun setDisableScreenshot(value: Boolean) {
-        _disableScreenshot.value = value
-        save()
-    }
+    fun setDisableScreenshot(value: Boolean) = updatePref(_disableScreenshot, value)
 
-    fun setMaxImageCacheSizeMB(value: Int) {
-        _maxImageCacheSizeMB.value = value.coerceIn(128, 8192)
-        save()
-    }
+    fun setMaxImageCacheSizeMB(value: Int) = updatePref(_maxImageCacheSizeMB, value.coerceIn(128, 8192))
 
-    fun setMaxSongCacheSizeMB(value: Int) {
-        _maxSongCacheSizeMB.value = if (value == -1) -1 else value.coerceIn(128, 8192)
-        save()
-    }
+    fun setMaxSongCacheSizeMB(value: Int) =
+        updatePref(_maxSongCacheSizeMB, if (value == -1) -1 else value.coerceIn(128, 8192))
 
-    fun setMaxDownloadSizeMB(value: Int) {
-        _maxDownloadSizeMB.value = if (value == -1) -1 else value.coerceIn(128, 8192)
-        save()
-    }
+    fun setMaxDownloadSizeMB(value: Int) =
+        updatePref(_maxDownloadSizeMB, if (value == -1) -1 else value.coerceIn(128, 8192))
 
-    fun setDownloadAsMp3(value: Boolean) {
-        _downloadAsMp3.value = value
-        save()
-    }
+    fun setDownloadAsMp3(value: Boolean) = updatePref(_downloadAsMp3, value)
 
-    fun setEnableBackupUpload(value: Boolean) {
-        _enableBackupUpload.value = value
-        save()
-    }
+    fun setEnableBackupUpload(value: Boolean) = updatePref(_enableBackupUpload, value)
 
-    fun setAutoBackupEnabled(value: Boolean) {
-        _autoBackupEnabled.value = value
-        save()
-    }
+    fun setAutoBackupEnabled(value: Boolean) = updatePref(_autoBackupEnabled, value)
 
-    fun setAutoBackupFrequencyHours(value: Int) {
-        _autoBackupFrequencyHours.value = BackupFrequency.fromHours(value).hours
-        save()
-    }
+    fun setAutoBackupFrequencyHours(value: Int) =
+        updatePref(_autoBackupFrequencyHours, BackupFrequency.fromHours(value).hours)
 
-    fun setAutoBackupKeepCount(value: Int) {
-        _autoBackupKeepCount.value = value.coerceIn(1, 20)
-        save()
-    }
+    fun setAutoBackupKeepCount(value: Int) = updatePref(_autoBackupKeepCount, value.coerceIn(1, 20))
 
-    fun setAutoBackupUseCustomLocation(value: Boolean) {
-        _autoBackupUseCustomLocation.value = value
-        save()
-    }
+    fun setAutoBackupUseCustomLocation(value: Boolean) = updatePref(_autoBackupUseCustomLocation, value)
 
-    fun setAutoBackupCustomLocation(value: String) {
-        _autoBackupCustomLocation.value = value.trim()
-        save()
-    }
+    fun setAutoBackupCustomLocation(value: String) = updatePref(_autoBackupCustomLocation, value.trim())
 
-    fun setAutoUpdateEnabled(value: Boolean) {
-        _autoUpdateEnabled.value = value
-        save()
-    }
+    fun setAutoUpdateEnabled(value: Boolean) = updatePref(_autoUpdateEnabled, value)
 
-    fun setAutoUpdateCheckFrequency(value: UpdateCheckFrequency) {
-        _autoUpdateCheckFrequency.value = value
-        save()
-    }
+    fun setAutoUpdateCheckFrequency(value: UpdateCheckFrequency) = updatePref(_autoUpdateCheckFrequency, value)
 
-    fun setUpdateLastCheckTime(value: Long) {
-        _lastUpdateCheckTimeMs.value = value.coerceAtLeast(-1L)
-        save()
-    }
+    fun setUpdateLastCheckTime(value: Long) = updatePref(_lastUpdateCheckTimeMs, value.coerceAtLeast(-1L))
 
     fun setLatestUpdateInfo(
         versionName: String,
@@ -1072,11 +812,21 @@ class DesktopPreferences private constructor(
         releaseNotes: String = "",
         releasePageUrl: String = "",
     ) {
-        _latestVersionName.value = versionName.trim()
-        _latestVersionDownloadUrl.value = downloadUrl.trim()
+        val trimmedVersion = versionName.trim()
+        val trimmedUrl = downloadUrl.trim()
+        val trimmedPage = releasePageUrl.trim()
+        if (_latestVersionName.value == trimmedVersion &&
+            _latestVersionDownloadUrl.value == trimmedUrl &&
+            _latestVersionReleaseNotes.value == releaseNotes &&
+            _latestVersionReleasePageUrl.value == trimmedPage
+        ) {
+            return
+        }
+        _latestVersionName.value = trimmedVersion
+        _latestVersionDownloadUrl.value = trimmedUrl
         _latestVersionReleaseNotes.value = releaseNotes
-        _latestVersionReleasePageUrl.value = releasePageUrl.trim()
-        save()
+        _latestVersionReleasePageUrl.value = trimmedPage
+        scheduleSave()
     }
 
     fun updateLatestReleaseCheck(
@@ -1086,33 +836,43 @@ class DesktopPreferences private constructor(
         releaseNotes: String? = null,
         releasePageUrl: String? = null,
     ) {
-        _lastUpdateCheckTimeMs.value = checkTimeMs.coerceAtLeast(-1L)
-        _latestVersionName.value = versionName.orEmpty().trim()
-        _latestVersionDownloadUrl.value = downloadUrl.orEmpty().trim()
-        _latestVersionReleaseNotes.value = releaseNotes.orEmpty()
-        _latestVersionReleasePageUrl.value = releasePageUrl.orEmpty().trim()
-        save()
+        val clampedTime = checkTimeMs.coerceAtLeast(-1L)
+        val trimmedVersion = versionName.orEmpty().trim()
+        val trimmedUrl = downloadUrl.orEmpty().trim()
+        val safeNotes = releaseNotes.orEmpty()
+        val trimmedPage = releasePageUrl.orEmpty().trim()
+        if (_lastUpdateCheckTimeMs.value == clampedTime &&
+            _latestVersionName.value == trimmedVersion &&
+            _latestVersionDownloadUrl.value == trimmedUrl &&
+            _latestVersionReleaseNotes.value == safeNotes &&
+            _latestVersionReleasePageUrl.value == trimmedPage
+        ) {
+            return
+        }
+        _lastUpdateCheckTimeMs.value = clampedTime
+        _latestVersionName.value = trimmedVersion
+        _latestVersionDownloadUrl.value = trimmedUrl
+        _latestVersionReleaseNotes.value = safeNotes
+        _latestVersionReleasePageUrl.value = trimmedPage
+        scheduleSave()
     }
 
-    fun setShowLyrics(value: Boolean) {
-        _showLyrics.value = value
-        save()
-    }
+    fun setShowLyrics(value: Boolean) = updatePref(_showLyrics, value)
 
-    fun setRomanizeLyrics(value: Boolean) {
-        _romanizeLyrics.value = value
-        save()
-    }
+    fun setRomanizeLyrics(value: Boolean) = updatePref(_romanizeLyrics, value)
 
     fun setYoutubeCookie(value: String?) {
-        _youtubeCookie.value = value
-        persistSensitiveValue(SensitiveKeys.YOUTUBE_COOKIE, value)
-        save()
+        val sanitized = sanitizeCookieString(value)
+        if (_youtubeCookie.value == sanitized) return
+        _youtubeCookie.value = sanitized
+        persistSensitiveValueAsync(SensitiveKeys.YOUTUBE_COOKIE, sanitized)
+        scheduleSave()
     }
 
     fun clearSensitiveData() {
         _proxyPassword.value = ""
         _discordToken.value = ""
+        _discordRefreshToken.value = ""
         _spotifyAccessToken.value = ""
         _spotifyRefreshToken.value = ""
         _spotifyTokenExpiryEpochMillis.value = 0L
@@ -1120,7 +880,7 @@ class DesktopPreferences private constructor(
         _youtubeCookie.value = null
 
         clearSensitiveStoreEntries()
-        save()
+        flush()
     }
 
     fun resetToDefaults(clearSensitive: Boolean = false) {
@@ -1132,7 +892,7 @@ class DesktopPreferences private constructor(
             Files.writeString(filePath, "{}", StandardCharsets.UTF_8)
         }
         load()
-        save()
+        flush()
     }
 
     // === Persistence ===
@@ -1238,12 +998,29 @@ class DesktopPreferences private constructor(
                 legacyJsonKey = "discordToken",
                 secureKey = SensitiveKeys.DISCORD_TOKEN,
             )
+            _discordRefreshToken.value = readSensitiveValue(
+                json = json,
+                legacyJsonKey = "discordRefreshToken",
+                secureKey = SensitiveKeys.DISCORD_REFRESH_TOKEN,
+            )
             _discordName.value = json.optString("discordName", "")
             _discordUsername.value = json.optString("discordUsername", "")
             _discordAvatarUrl.value =
                 json.optString("discordAvatarUrl", "").takeIf { it != "null" } ?: ""
             _discordInfoDismissed.value = json.optBoolean("discordInfoDismissed", false)
             _enableDiscordRPC.value = json.optBoolean("discordRPCEnable", true)
+            _discordAdvancedMode.value = json.optBoolean("discordAdvancedMode", false)
+            _discordUserStatus.value = json.optString("discordUserStatus", "online").ifBlank { "online" }
+            _discordActivityType.value = json.optInt("discordActivityType", 2)
+            _discordActivityName.value = json.optString("discordActivityName", "")
+            _discordDetailsTemplate.value = json.optString("discordDetailsTemplate", "{song.name}")
+            _discordStateTemplate.value = json.optString("discordStateTemplate", "{artist.name}")
+            _discordButton1Enabled.value = json.optBoolean("discordButton1Enabled", true)
+            _discordButton1Label.value = json.optString("discordButton1Label", "Listen on YouTube Music")
+            _discordButton1Url.value = json.optString("discordButton1Url", "https://music.youtube.com/watch?v={song.id}")
+            _discordButton2Enabled.value = json.optBoolean("discordButton2Enabled", true)
+            _discordButton2Label.value = json.optString("discordButton2Label", "Join our discord")
+            _discordButton2Url.value = json.optString("discordButton2Url", "https://discord.gg/H8x3yNbc67")
             _discordLastSyncEpochMillis.value = json.optLong("discordLastSyncEpochMillis", 0L)
             _discordLastErrorMessage.value =
                 json.optString("discordLastErrorMessage", "").takeIf { it != "null" } ?: ""
@@ -1305,8 +1082,8 @@ class DesktopPreferences private constructor(
                 .let { value -> runCatching { SongFilter.valueOf(value.uppercase()) }.getOrDefault(SongFilter.LIKED) }
             _albumFilter.value = json.optString("albumFilter", "liked")
                 .let { value -> runCatching { AlbumFilter.valueOf(value.uppercase()) }.getOrDefault(AlbumFilter.LIKED) }
-            _artistFilter.value = json.optString("artistFilter", "liked")
-                .let { value -> runCatching { ArtistFilter.valueOf(value.uppercase()) }.getOrDefault(ArtistFilter.LIKED) }
+            _artistFilter.value = json.optString("artistFilter", "library")
+                .let { value -> runCatching { ArtistFilter.valueOf(value.uppercase()) }.getOrDefault(ArtistFilter.LIBRARY) }
 
             _showLikedPlaylist.value = json.optBoolean("showLikedPlaylist", true)
             _showDownloadedPlaylist.value = json.optBoolean("showDownloadedPlaylist", true)
@@ -1351,15 +1128,20 @@ class DesktopPreferences private constructor(
 
             _showLyrics.value = json.optBoolean("showLyrics", true)
             _romanizeLyrics.value = json.optBoolean("romanizeLyrics", false)
-            _youtubeCookie.value = readNullableSensitiveValue(
+            val rawYoutubeCookie = readNullableSensitiveValue(
                 json = json,
                 legacyJsonKey = "youtubeCookie",
                 secureKey = SensitiveKeys.YOUTUBE_COOKIE,
             )
+            val cleanYoutubeCookie = sanitizeCookieString(rawYoutubeCookie)
+            _youtubeCookie.value = cleanYoutubeCookie
+            if (rawYoutubeCookie != null && rawYoutubeCookie != cleanYoutubeCookie) {
+                persistSensitiveValue(SensitiveKeys.YOUTUBE_COOKIE, cleanYoutubeCookie)
+            }
 
             if (migratedSensitiveValues) {
                 migratedSensitiveValues = false
-                save()
+                scheduleSave()
             }
         }
     }
@@ -1407,9 +1189,34 @@ class DesktopPreferences private constructor(
         }
     }
 
+    private fun persistSensitiveValueAsync(secureKey: String, value: String?) {
+        saveScope.launch {
+            persistSensitiveValue(secureKey, value)
+        }
+    }
+
+    private fun scheduleSave() {
+        synchronized(saveLock) {
+            saveJob?.cancel()
+            saveJob = saveScope.launch {
+                delay(250L)
+                save()
+            }
+        }
+    }
+
+    fun flush() {
+        synchronized(saveLock) {
+            saveJob?.cancel()
+            saveJob = null
+            save()
+        }
+    }
+
     private fun clearSensitiveStoreEntries() {
         secureStore.remove(SensitiveKeys.PROXY_PASSWORD)
         secureStore.remove(SensitiveKeys.DISCORD_TOKEN)
+        secureStore.remove(SensitiveKeys.DISCORD_REFRESH_TOKEN)
         secureStore.remove(SensitiveKeys.SPOTIFY_ACCESS_TOKEN)
         secureStore.remove(SensitiveKeys.SPOTIFY_REFRESH_TOKEN)
         secureStore.remove(SensitiveKeys.LASTFM_SESSION_KEY)
@@ -1417,9 +1224,10 @@ class DesktopPreferences private constructor(
     }
 
     private fun save() {
-        runCatching {
-            ensureParent()
-            val json = JSONObject().apply {
+        synchronized(saveLock) {
+            runCatching {
+                ensureParent()
+                val json = JSONObject().apply {
                 put("darkMode", _darkMode.value.name.lowercase())
                 put("pureBlack", _pureBlack.value)
                 put("dynamicColor", _dynamicColor.value)
@@ -1492,6 +1300,18 @@ class DesktopPreferences private constructor(
                 put("discordAvatarUrl", _discordAvatarUrl.value)
                 put("discordInfoDismissed", _discordInfoDismissed.value)
                 put("discordRPCEnable", _enableDiscordRPC.value)
+                put("discordAdvancedMode", _discordAdvancedMode.value)
+                put("discordUserStatus", _discordUserStatus.value)
+                put("discordActivityType", _discordActivityType.value)
+                put("discordActivityName", _discordActivityName.value)
+                put("discordDetailsTemplate", _discordDetailsTemplate.value)
+                put("discordStateTemplate", _discordStateTemplate.value)
+                put("discordButton1Enabled", _discordButton1Enabled.value)
+                put("discordButton1Label", _discordButton1Label.value)
+                put("discordButton1Url", _discordButton1Url.value)
+                put("discordButton2Enabled", _discordButton2Enabled.value)
+                put("discordButton2Label", _discordButton2Label.value)
+                put("discordButton2Url", _discordButton2Url.value)
                 put("discordLastSyncEpochMillis", _discordLastSyncEpochMillis.value)
                 put("discordLastErrorMessage", _discordLastErrorMessage.value)
                 put("spotifyUserName", _spotifyUserName.value)
@@ -1552,7 +1372,14 @@ class DesktopPreferences private constructor(
                 put("showLyrics", _showLyrics.value)
                 put("romanizeLyrics", _romanizeLyrics.value)
             }
-            Files.writeString(filePath, json.toString(2), StandardCharsets.UTF_8)
+                val tempFile = filePath.resolveSibling("${filePath.fileName}.tmp")
+                Files.writeString(tempFile, json.toString(2), StandardCharsets.UTF_8)
+                runCatching {
+                    Files.move(tempFile, filePath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                }.getOrElse {
+                    Files.move(tempFile, filePath, StandardCopyOption.REPLACE_EXISTING)
+                }
+            }
         }
     }
 
@@ -1797,12 +1624,14 @@ enum class NotificationButtonTypePreference {
 enum class PlayerBackgroundStyle {
     DEFAULT,
     GRADIENT,
-    BLUR;
+    BLUR,
+    LIQUID;
 
     companion object {
         fun fromString(value: String): PlayerBackgroundStyle = when (value.lowercase()) {
             "gradient" -> GRADIENT
             "blur" -> BLUR
+            "liquid" -> LIQUID
             else -> DEFAULT
         }
     }
@@ -1812,6 +1641,7 @@ enum class PlayerBackgroundStyle {
             DEFAULT -> "follow_theme"
             GRADIENT -> "gradient"
             BLUR -> "player_background_blur"
+            LIQUID -> "player_background_liquid"
         }
 }
 

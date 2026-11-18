@@ -333,7 +333,7 @@ internal fun SettingsMainScreen(
     }
 }
 
-private fun resolveDeviceName(): String {
+internal fun resolveDeviceName(): String {
     val envComputerName = System.getenv("COMPUTERNAME").orEmpty().trim()
     if (envComputerName.isNotBlank()) return envComputerName
 
