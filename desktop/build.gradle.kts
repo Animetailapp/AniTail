@@ -59,7 +59,7 @@ dependencies {
 
 
     implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.compose.material3:material3:1.13.10-alpha01+dev5206")
+    implementation("org.jetbrains.compose.material3:material3:1.13.10-alpha01+snapshot.v-mazunin-webpack-compilation-error-gradle-plugin-tests")
     implementation(libs.materialKolor) {
         exclude(group = "org.jetbrains.compose.material3")
         exclude(group = "org.jetbrains.compose.foundation")
