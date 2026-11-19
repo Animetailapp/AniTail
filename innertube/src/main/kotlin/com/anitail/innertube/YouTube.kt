@@ -1978,6 +1978,22 @@ object YouTube {
             }
     }
 
+    suspend fun nextRawJson(
+        videoId: String,
+        params: String? = null,
+    ): Result<JsonObject> = runCatching {
+        val text = innerTube.next(
+            client = WEB_REMIX,
+            videoId = videoId,
+            playlistId = null,
+            playlistSetVideoId = null,
+            index = null,
+            params = params,
+            continuation = null,
+        ).bodyAsText()
+        Json.parseToJsonElement(text).jsonObject
+    }
+
     suspend fun transcript(videoId: String): Result<String> = runCatching {
         val response = innerTube.getTranscript(WEB, videoId).body<GetTranscriptResponse>()
         response.actions?.firstOrNull()?.updateEngagementPanelAction?.content?.transcriptRenderer?.body?.transcriptBodyRenderer?.cueGroups?.joinToString(separator = "\n") { group ->

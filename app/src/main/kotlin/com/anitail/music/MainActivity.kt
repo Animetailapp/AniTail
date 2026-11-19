@@ -176,6 +176,11 @@ import com.anitail.music.ui.component.rememberBottomSheetState
 import com.anitail.music.ui.component.shimmer.ShimmerTheme
 import com.anitail.music.ui.menu.YouTubeSongMenu
 import com.anitail.music.ui.player.BottomSheetPlayer
+import com.anitail.music.ui.player.LocalIsInPipMode
+import com.anitail.music.ui.player.MusicVideoSurface
+import com.anitail.music.ui.player.PictureInPictureHelper
+import androidx.media3.common.VideoSize
+import android.content.res.Configuration
 import com.anitail.music.ui.screens.Screens
 import com.anitail.music.ui.screens.navigationBuilder
 import com.anitail.music.ui.screens.search.LocalSearchScreen
@@ -240,6 +245,7 @@ class MainActivity : AppCompatActivity() {
     private var pendingExternalAction by mutableStateOf<String?>(null)
 
     private var isServiceBound = false
+    private val isInPipModeState = mutableStateOf(false)
     private var playerConnection by mutableStateOf<PlayerConnection?>(null)
     private val serviceConnection =
         object : ServiceConnection {
@@ -352,6 +358,15 @@ class MainActivity : AppCompatActivity() {
         } else {
             pendingIntent = intent
         }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration,
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        isInPipModeState.value = isInPictureInPictureMode
     }
 
     override fun attachBaseContext(newBase: Context) {
@@ -846,6 +861,23 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
+                    val activeConn = playerConnection
+                    val pipIsPlaying = activeConn?.isPlaying?.collectAsState()?.value ?: false
+                    val pipVideoSize = activeConn?.videoSize?.collectAsState()?.value ?: VideoSize.UNKNOWN
+                    val pipIsVideoMode = activeConn?.isVideoModeActive?.collectAsState()?.value ?: false
+                    val pipMediaMetadata = activeConn?.mediaMetadata?.collectAsState()?.value
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        LaunchedEffect(pipIsPlaying, pipVideoSize, pipIsVideoMode) {
+                            PictureInPictureHelper.updatePictureInPictureParams(
+                                activity = this@MainActivity,
+                                isPlaying = pipIsPlaying,
+                                videoSize = pipVideoSize,
+                                hasVideo = pipIsVideoMode,
+                            )
+                        }
+                    }
+
                     CompositionLocalProvider(
                         LocalDatabase provides database,
                         LocalContentColor provides if (pureBlack) Color.White else contentColorFor(MaterialTheme.colorScheme.surface),
@@ -855,6 +887,7 @@ class MainActivity : AppCompatActivity() {
                         LocalDownloadLibraryRepository provides downloadLibraryRepository,
                         LocalShimmerTheme provides ShimmerTheme,
                         LocalSyncUtils provides syncUtils,
+                        LocalIsInPipMode provides isInPipModeState.value,
                     ) {
                         Scaffold(
                             topBar = {
@@ -1464,6 +1497,35 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        if (isInPipModeState.value) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black),
+                            ) {
+                                if (pipIsVideoMode && activePlayer != null) {
+                                    MusicVideoSurface(
+                                        player = activePlayer,
+                                        artworkUrl = pipMediaMetadata?.thumbnailUrl,
+                                        cornerRadius = 0.dp,
+                                        fillContainer = false,
+                                        useSurfaceView = true,
+                                        showControls = false,
+                                        isPip = true,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                } else {
+                                    AsyncImage(
+                                        model = pipMediaMetadata?.thumbnailUrl,
+                                        contentDescription = null,
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
                                 }
                             }
                         }

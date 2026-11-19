@@ -20,6 +20,8 @@ import com.anitail.music.playback.StreamUrlCache
 import com.anitail.music.utils.cipher.CipherDeobfuscator
 import com.anitail.music.utils.potoken.PoTokenGenerator
 import com.anitail.music.utils.potoken.PoTokenResult
+import com.metrolist.innertubex.sabr.SabrBootstrap
+import com.metrolist.innertubex.sabr.SabrVideoVariant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -112,7 +114,54 @@ object YTPlayerUtils {
         val requireBoundedRange: Boolean = false,
         val rangeChunkSizeBytes: Long = 0L,
         val useRangeChunks: Boolean = false,
-    )
+        val videoUrl: String? = null,
+        val videoWidth: Int? = null,
+        val videoHeight: Int? = null,
+        val videoMimeType: String? = null,
+        val videoCodecs: String? = null,
+        val videoBitrate: Int? = null,
+        val videoItag: Int? = null,
+        val videoContentLengthBytes: Long? = null,
+        val sabrBootstrap: SabrBootstrap? = null,
+        val sabrVideoBootstrap: SabrBootstrap? = null,
+        val availableVideoHeights: List<Int> = emptyList(),
+        val isHls: Boolean = false,
+    ) {
+        val isSabr: Boolean
+            get() = sabrBootstrap != null
+
+        val hasSabrVideo: Boolean
+            get() = sabrVideoBootstrap?.selectedVideoFormat != null
+
+        val hasDirectVideo: Boolean
+            get() = !videoUrl.isNullOrBlank() && !videoUrl.startsWith("sabr-video://")
+
+        val hasVideo: Boolean
+            get() = hasDirectVideo || hasSabrVideo || isHlsStream
+
+        val isMuxedVideo: Boolean
+            get() = !videoUrl.isNullOrBlank() && videoUrl == streamUrl
+
+        val isHlsStream: Boolean
+            get() =
+                isHls ||
+                    format.mimeType.contains("mpegurl", ignoreCase = true) ||
+                    videoMimeType.orEmpty().contains("mpegurl", ignoreCase = true) ||
+                    streamUrl.substringBefore('?').endsWith(".m3u8", ignoreCase = true) ||
+                    videoUrl.orEmpty().substringBefore('?').endsWith(".m3u8", ignoreCase = true)
+
+        fun withSabrVideoVariant(variant: SabrVideoVariant): PlaybackData =
+            copy(
+                sabrVideoBootstrap = checkNotNull(sabrVideoBootstrap).withVideoVariant(variant),
+                videoItag = variant.format.itag,
+                videoWidth = variant.width,
+                videoHeight = variant.height,
+                videoMimeType = variant.mimeType,
+                videoCodecs = null,
+                videoBitrate = variant.bitrate,
+                videoContentLengthBytes = variant.contentLengthBytes,
+            )
+    }
 
     /**
      * Custom player response intended to use for playback.
@@ -401,6 +450,232 @@ object YTPlayerUtils {
             streamHeaders = streamHeaders,
         )
     }
+    }
+
+    suspend fun playerResponseForVideoPlayback(
+        videoId: String,
+        playlistId: String? = null,
+        audioQuality: AudioQuality,
+        maxVideoHeight: Int? = null,
+        connectivityManager: ConnectivityManager,
+        isLive: Boolean? = null,
+        isExplicit: Boolean? = null,
+    ): Result<PlaybackData> {
+        val innertubexResult =
+            InnerTubeXPlayer.playerResponseForVideoPlayback(
+                videoId = videoId,
+                audioQuality = audioQuality,
+                connectivityManager = connectivityManager,
+                maxVideoHeight = maxVideoHeight,
+                isLive = isLive,
+                isExplicit = isExplicit,
+            )
+        if (innertubexResult.isSuccess && innertubexResult.getOrNull()?.hasVideo == true) {
+            Timber.tag(logTag).d("Successfully obtained video playback data via InnerTubeX for videoId: $videoId")
+            return innertubexResult
+        }
+        Timber.tag(logTag).w(
+            innertubexResult.exceptionOrNull(),
+            "InnerTubeX video resolution failed for $videoId; falling back to legacy pipeline",
+        )
+
+        return runCatching {
+            val signatureTimestamp = getSignatureTimestampOrNull(videoId)
+            val isLoggedIn = YouTube.cookie != null
+            val sessionId = YouTube.visitorData
+            val webPoToken =
+                if (sessionId != null) {
+                    runCatching { poTokenGenerator.getWebClientPoToken(videoId, sessionId) }.getOrNull()
+                } else {
+                    null
+                }
+
+            val videoFallbackClients =
+                listOf(
+                    ANDROID_VR_NO_AUTH,
+                    IOS,
+                    MOBILE,
+                    TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+                    WEB,
+                    WEB_CREATOR,
+                    MAIN_CLIENT,
+                )
+
+            var audioConfig: PlayerResponse.PlayerConfig.AudioConfig? = null
+            var videoDetails: PlayerResponse.VideoDetails? = null
+            var playbackTracking: PlayerResponse.PlaybackTracking? = null
+
+            for (client in videoFallbackClients) {
+                if (client.loginRequired && !isLoggedIn && YouTube.cookie == null) continue
+                val clientSigTimestamp = if (client.useSignatureTimestamp) signatureTimestamp else null
+                val clientPoToken = if (client.useWebPoTokens) webPoToken?.playerRequestPoToken else null
+                val response =
+                    try {
+                        YouTube.player(
+                            videoId = videoId,
+                            playlistId = playlistId,
+                            client = client,
+                            signatureTimestamp = clientSigTimestamp,
+                            poToken = clientPoToken,
+                        ).getOrNull()
+                    } catch (_: Exception) {
+                        null
+                    } ?: continue
+
+                if (!isPlayable(response.playabilityStatus.status)) continue
+                audioConfig = audioConfig ?: response.playerConfig?.audioConfig
+                videoDetails = videoDetails ?: response.videoDetails
+                playbackTracking = playbackTracking ?: response.playbackTracking
+                val streamingData = response.streamingData ?: continue
+                val headers = client.streamHeaders()
+                val expiresIn = streamingData.expiresInSeconds.coerceAtLeast(1)
+
+                val allVideoFormats =
+                    (streamingData.adaptiveFormats + streamingData.formats.orEmpty())
+                        .filter { !it.isAudio && (it.height ?: 0) > 0 }
+                val availableHeights =
+                    allVideoFormats.mapNotNull { it.height?.takeIf { h -> h > 0 } }.distinct().sorted()
+
+                // 1. Try separate adaptive video + audio
+                val adaptiveVideos = streamingData.adaptiveFormats.filter { !it.isAudio && (it.height ?: 0) > 0 }
+                val chosenVideo = selectLegacyVideoFormat(adaptiveVideos, maxVideoHeight)
+                val chosenAudio = findFormat(response, audioQuality, connectivityManager)
+                if (chosenVideo != null && chosenAudio != null) {
+                    val videoUrl = findUrlOrNull(chosenVideo, videoId)
+                    val audioUrl = findUrlOrNull(chosenAudio, videoId)
+                    if (!videoUrl.isNullOrBlank() &&
+                        !audioUrl.isNullOrBlank() &&
+                        validateStatus(videoUrl, headers) &&
+                        validateStatus(audioUrl, headers)
+                    ) {
+                        return@runCatching PlaybackData(
+                            audioConfig = audioConfig,
+                            videoDetails = videoDetails,
+                            playbackTracking = playbackTracking,
+                            format = chosenAudio,
+                            streamUrl = audioUrl,
+                            streamExpiresInSeconds = expiresIn,
+                            streamClient = client.clientName,
+                            streamHeaders = headers,
+                            videoUrl = videoUrl,
+                            videoWidth = chosenVideo.width,
+                            videoHeight = chosenVideo.height,
+                            videoMimeType = chosenVideo.mimeType.substringBefore(';'),
+                            videoCodecs =
+                                chosenVideo.mimeType
+                                    .substringAfter("codecs=", "")
+                                    .removeSurrounding("\"")
+                                    .takeIf { it.isNotBlank() },
+                            videoBitrate = chosenVideo.bitrate,
+                            videoItag = chosenVideo.itag,
+                            videoContentLengthBytes = chosenVideo.contentLength,
+                            availableVideoHeights = availableHeights,
+                        )
+                    }
+                }
+
+                // 2. Try muxed formats
+                val muxedVideos = streamingData.formats.orEmpty().filter { !it.isAudio && (it.height ?: 0) > 0 }
+                val chosenMuxed = selectLegacyVideoFormat(muxedVideos, maxVideoHeight)
+                if (chosenMuxed != null) {
+                    val muxedUrl = findUrlOrNull(chosenMuxed, videoId)
+                    if (!muxedUrl.isNullOrBlank() && validateStatus(muxedUrl, headers)) {
+                        return@runCatching PlaybackData(
+                            audioConfig = audioConfig,
+                            videoDetails = videoDetails,
+                            playbackTracking = playbackTracking,
+                            format = chosenMuxed,
+                            streamUrl = muxedUrl,
+                            streamExpiresInSeconds = expiresIn,
+                            streamClient = client.clientName,
+                            streamHeaders = headers,
+                            videoUrl = muxedUrl,
+                            videoWidth = chosenMuxed.width,
+                            videoHeight = chosenMuxed.height,
+                            videoMimeType = chosenMuxed.mimeType.substringBefore(';'),
+                            videoCodecs =
+                                chosenMuxed.mimeType
+                                    .substringAfter("codecs=", "")
+                                    .removeSurrounding("\"")
+                                    .takeIf { it.isNotBlank() },
+                            videoBitrate = chosenMuxed.bitrate,
+                            videoItag = chosenMuxed.itag,
+                            videoContentLengthBytes = chosenMuxed.contentLength,
+                            availableVideoHeights = availableHeights,
+                        )
+                    }
+                }
+
+                // 3. Try HLS manifest (e.g. IOS / live broadcasts)
+                val hlsUrl = streamingData.hlsManifestUrl?.takeIf { it.isNotBlank() }
+                if (hlsUrl != null) {
+                    val placeholderFormat =
+                        chosenAudio ?: PlayerResponse.StreamingData.Format(
+                            itag = 0,
+                            url = hlsUrl,
+                            mimeType = "application/x-mpegURL",
+                            bitrate = 0,
+                            width = null,
+                            height = maxVideoHeight,
+                            contentLength = null,
+                            quality = "hls",
+                            fps = null,
+                            qualityLabel = maxVideoHeight?.let { "${it}p" },
+                            averageBitrate = null,
+                            audioQuality = null,
+                            approxDurationMs = null,
+                            audioSampleRate = null,
+                            audioChannels = null,
+                            loudnessDb = null,
+                            lastModified = null,
+                            signatureCipher = null,
+                        )
+                    return@runCatching PlaybackData(
+                        audioConfig = audioConfig,
+                        videoDetails = videoDetails,
+                        playbackTracking = playbackTracking,
+                        format = placeholderFormat,
+                        streamUrl = hlsUrl,
+                        streamExpiresInSeconds = expiresIn,
+                        streamClient = client.clientName,
+                        streamHeaders = headers,
+                        videoUrl = hlsUrl,
+                        videoHeight = maxVideoHeight,
+                        videoMimeType = "application/x-mpegURL",
+                        availableVideoHeights = availableHeights,
+                        isHls = true,
+                    )
+                }
+            }
+
+            throw PlaybackException(
+                "No playable video stream available",
+                innertubexResult.exceptionOrNull(),
+                PlaybackException.ERROR_CODE_REMOTE_ERROR,
+            )
+        }
+    }
+
+    private fun selectLegacyVideoFormat(
+        formats: List<PlayerResponse.StreamingData.Format>,
+        maxVideoHeight: Int?,
+    ): PlayerResponse.StreamingData.Format? {
+        val candidates = formats.filter { !it.isAudio && (it.height ?: 0) > 0 }
+        if (candidates.isEmpty()) return null
+        val nonAv1 = candidates.filterNot { it.mimeType.contains("av01", ignoreCase = true) }.ifEmpty { candidates }
+        val withinCap =
+            if (maxVideoHeight != null) {
+                nonAv1.filter { (it.height ?: 0) <= maxVideoHeight }.ifEmpty { nonAv1 }
+            } else {
+                nonAv1.filter { (it.height ?: 0) <= 2160 }.ifEmpty { nonAv1 }
+            }
+        return withinCap.maxWithOrNull(
+            compareBy<PlayerResponse.StreamingData.Format>(
+                { it.height ?: 0 },
+                { if (it.mimeType.contains("mp4", ignoreCase = true)) 1 else 0 },
+                { it.bitrate },
+            ),
+        )
     }
 
     /**
