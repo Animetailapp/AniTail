@@ -8,7 +8,7 @@ pluginManagement {
         maven { setUrl("https://packages.jetbrains.team/maven/p/cmp/dev") }
     }
     plugins {
-        id("org.jetbrains.compose") version "1.13.10-alpha01+dev5206"
+        id("org.jetbrains.compose") version "1.13.10-alpha01+dev5211"
         id("org.jetbrains.kotlin.plugin.compose") version "2.5.0-RC"
     }
 }
