@@ -68,9 +68,11 @@ import com.anitail.music.LocalDatabase
 import com.anitail.music.LocalPlayerConnection
 import com.anitail.music.R
 import com.anitail.music.constants.MiniPlayerHeight
+import com.anitail.music.constants.PlayVideosInMiniPlayerKey
 import com.anitail.music.constants.SwipeSensitivityKey
 import com.anitail.music.constants.ThumbnailCornerRadius
 import com.anitail.music.constants.UseNewMiniPlayerDesignKey
+import com.anitail.music.playback.video.shouldShowMusicVideoSurface
 import com.anitail.music.db.entities.ArtistEntity
 import com.anitail.music.extensions.togglePlayPause
 import com.anitail.music.models.MediaMetadata
@@ -86,6 +88,7 @@ fun MiniPlayer(
     duration: Long,
     modifier: Modifier = Modifier,
     pureBlack: Boolean,
+    isPlayerCollapsed: Boolean = true,
     onOpenPlayer: () -> Unit = {},
 ) {
     val useNewMiniPlayerDesign by rememberPreference(UseNewMiniPlayerDesignKey, true)
@@ -96,6 +99,7 @@ fun MiniPlayer(
             duration = duration,
             modifier = modifier,
             pureBlack = pureBlack,
+            isPlayerCollapsed = isPlayerCollapsed,
             onOpenPlayer = onOpenPlayer,
         )
     } else {
@@ -104,6 +108,7 @@ fun MiniPlayer(
             duration = duration,
             modifier = modifier,
             pureBlack = pureBlack,
+            isPlayerCollapsed = isPlayerCollapsed,
             onOpenPlayer = onOpenPlayer,
         )
     }
@@ -115,9 +120,24 @@ private fun NewMiniPlayer(
     duration: Long,
     modifier: Modifier = Modifier,
     pureBlack: Boolean,
+    isPlayerCollapsed: Boolean = true,
     onOpenPlayer: () -> Unit,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
+    val playVideosInMiniPlayer by rememberPreference(PlayVideosInMiniPlayerKey, true)
+    val isVideoModeActive by playerConnection.isVideoModeActive.collectAsState()
+    val isVideoViewerVisible by playerConnection.isVideoViewerVisible.collectAsState()
+    val currentVideoPlaybackData by playerConnection.currentVideoPlaybackData.collectAsState()
+    val isInPipMode = LocalIsInPipMode.current
+    val showMiniVideo =
+        playVideosInMiniPlayer &&
+            isPlayerCollapsed &&
+            !isInPipMode &&
+            shouldShowMusicVideoSurface(
+                isVideoModeActive = isVideoModeActive,
+                isVideoViewerVisible = isVideoViewerVisible,
+                hasVideo = currentVideoPlaybackData?.hasVideo == true,
+            )
     val database = LocalDatabase.current
     val isPlaying by playerConnection.isPlaying.collectAsState()
     val playbackState by playerConnection.playbackState.collectAsState()
@@ -287,12 +307,14 @@ private fun NewMiniPlayer(
                                 }
                             }
                     ) {
-                        mediaMetadata?.thumbnailUrl?.let { thumbnailUrl ->
-                            AsyncImage(
-                                model = thumbnailUrl,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
+                        if (showMiniVideo) {
+                            MusicVideoSurface(
+                                player = playerConnection.player,
+                                artworkUrl = mediaMetadata?.thumbnailUrl,
+                                cornerRadius = 20.dp,
+                                fillContainer = true,
+                                showControls = false,
+                                modifier = Modifier.fillMaxSize(),
                             )
 
                             Box(
@@ -300,6 +322,21 @@ private fun NewMiniPlayer(
                                     .fillMaxSize()
                                     .background(Color.Black.copy(alpha = 0.32f))
                             )
+                        } else {
+                            mediaMetadata?.thumbnailUrl?.let { thumbnailUrl ->
+                                AsyncImage(
+                                    model = thumbnailUrl,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Black.copy(alpha = 0.32f))
+                                )
+                            }
                         }
 
                         Icon(
@@ -515,9 +552,24 @@ private fun LegacyMiniPlayer(
     duration: Long,
     modifier: Modifier = Modifier,
     pureBlack: Boolean,
+    isPlayerCollapsed: Boolean = true,
     onOpenPlayer: () -> Unit,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
+    val playVideosInMiniPlayer by rememberPreference(PlayVideosInMiniPlayerKey, true)
+    val isVideoModeActive by playerConnection.isVideoModeActive.collectAsState()
+    val isVideoViewerVisible by playerConnection.isVideoViewerVisible.collectAsState()
+    val currentVideoPlaybackData by playerConnection.currentVideoPlaybackData.collectAsState()
+    val isInPipMode = LocalIsInPipMode.current
+    val showMiniVideo =
+        playVideosInMiniPlayer &&
+            isPlayerCollapsed &&
+            !isInPipMode &&
+            shouldShowMusicVideoSurface(
+                isVideoModeActive = isVideoModeActive,
+                isVideoViewerVisible = isVideoViewerVisible,
+                hasVideo = currentVideoPlaybackData?.hasVideo == true,
+            )
     val isPlaying by playerConnection.isPlaying.collectAsState()
     val playbackState by playerConnection.playbackState.collectAsState()
     val error by playerConnection.error.collectAsState()
@@ -643,6 +695,8 @@ private fun LegacyMiniPlayer(
                         mediaMetadata = it,
                         error = error,
                         pureBlack = pureBlack,
+                        showMiniVideo = showMiniVideo,
+                        player = playerConnection.player,
                         modifier = Modifier.padding(horizontal = 6.dp),
                     )
                 }
@@ -751,6 +805,8 @@ private fun LegacyMiniMediaInfo(
     error: PlaybackException?,
     modifier: Modifier = Modifier,
     pureBlack: Boolean,
+    showMiniVideo: Boolean = false,
+    player: Player? = null,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -762,31 +818,42 @@ private fun LegacyMiniMediaInfo(
                 .size(48.dp)
                 .clip(RoundedCornerShape(ThumbnailCornerRadius))
         ) {
-            // Blurred background for thumbnail
-            AsyncImage(
-                model = mediaMetadata.thumbnailUrl,
-                contentDescription = null,
-                contentScale = ContentScale.FillBounds,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer(
-                        renderEffect = BlurEffect(
-                            radiusX = 75f,
-                            radiusY = 75f
-                        ),
-                        alpha = 0.5f
-                    )
-            )
+            if (showMiniVideo && player != null) {
+                MusicVideoSurface(
+                    player = player,
+                    artworkUrl = mediaMetadata.thumbnailUrl,
+                    cornerRadius = ThumbnailCornerRadius,
+                    fillContainer = true,
+                    showControls = false,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                // Blurred background for thumbnail
+                AsyncImage(
+                    model = mediaMetadata.thumbnailUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.FillBounds,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            renderEffect = BlurEffect(
+                                radiusX = 75f,
+                                radiusY = 75f
+                            ),
+                            alpha = 0.5f
+                        )
+                )
 
-            // Main thumbnail
-            AsyncImage(
-                model = mediaMetadata.thumbnailUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(ThumbnailCornerRadius)),
-            )
+                // Main thumbnail
+                AsyncImage(
+                    model = mediaMetadata.thumbnailUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(ThumbnailCornerRadius)),
+                )
+            }
 
             androidx.compose.animation.AnimatedVisibility(
                 visible = error != null,

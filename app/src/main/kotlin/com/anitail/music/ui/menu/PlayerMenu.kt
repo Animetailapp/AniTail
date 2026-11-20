@@ -70,6 +70,17 @@ import com.anitail.music.R
 import com.anitail.music.constants.ListItemHeight
 import com.anitail.music.models.MediaMetadata
 import com.anitail.music.playback.queues.YouTubeQueue
+import com.anitail.music.constants.MusicVideoQuality
+import com.anitail.music.constants.MusicVideoQualityKey
+import com.anitail.music.constants.targetHeight
+import com.anitail.music.utils.rememberEnumPreference
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.saveable.rememberSaveable
 import com.anitail.music.ui.component.BigSeekBar
 import com.anitail.music.ui.component.BottomSheetState
 import com.anitail.music.ui.component.DownloadFormatDialog
@@ -212,6 +223,26 @@ fun PlayerMenu(
         TempoPitchDialog(
             onDismiss = { showPitchTempoDialog = false },
         )
+    }
+
+    val isVideoModeActive by playerConnection.isVideoModeActive.collectAsState()
+    val currentVideoPlaybackData by playerConnection.currentVideoPlaybackData.collectAsState()
+    val (selectedVideoQuality, _) = rememberEnumPreference(MusicVideoQualityKey, MusicVideoQuality.AUTO)
+    var showVideoResolution by rememberSaveable { mutableStateOf(false) }
+
+    if (showVideoResolution) {
+        VideoResolutionPage(
+            currentHeight = currentVideoPlaybackData?.videoHeight,
+            availableHeights = currentVideoPlaybackData?.availableVideoHeights.orEmpty(),
+            selectedQuality = selectedVideoQuality,
+            onSelect = { quality ->
+                playerConnection.changeMusicVideoResolution(quality)
+                showVideoResolution = false
+                onDismiss()
+            },
+            onBack = { showVideoResolution = false },
+        )
+        return
     }
 
     if (isQueueTrigger != true) {
@@ -565,6 +596,36 @@ fun PlayerMenu(
             )
         }
 
+        if (isVideoModeActive) {
+            item {
+                val resolutionLabel =
+                    when (selectedVideoQuality) {
+                        MusicVideoQuality.AUTO -> {
+                            val activeHeight = currentVideoPlaybackData?.videoHeight
+                            if (activeHeight != null) {
+                                "${stringResource(R.string.music_video_quality_auto)} (${activeHeight}p)"
+                            } else {
+                                stringResource(R.string.music_video_quality_auto)
+                            }
+                        }
+                        MusicVideoQuality.P2160 -> "4K (2160p)"
+                        else -> "${selectedVideoQuality.targetHeight}p"
+                    }
+                ListItem(
+                    headlineContent = { Text(text = stringResource(R.string.music_video_resolution)) },
+                    supportingContent = { Text(text = resolutionLabel) },
+                    leadingContent = {
+                        Icon(
+                            imageVector = Icons.Rounded.Tune,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.tvClickable {
+                        showVideoResolution = true
+                    }
+                )
+            }
+        }
         if (isQueueTrigger != true) {
             item {
                 ListItem(
@@ -606,6 +667,93 @@ fun PlayerMenu(
                     }
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun VideoResolutionPage(
+    currentHeight: Int?,
+    availableHeights: List<Int>,
+    selectedQuality: MusicVideoQuality,
+    onSelect: (MusicVideoQuality) -> Unit,
+    onBack: () -> Unit,
+) {
+    val selectableQualities =
+        MusicVideoQuality.entries.filter { quality ->
+            val h = quality.targetHeight
+            h == null || availableHeights.isEmpty() || h in availableHeights || h == currentHeight
+        }
+    LazyColumn(
+        contentPadding = PaddingValues(
+            start = 8.dp,
+            top = 8.dp,
+            end = 8.dp,
+            bottom = 8.dp + WindowInsets.systemBars.asPaddingValues().calculateBottomPadding(),
+        ),
+    ) {
+        item {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = stringResource(R.string.back),
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.music_video_resolution),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+        }
+        items(selectableQualities) { quality ->
+            val label =
+                when (quality) {
+                    MusicVideoQuality.AUTO -> stringResource(R.string.music_video_quality_auto)
+                    MusicVideoQuality.P2160 -> "4K (2160p)"
+                    else -> "${quality.targetHeight}p"
+                }
+            val isSelected =
+                quality == selectedQuality ||
+                    (quality.targetHeight != null && quality.targetHeight == currentHeight)
+            ListItem(
+                headlineContent = { Text(text = label) },
+                supportingContent =
+                    if (isSelected) {
+                        { Text(text = stringResource(R.string.music_video_resolution_current)) }
+                    } else {
+                        null
+                    },
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Rounded.Tune,
+                        contentDescription = null,
+                    )
+                },
+                trailingContent =
+                    if (isSelected) {
+                        {
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                modifier = Modifier.tvClickable {
+                    onSelect(quality)
+                },
+            )
         }
     }
 }

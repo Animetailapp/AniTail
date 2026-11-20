@@ -75,6 +75,7 @@ import com.anitail.music.R
 import com.anitail.music.constants.AudioNormalizationKey
 import com.anitail.music.constants.AudioOffload
 import com.anitail.music.constants.AudioQualityKey
+import com.anitail.music.constants.MusicVideoPlaybackEnabledKey
 import com.anitail.music.constants.AutoDownloadLyricsKey
 import com.anitail.music.constants.AutoDownloadOnLikeKey
 import com.anitail.music.constants.AutoLoadMoreKey
@@ -140,12 +141,16 @@ import com.anitail.music.extensions.toEnum
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.lyrics.LyricsHelper
 import com.anitail.music.lyrics.lyricsTextLooksSynced
+import com.anitail.music.models.MediaMetadata
 import com.anitail.music.models.PersistQueue
 import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.playback.queues.EmptyQueue
 import com.anitail.music.playback.queues.ListQueue
 import com.anitail.music.playback.queues.Queue
 import com.anitail.music.playback.queues.filterExplicit
+import com.anitail.music.playback.video.AndroidVideoModeController
+import com.anitail.music.playback.video.MusicVideoResolver
+import com.anitail.music.playback.video.VideoAwareMediaSourceFactory
 import com.anitail.music.ui.component.MusicOrbWidgetProvider
 import com.anitail.music.ui.component.MusicWidgetProvider.Companion.ACTION_NEXT
 import com.anitail.music.ui.component.MusicWidgetProvider.Companion.ACTION_PLAY_PAUSE
@@ -212,6 +217,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   @Inject lateinit var lyricsHelper: LyricsHelper
   @Inject lateinit var syncUtils: SyncUtils
   @Inject lateinit var equalizerService: EqualizerService
+  @Inject lateinit var musicVideoResolver: MusicVideoResolver
     @Inject
     lateinit var downloadUtil: DownloadUtil
 
@@ -280,6 +286,45 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     private var isCrossfading = false
     private val _playerFlow = MutableStateFlow<ExoPlayer?>(null)
     val playerFlow = _playerFlow.asStateFlow()
+
+    private val directOkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .proxy(YouTube.proxy)
+            .proxyAuthenticator { _, response ->
+                YouTube.proxyAuth?.let { auth ->
+                    response.request.newBuilder()
+                        .header("Proxy-Authorization", auth)
+                        .build()
+                } ?: response.request
+            }
+            .build()
+    }
+
+    private val videoAwareMediaSourceFactory: VideoAwareMediaSourceFactory by lazy {
+        VideoAwareMediaSourceFactory(
+            context = this,
+            audioMediaSourceFactory =
+                DefaultMediaSourceFactory(
+                    createDataSourceFactory(),
+                    DefaultExtractorsFactory(),
+                ),
+            directHttpDataSourceFactoryProvider = { headers ->
+                OkHttpDataSource.Factory(directOkHttpClient)
+                    .setUserAgent(YouTubeClient.USER_AGENT_WEB)
+                    .apply {
+                        if (headers.isNotEmpty()) {
+                            setDefaultRequestProperties(headers)
+                        }
+                    }
+            },
+        )
+    }
+
+    lateinit var videoModeController: AndroidVideoModeController
+        private set
+
+    val isCasting: Boolean
+        get() = castPlayer != null && this::mediaSession.isInitialized && mediaSession.player === castPlayer
 
     private val secondaryPlayerListener =
         object : Player.Listener {
@@ -377,6 +422,80 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     ensureForegroundChannelExists()
 
     connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+
+    videoModeController =
+        AndroidVideoModeController(
+            context = this,
+            dataStore = dataStore,
+            connectivityManager = connectivityManager,
+            scope = scope,
+            ioScope = ioScope,
+            musicVideoResolver = musicVideoResolver,
+            videoMediaSourceFactory = videoAwareMediaSourceFactory,
+            getCurrentMetadata = { if (this::player.isInitialized) player.currentMetadata else null },
+            getCurrentMediaId = { if (this::player.isInitialized) player.currentMediaItem?.mediaId else null },
+            getCurrentPositionMs = { if (this::player.isInitialized) player.currentPosition.coerceAtLeast(0L) else 0L },
+            getPlaybackState = { if (this::player.isInitialized) player.playbackState else STATE_IDLE },
+            getIsPlaying = { if (this::player.isInitialized) player.isPlaying else false },
+            getPlayWhenReady = { if (this::player.isInitialized) player.playWhenReady else false },
+            isVideoPlaybackAllowed = {
+                !(castPlayer != null && this::mediaSession.isInitialized && mediaSession.player === castPlayer) &&
+                    !(isJamEnabled && !isJamHost)
+            },
+            fetchVideoPlaybackData = { metadata, maxVideoHeight ->
+                YTPlayerUtils.playerResponseForVideoPlayback(
+                    videoId = metadata.id,
+                    audioQuality = audioQuality,
+                    maxVideoHeight = maxVideoHeight,
+                    connectivityManager = connectivityManager,
+                    isLive = metadata.isLive,
+                    isExplicit = metadata.explicit,
+                ).getOrNull()
+            },
+            fetchTrackMetadata = { videoId ->
+                YouTube.queue(videoIds = listOf(videoId)).getOrNull()?.firstOrNull()
+            },
+            commitMediaReplacement = { targetMetadata, targetPositionMs, resumePlayback, replaceItem ->
+                if (!this::player.isInitialized ||
+                    (castPlayer != null && this::mediaSession.isInitialized && mediaSession.player === castPlayer)
+                ) {
+                    false
+                } else {
+                    val currentIndex = player.currentMediaItemIndex
+                    if (currentIndex < 0 || currentIndex >= player.mediaItemCount) {
+                        false
+                    } else {
+                        if (replaceItem) {
+                            ioScope.launch {
+                                runCatching {
+                                    database.transaction {
+                                        insert(targetMetadata)
+                                    }
+                                }
+                            }
+                        }
+                        player.replaceMediaItem(currentIndex, targetMetadata.toMediaItem())
+                        player.seekTo(currentIndex, targetPositionMs)
+                        player.prepare()
+                        player.playWhenReady = resumePlayback
+                        currentMediaMetadata.value = targetMetadata
+                        showMediaNotification()
+                        sendWidgetUpdateBroadcast()
+                        true
+                    }
+                }
+            },
+            onVideoModeCommitted = { isVideo ->
+                if (this::player.isInitialized) {
+                    if (isVideo) {
+                        player.setOffloadEnabled(false)
+                    } else {
+                        player.setOffloadEnabled(dataStore.get(AudioOffload, false) && crossfadeDurationSeconds.value == 0)
+                        scheduleCrossfade()
+                    }
+                }
+            },
+        )
 
     player =
         ExoPlayer.Builder(this)
@@ -556,13 +675,31 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             .collectLatest(scope) { durationSeconds ->
                 crossfadeDurationSeconds.value = durationSeconds
                 if (durationSeconds == 0) {
-                    player.setOffloadEnabled(dataStore.get(AudioOffload, false))
+                    player.setOffloadEnabled(
+                        dataStore.get(AudioOffload, false) && !videoModeController.isVideoModeActive.value,
+                    )
                     resetCrossfadeState()
                 } else {
                     player.setOffloadEnabled(false)
                     scheduleCrossfade()
                 }
             }
+
+        dataStore.data
+            .map { it[MusicVideoPlaybackEnabledKey] ?: true }
+            .distinctUntilChanged()
+            .collect(scope) { enabled ->
+                videoModeController.onVideoPlaybackSettingChanged(enabled)
+            }
+
+        videoModeController.isVideoModeActive.collectLatest(scope) { active ->
+            while (active && kotlinx.coroutines.currentCoroutineContext().isActive) {
+                if (this::player.isInitialized) {
+                    videoAwareMediaSourceFactory.updatePlaybackPosition(player.currentPosition)
+                }
+                delay(500)
+            }
+        }
 
     combine(
             currentFormat,
@@ -1765,9 +1902,13 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       mediaItem: MediaItem?,
       reason: Int,
   ) {
+      if (videoModeController.isCommittingTransition) {
+          return
+      }
       if (!isCrossfading) {
           resetCrossfadeState()
       }
+      videoModeController.onTrackTransition(mediaItem?.metadata)
 
     if (dataStore.get(AutoLoadMoreKey, true) &&
         reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT &&
@@ -2135,6 +2276,11 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
       Timber.tag("MusicService").w(error, "Player error occurred for $mediaId: errorCode=${error.errorCode}, message=${error.message}")
 
+      if (this::videoModeController.isInitialized && videoModeController.isVideoModeActive.value) {
+          videoModeController.fallbackToAudioOnError()
+          return
+      }
+
       if (isExpiredUrlError(error)) {
           Timber.tag("MusicService").d("Expired/Forbidden URL (403/410) detected, refreshing stream URL for $mediaId")
           handleExpiredUrlError(mediaId, failedStreamClient)
@@ -2161,6 +2307,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         reason: Int,
     ) {
         if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+            videoAwareMediaSourceFactory.beginPlaybackSeek(newPosition.positionMs)
+            videoAwareMediaSourceFactory.endPlaybackSeek(newPosition.positionMs)
             scheduleCrossfade()
         }
     }
@@ -2168,6 +2316,12 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     private fun scheduleCrossfade() {
         crossfadeTriggerJob?.cancel()
         crossfadeTriggerJob = null
+
+        if (this::videoModeController.isInitialized &&
+            (videoModeController.isVideoModeActive.value || videoModeController.isVideoModeResolving.value)
+        ) {
+            return
+        }
 
         val durationMs = crossfadeDurationSeconds.value * 1_000L
         if (durationMs <= 0L) return
@@ -2395,19 +2549,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                     .setUpstreamDataSourceFactory(
                         DefaultDataSource.Factory(
                             this,
-                            OkHttpDataSource.Factory(
-                                OkHttpClient
-                                    .Builder()
-                                    .proxy(YouTube.proxy)
-                                    .proxyAuthenticator { _, response ->
-                                        YouTube.proxyAuth?.let { auth ->
-                                            response.request.newBuilder()
-                                                .header("Proxy-Authorization", auth)
-                                                .build()
-                                        } ?: response.request
-                                    }
-                                    .build(),
-                            ).setUserAgent(YouTubeClient.USER_AGENT_WEB),
+                            OkHttpDataSource.Factory(directOkHttpClient)
+                                .setUserAgent(YouTubeClient.USER_AGENT_WEB),
                         ),
                     ).setCacheWriteDataSinkFactory(null),
             )
@@ -2519,11 +2662,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         }
     }
 
-  private fun createMediaSourceFactory() =
-      DefaultMediaSourceFactory(
-          createDataSourceFactory(),
-          DefaultExtractorsFactory(),
-      )
+  private fun createMediaSourceFactory() = videoAwareMediaSourceFactory
 
   private fun createRenderersFactory() =
       object : DefaultRenderersFactory(this) {
@@ -2646,6 +2785,9 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
     // Cancel all coroutines before releasing the player to prevent
     // accessing the player after it has been released.
+    if (this::videoModeController.isInitialized) {
+        videoModeController.release()
+    }
     scope.cancel()
 
     if (this::mediaSession.isInitialized) {
@@ -2735,6 +2877,10 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
     if (!this::player.isInitialized) return
     player.pause()
       resetCrossfadeState()
+    if (this::videoModeController.isInitialized) {
+        videoModeController.clearVideoMode(resetViewerPreference = false)
+    }
+    videoAwareMediaSourceFactory.releaseAll()
     widgetStaticCache = null
 
     if (dataStore.get(PersistentQueueKey, true)) {
@@ -2839,6 +2985,9 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
             if (isCastPreparing.value) {
                 return
+            }
+            if (this::videoModeController.isInitialized) {
+                videoModeController.clearVideoMode(resetViewerPreference = false)
             }
             isCastPreparing.value = true
             // Capturar estado del player en el hilo principal sin bloqueo

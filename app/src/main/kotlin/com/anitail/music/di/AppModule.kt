@@ -3,6 +3,8 @@ package com.anitail.music.di
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import kotlinx.coroutines.flow.first
 import androidx.media3.database.DatabaseProvider
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
@@ -89,5 +91,32 @@ object AppModule {
     @Singleton
     fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
         return context.dataStore
+    }
+
+    @Provides
+    @Singleton
+    fun provideMusicVideoResolver(
+        dataStore: DataStore<Preferences>,
+    ): com.anitail.music.playback.video.MusicVideoResolver {
+        return com.anitail.music.playback.video.MusicVideoResolver(
+            readCacheJson = {
+                dataStore.data.first()[com.anitail.music.constants.MusicVideoCacheJsonKey] ?: "{}"
+            },
+            writeCacheJson = { encoded ->
+                dataStore.edit { prefs ->
+                    prefs[com.anitail.music.constants.MusicVideoCacheJsonKey] = encoded
+                }
+            },
+            cacheSessionKey = {
+                val prefs = dataStore.data.first()
+                listOf(
+                    prefs[com.anitail.music.constants.InnerTubeCookieKey].orEmpty(),
+                    prefs[com.anitail.music.constants.DataSyncIdKey].orEmpty(),
+                    prefs[com.anitail.music.constants.ContentLanguageKey].orEmpty(),
+                    prefs[com.anitail.music.constants.ContentCountryKey].orEmpty(),
+                    prefs[com.anitail.music.constants.VisitorDataKey].orEmpty(),
+                )
+            },
+        )
     }
 }

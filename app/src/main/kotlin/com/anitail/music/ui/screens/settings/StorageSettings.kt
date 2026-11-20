@@ -80,6 +80,11 @@ import com.anitail.music.constants.MaxImageCacheSizeKey
 import com.anitail.music.constants.MaxSongCacheSizeKey
 import com.anitail.music.constants.VisitorDataKey
 import com.anitail.music.extensions.tryOrNull
+import com.anitail.music.playback.video.MusicVideoResolver
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import com.anitail.music.ui.component.AnimatedIconButton
 import com.anitail.music.ui.component.EnhancedListPreference
 import com.anitail.music.ui.component.EnhancedPreferenceEntry
@@ -94,6 +99,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface MusicVideoResolverEntryPoint {
+    fun musicVideoResolver(): MusicVideoResolver
+}
 
 private data class StorageSnapshot(
     val imageCacheSize: Long,
@@ -153,6 +164,19 @@ fun StorageSettings(
     var showVisitorDataResetConfirm by remember { mutableStateOf(false) }
     var isResettingVisitorData by remember { mutableStateOf(false) }
     var customPathValid by remember { mutableStateOf(true) }
+    val musicVideoResolver =
+        remember(context) {
+            EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                MusicVideoResolverEntryPoint::class.java,
+            ).musicVideoResolver()
+        }
+    var videoCacheSize by remember { mutableStateOf(0L) }
+    var showVideoCacheClearConfirm by remember { mutableStateOf(false) }
+
+    LaunchedEffect(musicVideoResolver) {
+        videoCacheSize = withContext(Dispatchers.IO) { musicVideoResolver.getCacheSizeBytes() }
+    }
 
     suspend fun loadStorageSnapshot(): StorageSnapshot = withContext(Dispatchers.IO) {
         StorageSnapshot(
@@ -585,6 +609,31 @@ fun StorageSettings(
                 )
             }
 
+            StorageSection(
+                title = stringResource(R.string.music_video_cache),
+                icon = R.drawable.storage
+            ) {
+                Text(
+                    text = stringResource(R.string.size_used, formatFileSize(videoCacheSize)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                )
+
+                Text(
+                    text = stringResource(R.string.clear_music_video_cache_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                )
+
+                EnhancedPreferenceEntry(
+                    title = stringResource(R.string.clear_music_video_cache),
+                    icon = R.drawable.delete,
+                    iconTint = MaterialTheme.colorScheme.error,
+                    onClick = { showVideoCacheClearConfirm = true },
+                )
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
@@ -675,6 +724,24 @@ fun StorageSettings(
                 }
             },
             onDismiss = { showVisitorDataResetConfirm = false }
+        )
+    }
+
+    if (showVideoCacheClearConfirm) {
+        ConfirmationDialog(
+            title = stringResource(R.string.clear_music_video_cache),
+            message = stringResource(R.string.clear_music_video_cache_dialog),
+            onConfirm = {
+                coroutineScope.launch(Dispatchers.IO) {
+                    musicVideoResolver.clearCache()
+                    val refreshedSize = musicVideoResolver.getCacheSizeBytes()
+                    withContext(Dispatchers.Main) {
+                        videoCacheSize = refreshedSize
+                        showVideoCacheClearConfirm = false
+                    }
+                }
+            },
+            onDismiss = { showVideoCacheClearConfirm = false }
         )
     }
 }

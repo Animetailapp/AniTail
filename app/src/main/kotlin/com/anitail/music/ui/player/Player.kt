@@ -2,6 +2,10 @@ package com.anitail.music.ui.player
 
 import android.content.Intent
 import android.content.res.Configuration
+import android.os.Build
+import android.widget.Toast
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -142,6 +146,9 @@ import com.anitail.music.constants.SliderStyleKey
 import com.anitail.music.constants.ThumbnailCornerRadius
 import com.anitail.music.constants.UseNewMiniPlayerDesignKey
 import com.anitail.music.constants.UseNewPlayerDesignKey
+import com.anitail.music.constants.MusicVideoPlaybackEnabledKey
+import com.anitail.music.constants.ShowPlayerVideoButtonKey
+import com.anitail.music.playback.video.shouldShowMusicVideoSurface
 import com.anitail.music.db.entities.LyricsEntity
 import com.anitail.music.extensions.metadata
 import com.anitail.music.extensions.togglePlayPause
@@ -275,6 +282,56 @@ fun BottomSheetPlayer(
 
     val canSkipPrevious by playerConnection.canSkipPrevious.collectAsState()
     val canSkipNext by playerConnection.canSkipNext.collectAsState()
+
+    val isVideoModeActive by playerConnection.isVideoModeActive.collectAsState()
+    val isVideoModeResolving by playerConnection.isVideoModeResolving.collectAsState()
+    val isVideoViewerVisible by playerConnection.isVideoViewerVisible.collectAsState()
+    val currentVideoPlaybackData by playerConnection.currentVideoPlaybackData.collectAsState()
+    val videoSize by playerConnection.videoSize.collectAsState()
+    val musicVideoPlaybackEnabled by rememberPreference(MusicVideoPlaybackEnabledKey, defaultValue = true)
+    val showPlayerVideoButton by rememberPreference(ShowPlayerVideoButtonKey, defaultValue = true)
+    val isInPipMode = LocalIsInPipMode.current
+    var isVideoFullscreen by rememberSaveable { mutableStateOf(false) }
+
+    val view = LocalView.current
+    LaunchedEffect(isVideoModeActive, isInPipMode) {
+        if (!isVideoModeActive || isInPipMode) {
+            isVideoFullscreen = false
+        }
+    }
+
+    LaunchedEffect(playerConnection) {
+        playerConnection.videoErrorEvent.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val keepVideoScreenOn = isVideoModeActive && isPlaying && !state.isCollapsed && !isInPipMode
+    DisposableEffect(view, keepVideoScreenOn) {
+        if (keepVideoScreenOn) {
+            view.keepScreenOn = true
+        }
+        onDispose {
+            if (keepVideoScreenOn) {
+                view.keepScreenOn = false
+            }
+        }
+    }
+
+    val showVideoButton =
+        musicVideoPlaybackEnabled &&
+            showPlayerVideoButton &&
+            mediaMetadata?.isLocalTrack == false &&
+            !playerConnection.service.isCasting &&
+            !(playerConnection.service.isJamEnabled && !playerConnection.service.isJamHost)
+
+    val showEmbeddedVideo =
+        shouldShowMusicVideoSurface(
+            isVideoModeActive = isVideoModeActive,
+            isVideoViewerVisible = isVideoViewerVisible,
+            hasVideo = currentVideoPlaybackData?.hasVideo == true,
+            presentationAllowed = !state.isCollapsed && !isVideoFullscreen && !isInPipMode,
+        )
 
     var showLyrics by rememberPreference(ShowLyricsKey, defaultValue = false)
     val (hideStatusBarOnFullscreen) = rememberPreference(HideStatusBarOnFullscreenKey, false)
@@ -727,6 +784,7 @@ fun BottomSheetPlayer(
                 position = position,
                 duration = duration,
                 pureBlack = pureBlack,
+                isPlayerCollapsed = state.isCollapsed,
                 onOpenPlayer = state::expandSoft,
             )
         },
@@ -1774,15 +1832,44 @@ fun BottomSheetPlayer(
                                 val screenWidth = LocalConfiguration.current.screenWidthDp
                                 val thumbnailSize = (screenWidth * 0.4).dp
                                 AnimatedContent(
-                                    targetState = showLyrics,
+                                    targetState = showLyrics to showEmbeddedVideo,
                                     label = "Lyrics",
                                     transitionSpec = { fadeIn() togetherWith fadeOut() },
-                                ) { isLyricsVisible ->
+                                ) { (isLyricsVisible, embedVideo) ->
                                     if (isLyricsVisible) {
                                         InlineLyricsView(
                                             mediaMetadata = mediaMetadata,
                                             showLyrics = isLyricsVisible,
                                             sliderPositionProvider = { sliderPosition },
+                                        )
+                                    } else if (embedVideo) {
+                                        MusicVideoSurface(
+                                            player = playerConnection.player,
+                                            artworkUrl = mediaMetadata?.thumbnailUrl,
+                                            cornerRadius = ThumbnailCornerRadius,
+                                            useSurfaceView = false,
+                                            showControls = true,
+                                            onFullscreenClick = { isVideoFullscreen = true },
+                                            onPiPClick =
+                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                                    {
+                                                        context.findActivity()?.let { activity ->
+                                                            PictureInPictureHelper.enterPictureInPicture(
+                                                                activity = activity,
+                                                                isPlaying = isPlaying,
+                                                                videoSize = videoSize,
+                                                                hasVideo = true,
+                                                            )
+                                                        }
+                                                    }
+                                                } else {
+                                                    null
+                                                },
+                                            modifier =
+                                                Modifier
+                                                    .fillMaxWidth()
+                                                    .sizeIn(maxWidth = thumbnailSize * 1.4f)
+                                                    .padding(horizontal = 16.dp),
                                         )
                                     } else {
                                         Thumbnail(
@@ -1806,6 +1893,18 @@ fun BottomSheetPlayer(
                                     ),
                         ) {
                             Spacer(Modifier.weight(1f))
+
+                            if (showVideoButton) {
+                                AudioVideoModeSwitcher(
+                                    useNewPlayerDesign = useNewPlayerDesign,
+                                    isVideoActive = isVideoModeActive,
+                                    isResolving = isVideoModeResolving,
+                                    contentColor = TextBackgroundColor,
+                                    onSongClick = { playerConnection.setVideoMode(false) },
+                                    onVideoClick = { playerConnection.setVideoMode(true) },
+                                    modifier = Modifier.padding(bottom = 12.dp),
+                                )
+                            }
 
                             mediaMetadata?.let {
                                 controlsContent(it)
@@ -1873,20 +1972,68 @@ fun BottomSheetPlayer(
                             }
                         }
 
+                        AnimatedVisibility(visible = showVideoButton && !isFullScreen) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp),
+                            ) {
+                                AudioVideoModeSwitcher(
+                                    useNewPlayerDesign = useNewPlayerDesign,
+                                    isVideoActive = isVideoModeActive,
+                                    isResolving = isVideoModeResolving,
+                                    contentColor = TextBackgroundColor,
+                                    onSongClick = { playerConnection.setVideoMode(false) },
+                                    onVideoClick = { playerConnection.setVideoMode(true) },
+                                )
+                            }
+                        }
+
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier.weight(1f),
                         ) {
                             AnimatedContent(
-                                targetState = showLyrics,
+                                targetState = showLyrics to showEmbeddedVideo,
                                 label = "Lyrics",
                                 transitionSpec = { fadeIn() togetherWith fadeOut() },
-                            ) { isLyricsVisible ->
+                            ) { (isLyricsVisible, embedVideo) ->
                                 if (isLyricsVisible) {
                                     InlineLyricsView(
                                         mediaMetadata = mediaMetadata,
                                         showLyrics = isLyricsVisible,
                                         sliderPositionProvider = { sliderPosition },
+                                    )
+                                } else if (embedVideo) {
+                                    MusicVideoSurface(
+                                        player = playerConnection.player,
+                                        artworkUrl = mediaMetadata?.thumbnailUrl,
+                                        cornerRadius = ThumbnailCornerRadius,
+                                        useSurfaceView = false,
+                                        showControls = true,
+                                        onFullscreenClick = { isVideoFullscreen = true },
+                                        onPiPClick =
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                                {
+                                                    context.findActivity()?.let { activity ->
+                                                        PictureInPictureHelper.enterPictureInPicture(
+                                                            activity = activity,
+                                                            isPlaying = isPlaying,
+                                                            videoSize = videoSize,
+                                                            hasVideo = true,
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                null
+                                            },
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = PlayerHorizontalPadding)
+                                                .nestedScroll(state.preUpPostDownNestedScrollConnection),
                                     )
                                 } else {
                                     Thumbnail(
@@ -1927,6 +2074,30 @@ fun BottomSheetPlayer(
                     iconButtonColor = iconButtonColor,
                     pureBlack = pureBlack,
                     onShowSleepTimerDialog = { showSleepTimerDialog = true },
+                )
+            }
+
+            val fullscreenMetadata = mediaMetadata
+            if (isVideoFullscreen && isVideoModeActive && !isInPipMode && fullscreenMetadata != null) {
+                VideoFullscreenPlayer(
+                    mediaMetadata = fullscreenMetadata,
+                    onDismiss = { isVideoFullscreen = false },
+                    onOpenMenu = {
+                        menuState.show {
+                            PlayerMenu(
+                                mediaMetadata = fullscreenMetadata,
+                                navController = navController,
+                                playerBottomSheetState = state,
+                                onShowDetailsDialog = {
+                                    bottomSheetPageState.show {
+                                        ShowMediaInfo(fullscreenMetadata.id)
+                                    }
+                                },
+                                onDismiss = menuState::dismiss,
+                                onShowSleepTimerDialog = { showSleepTimerDialog = true },
+                            )
+                        }
+                    },
                 )
             }
         }

@@ -1159,4 +1159,29 @@
     <string name="brand_lastfm">Last.fm</string>
     <string name="latest_release">Última versión</string>
     <string name="latest_episode">Último episodio</string>
+
+    <!-- Reproducción de videos musicales -->
+    <string name="video">Video</string>
+    <string name="play_music_videos">Reproducir videos musicales</string>
+    <string name="play_music_videos_description">Muestra el video de las canciones que tengan uno (usa más datos)</string>
+    <string name="show_player_video_button">Selector de audio/video</string>
+    <string name="show_player_video_button_desc">Muestra el selector de canción/video en el reproductor</string>
+    <string name="music_video_quality">Calidad de video musical</string>
+    <string name="music_video_quality_desc">Resolución predeterminada para videos musicales</string>
+    <string name="music_video_quality_auto">Automática</string>
+    <string name="music_video_resolution">Resolución de video</string>
+    <string name="music_video_resolution_desc">Cambiar la resolución de este video musical</string>
+    <string name="music_video_resolution_current">Reproduciendo ahora</string>
+    <string name="music_video_cache">Caché de videos musicales</string>
+    <string name="clear_music_video_cache">Limpiar caché de videos musicales</string>
+    <string name="clear_music_video_cache_desc">Elimina las coincidencias guardadas entre canciones y videos</string>
+    <string name="clear_music_video_cache_dialog">¿Limpiar todas las asociaciones en caché de videos musicales?</string>
+    <string name="play_videos_in_mini_player">Reproducir videos en el minireproductor</string>
+    <string name="play_videos_in_mini_player_desc">Muestra la vista previa del video dentro del minireproductor</string>
+    <string name="enter_pip">Modo imagen en imagen</string>
+    <string name="enter_fullscreen">Pantalla completa</string>
+    <string name="music_video_not_found">No hay video musical disponible para esta canción.</string>
+    <string name="music_video_unavailable">No se pudo reproducir el video musical.</string>
+    <string name="music_track_unavailable">No se pudo reproducir la pista de audio.</string>
+    <string name="subtitles">Subtítulos</string>
 </resources>

@@ -131,6 +131,35 @@ val NotificationButtonTypeKey = stringPreferencesKey("notificationButtonType")
 val EnableBackupUploadKey = booleanPreferencesKey("enableBackupUpload")
 val EnableCastKey = booleanPreferencesKey("enableCast")
 
+enum class MusicVideoQuality {
+    AUTO,
+    P2160,
+    P1440,
+    P1080,
+    P720,
+    P480,
+    P360,
+}
+
+val MusicVideoQuality.targetHeight: Int?
+    get() =
+        when (this) {
+            MusicVideoQuality.AUTO -> null
+            MusicVideoQuality.P2160 -> 2160
+            MusicVideoQuality.P1440 -> 1440
+            MusicVideoQuality.P1080 -> 1080
+            MusicVideoQuality.P720 -> 720
+            MusicVideoQuality.P480 -> 480
+            MusicVideoQuality.P360 -> 360
+        }
+
+val MusicVideoPlaybackEnabledKey = booleanPreferencesKey("musicVideoPlaybackEnabled")
+val ShowPlayerVideoButtonKey = booleanPreferencesKey("showPlayerVideoButton")
+val MusicVideoQualityKey = stringPreferencesKey("musicVideoQuality")
+val VideoViewerVisibleKey = booleanPreferencesKey("videoViewerVisible")
+val PlayVideosInMiniPlayerKey = booleanPreferencesKey("playVideosInMiniPlayer")
+val MusicVideoCacheJsonKey = stringPreferencesKey("musicVideoCacheJson")
+
 enum class NotificationButtonType {
     CLOSE,
     LIKE,

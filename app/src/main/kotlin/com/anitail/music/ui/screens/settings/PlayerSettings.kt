@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PictureInPictureAlt
+import androidx.compose.material.icons.rounded.SmartDisplay
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -37,7 +40,13 @@ import com.anitail.music.constants.AutoSkipNextOnErrorKey
 import com.anitail.music.constants.CrossfadeDurationKey
 import com.anitail.music.constants.EnableCastKey
 import com.anitail.music.constants.HistoryDuration
+import com.anitail.music.constants.MusicVideoPlaybackEnabledKey
+import com.anitail.music.constants.MusicVideoQuality
+import com.anitail.music.constants.MusicVideoQualityKey
 import com.anitail.music.constants.NotificationButtonType
+import com.anitail.music.constants.PlayVideosInMiniPlayerKey
+import com.anitail.music.constants.ShowPlayerVideoButtonKey
+import com.anitail.music.constants.targetHeight
 import com.anitail.music.constants.NotificationButtonTypeKey
 import com.anitail.music.constants.PersistentQueueKey
 import com.anitail.music.constants.SimilarContent
@@ -127,6 +136,22 @@ fun PlayerSettings(
     val (audioOffload, onAudioOffloadChange) = rememberPreference(
         key = AudioOffload,
         defaultValue = false
+    )
+    val (musicVideoPlaybackEnabled, onMusicVideoPlaybackEnabledChange) = rememberPreference(
+        key = MusicVideoPlaybackEnabledKey,
+        defaultValue = true
+    )
+    val (showPlayerVideoButton, onShowPlayerVideoButtonChange) = rememberPreference(
+        key = ShowPlayerVideoButtonKey,
+        defaultValue = true
+    )
+    val (musicVideoQuality, onMusicVideoQualityChange) = rememberEnumPreference(
+        key = MusicVideoQualityKey,
+        defaultValue = MusicVideoQuality.AUTO
+    )
+    val (playVideosInMiniPlayer, onPlayVideosInMiniPlayerChange) = rememberPreference(
+        key = PlayVideosInMiniPlayerKey,
+        defaultValue = true
     )
     val (widgetActionLyricsEnabled, onWidgetActionLyricsEnabledChange) = rememberPreference(
         WidgetActionLyricsEnabledKey,
@@ -263,6 +288,46 @@ fun PlayerSettings(
             icon = { Icon(painterResource(R.drawable.equalizer), null) },
             onClick = { navController.navigate("settings/equalizer") },
         )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.play_music_videos)) },
+            description = stringResource(R.string.play_music_videos_description),
+            icon = { Icon(painterResource(R.drawable.play), null) },
+            checked = musicVideoPlaybackEnabled,
+            onCheckedChange = onMusicVideoPlaybackEnabledChange
+        )
+
+        if (musicVideoPlaybackEnabled) {
+            SwitchPreference(
+                title = { Text(stringResource(R.string.show_player_video_button)) },
+                description = stringResource(R.string.show_player_video_button_desc),
+                icon = { Icon(Icons.Rounded.SmartDisplay, null) },
+                checked = showPlayerVideoButton,
+                onCheckedChange = onShowPlayerVideoButtonChange
+            )
+
+            EnumListPreference(
+                title = { Text(stringResource(R.string.music_video_quality)) },
+                icon = { Icon(painterResource(R.drawable.tune), null) },
+                selectedValue = musicVideoQuality,
+                onValueSelected = onMusicVideoQualityChange,
+                valueText = { quality ->
+                    when (quality) {
+                        MusicVideoQuality.AUTO -> stringResource(R.string.music_video_quality_auto)
+                        MusicVideoQuality.P2160 -> "4K (2160p)"
+                        else -> stringResource(R.string.music_video_quality_resolution, quality.targetHeight?.toString().orEmpty())
+                    }
+                }
+            )
+
+            SwitchPreference(
+                title = { Text(stringResource(R.string.play_videos_in_mini_player)) },
+                description = stringResource(R.string.play_videos_in_mini_player_desc),
+                icon = { Icon(Icons.Rounded.PictureInPictureAlt, null) },
+                checked = playVideosInMiniPlayer,
+                onCheckedChange = onPlayVideosInMiniPlayerChange
+            )
+        }
 
         PreferenceGroupTitle(
             title = stringResource(R.string.queue)

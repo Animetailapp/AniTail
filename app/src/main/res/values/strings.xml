@@ -1229,4 +1229,30 @@
     <string name="brand_lastfm">Last.fm</string>
     <string name="latest_release">Latest release</string>
     <string name="latest_episode">Latest episode</string>
+
+    <!-- Music video playback -->
+    <string name="video">Video</string>
+    <string name="play_music_videos">Play music videos</string>
+    <string name="play_music_videos_description">Show the video for songs that have one (uses more data)</string>
+    <string name="show_player_video_button">Audio/video picker</string>
+    <string name="show_player_video_button_desc">Show the song/video switcher in the player</string>
+    <string name="music_video_quality">Music video quality</string>
+    <string name="music_video_quality_desc">Default resolution for music videos</string>
+    <string name="music_video_quality_auto">Auto</string>
+    <string name="music_video_quality_resolution" translatable="false">%1$sp</string>
+    <string name="music_video_resolution">Video resolution</string>
+    <string name="music_video_resolution_desc">Change the resolution for this music video</string>
+    <string name="music_video_resolution_current">Currently playing</string>
+    <string name="music_video_cache">Music video cache</string>
+    <string name="clear_music_video_cache">Clear music video cache</string>
+    <string name="clear_music_video_cache_desc">Remove cached song-to-video resolution matches</string>
+    <string name="clear_music_video_cache_dialog">Clear all cached music video resolutions?</string>
+    <string name="play_videos_in_mini_player">Play videos in mini player</string>
+    <string name="play_videos_in_mini_player_desc">Show music video preview inside the mini player</string>
+    <string name="enter_pip">Enter picture-in-picture</string>
+    <string name="enter_fullscreen">Enter fullscreen</string>
+    <string name="music_video_not_found">No music video is available for this track.</string>
+    <string name="music_video_unavailable">The music video could not be played.</string>
+    <string name="music_track_unavailable">The audio track could not be played.</string>
+    <string name="subtitles">Subtitles</string>
 </resources>
