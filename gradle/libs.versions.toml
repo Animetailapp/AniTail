@@ -1,5 +1,5 @@
 [versions]
-androidGradlePlugin = "9.5.1"
+androidGradlePlugin = "9.6.0-alpha04"
 documentfile = "1.1.0"
 hiltWork = "1.4.0"
 commonsCodec = "1.23.0"
