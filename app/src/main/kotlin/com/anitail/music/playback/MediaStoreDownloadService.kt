@@ -40,6 +40,7 @@ class MediaStoreDownloadService : Service() {
     private val songInfoCache = mutableMapOf<String, Pair<String, String>>()
     private var lastNotificationKey: String? = null
     private val activeChildNotificationIds = mutableSetOf<Int>()
+    private val notifiedFailedSongIds = mutableSetOf<String>()
 
     companion object {
         private const val NOTIFICATION_CHANNEL_ID = "mediastore_download"
@@ -157,6 +158,28 @@ class MediaStoreDownloadService : Service() {
     }
 
     private suspend fun updateNotification(states: Map<String, MediaStoreDownloadManager.DownloadState>) {
+        val failedDownloads = states.values.filter {
+            it.status == MediaStoreDownloadManager.DownloadState.Status.FAILED
+        }
+        val currentFailedIds = failedDownloads.mapTo(HashSet()) { it.songId }
+        notifiedFailedSongIds.retainAll(currentFailedIds)
+
+        for (failedState in failedDownloads) {
+            if (notifiedFailedSongIds.add(failedState.songId)) {
+                val (title, artist) = resolveSongInfo(failedState.songId)
+                val detail = failedState.error?.takeIf { it.isNotBlank() } ?: artist
+                val failedNotification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+                    .setContentTitle(getString(R.string.download_failed))
+                    .setContentText("$title • $detail")
+                    .setSmallIcon(R.drawable.error)
+                    .setAutoCancel(true)
+                    .setOngoing(false)
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .build()
+                notificationManager.notify(notificationIdForSong(failedState.songId), failedNotification)
+            }
+        }
+
         val activeDownloads = states.values.filter {
             it.status == MediaStoreDownloadManager.DownloadState.Status.DOWNLOADING ||
                     it.status == MediaStoreDownloadManager.DownloadState.Status.QUEUED

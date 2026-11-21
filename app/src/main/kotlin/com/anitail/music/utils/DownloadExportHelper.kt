@@ -205,6 +205,9 @@ class DownloadExportHelper @Inject constructor(
     fun verifyFileAccess(uri: String): Boolean {
         return try {
             val parsedUri = Uri.parse(uri)
+            if (uri.startsWith("content://media/")) {
+                return context.contentResolver.openFileDescriptor(parsedUri, "r")?.use { true } ?: false
+            }
             val docFile = DocumentFile.fromSingleUri(context, parsedUri)
             val exists = docFile?.exists() == true
             val canRead = docFile?.canRead() == true
@@ -217,10 +220,10 @@ class DownloadExportHelper @Inject constructor(
 
     private fun getExtensionFromFormat(format: FormatEntity?, mediaStoreUri: String?): String = when {
         format == null -> inferExtensionFromMediaStoreUri(mediaStoreUri) ?: "m4a"
-        format.mimeType.contains("audio/webm") -> "ogg"
-        format.mimeType.contains("audio/mp4") -> "m4a"
-        format.mimeType.contains("audio/mpeg") -> "mp3"
-        format.mimeType.contains("audio/ogg") -> "ogg"
+        format.mimeType.contains("audio/webm", ignoreCase = true) -> "weba"
+        format.mimeType.contains("audio/mp4", ignoreCase = true) -> "m4a"
+        format.mimeType.contains("audio/mpeg", ignoreCase = true) -> "mp3"
+        format.mimeType.contains("audio/ogg", ignoreCase = true) -> "ogg"
         else -> "m4a"
     }
 
@@ -306,10 +309,10 @@ class DownloadExportHelper @Inject constructor(
     private fun inferExtensionFromMimeType(mimeType: String?): String? {
         if (mimeType.isNullOrBlank()) return null
         return when {
-            mimeType.contains("audio/mpeg") -> "mp3"
-            mimeType.contains("audio/mp4") -> "m4a"
-            mimeType.contains("audio/ogg") -> "ogg"
-            mimeType.contains("audio/webm") -> "ogg"
+            mimeType.contains("audio/mpeg", ignoreCase = true) -> "mp3"
+            mimeType.contains("audio/mp4", ignoreCase = true) -> "m4a"
+            mimeType.contains("audio/ogg", ignoreCase = true) -> "ogg"
+            mimeType.contains("audio/webm", ignoreCase = true) -> "weba"
             else -> null
         }
     }
@@ -317,6 +320,7 @@ class DownloadExportHelper @Inject constructor(
     private fun mimeTypeFromExtension(extension: String): String = when (extension) {
         "mp3" -> "audio/mpeg"
         "ogg" -> "audio/ogg"
+        "weba" -> "audio/webm"
         "m4a" -> "audio/mp4"
         else -> "audio/mp4"
     }

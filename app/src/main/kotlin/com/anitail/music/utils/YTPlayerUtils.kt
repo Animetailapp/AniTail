@@ -175,20 +175,118 @@ object YTPlayerUtils {
         connectivityManager: ConnectivityManager,
         targetItag: Int = 0,
     ): Result<PlaybackData> {
-        val innertubexResult = InnerTubeXPlayer.playerResponseForPlayback(
-            videoId = videoId,
-            playlistId = playlistId,
-            audioQuality = audioQuality,
-            connectivityManager = connectivityManager,
+        val requestedContainer = InnerTubeXPlayer.targetAudioContainerForItag(targetItag)
+        var cachedInnerTubeXResult: Result<PlaybackData>? = null
+        return resolvePlaybackWithTargetItag(
             targetItag = targetItag,
+            requestedContainer = requestedContainer,
+            resolveInnerTubeX = {
+                InnerTubeXPlayer.playerResponseForPlayback(
+                    videoId = videoId,
+                    playlistId = playlistId,
+                    audioQuality = audioQuality,
+                    connectivityManager = connectivityManager,
+                    targetItag = targetItag,
+                ).also { cachedInnerTubeXResult = it }
+            },
+            resolveLegacy = { requireExactTargetItag, preferredContainer ->
+                playerResponseForPlaybackLegacy(
+                    videoId = videoId,
+                    playlistId = playlistId,
+                    audioQuality = audioQuality,
+                    connectivityManager = connectivityManager,
+                    targetItag = targetItag,
+                    requireExactTargetItag = requireExactTargetItag,
+                    preferredContainer = preferredContainer,
+                    hasInnerTubeXFallback = cachedInnerTubeXResult?.isSuccess == true,
+                )
+            },
         )
-        if (innertubexResult.isSuccess) {
-            Timber.tag(logTag).d("Successfully obtained playback data via InnerTubeX for videoId: $videoId")
-            return innertubexResult
-        }
-        Timber.tag(logTag).w(innertubexResult.exceptionOrNull(), "InnerTubeX resolution failed for $videoId; falling back to legacy pipeline")
+    }
 
-        return runCatching {
+    internal suspend fun resolvePlaybackWithTargetItag(
+        targetItag: Int,
+        requestedContainer: InnerTubeXPlayer.TargetAudioContainer?,
+        resolveInnerTubeX: suspend () -> Result<PlaybackData>,
+        resolveLegacy: suspend (
+            requireExactTargetItag: Boolean,
+            preferredContainer: InnerTubeXPlayer.TargetAudioContainer?,
+        ) -> Result<PlaybackData>,
+    ): Result<PlaybackData> {
+        val innertubexResult = resolveInnerTubeX()
+        if (targetItag <= 0) {
+            if (innertubexResult.isSuccess) {
+                Timber.tag(logTag).d("Successfully obtained playback data via InnerTubeX")
+                return innertubexResult
+            }
+            Timber.tag(logTag).w(
+                innertubexResult.exceptionOrNull(),
+                "InnerTubeX resolution failed; falling back to legacy pipeline",
+            )
+            return resolveLegacy(false, null)
+        }
+
+        val innertubexData = innertubexResult.getOrNull()
+        if (innertubexData != null && innertubexData.format.itag == targetItag) {
+            Timber.tag(logTag).d("Successfully obtained exact targetItag=%d via InnerTubeX", targetItag)
+            return Result.success(innertubexData)
+        }
+
+        val innerTubeXContainerFallback =
+            innertubexData?.takeIf {
+                requestedContainer != null &&
+                    InnerTubeXPlayer.matchesTargetContainer(it.format.mimeType, requestedContainer)
+            }
+
+        val exactLegacyResult = resolveLegacy(true, requestedContainer)
+        if (exactLegacyResult.isSuccess) {
+            return exactLegacyResult
+        }
+
+        if (innerTubeXContainerFallback != null) {
+            Timber.tag(logTag).w(
+                exactLegacyResult.exceptionOrNull(),
+                "Exact targetItag=%d unavailable in legacy pipeline; using container-matched InnerTubeX stream itag=%d (%s)",
+                targetItag,
+                innerTubeXContainerFallback.format.itag,
+                innerTubeXContainerFallback.format.mimeType,
+            )
+            return Result.success(innerTubeXContainerFallback)
+        }
+
+        if (requestedContainer != null) {
+            val containerLegacyResult = resolveLegacy(false, requestedContainer)
+            if (containerLegacyResult.isSuccess) {
+                return containerLegacyResult
+            }
+        }
+
+        if (innertubexData != null) {
+            Timber.tag(logTag).w(
+                exactLegacyResult.exceptionOrNull(),
+                "Requested targetItag=%d (%s) unavailable; falling back to InnerTubeX stream itag=%d (%s)",
+                targetItag,
+                requestedContainer,
+                innertubexData.format.itag,
+                innertubexData.format.mimeType,
+            )
+            return Result.success(innertubexData)
+        }
+
+        return exactLegacyResult.exceptionOrNull()?.let { Result.failure(it) }
+            ?: innertubexResult
+    }
+
+    private suspend fun playerResponseForPlaybackLegacy(
+        videoId: String,
+        playlistId: String? = null,
+        audioQuality: AudioQuality,
+        connectivityManager: ConnectivityManager,
+        targetItag: Int = 0,
+        requireExactTargetItag: Boolean = false,
+        preferredContainer: InnerTubeXPlayer.TargetAudioContainer? = null,
+        hasInnerTubeXFallback: Boolean = false,
+    ): Result<PlaybackData> = runCatching {
             Timber.tag(logTag).d("Fetching player response for videoId: $videoId, playlistId: $playlistId")
 
         // 1. Check StreamUrlCache first
@@ -274,7 +372,8 @@ object YTPlayerUtils {
         var streamUrl: String? = null
         var streamExpiresInSeconds: Int? = null
         var streamPlayerResponse: PlayerResponse? = null
-        var successClient: YouTubeClient = MAIN_CLIENT
+        var resolvedSuccessClient: YouTubeClient? = null
+        val requireValidatedStream = targetItag > 0 || preferredContainer != null
 
         for (clientIndex in (-1 until STREAM_FALLBACK_CLIENTS.size)) {
             // reset for each client
@@ -323,10 +422,12 @@ object YTPlayerUtils {
 
                 format =
                     findFormat(
-                        response,
-                        audioQuality,
-                        connectivityManager,
-                        targetItag,
+                        playerResponse = response,
+                        audioQuality = audioQuality,
+                        connectivityManager = connectivityManager,
+                        targetItag = targetItag,
+                        requireExactTargetItag = requireExactTargetItag,
+                        preferredContainer = preferredContainer,
                     )
 
                 if (format == null) {
@@ -365,23 +466,25 @@ object YTPlayerUtils {
                 streamExpiresInSeconds = response.streamingData?.expiresInSeconds ?: 21600
                 Timber.tag(logTag).d("Stream expires in: $streamExpiresInSeconds seconds")
 
-                if (clientIndex == STREAM_FALLBACK_CLIENTS.size - 1) {
+                if (clientIndex == STREAM_FALLBACK_CLIENTS.size - 1 &&
+                    !(requireValidatedStream && hasInnerTubeXFallback)
+                ) {
                     /** skip [validateStatus] for last client */
                     Timber.tag(logTag).d("Using last fallback client without validation: ${client.clientName}")
-                    successClient = client
+                    resolvedSuccessClient = client
                     break
                 }
 
-                if (currentClient.clientName == "WEB_REMIX") {
+                if (currentClient.clientName == "WEB_REMIX" && !requireValidatedStream) {
                     Timber.tag(logTag).d("WEB_REMIX - skipping HEAD validation, letting ExoPlayer try directly")
-                    successClient = currentClient
+                    resolvedSuccessClient = currentClient
                     break
                 }
 
                 if (validateStatus(streamUrl, currentClient.streamHeaders())) {
                     // working stream found
                     Timber.tag(logTag).d("Stream validated successfully with client: ${currentClient.clientName}")
-                    successClient = currentClient
+                    resolvedSuccessClient = currentClient
                     break
                 } else {
                     Timber.tag(logTag).d("Stream validation failed for client: ${currentClient.clientName}")
@@ -426,6 +529,7 @@ object YTPlayerUtils {
             throw Exception("Could not find stream url")
         }
 
+        val successClient = resolvedSuccessClient ?: throw Exception("Stream validation failed for all clients")
         val streamHeaders = successClient.streamHeaders()
 
         // Cache in StreamUrlCache
@@ -449,7 +553,6 @@ object YTPlayerUtils {
             streamClient = successClient.clientName,
             streamHeaders = streamHeaders,
         )
-    }
     }
 
     suspend fun playerResponseForVideoPlayback(
@@ -721,6 +824,25 @@ object YTPlayerUtils {
         audioQuality: AudioQuality,
         connectivityManager: ConnectivityManager,
         targetItag: Int = 0,
+        requireExactTargetItag: Boolean = false,
+        preferredContainer: InnerTubeXPlayer.TargetAudioContainer? = null,
+    ): PlayerResponse.StreamingData.Format? =
+        findFormat(
+            playerResponse = playerResponse,
+            audioQuality = audioQuality,
+            isMetered = connectivityManager.isActiveNetworkMetered,
+            targetItag = targetItag,
+            requireExactTargetItag = requireExactTargetItag,
+            preferredContainer = preferredContainer,
+        )
+
+    internal fun findFormat(
+        playerResponse: PlayerResponse,
+        audioQuality: AudioQuality,
+        isMetered: Boolean,
+        targetItag: Int = 0,
+        requireExactTargetItag: Boolean = false,
+        preferredContainer: InnerTubeXPlayer.TargetAudioContainer? = null,
     ): PlayerResponse.StreamingData.Format? {
         if (targetItag > 0) {
             val exactFormat = playerResponse.streamingData?.adaptiveFormats?.find { it.itag == targetItag }
@@ -728,20 +850,34 @@ object YTPlayerUtils {
                 Timber.tag(logTag).d("Using exact format itag: $targetItag")
                 return exactFormat
             }
+            if (requireExactTargetItag) {
+                Timber.tag(logTag).d("Requested exact itag $targetItag not found on this client")
+                return null
+            }
             Timber.tag(logTag).w("Requested itag $targetItag not found, falling back to auto")
         }
 
-        Timber.tag(logTag).d("Finding format with audioQuality: $audioQuality, network metered: ${connectivityManager.isActiveNetworkMetered}")
+        Timber.tag(logTag).d("Finding format with audioQuality: $audioQuality, network metered: $isMetered")
 
-        val format = playerResponse.streamingData?.adaptiveFormats
+        val candidates = playerResponse.streamingData?.adaptiveFormats
             ?.filter { it.isAudio }
-            ?.maxByOrNull {
-                it.bitrate * when (audioQuality) {
-                    AudioQuality.AUTO -> if (connectivityManager.isActiveNetworkMetered) -1 else 1
-                    AudioQuality.HIGH -> 1
-                    AudioQuality.LOW -> -1
-                } + (if (it.mimeType.startsWith("audio/webm")) 10240 else 0) // prefer opus stream
+            ?.let { audioFormats ->
+                if (preferredContainer != null) {
+                    audioFormats.filter {
+                        InnerTubeXPlayer.matchesTargetContainer(it.mimeType, preferredContainer)
+                    }
+                } else {
+                    audioFormats
+                }
             }
+
+        val format = candidates?.maxByOrNull {
+            it.bitrate * when (audioQuality) {
+                AudioQuality.AUTO -> if (isMetered) -1 else 1
+                AudioQuality.HIGH -> 1
+                AudioQuality.LOW -> -1
+            } + (if (it.mimeType.startsWith("audio/webm")) 10240 else 0) // prefer opus stream
+        }
 
         if (format != null) {
             Timber.tag(logTag).d("Selected format: ${format.mimeType}, bitrate: ${format.bitrate}")
@@ -794,6 +930,8 @@ object YTPlayerUtils {
                 ?.filter { it.isAudio }
                 ?.forEach { format ->
                     if (uniqueFormats.containsKey(format.itag)) return@forEach
+
+                    InnerTubeXPlayer.rememberFormatMimeType(format.itag, format.mimeType)
 
                     val codec = when {
                         format.mimeType.contains("opus", ignoreCase = true) -> "OPUS"
