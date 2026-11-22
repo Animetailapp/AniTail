@@ -85,12 +85,15 @@ data class BrowseResponse(
         val musicEditablePlaylistDetailHeaderRenderer: MusicEditablePlaylistDetailHeaderRenderer?,
         val musicVisualHeaderRenderer: MusicVisualHeaderRenderer?,
         val musicHeaderRenderer: MusicHeaderRenderer?,
+        val musicResponsiveHeaderRenderer: com.anitail.innertube.models.MusicResponsiveHeaderRenderer? = null,
     ) {
         @Serializable
         data class MusicImmersiveHeaderRenderer(
             val title: Runs,
             val description: Runs?,
             val thumbnail: ThumbnailRenderer?,
+            val foregroundThumbnail: ThumbnailRenderer? = null,
+            val backgroundImage: ThumbnailRenderer? = null,
             val playButton: Button?,
             val startRadioButton: Button?,
             val subscriptionButton: SubscriptionButton?,
@@ -114,6 +117,7 @@ data class BrowseResponse(
             val title: Runs,
             val foregroundThumbnail: ThumbnailRenderer,
             val thumbnail: ThumbnailRenderer?,
+            val subscriptionButton: SubscriptionButton? = null,
         )
 
         @Serializable
