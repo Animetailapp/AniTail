@@ -12,6 +12,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.anitail.music.ui.screens.artist.AboutArtistScreen
 import com.anitail.music.ui.screens.artist.ArtistAlbumsScreen
 import com.anitail.music.ui.screens.artist.ArtistItemsScreen
 import com.anitail.music.ui.screens.artist.ArtistScreen
@@ -198,6 +199,17 @@ fun NavGraphBuilder.navigationBuilder(
         ),
     ) {
         ArtistScreen(navController, scrollBehavior)
+    }
+    composable(
+        route = "artist/{artistId}/about",
+        arguments =
+        listOf(
+            navArgument("artistId") {
+                type = NavType.StringType
+            },
+        ),
+    ) {
+        AboutArtistScreen(navController = navController)
     }
     composable(
         route = "artist/{artistId}/songs",

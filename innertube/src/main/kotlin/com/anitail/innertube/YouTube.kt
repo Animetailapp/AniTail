@@ -383,8 +383,18 @@ object YouTube {
             )
         }
 
-        val descriptionShelf = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+        val immersive = response.header?.musicImmersiveHeaderRenderer
+        val visual = response.header?.musicVisualHeaderRenderer
+        val musicHeader = response.header?.musicHeaderRenderer
+        val detail = response.header?.musicDetailHeaderRenderer
+        val singleColContents = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
             ?.tabRenderer?.content?.sectionListRenderer?.contents
+        val twoColContents = response.contents?.twoColumnBrowseResultsRenderer?.tabs?.firstOrNull()
+            ?.tabRenderer?.content?.sectionListRenderer?.contents
+        val responsiveHeader = response.header?.musicResponsiveHeaderRenderer
+            ?: twoColContents?.firstNotNullOfOrNull { it.musicResponsiveHeaderRenderer }
+
+        val descriptionShelf = (singleColContents ?: twoColContents)
             ?.firstOrNull { it.musicDescriptionShelfRenderer != null }
             ?.musicDescriptionShelfRenderer
             ?: response.contents?.sectionListRenderer?.contents
@@ -392,42 +402,108 @@ object YouTube {
                 ?.musicDescriptionShelfRenderer
 
         val descriptionRuns = descriptionShelf?.description?.runs?.let(::mapRuns)
-            ?: response.header?.musicImmersiveHeaderRenderer?.description?.runs?.let(::mapRuns)
+            ?: immersive?.description?.runs?.let(::mapRuns)
+
+        val descriptionText = descriptionRuns?.let { runs ->
+            runs.joinToString(separator = "") { run ->
+                val url = run.navigationEndpoint?.urlEndpoint?.url
+                if (!url.isNullOrBlank()) {
+                    if (run.text.isNotBlank() && !run.text.contains("://")) "${run.text} $url" else url
+                } else {
+                    run.text
+                }
+            }
+                .replace(Regex("\\s*\\(\\s*\\)"), "")
+                .replace(Regex("\\s{2,}"), " ")
+                .trim()
+                .takeIf { it.isNotBlank() }
+        } ?: responsiveHeader?.extractDescriptionText()
 
         val viewCount = descriptionShelf?.subheader?.runs?.firstOrNull()?.text?.takeIf { it.isNotBlank() }
+
+        val banner = immersive?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
+            ?: immersive?.foregroundThumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
+            ?: immersive?.backgroundImage?.musicThumbnailRenderer?.getThumbnailUrl()
+            ?: visual?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
+            ?: visual?.foregroundThumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
+            ?: detail?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
+            ?: responsiveHeader?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
+
+        val rawSections = (singleColContents ?: twoColContents)
+            ?.mapNotNull(ArtistPage::fromSectionListRendererContent)
+            .orEmpty()
+
+        val exactArtistItem = rawSections
+            .asSequence()
+            .flatMap { it.items.asSequence() }
+            .filterIsInstance<ArtistItem>()
+            .firstOrNull { it.id == browseId }
+
+        val artistTitle = immersive?.title?.runs?.firstOrNull()?.text
+            ?: visual?.title?.runs?.firstOrNull()?.text
+            ?: musicHeader?.title?.runs?.firstOrNull()?.text
+            ?: detail?.title?.runs?.firstOrNull()?.text
+            ?: responsiveHeader?.title?.runs?.firstOrNull()?.text
+            ?: exactArtistItem?.title
+            ?: ""
+
+        val artistThumbnail = visual?.foregroundThumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
+            ?: immersive?.foregroundThumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
+            ?: exactArtistItem?.thumbnail
+            ?: banner
+
+        val albumArtistsFallback = if (artistTitle.isNotBlank()) listOf(Artist(name = artistTitle, id = browseId)) else emptyList()
+        val sections = rawSections.map { section ->
+            section.copy(
+                items = section.items.map { item ->
+                    when (item) {
+                        is SongItem -> if (item.artists.isEmpty() && albumArtistsFallback.isNotEmpty()) {
+                            item.copy(artists = albumArtistsFallback)
+                        } else item
+                        is AlbumItem -> if (item.artists.isNullOrEmpty() && albumArtistsFallback.isNotEmpty()) {
+                            item.copy(artists = albumArtistsFallback)
+                        } else item
+                        else -> item
+                    }
+                }
+            )
+        }
+
+        val subscribeRenderer = immersive?.subscriptionButton?.subscribeButtonRenderer
+            ?: visual?.subscriptionButton?.subscribeButtonRenderer
+        val subscriberCountText = subscribeRenderer?.subscriberCountText?.runs?.joinToString("") { it.text }?.takeIf { it.isNotBlank() }
+            ?: immersive?.subscriptionButton2?.subscribeButtonRenderer?.subscriberCountWithSubscribeText?.runs?.joinToString("") { it.text }?.takeIf { it.isNotBlank() }
+            ?: subscribeRenderer?.longSubscriberCountText?.runs?.joinToString("") { it.text }?.takeIf { it.isNotBlank() }
+            ?: subscribeRenderer?.shortSubscriberCountText?.runs?.joinToString("") { it.text }?.takeIf { it.isNotBlank() }
+
+        val monthlyListenerCount = immersive?.monthlyListenerCount?.runs
+            ?.joinToString("") { it.text }
+            ?.takeIf { it.isNotBlank() }
 
         ArtistPage(
             artist = ArtistItem(
                 id = browseId,
-                title = response.header?.musicImmersiveHeaderRenderer?.title?.runs?.firstOrNull()?.text
-                    ?: response.header?.musicVisualHeaderRenderer?.title?.runs?.firstOrNull()?.text
-                    ?: response.header?.musicHeaderRenderer?.title?.runs?.firstOrNull()?.text!!,
-                thumbnail = response.header?.musicImmersiveHeaderRenderer?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
-                    ?: response.header?.musicVisualHeaderRenderer?.foregroundThumbnail?.musicThumbnailRenderer?.getThumbnailUrl()
-                    ?: response.header?.musicDetailHeaderRenderer?.thumbnail?.musicThumbnailRenderer?.getThumbnailUrl(),
-                channelId = response.header?.musicImmersiveHeaderRenderer?.subscriptionButton?.subscribeButtonRenderer?.channelId,
-                playEndpoint = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
-                    ?.tabRenderer?.content?.sectionListRenderer?.contents?.firstOrNull()?.musicShelfRenderer
+                title = artistTitle,
+                thumbnail = artistThumbnail,
+                channelId = subscribeRenderer?.channelId,
+                playEndpoint = singleColContents?.firstOrNull()?.musicShelfRenderer
                     ?.contents?.firstOrNull()?.musicResponsiveListItemRenderer?.overlay?.musicItemThumbnailOverlayRenderer
-                    ?.content?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchEndpoint,
-                shuffleEndpoint = response.header?.musicImmersiveHeaderRenderer?.playButton?.buttonRenderer?.navigationEndpoint?.watchEndpoint
-                    ?: response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()?.tabRenderer?.content?.sectionListRenderer
-                        ?.contents?.firstOrNull()?.musicShelfRenderer?.contents?.firstOrNull()?.musicResponsiveListItemRenderer?.navigationEndpoint?.watchPlaylistEndpoint,
-                radioEndpoint = response.header?.musicImmersiveHeaderRenderer?.startRadioButton?.buttonRenderer?.navigationEndpoint?.watchEndpoint
+                    ?.content?.musicPlayButtonRenderer?.playNavigationEndpoint?.anyWatchEndpoint,
+                shuffleEndpoint = immersive?.playButton?.buttonRenderer?.navigationEndpoint?.anyWatchEndpoint
+                    ?: immersive?.playButton?.buttonRenderer?.command?.anyWatchEndpoint
+                    ?: singleColContents?.firstOrNull()?.musicShelfRenderer
+                        ?.contents?.firstOrNull()?.musicResponsiveListItemRenderer?.navigationEndpoint?.anyWatchEndpoint,
+                radioEndpoint = immersive?.startRadioButton?.buttonRenderer?.navigationEndpoint?.anyWatchEndpoint
+                    ?: immersive?.startRadioButton?.buttonRenderer?.command?.anyWatchEndpoint
             ),
-            sections = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
-                ?.tabRenderer?.content?.sectionListRenderer?.contents
-                ?.mapNotNull(ArtistPage::fromSectionListRendererContent)!!,
-            description = descriptionRuns?.joinToString(separator = "") { it.text },
-                subscriberCountText = response.header?.musicImmersiveHeaderRenderer?.subscriptionButton2
-                    ?.subscribeButtonRenderer?.subscriberCountWithSubscribeText?.runs?.firstOrNull()?.text
-                    ?: response.header?.musicImmersiveHeaderRenderer?.subscriptionButton?.subscribeButtonRenderer
-                        ?.longSubscriberCountText?.runs?.firstOrNull()?.text
-                    ?: response.header?.musicImmersiveHeaderRenderer?.subscriptionButton?.subscribeButtonRenderer
-                        ?.shortSubscriberCountText?.runs?.firstOrNull()?.text,
-            monthlyListenerCount = response.header?.musicImmersiveHeaderRenderer?.monthlyListenerCount?.runs?.firstOrNull()?.text,
+            sections = sections,
+            description = descriptionText,
+            subscriberCountText = subscriberCountText,
+            monthlyListenerCount = monthlyListenerCount,
             descriptionRuns = descriptionRuns,
             viewCount = viewCount,
+            banner = banner,
+            isSubscribed = subscribeRenderer?.subscribed == true,
         )
     }
 

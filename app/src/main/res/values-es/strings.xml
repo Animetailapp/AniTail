@@ -1184,4 +1184,20 @@
     <string name="music_video_unavailable">No se pudo reproducir el video musical.</string>
     <string name="music_track_unavailable">No se pudo reproducir la pista de audio.</string>
     <string name="subtitles">Subtítulos</string>
+
+    <!-- Expressive Artist -->
+    <string name="error_occurred">Ha ocurrido un error</string>
+    <string name="artist_refresh">Actualizar artista</string>
+    <string name="artist_actions">Acciones del artista</string>
+    <string name="from_your_library">De tu biblioteca</string>
+    <string name="artist_subscriber_count">%1$s suscriptores</string>
+    <string name="monthly_audience_short">audiencia mensual</string>
+    <string name="artist_play_all">Reproducir todo</string>
+    <string name="see_all">Ver todo</string>
+    <string name="artist_photo_position">%1$d de %2$d</string>
+    <string name="artist_photo_open_original">Abrir original</string>
+    <string name="artist_photo_content_description">Foto de %1$s</string>
+    <string name="artist_photo_view_author">Ver el perfil de Last.fm de quien ha subido el contenido</string>
+    <string name="saved">Guardado</string>
+    <string name="action_download">Descargar</string>
 </resources>

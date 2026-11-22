@@ -402,4 +402,48 @@
         <item quantity="one">1 secondo</item>
         <item quantity="other">%d secondi</item>
     </plurals>
+
+    <!-- Expressive Artist -->
+    <string name="loading">Caricamento…</string>
+    <string name="retry">Riprova</string>
+    <string name="error_occurred">Si è verificato un errore</string>
+    <string name="artist_refresh">Aggiorna artista</string>
+    <string name="artist_actions">Azioni artista</string>
+    <string name="latest_release">Ultima uscita</string>
+    <string name="top_tracks">Tracce più ascoltate</string>
+    <string name="from_your_library">Dalla tua libreria</string>
+    <string name="artist_subscriber_count">%1$s iscritti</string>
+    <string name="monthly_audience_short">ascoltatori mensili</string>
+    <string name="subscribed">Iscritto</string>
+    <string name="subscribe">Iscriviti</string>
+    <string name="artist_play_all">Riproduci tutto</string>
+    <string name="see_all">Vedi tutto</string>
+    <string name="show_more">Mostra di più</string>
+    <string name="show_less">Mostra meno</string>
+    <string name="more_options">Più opzioni</string>
+    <string name="artist_photo_position">%1$d di %2$d</string>
+    <string name="artist_photo_open_original">Apri l\'originale</string>
+    <string name="artist_photo_content_description">Foto di %1$s</string>
+    <string name="artist_photo_view_author">Vedi il profilo Last.fm dell\'autore</string>
+    <string name="artist_photo_uploaded">%1$s caricato</string>
+    <string name="artist_photo_view_on_lastfm">Vedi su Last.fm</string>
+    <string name="artist_photo_details_unavailable">Dettagli immagine non disponibili</string>
+    <string name="saved">Salvato</string>
+    <string name="close">Chiudi</string>
+    <string name="action_download">Scarica</string>
+    <string name="about_artist">Informazioni sull\'artista</string>
+    <string name="artist_lastfm_listeners">Ascoltatori Last.fm</string>
+    <string name="artist_lastfm_scrobbles">Scrobble Last.fm</string>
+    <string name="artist_monthly_audience">Ascoltatori mensili</string>
+    <string name="artist_lastfm_biography">Biografia Last.fm</string>
+    <string name="artist_lastfm_read_more">Leggi di più su Last.fm</string>
+    <string name="artist_similar_artists">Artisti simili su Last.fm</string>
+    <string name="genres">Generi</string>
+    <string name="total_views">Visualizzazioni totali</string>
+    <string name="could_not_load_info">Impossibile caricare le informazioni dell\'artista</string>
+    <string name="no_bio_title">Nessuna biografia disponibile</string>
+    <string name="no_bio_hint">L\'artista non ha ancora una biografia, ma puoi aiutare modificando il loro profilo Last.fm.</string>
+    <string name="lastfm_profile_hint">Puoi contribuire aggiungendo le informazioni al loro profilo Last.fm.</string>
+    <string name="lastfm_link_text">Profilo Last.fm</string>
+    <string name="brand_lastfm">Last.fm</string>
 </resources>

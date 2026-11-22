@@ -12,5 +12,6 @@ data class SubscriptionButton(
         val channelId: String,
         val longSubscriberCountText: Runs? = null,
         val shortSubscriberCountText: Runs? = null,
+        val subscriberCountText: Runs? = null,
     )
 }
