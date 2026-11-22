@@ -52,6 +52,7 @@ import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import com.anitail.innertube.models.YouTubeClient
 import com.anitail.music.utils.cipher.CipherDeobfuscator
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -200,6 +201,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import timber.log.Timber
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.UnknownHostException
 import java.time.LocalDateTime
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -309,11 +313,19 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                     DefaultExtractorsFactory(),
                 ),
             directHttpDataSourceFactoryProvider = { headers ->
+                val userAgentEntry =
+                    headers.entries.firstOrNull { (key, _) -> key.equals("User-Agent", ignoreCase = true) }
+                val filteredHeaders =
+                    if (userAgentEntry != null) {
+                        headers.filterKeys { !it.equals("User-Agent", ignoreCase = true) }
+                    } else {
+                        headers
+                    }
                 OkHttpDataSource.Factory(directOkHttpClient)
-                    .setUserAgent(YouTubeClient.USER_AGENT_WEB)
+                    .setUserAgent(userAgentEntry?.value)
                     .apply {
-                        if (headers.isNotEmpty()) {
-                            setDefaultRequestProperties(headers)
+                        if (filteredHeaders.isNotEmpty()) {
+                            setDefaultRequestProperties(filteredHeaders)
                         }
                     }
             },
@@ -495,12 +507,33 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                     }
                 }
             },
+            onVideoStreamFailed = { videoId, clientName, excludeClient, refreshCipher ->
+                if (excludeClient && !clientName.isNullOrBlank()) {
+                    InnerTubeXPlayer.markStreamClientFailed(videoId, clientName)
+                    if (clientName == "WEB_REMIX") {
+                        YTPlayerUtils.markWebRemixFailed(videoId)
+                    }
+                }
+                if (refreshCipher) {
+                    ioScope.launch {
+                        InnerTubeXPlayer.refreshAfterStreamRejection()
+                        if (CipherDeobfuscator.onStreamRejected()) {
+                            YTPlayerUtils.clearWebRemixFailures()
+                        }
+                    }
+                }
+            },
         )
 
     player =
         ExoPlayer.Builder(this)
             .setMediaSourceFactory(createMediaSourceFactory())
             .setRenderersFactory(createRenderersFactory())
+            .setLoadControl(
+                DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(15_000, 30_000, 2_000, 5_000)
+                    .build(),
+            )
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .setAudioAttributes(
@@ -692,14 +725,19 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                 videoModeController.onVideoPlaybackSettingChanged(enabled)
             }
 
-        videoModeController.isVideoModeActive.collectLatest(scope) { active ->
-            while (active && kotlinx.coroutines.currentCoroutineContext().isActive) {
-                if (this::player.isInitialized) {
-                    videoAwareMediaSourceFactory.updatePlaybackPosition(player.currentPosition)
+        combine(
+            videoModeController.isVideoModeActive,
+            videoModeController.isVideoModeResolving,
+        ) { active, resolving -> active || resolving }
+            .distinctUntilChanged()
+            .collectLatest(scope) { active ->
+                while (active && kotlinx.coroutines.currentCoroutineContext().isActive) {
+                    if (this::player.isInitialized) {
+                        videoAwareMediaSourceFactory.updatePlaybackPosition(player.currentPosition)
+                    }
+                    delay(500)
                 }
-                delay(500)
             }
-        }
 
     combine(
             currentFormat,
@@ -2079,9 +2117,15 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       @Player.State playbackState: Int,
   ) {
     if (playbackState == STATE_IDLE) {
-      currentQueue = EmptyQueue
-      player.shuffleModeEnabled = false
-      queueTitle = null
+      val recoveringVideoError =
+          player.playerError != null &&
+              this::videoModeController.isInitialized &&
+              (videoModeController.isVideoModeActive.value || videoModeController.isVideoModeResolving.value)
+      if (!recoveringVideoError) {
+        currentQueue = EmptyQueue
+        player.shuffleModeEnabled = false
+        queueTitle = null
+      }
     }
   }
 
@@ -2101,6 +2145,14 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
 
     if (events.containsAny(
         Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_PLAY_WHEN_READY_CHANGED)) {
+        if (this::videoModeController.isInitialized && videoModeController.isVideoModeActive.value) {
+          val shouldSuspendSabr = player.playbackState == STATE_READY && !player.playWhenReady
+          if (shouldSuspendSabr) {
+            videoAwareMediaSourceFactory.suspendSabrProducers()
+          } else {
+            videoAwareMediaSourceFactory.resumeSabrProducers(player.currentPosition)
+          }
+        }
         scheduleCrossfade()
       val isBufferingOrReady =
           player.playbackState == Player.STATE_BUFFERING || player.playbackState == STATE_READY
@@ -2270,14 +2322,44 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
       }
   }
 
+  private fun isNetworkConnectionError(error: PlaybackException): Boolean {
+      if (error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED) {
+          return true
+      }
+      val visited = mutableSetOf<Throwable>()
+      var cause: Throwable? = error
+      while (cause != null && visited.add(cause)) {
+          if (cause is PlaybackException &&
+              cause.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
+          ) {
+              return true
+          }
+          if (cause is UnknownHostException ||
+              cause is ConnectException ||
+              cause is NoRouteToHostException
+          ) {
+              return true
+          }
+          cause = cause.cause
+      }
+      return false
+  }
+
   override fun onPlayerError(error: PlaybackException) {
       val mediaId = player.currentMediaItem?.mediaId
       val failedStreamClient = mediaId?.let { StreamUrlCache.clientName(it) }
 
       Timber.tag("MusicService").w(error, "Player error occurred for $mediaId: errorCode=${error.errorCode}, message=${error.message}")
 
-      if (this::videoModeController.isInitialized && videoModeController.isVideoModeActive.value) {
-          videoModeController.fallbackToAudioOnError()
+      if (!isNetworkConnected.value || isNetworkConnectionError(error)) {
+          waitOnNetworkError()
+          return
+      }
+
+      if (this::videoModeController.isInitialized &&
+          (videoModeController.isVideoModeActive.value || videoModeController.isVideoModeResolving.value)
+      ) {
+          videoModeController.handlePlaybackError(error)
           return
       }
 
@@ -2287,13 +2369,6 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
           return
       }
 
-      val isConnectionError = (error.cause?.cause is PlaybackException) &&
-              (error.cause?.cause as PlaybackException).errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
-
-      if (!isNetworkConnected.value || isConnectionError) {
-          waitOnNetworkError()
-          return
-      }
       if (dataStore.get(AutoSkipNextOnErrorKey, false)) {
           skipOnError()
       } else {
@@ -2306,10 +2381,19 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         newPosition: Player.PositionInfo,
         reason: Int,
     ) {
-        if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+        if (reason == Player.DISCONTINUITY_REASON_SEEK ||
+            reason == Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT
+        ) {
             videoAwareMediaSourceFactory.beginPlaybackSeek(newPosition.positionMs)
             videoAwareMediaSourceFactory.endPlaybackSeek(newPosition.positionMs)
-            scheduleCrossfade()
+            if (this::videoModeController.isInitialized &&
+                (videoModeController.isVideoModeActive.value || videoModeController.isVideoModeResolving.value)
+            ) {
+                videoAwareMediaSourceFactory.resumeSabrProducers(newPosition.positionMs)
+            }
+            if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+                scheduleCrossfade()
+            }
         }
     }
 
@@ -2686,7 +2770,7 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                     ),
                 )
                 .build()
-      }
+      }.setEnableDecoderFallback(true)
 
   override fun onPlaybackStatsReady(
       eventTime: AnalyticsListener.EventTime,

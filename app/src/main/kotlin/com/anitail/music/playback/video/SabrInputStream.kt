@@ -103,6 +103,8 @@ class SabrInputStream(
     private val cachedRanges = mutableListOf<LongRange>()
     private val cachedChunkEndTimes = mutableMapOf<Long, Long>()
     private var readPosition = 0L
+    private var lastRequestedPosition = 0L
+    private var waitingReadPosition: Long? = null
     private var completed = false
     private var receivedMedia = false
 
@@ -111,6 +113,8 @@ class SabrInputStream(
     private var producer: Job? = null
     private var producerSuspended = false
     private var producerInitialPlayerTimeMs = 0L
+    private var generationSawMediaChunk = false
+    private var seekBackstepAttempts = 0
     private var startupDeadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(startupTimeoutMs)
 
     init {
@@ -162,7 +166,7 @@ class SabrInputStream(
         synchronized(stateLock) {
             if (closed || !producerSuspended) return
             producerSuspended = false
-            startIfNeeded(readPosition)
+            startIfNeeded(lastRequestedPosition)
             stateLock.notifyAll()
         }
     }
@@ -171,7 +175,18 @@ class SabrInputStream(
         if (producer != null || completed || closed || producerSuspended || failure != null) return
         val target = synchronized(playbackPositionLock) { (playbackPositionMs - seekPrerollMs).coerceAtLeast(0L) }
         val prefixEnd = cachedEndAt(0L)
-        startProducer(if (position == 0L && prefixEnd == null) 0L else maxOf(target, cachedChunkEndTimes[prefixEnd] ?: 0L))
+        val resumeTimeMs =
+            if (position == 0L && prefixEnd == null) {
+                0L
+            } else {
+                val boundaryEndTimeMs =
+                    cachedChunkEndTimes[position]?.let { (it - 1_000L).coerceAtLeast(0L) }
+                        ?: cachedEndAt(position)?.let { end ->
+                            cachedChunkEndTimes[end]?.minus(1_000L)?.coerceAtLeast(0L)
+                        }
+                boundaryEndTimeMs ?: maxOf(target, cachedChunkEndTimes[prefixEnd] ?: 0L)
+            }
+        startProducer(resumeTimeMs)
     }
 
     private fun startProducer(initialPlayerTimeMs: Long) {
@@ -181,6 +196,7 @@ class SabrInputStream(
                     producerGeneration++
                     failure = null
                     completed = false
+                    generationSawMediaChunk = false
                     producerInitialPlayerTimeMs = initialPlayerTimeMs
                     if (!receivedMedia) {
                         startupDeadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(startupTimeoutMs)
@@ -262,45 +278,65 @@ class SabrInputStream(
 
         val count: Int
         synchronized(stateLock) {
+            lastRequestedPosition = position
             startIfNeeded(position)
             var availableEnd = cachedEndAt(position)
+            if (availableEnd != null) {
+                seekBackstepAttempts = 0
+            }
             var readDeadlineNanos =
                 if (receivedMedia) {
                     System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(readTimeoutMs)
                 } else {
                     startupDeadlineNanos
                 }
-            while (!closed && failure == null && !completed && availableEnd == null) {
-                try {
-                    if (producerSuspended) {
-                        stateLock.wait()
-                        readDeadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(readTimeoutMs)
-                        availableEnd = cachedEndAt(position)
-                        continue
+            waitingReadPosition = position
+            try {
+                while (!closed && failure == null && !completed && availableEnd == null) {
+                    try {
+                        if (producerSuspended) {
+                            stateLock.wait()
+                            readDeadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(readTimeoutMs)
+                            availableEnd = cachedEndAt(position)
+                            continue
+                        }
+                        val remainingNanos = readDeadlineNanos - System.nanoTime()
+                        if (remainingNanos <= 0L) {
+                            val currentPlaybackMs = synchronized(playbackPositionLock) { playbackPositionMs }
+                            if (isProducerPacingAheadLocked(position, currentPlaybackMs)) {
+                                readDeadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(readTimeoutMs)
+                                availableEnd = cachedEndAt(position)
+                                continue
+                            }
+                            failure =
+                                SocketTimeoutException(
+                                    if (receivedMedia) {
+                                        "SABR stream stalled while waiting for media"
+                                    } else {
+                                        "SABR stream produced no media before the startup deadline"
+                                    },
+                                )
+                            completed = true
+                            break
+                        }
+                        val remainingMillis =
+                            TimeUnit.NANOSECONDS
+                                .toMillis(remainingNanos)
+                                .coerceIn(1L, READ_WAIT_SLICE_MS)
+                        stateLock.wait(remainingMillis)
+                    } catch (error: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        throw InterruptedIOException("SABR read interrupted").apply { initCause(error) }
                     }
-                    val remainingNanos = readDeadlineNanos - System.nanoTime()
-                    if (remainingNanos <= 0L) {
-                        failure =
-                            SocketTimeoutException(
-                                if (receivedMedia) {
-                                    "SABR stream stalled while waiting for media"
-                                } else {
-                                    "SABR stream produced no media before the startup deadline"
-                                },
-                            )
-                        completed = true
-                        break
-                    }
-                    val remainingMillis =
-                        TimeUnit.NANOSECONDS
-                            .toMillis(remainingNanos)
-                            .coerceAtLeast(1L)
-                    stateLock.wait(remainingMillis)
-                } catch (error: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                    throw InterruptedIOException("SABR read interrupted").apply { initCause(error) }
+                    availableEnd = cachedEndAt(position)
                 }
-                availableEnd = cachedEndAt(position)
+            } finally {
+                if (waitingReadPosition == position) {
+                    waitingReadPosition = null
+                }
+            }
+            if (availableEnd != null) {
+                seekBackstepAttempts = 0
             }
             if (availableEnd == null) {
                 if (!closed && completed && failure == null && (mediaSize != null || cachedRanges.any { it.first > position })) {
@@ -331,6 +367,8 @@ class SabrInputStream(
         synchronized(stateLock) {
             check(!closed) { "SABR stream is closed" }
             readPosition = position
+            lastRequestedPosition = position
+            seekBackstepAttempts = 0
             if (failure?.findSabrProtocolException() != null) return position
             if (producerSuspended) return position
             if (producer == null) {
@@ -565,6 +603,7 @@ class SabrInputStream(
                 cache.addCachedRange(chunk.startRange until endRangeExclusive)
             }
         }
+        var restartPlayerTimeMs: Long? = null
         synchronized(stateLock) {
             if (closed || producerGeneration != generation) return
             receivedMedia = true
@@ -580,8 +619,44 @@ class SabrInputStream(
             if (mediaSize != null && isFullyCached()) {
                 completed = true
             }
+            if (!chunk.isInitialization && !generationSawMediaChunk) {
+                generationSawMediaChunk = true
+                val waitingPos = waitingReadPosition
+                if (
+                    waitingPos != null &&
+                    cachedEndAt(waitingPos) == null &&
+                    chunk.startRange > waitingPos &&
+                    producerInitialPlayerTimeMs > 0L &&
+                    seekBackstepAttempts < MAX_SEEK_BACKSTEPS
+                ) {
+                    seekBackstepAttempts++
+                    restartPlayerTimeMs =
+                        (producerInitialPlayerTimeMs - SEEK_BACKSTEP_MS * seekBackstepAttempts)
+                            .coerceAtLeast(0L)
+                }
+            }
             stateLock.notifyAll()
         }
+        restartPlayerTimeMs?.let { backstepTarget ->
+            synchronized(stateLock) {
+                if (!closed && producerGeneration == generation && !producerSuspended && !completed && failure == null) {
+                    startProducer(backstepTarget)
+                }
+            }
+        }
+    }
+
+    private fun isProducerPacingAheadLocked(
+        position: Long,
+        currentPlaybackMs: Long,
+    ): Boolean {
+        if (!receivedMedia || producer?.isActive != true) return false
+        val bufferedEndMs =
+            cachedChunkEndTimes[position]
+                ?: cachedRanges.lastOrNull { it.last < position }?.let { cachedChunkEndTimes[it.last + 1L] }
+                ?: return false
+        return bufferedEndMs >= producerInitialPlayerTimeMs &&
+            bufferedEndMs - currentPlaybackMs > SABR_PACING_HEADROOM_MS
     }
 
     private fun isFullyCached(): Boolean {
@@ -631,8 +706,12 @@ class SabrInputStream(
     }
 
     companion object {
-        const val DEFAULT_SEEK_PREROLL_MS = 10_000L
+        const val DEFAULT_SEEK_PREROLL_MS = 15_000L
         private const val SEEK_RESTART_THRESHOLD_MS = 15_000L
+        private const val SEEK_BACKSTEP_MS = 15_000L
+        private const val MAX_SEEK_BACKSTEPS = 4
+        private const val SABR_PACING_HEADROOM_MS = 5_000L
+        private const val READ_WAIT_SLICE_MS = 5_000L
         private const val DEFAULT_STARTUP_TIMEOUT_MS = 15_000L
         private const val EARLY_END_TOLERANCE_MS = 2_000L
         private const val DEFAULT_READ_TIMEOUT_MS = 90_000L
