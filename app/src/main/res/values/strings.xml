@@ -1255,4 +1255,20 @@
     <string name="music_video_unavailable">The music video could not be played.</string>
     <string name="music_track_unavailable">The audio track could not be played.</string>
     <string name="subtitles">Subtitles</string>
+
+    <!-- Expressive Artist -->
+    <string name="error_occurred">An error occurred</string>
+    <string name="artist_refresh">Refresh artist</string>
+    <string name="artist_actions">Artist actions</string>
+    <string name="from_your_library">From your library</string>
+    <string name="artist_subscriber_count">%1$s subscribers</string>
+    <string name="monthly_audience_short">monthly audience</string>
+    <string name="artist_play_all">Play all</string>
+    <string name="see_all">See all</string>
+    <string name="artist_photo_position">%1$d of %2$d</string>
+    <string name="artist_photo_open_original">Open original</string>
+    <string name="artist_photo_content_description">Photo of %1$s</string>
+    <string name="artist_photo_view_author">View uploader\'s Last.fm profile</string>
+    <string name="saved">Saved</string>
+    <string name="action_download">Download</string>
 </resources>

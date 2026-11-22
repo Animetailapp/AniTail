@@ -36,7 +36,8 @@ data class SongItem(
     val libraryAddToken: String? = null,
     val libraryRemoveToken: String? = null,
     val historyRemoveToken: String? = null,
-    val isEpisode: Boolean = false
+    val isEpisode: Boolean = false,
+    val playCountText: String? = null,
 ) : YTItem() {
     val isVideoSong: Boolean
         get() = musicVideoType != null && musicVideoType != MUSIC_VIDEO_TYPE_ATV
@@ -54,6 +55,8 @@ data class AlbumItem(
     val year: Int? = null,
     override val thumbnail: String,
     override val explicit: Boolean = false,
+    val type: String? = null,
+    val songCount: Int? = null,
 ) : YTItem() {
     override val shareLink: String
         get() = "https://music.youtube.com/playlist?list=$playlistId"
