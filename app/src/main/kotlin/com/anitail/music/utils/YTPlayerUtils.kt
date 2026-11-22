@@ -41,6 +41,8 @@ object YTPlayerUtils {
     private val poTokenGenerator = PoTokenGenerator()
 
     private const val WEB_REMIX_FAILURE_TTL_MS = 5 * 60 * 1000L
+    private const val LEGACY_VIDEO_RANGE_CHUNK_BYTES = 2 * 1024 * 1024L
+    private val cipherRefreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val webRemixFailures = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     fun markWebRemixFailed(videoId: String) {
@@ -62,7 +64,38 @@ object YTPlayerUtils {
         InnerTubeXPlayer.clearStreamClientFailures()
     }
 
-    private val cipherRefreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private fun YouTubeClient.needsNTransform(): Boolean =
+        useWebPoTokens ||
+            clientName in listOf(
+                "WEB",
+                "WEB_REMIX",
+                "WEB_CREATOR",
+                "TVHTML5",
+                "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+            )
+
+    private suspend fun prepareLegacyStreamUrl(
+        rawUrl: String,
+        client: YouTubeClient,
+        poToken: PoTokenResult?,
+    ): String {
+        if (!client.needsNTransform()) return rawUrl
+
+        return try {
+            var resolvedUrl = CipherDeobfuscator.transformNParamInUrl(rawUrl)
+            val streamingToken = poToken?.streamingDataPoToken
+            if (client.useWebPoTokens && streamingToken != null) {
+                val separator = if ("?" in resolvedUrl) "&" else "?"
+                resolvedUrl = "${resolvedUrl}${separator}pot=${Uri.encode(streamingToken)}"
+            }
+            resolvedUrl
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "N-transform or pot append failed: ${e.message}")
+            rawUrl
+        }
+    }
 
     /**
      * The main client is used for metadata and initial streams.
@@ -445,23 +478,8 @@ object YTPlayerUtils {
 
                 // Apply n-transform and PoToken for web clients
                 val currentClient = client
-                val needsNTransform = currentClient.useWebPoTokens ||
-                    currentClient.clientName in listOf("WEB", "WEB_REMIX", "WEB_CREATOR", "TVHTML5")
-
-                if (needsNTransform) {
-                    try {
-                        streamUrl = CipherDeobfuscator.transformNParamInUrl(streamUrl)
-                        val needsPoToken = currentClient.useWebPoTokens && poToken?.streamingDataPoToken != null
-                        if (needsPoToken) {
-                            val separator = if ("?" in streamUrl) "&" else "?"
-                            streamUrl = "${streamUrl}${separator}pot=${Uri.encode(poToken.streamingDataPoToken)}"
-                        }
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Timber.tag(TAG).e(e, "N-transform or pot append failed: ${e.message}")
-                    }
-                }
+                val needsNTransform = currentClient.needsNTransform()
+                streamUrl = prepareLegacyStreamUrl(streamUrl, currentClient, poToken)
 
                 streamExpiresInSeconds = response.streamingData?.expiresInSeconds ?: 21600
                 Timber.tag(logTag).d("Stream expires in: $streamExpiresInSeconds seconds")
@@ -595,13 +613,13 @@ object YTPlayerUtils {
 
             val videoFallbackClients =
                 listOf(
-                    ANDROID_VR_NO_AUTH,
                     IOS,
-                    MOBILE,
                     TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+                    MOBILE,
                     WEB,
                     WEB_CREATOR,
                     MAIN_CLIENT,
+                    ANDROID_VR_NO_AUTH,
                 )
 
             var audioConfig: PlayerResponse.PlayerConfig.AudioConfig? = null
@@ -644,8 +662,10 @@ object YTPlayerUtils {
                 val chosenVideo = selectLegacyVideoFormat(adaptiveVideos, maxVideoHeight)
                 val chosenAudio = findFormat(response, audioQuality, connectivityManager)
                 if (chosenVideo != null && chosenAudio != null) {
-                    val videoUrl = findUrlOrNull(chosenVideo, videoId)
-                    val audioUrl = findUrlOrNull(chosenAudio, videoId)
+                    val rawVideoUrl = findUrlOrNull(chosenVideo, videoId)
+                    val rawAudioUrl = findUrlOrNull(chosenAudio, videoId)
+                    val videoUrl = rawVideoUrl?.let { prepareLegacyStreamUrl(it, client, webPoToken) }
+                    val audioUrl = rawAudioUrl?.let { prepareLegacyStreamUrl(it, client, webPoToken) }
                     if (!videoUrl.isNullOrBlank() &&
                         !audioUrl.isNullOrBlank() &&
                         validateStatus(videoUrl, headers) &&
@@ -660,6 +680,9 @@ object YTPlayerUtils {
                             streamExpiresInSeconds = expiresIn,
                             streamClient = client.clientName,
                             streamHeaders = headers,
+                            requireBoundedRange = true,
+                            rangeChunkSizeBytes = LEGACY_VIDEO_RANGE_CHUNK_BYTES,
+                            useRangeChunks = true,
                             videoUrl = videoUrl,
                             videoWidth = chosenVideo.width,
                             videoHeight = chosenVideo.height,
@@ -681,7 +704,10 @@ object YTPlayerUtils {
                 val muxedVideos = streamingData.formats.orEmpty().filter { !it.isAudio && (it.height ?: 0) > 0 }
                 val chosenMuxed = selectLegacyVideoFormat(muxedVideos, maxVideoHeight)
                 if (chosenMuxed != null) {
-                    val muxedUrl = findUrlOrNull(chosenMuxed, videoId)
+                    val muxedUrl =
+                        findUrlOrNull(chosenMuxed, videoId)?.let {
+                            prepareLegacyStreamUrl(it, client, webPoToken)
+                        }
                     if (!muxedUrl.isNullOrBlank() && validateStatus(muxedUrl, headers)) {
                         return@runCatching PlaybackData(
                             audioConfig = audioConfig,
@@ -692,6 +718,9 @@ object YTPlayerUtils {
                             streamExpiresInSeconds = expiresIn,
                             streamClient = client.clientName,
                             streamHeaders = headers,
+                            requireBoundedRange = true,
+                            rangeChunkSizeBytes = LEGACY_VIDEO_RANGE_CHUNK_BYTES,
+                            useRangeChunks = true,
                             videoUrl = muxedUrl,
                             videoWidth = chosenMuxed.width,
                             videoHeight = chosenMuxed.height,

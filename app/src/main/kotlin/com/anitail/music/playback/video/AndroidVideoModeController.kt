@@ -8,7 +8,9 @@ import android.os.SystemClock
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.HttpDataSource
 import com.anitail.innertube.models.SongItem
 import com.anitail.music.R
 import com.anitail.music.constants.MusicVideoPlaybackEnabledKey
@@ -21,6 +23,8 @@ import com.anitail.music.models.MediaMetadata
 import com.anitail.music.models.toMediaMetadata
 import com.anitail.music.utils.YTPlayerUtils
 import com.anitail.music.utils.get
+import com.metrolist.innertubex.sabr.SabrFailureKind
+import com.metrolist.innertubex.sabr.findSabrProtocolException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +68,12 @@ class AndroidVideoModeController(
         replaceItem: Boolean,
     ) -> Boolean,
     private val onVideoModeCommitted: (isVideo: Boolean) -> Unit,
+    private val onVideoStreamFailed: (
+        videoId: String,
+        clientName: String?,
+        excludeClient: Boolean,
+        refreshCipher: Boolean,
+    ) -> Unit = { _, _, _, _ -> },
 ) {
     private val _isVideoModeActive = MutableStateFlow(false)
     val isVideoModeActive: StateFlow<Boolean> = _isVideoModeActive.asStateFlow()
@@ -88,6 +98,8 @@ class AndroidVideoModeController(
     private var videoModeSongId: String? = null
     private var videoModePositionMap: CounterpartPositionMap? = null
     private var videoModeOriginalAudio: MediaMetadata? = null
+    private var videoErrorRetryCount = 0
+    private var lastVideoErrorAtMs = 0L
 
     @Volatile
     var isCommittingTransition: Boolean = false
@@ -173,21 +185,85 @@ class AndroidVideoModeController(
         }
     }
 
+    fun handlePlaybackError(error: PlaybackException) {
+        val current = getCurrentMetadata()
+        val failedClient = _currentVideoPlaybackData.value?.streamClient
+
+        val now = SystemClock.elapsedRealtime()
+        if (lastVideoErrorAtMs > 0L && now - lastVideoErrorAtMs >= VIDEO_ERROR_RETRY_WINDOW_MS) {
+            videoErrorRetryCount = 0
+        }
+
+        val sabrError = error.findSabrProtocolException()
+        val httpStatusCode = findHttpResponseCode(error)
+        val (excludeClient, refreshCipher) =
+            when {
+                sabrError?.kind == SabrFailureKind.RELOAD_PLAYER ->
+                    (videoErrorRetryCount > 0) to false
+
+                sabrError != null ->
+                    true to false
+
+                httpStatusCode == 403 || httpStatusCode == 410 ->
+                    true to true
+
+                else ->
+                    (videoErrorRetryCount > 0) to false
+            }
+
+        if (current != null) {
+            onVideoStreamFailed(current.id, failedClient, excludeClient, refreshCipher)
+        }
+
+        if (current != null && videoErrorRetryCount < MAX_VIDEO_RETRIES) {
+            videoErrorRetryCount++
+            lastVideoErrorAtMs = now
+            Timber.tag(TAG).w(
+                error,
+                "Video playback error for ${current.id} (client=$failedClient, sabr=${sabrError?.kind}, http=$httpStatusCode); retrying ($videoErrorRetryCount/$MAX_VIDEO_RETRIES)",
+            )
+            requestVideoMode(
+                wantVideo = true,
+                silent = true,
+                forceReloadSameQuality = true,
+                preservePositionMs = getCurrentPositionMs(),
+                forcePlayWhenReady = getPlayWhenReady(),
+            )
+        } else {
+            fallbackToAudioOnError()
+        }
+    }
+
     fun fallbackToAudioOnError() {
         val current = getCurrentMetadata()
         Timber.tag(TAG).w("Video playback error for ${current?.id}; falling back to audio mode")
         _videoErrorEvent.tryEmit(context.getString(R.string.music_video_unavailable))
-        if (current != null && _isVideoModeActive.value) {
+        val hasRegisteredSpec = current != null && videoMediaSourceFactory.hasVideoSpec(current.id)
+        if (current != null && (_isVideoModeActive.value || hasRegisteredSpec)) {
             requestVideoMode(wantVideo = false, silent = true)
         } else {
             clearVideoMode(resetViewerPreference = false)
         }
     }
 
+    private fun findHttpResponseCode(error: Throwable): Int? {
+        val visited = mutableSetOf<Throwable>()
+        var current: Throwable? = error
+        while (current != null && visited.add(current)) {
+            if (current is HttpDataSource.InvalidResponseCodeException) {
+                return current.responseCode
+            }
+            current = current.cause
+        }
+        return null
+    }
+
     private fun requestVideoMode(
         wantVideo: Boolean,
         silent: Boolean,
         forceReloadSameQuality: Boolean = false,
+        preservePositionMs: Long? = null,
+        forcePlayWhenReady: Boolean? = null,
     ) {
         if (wantVideo && !dataStore.get(MusicVideoPlaybackEnabledKey, true)) return
         if (!isVideoPlaybackAllowed()) return
@@ -221,7 +297,7 @@ class AndroidVideoModeController(
                     var positionMap: CounterpartPositionMap? = null
 
                     if (wantVideo) {
-                        if (!sourceMetadata.isVideoSong && !isPodcastEpisode) {
+                        if (!sourceMetadata.isVideoSong && !isPodcastEpisode && !(wasVideoModeActive && forceReloadSameQuality)) {
                             when (val result = withContext(Dispatchers.IO) { musicVideoResolver.resolveMusicVideo(sourceMetadata.toSongItem()) }) {
                                 is MusicVideoResult.Found -> {
                                     Timber.tag(TAG).d(
@@ -273,7 +349,9 @@ class AndroidVideoModeController(
                         if (!isCurrentTarget(generation, expectedInstanceId, expectedSourceId)) return@launch
                         if (playbackData == null || !playbackData.hasVideo) {
                             Timber.tag(TAG).w("No playable video stream for ${targetMetadata.id}")
-                            if (!silent) {
+                            if (wasVideoModeActive || forceReloadSameQuality) {
+                                fallbackToAudioOnError()
+                            } else if (!silent) {
                                 _videoErrorEvent.tryEmit(context.getString(R.string.music_video_unavailable))
                             }
                             return@launch
@@ -281,11 +359,11 @@ class AndroidVideoModeController(
 
                         val transitionPositionMap =
                             positionMap.takeUnless { wasVideoModeActive && forceReloadSameQuality }
-                        val currentPosMs = getCurrentPositionMs()
+                        val currentPosMs = preservePositionMs ?: getCurrentPositionMs()
                         val targetPosMs = (transitionPositionMap?.mapPosition(currentPosMs) ?: currentPosMs).coerceAtLeast(0L)
-                        val resumePlayback = getPlayWhenReady()
+                        val resumePlayback = forcePlayWhenReady ?: getPlayWhenReady()
 
-                        videoMediaSourceFactory.register(targetMetadata.id, playbackData)
+                        videoMediaSourceFactory.register(targetMetadata.id, playbackData, initialPositionMs = targetPosMs)
 
                         isCommittingTransition = true
                         val committed =
@@ -302,6 +380,9 @@ class AndroidVideoModeController(
 
                         if (!committed) {
                             videoMediaSourceFactory.clear(targetMetadata.id)
+                            if (wasVideoModeActive || forceReloadSameQuality) {
+                                fallbackToAudioOnError()
+                            }
                             return@launch
                         }
 
@@ -351,10 +432,10 @@ class AndroidVideoModeController(
 
                         if (!isCurrentTarget(generation, expectedInstanceId, expectedSourceId)) return@launch
 
-                        val currentPosMs = getCurrentPositionMs()
+                        val currentPosMs = preservePositionMs ?: getCurrentPositionMs()
                         val mappedPosMs = positionMap?.mapPosition(currentPosMs) ?: currentPosMs
                         val clampedPosMs = clampPlaybackPositionToDuration(mappedPosMs, targetMetadata.duration)
-                        val resumePlayback = getPlayWhenReady()
+                        val resumePlayback = forcePlayWhenReady ?: getPlayWhenReady()
 
                         videoMediaSourceFactory.clear(sourceMetadata.id)
                         videoMediaSourceFactory.clear(targetMetadata.id)
@@ -386,12 +467,16 @@ class AndroidVideoModeController(
                     throw e
                 } catch (e: Exception) {
                     Timber.tag(TAG).w(e, "Video mode transition failed wantVideo=$wantVideo")
-                    if (!silent && isCurrentTarget(generation, expectedInstanceId, expectedSourceId)) {
-                        _videoErrorEvent.tryEmit(
-                            context.getString(
-                                if (wantVideo) R.string.music_video_unavailable else R.string.music_track_unavailable,
-                            ),
-                        )
+                    if (isCurrentTarget(generation, expectedInstanceId, expectedSourceId)) {
+                        if (wantVideo && (wasVideoModeActive || forceReloadSameQuality)) {
+                            fallbackToAudioOnError()
+                        } else if (!silent) {
+                            _videoErrorEvent.tryEmit(
+                                context.getString(
+                                    if (wantVideo) R.string.music_video_unavailable else R.string.music_track_unavailable,
+                                ),
+                            )
+                        }
                     }
                 } finally {
                     if (generation == videoModeGeneration) {
@@ -402,6 +487,7 @@ class AndroidVideoModeController(
     }
 
     private suspend fun runSabrAutoQuality() {
+        var lastInstanceId = -1L
         var lastPositionMs = -1L
         var bufferingSinceMs: Long? = null
         var nextDecisionAtMs = 0L
@@ -423,6 +509,16 @@ class AndroidVideoModeController(
                     lastPositionMs = -1L
                 }
                 eligible
+            }
+
+            val activeInstanceId = _playbackInstanceId.value
+            if (activeInstanceId != lastInstanceId) {
+                lastInstanceId = activeInstanceId
+                bufferingSinceMs = null
+                lastPositionMs = -1L
+                val instanceNow = SystemClock.elapsedRealtime()
+                nextDecisionAtMs = instanceNow + AUTO_QUALITY_INITIAL_GRACE_MS
+                upswitchBlockedUntilMs = instanceNow + AUTO_QUALITY_INITIAL_GRACE_MS
             }
 
             delay(AUTO_QUALITY_POLL_MS)
@@ -475,14 +571,15 @@ class AndroidVideoModeController(
                 ) ?: continue
 
             val upswitch = next.height > currentHeight
+            val switchPositionMs = getCurrentPositionMs()
             val updatedData = resource.withSabrVideoVariant(next)
-            videoMediaSourceFactory.register(currentMetadata.id, updatedData)
+            videoMediaSourceFactory.register(currentMetadata.id, updatedData, initialPositionMs = switchPositionMs)
             isCommittingTransition = true
             val committed =
                 try {
                     commitMediaReplacement(
                         currentMetadata,
-                        getCurrentPositionMs(),
+                        switchPositionMs,
                         getPlayWhenReady(),
                         false,
                     )
@@ -494,6 +591,8 @@ class AndroidVideoModeController(
             bufferingSinceMs = null
             if (committed) {
                 _currentVideoPlaybackData.value = updatedData
+            } else {
+                videoMediaSourceFactory.register(currentMetadata.id, resource, initialPositionMs = switchPositionMs)
             }
             if (upswitch && committed) {
                 upswitchBackoffMs = UPSWITCH_BACKOFF_MS
@@ -549,6 +648,8 @@ class AndroidVideoModeController(
         videoModeSongId = null
         videoModePositionMap = null
         videoModeOriginalAudio = null
+        videoErrorRetryCount = 0
+        lastVideoErrorAtMs = 0L
         _currentVideoPlaybackData.value = null
         _isVideoModeActive.value = false
         _isVideoModeResolving.value = false
@@ -577,11 +678,14 @@ class AndroidVideoModeController(
     companion object {
         private const val TAG = "AndroidVideoMode"
         private const val AUTO_QUALITY_POLL_MS = 2_000L
+        private const val AUTO_QUALITY_INITIAL_GRACE_MS = 10_000L
         private const val AUTO_QUALITY_COOLDOWN_MS = 15_000L
-        private const val STALL_MS = 4_000L
+        private const val STALL_MS = 6_000L
         private const val UPSWITCH_BACKOFF_MS = 60_000L
         private const val MAX_UPSWITCH_BACKOFF_MS = 600_000L
         private const val SEEK_JUMP_MS = 5_000L
         private const val DEFAULT_ESTIMATED_BANDWIDTH_BPS = 4_000_000L
+        private const val MAX_VIDEO_RETRIES = 2
+        private const val VIDEO_ERROR_RETRY_WINDOW_MS = 30_000L
     }
 }

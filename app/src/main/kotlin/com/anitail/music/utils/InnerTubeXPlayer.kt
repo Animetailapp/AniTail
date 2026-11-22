@@ -270,7 +270,7 @@ object InnerTubeXPlayer {
             Result.failure(error)
         }
 
-    fun sabrHttpClient(): HttpClient = YouTube.extractionTransport().httpClient
+    fun sabrHttpClient(): HttpClient = YouTube.extractionTransport().sabrHttpClient
 
     fun innertubeLogger(): InnerTubeLogger = logger
 
