@@ -1200,4 +1200,39 @@
     <string name="artist_photo_view_author">Ver el perfil de Last.fm de quien ha subido el contenido</string>
     <string name="saved">Guardado</string>
     <string name="action_download">Descargar</string>
+
+    <!-- Expressive Library -->
+    <string name="chip_content_description">%1$s, chip</string>
+    <string name="tracks">Canciones</string>
+    <string name="podcasts">Podcasts</string>
+    <string name="filter_local">Local</string>
+    <string name="my_top_100">Mi top 100</string>
+    <string name="uploaded_playlist_name">Subidas</string>
+    <string name="library_favorite_songs">Canciones favoritas</string>
+    <string name="library_offline_songs">Canciones sin conexión</string>
+    <string name="library_top_songs">Tus canciones más escuchadas</string>
+    <string name="library_cached_songs">Canciones en caché</string>
+    <string name="library_uploaded_songs">Tus canciones subidas</string>
+    <string name="library_local_songs">Canciones locales</string>
+    <string name="library_empty">Tu biblioteca está vacía</string>
+    <string name="library_load_failed">No se pudo cargar tu biblioteca. Comprueba tu conexión y vuelve a intentarlo.</string>
+    <string name="search_no_results">No se han encontrado resultados</string>
+    <string name="new_playlist">Nueva playlist</string>
+    <string name="hide_from_library_local">Ocultar localmente</string>
+    <string name="hidden_library_items">Elementos ocultos de la biblioteca</string>
+    <string name="restore_hidden_library_items">Restaurar elementos ocultos</string>
+    <string name="library_sort_updated">Actualizado</string>
+    <string name="history_sort_listening_time">Tiempo de escucha</string>
+    <string name="manual">Manual</string>
+    <string name="sort_options">Opciones de orden</string>
+    <string name="grid_view">Cuadrícula</string>
+    <string name="list_view">Lista</string>
+    <string name="playlist_direction_ascending">Dirección: ascendente</string>
+    <string name="playlist_direction_descending">Dirección: descendente</string>
+    <string name="playlist_reorder">Reordenar</string>
+    <string name="move_to_top">Mover al principio</string>
+    <string name="move_up">Subir</string>
+    <string name="move_down">Bajar</string>
+    <string name="move_to_bottom">Mover al final</string>
+    <string name="show_uploaded_playlist">Mostrar lista de subidas</string>
 </resources>

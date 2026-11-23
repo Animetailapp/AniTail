@@ -264,6 +264,11 @@ val ShowDownloadedPlaylistKey = booleanPreferencesKey("show_downloaded_playlist"
 val ShowTopPlaylistKey = booleanPreferencesKey("show_top_playlist")
 val ShowCachedPlaylistKey = booleanPreferencesKey("show_cached_playlist")
 val ShowLocalPlaylistKey = booleanPreferencesKey("show_local_playlist")
+val ShowUploadedPlaylistKey = booleanPreferencesKey("show_uploaded_playlist")
+val LibraryGridColumnsKey = intPreferencesKey("library_grid_columns")
+val LibraryManualOrderKey = stringPreferencesKey("library_manual_order")
+val LibraryHiddenItemsKey = stringPreferencesKey("library_hidden_items")
+val LibrarySortingMapKey = stringPreferencesKey("library_sorting_map")
 
 enum class LibraryViewType {
     LIST,
