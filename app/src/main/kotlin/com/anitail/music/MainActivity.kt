@@ -894,28 +894,38 @@ class MainActivity : AppCompatActivity() {
                                 if (shouldShowTopBar) {
                                     TopAppBar(
                                         title = {
-                                            if (navBackStackEntry?.destination?.route == Screens.Library.route) {
-                                                Text(
-                                                    text = stringResource(R.string.filter_library),
-                                                    style = MaterialTheme.typography.titleLarge,
-                                                    fontWeight = FontWeight.Bold,
-                                                )
-                                            } else {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Image(
-                                                        painter = painterResource(R.drawable.ic_anitail),
-                                                        contentDescription = "App Logo",
-                                                        modifier = Modifier
-                                                            .size(22.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(8.dp))
+                                            when (navBackStackEntry?.destination?.route) {
+                                                Screens.Library.route -> {
                                                     Text(
-                                                        text = stringResource(R.string.app_name),
+                                                        text = stringResource(R.string.filter_library),
                                                         style = MaterialTheme.typography.titleLarge,
-                                                        fontWeight = FontWeight.Bold
+                                                        fontWeight = FontWeight.Bold,
                                                     )
+                                                }
+                                                Screens.Explore.route -> {
+                                                    Text(
+                                                        text = stringResource(R.string.explore),
+                                                        style = MaterialTheme.typography.titleLarge,
+                                                        fontWeight = FontWeight.Bold,
+                                                    )
+                                                }
+                                                else -> {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Image(
+                                                            painter = painterResource(R.drawable.ic_anitail),
+                                                            contentDescription = "App Logo",
+                                                            modifier = Modifier
+                                                                .size(22.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(
+                                                            text = stringResource(R.string.app_name),
+                                                            style = MaterialTheme.typography.titleLarge,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
                                                 }
                                             }
                                         },

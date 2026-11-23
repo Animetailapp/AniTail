@@ -1305,4 +1305,5 @@
     <string name="move_down">Move down</string>
     <string name="move_to_bottom">Move to bottom</string>
     <string name="show_uploaded_playlist">Show uploaded playlist</string>
+    <string name="videos">Videos</string>
 </resources>
