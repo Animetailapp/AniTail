@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -82,6 +84,7 @@ import com.anitail.music.constants.ShowCachedPlaylistKey
 import com.anitail.music.constants.ShowDownloadedPlaylistKey
 import com.anitail.music.constants.ShowLikedPlaylistKey
 import com.anitail.music.constants.ShowTopPlaylistKey
+import com.anitail.music.constants.ShowUploadedPlaylistKey
 import com.anitail.music.constants.SliderStyle
 import com.anitail.music.constants.SliderStyleKey
 import com.anitail.music.constants.SlimNavBarKey
@@ -296,6 +299,10 @@ fun AppearanceSettings(
     )
     val (showCachedPlaylist, onShowCachedPlaylistChange) = rememberPreference(
         ShowCachedPlaylistKey,
+        defaultValue = true
+    )
+    val (showUploadedPlaylist, onShowUploadedPlaylistChange) = rememberPreference(
+        ShowUploadedPlaylistKey,
         defaultValue = true
     )
 
@@ -1021,6 +1028,13 @@ fun AppearanceSettings(
             icon = { Icon(painterResource(R.drawable.cached), null) },
             checked = showCachedPlaylist,
             onCheckedChange = onShowCachedPlaylistChange
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.show_uploaded_playlist)) },
+            icon = { Icon(Icons.Outlined.CloudUpload, null) },
+            checked = showUploadedPlaylist,
+            onCheckedChange = onShowUploadedPlaylistChange
         )
     }
 
