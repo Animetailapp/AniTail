@@ -2,10 +2,14 @@ package com.anitail.music.playback.queues
 
 import androidx.media3.common.MediaItem
 import com.anitail.music.extensions.metadata
+import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.models.MediaMetadata
 
 interface Queue {
     val preloadItem: MediaMetadata?
+
+    val preloadMediaItem: MediaItem?
+        get() = preloadItem?.toMediaItem()
 
     suspend fun getInitialStatus(): Status
 

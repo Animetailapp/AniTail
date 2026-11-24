@@ -333,9 +333,9 @@ fun CachePlaylistScreen(
                                             playerConnection.player.togglePlayPause()
                                         } else {
                                             playerConnection.playQueue(
-                                                ListQueue(
+                                                ListQueue.fromSongs(
                                                     title = "Cache Songs",
-                                                    items = cachedSongs.map { it.toMediaItem() },
+                                                    songs = cachedSongs,
                                                     startIndex = cachedSongs.indexOfFirst { it.id == songWrapper.item.id }
                                                 )
                                             )

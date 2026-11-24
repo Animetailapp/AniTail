@@ -410,10 +410,13 @@ fun BottomSheetPlayer(
     val defaultGradientColors =
         listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surfaceVariant)
 
-    LaunchedEffect(mediaMetadata?.id, playerBackground) {
+    val isSheetExpandedAboveCollapsed = state.value > state.collapsedBound
+
+    LaunchedEffect(mediaMetadata?.id, playerBackground, isSheetExpandedAboveCollapsed) {
         if (useBlackBackground && playerBackground != PlayerBackgroundStyle.BLUR) {
             gradientColors = listOf(Color.Black, Color.Black)
         } else if (playerBackground == PlayerBackgroundStyle.GRADIENT) {
+            if (!isSheetExpandedAboveCollapsed) return@LaunchedEffect
             val currentMetadata = mediaMetadata
             if (currentMetadata != null && currentMetadata.thumbnailUrl != null) {
                 // Check cache first
@@ -422,69 +425,62 @@ fun BottomSheetPlayer(
                     gradientColors = cachedColors
                 } else {
                     try {
-                        val request = ImageRequest.Builder(context)
-                            .data(currentMetadata.thumbnailUrl)
-                            .size(Size(200, 200)) // Larger size for better color extraction
-                            .allowHardware(false)
-                            .memoryCacheKey("gradient_${currentMetadata.id}") // Use consistent cache key with prefix
-                            .build()
+                        val extractedColors = withContext(Dispatchers.IO) {
+                            val request = ImageRequest.Builder(context)
+                                .data(currentMetadata.thumbnailUrl)
+                                .size(Size(160, 160))
+                                .allowHardware(false)
+                                .memoryCacheKey("gradient_${currentMetadata.id}")
+                                .build()
 
-                        val result = context.imageLoader.execute(request).drawable
-                        if (result != null) {
-                            val bitmap = result.toBitmap()
-                            val palette = withContext(Dispatchers.Default) {
-                                Palette.from(bitmap)
-                                    .maximumColorCount(16) // Increase color count for better extraction
-                                    .generate()
-                            }
+                            val drawable = context.imageLoader.execute(request).drawable
+                            if (drawable != null) {
+                                withContext(Dispatchers.Default) {
+                                    val bitmap = drawable.toBitmap()
+                                    val palette = Palette.from(bitmap)
+                                        .maximumColorCount(16)
+                                        .generate()
 
-                            // Try multiple extraction methods for better color quality
-                            palette.vibrantSwatch?.rgb?.let { Color(it) }
-                            palette.lightVibrantSwatch?.rgb?.let { Color(it) }
-                            palette.darkVibrantSwatch?.rgb?.let { Color(it) }
-                            val dominantColor = palette.dominantSwatch?.rgb?.let { Color(it) }
-                            palette.mutedSwatch?.rgb?.let { Color(it) }
-                            palette.lightMutedSwatch?.rgb?.let { Color(it) }
+                                    val dominantColor = palette.dominantSwatch?.rgb?.let { Color(it) }
+                                    fun isColorDark(color: Color): Boolean {
+                                        val yiq =
+                                            ((color.red * 255) * 299 + (color.green * 255) * 587 + (color.blue * 255) * 114) / 1000
+                                        return yiq < 128
+                                    }
 
-                            fun isColorDark(color: Color): Boolean {
-                                // YIQ formula to determine brightness
-                                val yiq =
-                                    ((color.red * 255) * 299 + (color.green * 255) * 587 + (color.blue * 255) * 114) / 1000
-                                return yiq < 128
-                            }
-
-                            val extractedColors = if (dominantColor != null) {
-                                if (isColorDark(dominantColor)) {
-                                    listOf(
-                                        dominantColor,
-                                        Color(
-                                            red = (dominantColor.red + 0.2f).coerceAtMost(1f),
-                                            green = (dominantColor.green + 0.2f).coerceAtMost(1f),
-                                            blue = (dominantColor.blue + 0.2f).coerceAtMost(1f),
-                                            alpha = dominantColor.alpha
-                                        )
-                                    )
-                                } else {
-                                    listOf(
-                                        dominantColor,
-                                        Color(
-                                            red = (dominantColor.red - 0.2f).coerceAtLeast(0f),
-                                            green = (dominantColor.green - 0.2f).coerceAtLeast(0f),
-                                            blue = (dominantColor.blue - 0.2f).coerceAtLeast(0f),
-                                            alpha = dominantColor.alpha
-                                        )
-                                    )
+                                    if (dominantColor != null) {
+                                        if (isColorDark(dominantColor)) {
+                                            listOf(
+                                                dominantColor,
+                                                Color(
+                                                    red = (dominantColor.red + 0.2f).coerceAtMost(1f),
+                                                    green = (dominantColor.green + 0.2f).coerceAtMost(1f),
+                                                    blue = (dominantColor.blue + 0.2f).coerceAtMost(1f),
+                                                    alpha = dominantColor.alpha,
+                                                ),
+                                            )
+                                        } else {
+                                            listOf(
+                                                dominantColor,
+                                                Color(
+                                                    red = (dominantColor.red - 0.2f).coerceAtLeast(0f),
+                                                    green = (dominantColor.green - 0.2f).coerceAtLeast(0f),
+                                                    blue = (dominantColor.blue - 0.2f).coerceAtLeast(0f),
+                                                    alpha = dominantColor.alpha,
+                                                ),
+                                            )
+                                        }
+                                    } else {
+                                        defaultGradientColors
+                                    }
                                 }
                             } else {
                                 defaultGradientColors
                             }
-
-                            // Cache the extracted colors
-                            gradientColorsCache[currentMetadata.id] = extractedColors
-                            gradientColors = extractedColors
-                        } else {
-                            gradientColors = defaultGradientColors
                         }
+
+                        gradientColorsCache[currentMetadata.id] = extractedColors
+                        gradientColors = extractedColors
                     } catch (e: Exception) {
                         gradientColors = defaultGradientColors
                         e.printStackTrace()
@@ -1827,7 +1823,18 @@ fun BottomSheetPlayer(
 
                             Box(
                                 contentAlignment = Alignment.Center,
-                                modifier = Modifier.weight(1f),
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .then(
+                                            if (showLyrics && !(isFullScreen && hideStatusBarOnFullscreen)) {
+                                                Modifier.windowInsetsPadding(
+                                                    WindowInsets.systemBars.only(WindowInsetsSides.Top)
+                                                )
+                                            } else {
+                                                Modifier
+                                            }
+                                        ),
                             ) {
                                 val screenWidth = LocalConfiguration.current.screenWidthDp
                                 val thumbnailSize = (screenWidth * 0.4).dp
@@ -1894,7 +1901,7 @@ fun BottomSheetPlayer(
                         ) {
                             Spacer(Modifier.weight(1f))
 
-                            if (showVideoButton) {
+                            if (showVideoButton && !showLyrics) {
                                 AudioVideoModeSwitcher(
                                     useNewPlayerDesign = useNewPlayerDesign,
                                     isVideoActive = isVideoModeActive,
@@ -1972,7 +1979,7 @@ fun BottomSheetPlayer(
                             }
                         }
 
-                        AnimatedVisibility(visible = showVideoButton && !isFullScreen) {
+                        AnimatedVisibility(visible = showVideoButton && !isFullScreen && !showLyrics) {
                             Box(
                                 contentAlignment = Alignment.Center,
                                 modifier =
@@ -1993,7 +2000,18 @@ fun BottomSheetPlayer(
 
                         Box(
                             contentAlignment = Alignment.Center,
-                            modifier = Modifier.weight(1f),
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .then(
+                                        if (showLyrics && !(isFullScreen && hideStatusBarOnFullscreen)) {
+                                            Modifier.windowInsetsPadding(
+                                                WindowInsets.systemBars.only(WindowInsetsSides.Top)
+                                            )
+                                        } else {
+                                            Modifier
+                                        }
+                                    ),
                         ) {
                             AnimatedContent(
                                 targetState = showLyrics to showEmbeddedVideo,

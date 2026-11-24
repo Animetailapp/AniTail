@@ -494,6 +494,8 @@ class MainActivity : AppCompatActivity() {
                 mutableStateOf(DefaultThemeColor)
             }
 
+            val themeColorCache = remember { android.util.LruCache<String, Color>(64) }
+
             LaunchedEffect(
                 playerConnection,
                 enableDynamicTheme,
@@ -524,32 +526,50 @@ class MainActivity : AppCompatActivity() {
                 }
                 // Cache para evitar reprocesar la misma imagen
                 var lastThumbnailUrl: String? = null
-                
+
                 playerConnection.service.currentMediaMetadata.collectLatest { song ->
-                    themeColor =
-                        if (song != null && song.thumbnailUrl != lastThumbnailUrl) {
-                            lastThumbnailUrl = song.thumbnailUrl
-                            withContext(Dispatchers.IO) {
-                                runCatching {
-                                    val result =
-                                        imageLoader.execute(
-                                            ImageRequest
-                                                .Builder(this@MainActivity)
-                                                .data(song.thumbnailUrl)
-                                                .allowHardware(false) // pixel access is not supported on Config#HARDWARE bitmaps
-                                                .diskCachePolicy(coil.request.CachePolicy.ENABLED) // Cache para mejor rendimiento
-                                                .build(),
-                                        )
-                                    (result.drawable as? BitmapDrawable)?.bitmap?.extractThemeColor()
-                                        ?: DefaultThemeColor
-                                }.getOrElse { DefaultThemeColor }
-                            }
-                        } else if (song == null) {
-                            lastThumbnailUrl = null
-                            DefaultThemeColor
-                        } else {
-                            themeColor // Mantener color actual si es la misma imagen
+                    val thumbnailUrl = song?.thumbnailUrl
+                    if (song == null || thumbnailUrl == null) {
+                        lastThumbnailUrl = null
+                        if (themeColor != DefaultThemeColor) {
+                            themeColor = DefaultThemeColor
                         }
+                    } else if (thumbnailUrl != lastThumbnailUrl) {
+                        lastThumbnailUrl = thumbnailUrl
+                        // Permitir que el ripple táctil, el MiniPlayer y el inicio del reproductor
+                        // completen sus primeros frames antes de recomponer el tema global.
+                        delay(150)
+                        val cached = themeColorCache.get(thumbnailUrl)
+                        val nextColor =
+                            cached
+                                ?: withContext(Dispatchers.IO) {
+                                    runCatching {
+                                        val result =
+                                            imageLoader.execute(
+                                                ImageRequest
+                                                    .Builder(this@MainActivity)
+                                                    .data(thumbnailUrl)
+                                                    .size(112, 112)
+                                                    .allowHardware(false)
+                                                    .diskCachePolicy(coil.request.CachePolicy.ENABLED)
+                                                    .build(),
+                                            )
+                                        val bitmap = (result.drawable as? BitmapDrawable)?.bitmap
+                                        if (bitmap != null) {
+                                            withContext(Dispatchers.Default) {
+                                                bitmap.extractThemeColor()
+                                            }
+                                        } else {
+                                            DefaultThemeColor
+                                        }
+                                    }.getOrElse { DefaultThemeColor }
+                                }.also { extracted ->
+                                    themeColorCache.put(thumbnailUrl, extracted)
+                                }
+                        if (themeColor != nextColor) {
+                            themeColor = nextColor
+                        }
+                    }
                 }
             }
 

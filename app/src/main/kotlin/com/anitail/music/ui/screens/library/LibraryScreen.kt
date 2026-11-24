@@ -676,9 +676,9 @@ fun LibraryScreen(
                                                         val songIndex = queueSongs.indexOfFirst { it.id == entry.song.id }
                                                             .coerceAtLeast(0)
                                                         conn.playQueue(
-                                                            ListQueue(
+                                                            ListQueue.fromSongs(
                                                                 title = queueAllSongsTitle,
-                                                                items = queueSongs.map { it.toMediaItem() },
+                                                                songs = queueSongs,
                                                                 startIndex = songIndex,
                                                             ),
                                                         )
