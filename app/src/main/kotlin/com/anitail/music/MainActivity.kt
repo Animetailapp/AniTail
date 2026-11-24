@@ -63,7 +63,9 @@ import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.contentColorFor
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -79,6 +81,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -873,21 +876,11 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
-                    val activeConn = playerConnection
-                    val pipIsPlaying = activeConn?.isPlaying?.collectAsState()?.value ?: false
-                    val pipVideoSize = activeConn?.videoSize?.collectAsState()?.value ?: VideoSize.UNKNOWN
-                    val pipIsVideoMode = activeConn?.isVideoModeActive?.collectAsState()?.value ?: false
-                    val pipMediaMetadata = activeConn?.mediaMetadata?.collectAsState()?.value
-
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        LaunchedEffect(pipIsPlaying, pipVideoSize, pipIsVideoMode) {
-                            PictureInPictureHelper.updatePictureInPictureParams(
-                                activity = this@MainActivity,
-                                isPlaying = pipIsPlaying,
-                                videoSize = pipVideoSize,
-                                hasVideo = pipIsVideoMode,
-                            )
-                        }
+                        PipParamsObserverEffect(
+                            activity = this@MainActivity,
+                            playerConnection = playerConnection,
+                        )
                     }
 
                     CompositionLocalProvider(
@@ -901,43 +894,6 @@ class MainActivity : AppCompatActivity() {
                         LocalSyncUtils provides syncUtils,
                         LocalIsInPipMode provides isInPipModeState.value,
                     ) {
-                        val (accountName) = rememberPreference(AccountNameKey, defaultValue = "")
-                        val (accountEmail) = rememberPreference(AccountEmailKey, defaultValue = "")
-                        val (accountChannelHandle) = rememberPreference(AccountChannelHandleKey, defaultValue = "")
-                        val (innerTubeCookie, onInnerTubeCookieChange) = rememberPreference(InnerTubeCookieKey, defaultValue = "")
-                        val (accountImageUrl) = rememberPreference(AccountImageUrlKey, defaultValue = "")
-                        val (discordAvatarUrl) = rememberPreference(DiscordAvatarUrlKey, defaultValue = "")
-                        val (discordUsername) = rememberPreference(DiscordUsernameKey, defaultValue = "")
-                        val (discordName) = rememberPreference(DiscordNameKey, defaultValue = "")
-                        val (preferredAvatarSource) = rememberEnumPreference(
-                            PreferredAvatarSourceKey,
-                            defaultValue = AvatarSource.YOUTUBE
-                        )
-                        val isYouTubeSignedIn = remember(innerTubeCookie) {
-                            "SAPISID" in parseCookieString(innerTubeCookie)
-                        }
-                        val avatarUrl = when (preferredAvatarSource) {
-                            AvatarSource.YOUTUBE -> accountImageUrl
-                            AvatarSource.DISCORD -> discordAvatarUrl
-                        }
-                        val accountDisplayName = when (preferredAvatarSource) {
-                            AvatarSource.YOUTUBE -> accountName.takeUnless { it.isBlank() || it == "Guest" }
-                                ?: discordUsername.takeIf { it.isNotBlank() }?.let { "@$it" }
-                                ?: ""
-                            AvatarSource.DISCORD -> discordName.takeIf { it.isNotBlank() }
-                                ?: discordUsername.takeIf { it.isNotBlank() }?.let { "@$it" }
-                                ?: accountName.takeUnless { it.isBlank() || it == "Guest" }
-                                ?: ""
-                        }
-                        val accountSubtitleHandle = when (preferredAvatarSource) {
-                            AvatarSource.YOUTUBE -> accountChannelHandle.ifBlank { accountEmail }
-                            AvatarSource.DISCORD -> discordUsername.takeIf { it.isNotBlank() }?.let { "@$it" }
-                                ?: accountChannelHandle.ifBlank { accountEmail }
-                        }
-                        val isAccountMenuSignedIn = isYouTubeSignedIn || discordUsername.isNotBlank()
-                        val hasUpdate = latestVersionName != BuildConfig.VERSION_NAME
-                        var showAccountMenu by rememberSaveable { mutableStateOf(false) }
-
                         var lastTapTime by remember { mutableLongStateOf(0L) }
                         var lastTappedIcon by remember { mutableStateOf<Int?>(null) }
                         var navigateToExplore by remember { mutableStateOf(false) }
@@ -992,39 +948,15 @@ class MainActivity : AppCompatActivity() {
                         Scaffold(
                             topBar = {
                                 if (shouldShowTopBar) {
-                                    ExpressiveMainTopAppBar(
+                                    MainTopAppBarSection(
                                         currentRoute = navBackStackEntry?.destination?.route,
+                                        latestVersionName = latestVersionName,
                                         pureBlack = pureBlack,
-                                        hasUpdate = hasUpdate,
-                                        avatarUrl = avatarUrl,
                                         scrollBehavior = searchBarScrollBehavior,
                                         onHistoryClick = { navController.navigate("history") },
                                         onSearchClick = { onActiveChange(true) },
-                                        onAvatarClick = { showAccountMenu = true },
-                                        accountMenuContent = {
-                                            if (showAccountMenu) {
-                                                ExpressiveAccountMenuPopup(
-                                                    displayName = accountDisplayName,
-                                                    accountHandle = accountSubtitleHandle,
-                                                    accountEmail = accountEmail,
-                                                    isYouTubeSignedIn = isYouTubeSignedIn,
-                                                    isSignedIn = isAccountMenuSignedIn,
-                                                    avatarUrl = avatarUrl,
-                                                    hasUpdate = hasUpdate,
-                                                    pureBlack = pureBlack,
-                                                    onDismiss = { showAccountMenu = false },
-                                                    onNavigate = { route ->
-                                                        showAccountMenu = false
-                                                        navController.navigate(route)
-                                                    },
-                                                    onLogout = {
-                                                        showAccountMenu = false
-                                                        onInnerTubeCookieChange("")
-                                                        App.forgetAccount(this@MainActivity)
-                                                    },
-                                                )
-                                            }
-                                        },
+                                        onNavigate = { route -> navController.navigate(route) },
+                                        onLogout = { App.forgetAccount(this@MainActivity) },
                                     )
                                 }
                                 if (active || navBackStackEntry?.destination?.route?.startsWith(
@@ -1262,11 +1194,14 @@ class MainActivity : AppCompatActivity() {
                                             pureBlack -> Color.Black
                                             else -> MaterialTheme.colorScheme.surfaceContainer
                                         }
-                                        val insetBg = if (playerBottomSheetState.progress > 0f) Color.Transparent else baseBg
 
                                         Box(
                                             modifier = Modifier
-                                                .background(insetBg)
+                                                .drawBehind {
+                                                    if (playerBottomSheetState.progress <= 0f && baseBg.alpha > 0f) {
+                                                        drawRect(baseBg)
+                                                    }
+                                                }
                                                 .fillMaxWidth()
                                                 .align(Alignment.BottomCenter)
                                                 .height(bottomInsetDp)
@@ -1442,32 +1377,10 @@ class MainActivity : AppCompatActivity() {
                         }
 
                         if (isInPipModeState.value) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black),
-                            ) {
-                                if (pipIsVideoMode && activePlayer != null) {
-                                    MusicVideoSurface(
-                                        player = activePlayer,
-                                        artworkUrl = pipMediaMetadata?.thumbnailUrl,
-                                        cornerRadius = 0.dp,
-                                        fillContainer = false,
-                                        useSurfaceView = true,
-                                        showControls = false,
-                                        isPip = true,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                } else {
-                                    AsyncImage(
-                                        model = pipMediaMetadata?.thumbnailUrl,
-                                        contentDescription = null,
-                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize(),
-                                    )
-                                }
-                            }
+                            MainPipOverlay(
+                                playerConnection = playerConnection,
+                                activePlayer = activePlayer,
+                            )
                         }
                     }
 
@@ -1753,3 +1666,145 @@ val LocalDownloadUtil = staticCompositionLocalOf<DownloadUtil> { error("No Downl
 val LocalSyncUtils = staticCompositionLocalOf<SyncUtils> { error("No SyncUtils provided") }
 val LocalDownloadLibraryRepository =
     staticCompositionLocalOf<DownloadLibraryRepository> { error("No DownloadLibraryRepository provided") }
+
+@RequiresApi(Build.VERSION_CODES.O)
+@Composable
+private fun PipParamsObserverEffect(
+    activity: AppCompatActivity,
+    playerConnection: PlayerConnection?,
+) {
+    val activeConn = playerConnection ?: return
+    val pipIsPlaying by activeConn.isPlaying.collectAsState()
+    val pipVideoSize by activeConn.videoSize.collectAsState()
+    val pipIsVideoMode by activeConn.isVideoModeActive.collectAsState()
+
+    LaunchedEffect(pipIsPlaying, pipVideoSize, pipIsVideoMode) {
+        PictureInPictureHelper.updatePictureInPictureParams(
+            activity = activity,
+            isPlaying = pipIsPlaying,
+            videoSize = pipVideoSize,
+            hasVideo = pipIsVideoMode,
+        )
+    }
+}
+
+@Composable
+private fun MainPipOverlay(
+    playerConnection: PlayerConnection?,
+    activePlayer: Player?,
+) {
+    val pipIsVideoMode = playerConnection?.isVideoModeActive?.collectAsState()?.value ?: false
+    val pipMediaMetadata = playerConnection?.mediaMetadata?.collectAsState()?.value
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+    ) {
+        if (pipIsVideoMode && activePlayer != null) {
+            MusicVideoSurface(
+                player = activePlayer,
+                artworkUrl = pipMediaMetadata?.thumbnailUrl,
+                cornerRadius = 0.dp,
+                fillContainer = false,
+                useSurfaceView = true,
+                showControls = false,
+                isPip = true,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            AsyncImage(
+                model = pipMediaMetadata?.thumbnailUrl,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MainTopAppBarSection(
+    currentRoute: String?,
+    latestVersionName: String,
+    pureBlack: Boolean,
+    scrollBehavior: TopAppBarScrollBehavior,
+    onHistoryClick: () -> Unit,
+    onSearchClick: () -> Unit,
+    onNavigate: (String) -> Unit,
+    onLogout: () -> Unit,
+) {
+    val (accountName) = rememberPreference(AccountNameKey, defaultValue = "")
+    val (accountEmail) = rememberPreference(AccountEmailKey, defaultValue = "")
+    val (accountChannelHandle) = rememberPreference(AccountChannelHandleKey, defaultValue = "")
+    val (innerTubeCookie, onInnerTubeCookieChange) = rememberPreference(InnerTubeCookieKey, defaultValue = "")
+    val (accountImageUrl) = rememberPreference(AccountImageUrlKey, defaultValue = "")
+    val (discordAvatarUrl) = rememberPreference(DiscordAvatarUrlKey, defaultValue = "")
+    val (discordUsername) = rememberPreference(DiscordUsernameKey, defaultValue = "")
+    val (discordName) = rememberPreference(DiscordNameKey, defaultValue = "")
+    val (preferredAvatarSource) = rememberEnumPreference(
+        PreferredAvatarSourceKey,
+        defaultValue = AvatarSource.YOUTUBE,
+    )
+    val isYouTubeSignedIn = remember(innerTubeCookie) {
+        "SAPISID" in parseCookieString(innerTubeCookie)
+    }
+    val avatarUrl = when (preferredAvatarSource) {
+        AvatarSource.YOUTUBE -> accountImageUrl
+        AvatarSource.DISCORD -> discordAvatarUrl
+    }
+    val accountDisplayName = when (preferredAvatarSource) {
+        AvatarSource.YOUTUBE -> accountName.takeUnless { it.isBlank() || it == "Guest" }
+            ?: discordUsername.takeIf { it.isNotBlank() }?.let { "@$it" }
+            ?: ""
+        AvatarSource.DISCORD -> discordName.takeIf { it.isNotBlank() }
+            ?: discordUsername.takeIf { it.isNotBlank() }?.let { "@$it" }
+            ?: accountName.takeUnless { it.isBlank() || it == "Guest" }
+            ?: ""
+    }
+    val accountSubtitleHandle = when (preferredAvatarSource) {
+        AvatarSource.YOUTUBE -> accountChannelHandle.ifBlank { accountEmail }
+        AvatarSource.DISCORD -> discordUsername.takeIf { it.isNotBlank() }?.let { "@$it" }
+            ?: accountChannelHandle.ifBlank { accountEmail }
+    }
+    val isAccountMenuSignedIn = isYouTubeSignedIn || discordUsername.isNotBlank()
+    val hasUpdate = latestVersionName != BuildConfig.VERSION_NAME
+    var showAccountMenu by rememberSaveable { mutableStateOf(false) }
+
+    ExpressiveMainTopAppBar(
+        currentRoute = currentRoute,
+        pureBlack = pureBlack,
+        hasUpdate = hasUpdate,
+        avatarUrl = avatarUrl,
+        scrollBehavior = scrollBehavior,
+        onHistoryClick = onHistoryClick,
+        onSearchClick = onSearchClick,
+        onAvatarClick = { showAccountMenu = true },
+        accountMenuContent = {
+            if (showAccountMenu) {
+                ExpressiveAccountMenuPopup(
+                    displayName = accountDisplayName,
+                    accountHandle = accountSubtitleHandle,
+                    accountEmail = accountEmail,
+                    isYouTubeSignedIn = isYouTubeSignedIn,
+                    isSignedIn = isAccountMenuSignedIn,
+                    avatarUrl = avatarUrl,
+                    hasUpdate = hasUpdate,
+                    pureBlack = pureBlack,
+                    onDismiss = { showAccountMenu = false },
+                    onNavigate = { route ->
+                        showAccountMenu = false
+                        onNavigate(route)
+                    },
+                    onLogout = {
+                        showAccountMenu = false
+                        onInnerTubeCookieChange("")
+                        onLogout()
+                    },
+                )
+            }
+        },
+    )
+}

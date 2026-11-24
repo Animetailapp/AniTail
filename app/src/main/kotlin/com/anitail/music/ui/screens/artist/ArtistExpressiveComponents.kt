@@ -2,7 +2,11 @@
 
 package com.anitail.music.ui.screens.artist
 
+import android.content.Context
+import android.database.ContentObserver
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -11,6 +15,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
@@ -152,10 +157,12 @@ import com.anitail.music.utils.rememberPreference
 import com.anitail.music.utils.sizedArtworkUrl
 import com.anitail.music.utils.toLinkSegments
 import com.anitail.music.utils.withoutPlaybackCountLabel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.isActive
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.coroutineContext
+import kotlin.math.roundToInt
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.random.Random
@@ -167,10 +174,31 @@ private val GridCaptionSafeSpace = 8.dp
 private const val CURRENT_SONG_ARTWORK_ROTATION_DEG_PER_SEC = 12f
 private const val ACTIVE_THUMBNAIL_SCRIM_ALPHA = 0.6f
 
-@Composable
-internal fun rememberArtistReducedMotion(): Boolean {
-    val context = LocalContext.current
-    return remember(context) {
+private object ReducedMotionScaleCache {
+    private val registered = AtomicBoolean(false)
+    private var reducedMotionState by mutableStateOf(false)
+
+    fun observe(context: Context): Boolean {
+        val appContext = context.applicationContext
+        if (registered.compareAndSet(false, true)) {
+            reducedMotionState = readReducedMotion(appContext)
+            try {
+                appContext.contentResolver.registerContentObserver(
+                    Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE),
+                    false,
+                    object : ContentObserver(Handler(Looper.getMainLooper())) {
+                        override fun onChange(selfChange: Boolean) {
+                            reducedMotionState = readReducedMotion(appContext)
+                        }
+                    },
+                )
+            } catch (_: SecurityException) {
+            }
+        }
+        return reducedMotionState
+    }
+
+    private fun readReducedMotion(context: Context): Boolean =
         runCatching {
             Settings.Global.getFloat(
                 context.contentResolver,
@@ -178,7 +206,12 @@ internal fun rememberArtistReducedMotion(): Boolean {
                 1f,
             ) <= 0f
         }.getOrDefault(false)
-    }
+}
+
+@Composable
+internal fun rememberArtistReducedMotion(): Boolean {
+    val context = LocalContext.current
+    return ReducedMotionScaleCache.observe(context)
 }
 
 private val artistArtworkPolygons = listOf(
@@ -193,14 +226,24 @@ private val artistArtworkPolygons = listOf(
     MaterialShapes.Bun,
 )
 
+private val ArtistArtworkShapeCache = ConcurrentHashMap<Int, FittedPolygonShape>()
+private var CurrentSongCookieShape: Shape? = null
+private val CurrentSongMorphCache = ConcurrentHashMap<Int, Morph>()
+
 @Composable
 internal fun artistArtworkShape(seed: String): Shape {
     val hash = seed.hashCode() and Int.MAX_VALUE
-    val startAngle = ((hash / artistArtworkPolygons.size) % 8) * 45
-    val polygon = artistArtworkPolygons[hash % artistArtworkPolygons.size]
+    val polyIndex = hash % artistArtworkPolygons.size
+    val angleBucket = (hash / artistArtworkPolygons.size) % 8
+    val cacheKey = polyIndex * 8 + angleBucket
+    ArtistArtworkShapeCache[cacheKey]?.let { return it }
+    val polygon = artistArtworkPolygons[polyIndex]
+    val startAngle = angleBucket * 45
     val sourcePath = polygon.toPath(startAngle = startAngle)
-    return remember(polygon, startAngle) {
-        FittedPolygonShape(Path().apply { addPath(sourcePath) })
+    return remember(cacheKey) {
+        ArtistArtworkShapeCache.getOrPut(cacheKey) {
+            FittedPolygonShape(Path().apply { addPath(sourcePath) })
+        }
     }
 }
 
@@ -214,27 +257,41 @@ internal fun carouselArtworkShape(item: YTItem): Shape =
 internal class FittedPolygonShape(
     private val sourcePath: Path,
 ) : Shape {
+    private val sourceBounds = sourcePath.getBounds()
+    private var cachedSize: Size = Size.Unspecified
+    private var cachedOutline: Outline? = null
+
     override fun createOutline(
         size: Size,
         layoutDirection: LayoutDirection,
         density: Density,
     ): Outline {
+        if (size == cachedSize) {
+            cachedOutline?.let { return it }
+        }
         val path = Path().apply { addPath(sourcePath) }
-        val bounds = path.getBounds()
-        if (bounds.width > 0f && bounds.height > 0f && size.width > 0f && size.height > 0f) {
-            val scale = minOf(size.width / bounds.width, size.height / bounds.height)
-            path.translate(-bounds.center)
+        if (sourceBounds.width > 0f && sourceBounds.height > 0f && size.width > 0f && size.height > 0f) {
+            val scale = minOf(size.width / sourceBounds.width, size.height / sourceBounds.height)
+            path.translate(-sourceBounds.center)
             path.transform(Matrix().apply { scale(scale, scale) })
             path.translate(Offset(size.width / 2f, size.height / 2f))
         }
-        return Outline.Generic(path)
+        return Outline.Generic(path).also {
+            cachedSize = size
+            cachedOutline = it
+        }
     }
 }
 
 @Composable
 internal fun currentSongArtworkShape(): Shape {
+    CurrentSongCookieShape?.let { return it }
     val sourcePath = MaterialShapes.Cookie9Sided.toPath(startAngle = 0)
-    return remember { FittedPolygonShape(Path().apply { addPath(sourcePath) }) }
+    return remember {
+        CurrentSongCookieShape ?: FittedPolygonShape(Path().apply { addPath(sourcePath) }).also {
+            CurrentSongCookieShape = it
+        }
+    }
 }
 
 @Composable
@@ -242,6 +299,12 @@ internal fun animatedCurrentSongArtworkShape(
     isCurrent: Boolean,
     inactiveShape: Shape,
 ): Shape {
+    var everCurrent by remember { mutableStateOf(isCurrent) }
+    if (isCurrent && !everCurrent) {
+        everCurrent = true
+    }
+    if (!everCurrent) return inactiveShape
+
     val reducedMotion = rememberArtistReducedMotion()
     val progress by animateFloatAsState(
         targetValue = if (isCurrent) 1f else 0f,
@@ -262,13 +325,16 @@ internal fun animatedCurrentSongArtworkShape(
                 if (progress >= 1f) return currentShape.createOutline(size, layoutDirection, density)
                 val inactiveOutline = inactiveShape.createOutline(size, layoutDirection, density)
                 val radius = (inactiveOutline as? Outline.Rounded)?.roundRect?.topLeftCornerRadius?.x ?: 0f
-                val morph = Morph(
-                    RoundedPolygon
-                        .rectangle(
-                            rounding = CornerRounding((radius * 2f / size.minDimension).coerceIn(0f, 1f)),
-                        ).normalized(),
-                    MaterialShapes.Cookie9Sided,
-                )
+                val normalizedRounding = (radius * 2f / size.minDimension).coerceIn(0f, 1f)
+                val morphKey = (normalizedRounding * 100f).roundToInt()
+                val morph = CurrentSongMorphCache.getOrPut(morphKey) {
+                    Morph(
+                        RoundedPolygon
+                            .rectangle(rounding = CornerRounding(morphKey / 100f))
+                            .normalized(),
+                        MaterialShapes.Cookie9Sided,
+                    )
+                }
                 return Outline.Generic(
                     morph.toPath(progress).apply { transform(Matrix().apply { scale(size.width, size.height) }) },
                 )
@@ -283,22 +349,24 @@ internal fun rememberCurrentSongArtworkRotation(
     isPlaying: Boolean,
 ): State<Float> {
     val rotation = remember { mutableFloatStateOf(0f) }
+    if (!isCurrent) {
+        if (rotation.floatValue != 0f) rotation.floatValue = 0f
+        return rotation
+    }
     val reducedMotion = rememberArtistReducedMotion()
-    LaunchedEffect(isCurrent, isPlaying, reducedMotion) {
-        if (!isCurrent) {
-            rotation.floatValue = 0f
-            return@LaunchedEffect
-        }
+    LaunchedEffect(isPlaying, reducedMotion) {
         if (!isPlaying || reducedMotion) return@LaunchedEffect
         val motionScale = coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f
         if (motionScale <= 0f) return@LaunchedEffect
-        var lastTimeNanos = System.nanoTime()
+        var lastFrameNanos = -1L
         while (isActive) {
-            delay(16L)
-            val now = System.nanoTime()
-            val dtSeconds = ((now - lastTimeNanos).coerceAtLeast(0L) / 1_000_000_000f) * motionScale
-            lastTimeNanos = now
-            rotation.floatValue = (rotation.floatValue + dtSeconds * CURRENT_SONG_ARTWORK_ROTATION_DEG_PER_SEC) % 360f
+            withInfiniteAnimationFrameNanos { frameTimeNanos ->
+                if (lastFrameNanos >= 0L) {
+                    val dtSeconds = ((frameTimeNanos - lastFrameNanos).coerceAtLeast(0L) / 1_000_000_000f) * motionScale
+                    rotation.floatValue = (rotation.floatValue + dtSeconds * CURRENT_SONG_ARTWORK_ROTATION_DEG_PER_SEC) % 360f
+                }
+                lastFrameNanos = frameTimeNanos
+            }
         }
     }
     return rotation
@@ -319,6 +387,18 @@ internal fun animateCurrentSongColors(
     content: Color = colorScheme.onSurface,
     subtitle: Color = colorScheme.onSurfaceVariant,
 ): CurrentSongColors {
+    var everCurrent by remember { mutableStateOf(isCurrent) }
+    if (isCurrent && !everCurrent) {
+        everCurrent = true
+    }
+    if (!everCurrent) {
+        return CurrentSongColors(
+            container = container,
+            content = content,
+            subtitle = subtitle,
+            link = colorScheme.primary,
+        )
+    }
     val progress by animateFloatAsState(
         targetValue = if (isCurrent) 1f else 0f,
         animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
@@ -1006,7 +1086,7 @@ internal fun ArtistSongRow(
     val contentColor = colors.content
     val subtitleColor = colors.subtitle
     val shape = animatedCurrentSongArtworkShape(isCurrent, RoundedCornerShape(4.dp))
-    val artworkRotation by rememberCurrentSongArtworkRotation(isCurrent, isPlaying)
+    val artworkRotationState = rememberCurrentSongArtworkRotation(isCurrent, isPlaying)
 
     val subtitleText = when (item) {
         is SongItem -> joinByBullet(
@@ -1038,7 +1118,7 @@ internal fun ArtistSongRow(
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .graphicsLayer { rotationZ = artworkRotation }
+                    .then(if (isCurrent) Modifier.graphicsLayer { rotationZ = artworkRotationState.value } else Modifier)
                     .clip(shape)
                     .background(MaterialTheme.colorScheme.secondaryContainer),
                 contentAlignment = Alignment.Center,
@@ -1046,7 +1126,7 @@ internal fun ArtistSongRow(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .graphicsLayer { rotationZ = -artworkRotation },
+                        .then(if (isCurrent) Modifier.graphicsLayer { rotationZ = -artworkRotationState.value } else Modifier),
                     contentAlignment = Alignment.Center,
                 ) {
                     item.thumbnail?.let { url ->
@@ -1140,7 +1220,7 @@ internal fun ArtistWideSongRow(
     val contentColor = colors.content
     val subtitleColor = colors.subtitle
     val artworkShape = animatedCurrentSongArtworkShape(isCurrent, RoundedCornerShape(4.dp))
-    val artworkRotation by rememberCurrentSongArtworkRotation(isCurrent, isPlaying)
+    val artworkRotationState = rememberCurrentSongArtworkRotation(isCurrent, isPlaying)
 
     Row(
         modifier = Modifier
@@ -1158,7 +1238,7 @@ internal fun ArtistWideSongRow(
         Box(
             Modifier
                 .size(40.dp)
-                .graphicsLayer { rotationZ = artworkRotation }
+                .then(if (isCurrent) Modifier.graphicsLayer { rotationZ = artworkRotationState.value } else Modifier)
                 .clip(artworkShape)
                 .background(MaterialTheme.colorScheme.secondaryContainer),
             contentAlignment = Alignment.Center,
@@ -1166,7 +1246,7 @@ internal fun ArtistWideSongRow(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { rotationZ = -artworkRotation },
+                    .then(if (isCurrent) Modifier.graphicsLayer { rotationZ = -artworkRotationState.value } else Modifier),
             ) {
                 AsyncImage(
                     model = sizedArtworkUrl(song.thumbnail, 544),

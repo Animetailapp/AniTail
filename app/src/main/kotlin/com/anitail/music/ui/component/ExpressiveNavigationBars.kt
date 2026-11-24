@@ -33,7 +33,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -101,6 +100,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -133,6 +133,9 @@ import com.anitail.music.ui.utils.tvFocusable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
+
+private val ExpressivePolygonShapeCache = ConcurrentHashMap<Pair<RoundedPolygon, Int>, Shape>()
 
 /**
  * Converts a [RoundedPolygon] into a Compose [Shape] fitted cleanly within component bounds.
@@ -142,9 +145,13 @@ internal fun rememberExpressivePolygonShape(
     polygon: RoundedPolygon,
     startAngle: Int = 0,
 ): Shape {
+    val key = polygon to startAngle
+    ExpressivePolygonShapeCache[key]?.let { return it }
     val sourcePath = polygon.toPath(startAngle = startAngle)
     return remember(polygon, startAngle) {
-        FittedPolygonShape(Path().apply { addPath(sourcePath) })
+        ExpressivePolygonShapeCache.getOrPut(key) {
+            FittedPolygonShape(Path().apply { addPath(sourcePath) })
+        }
     }
 }
 
@@ -1197,45 +1204,47 @@ fun ExpressiveShortNavigationBar(
                     }
                 }
             } else {
-                BoxWithConstraints(
+                var trackSize by remember { mutableStateOf(IntSize.Zero) }
+                val trackWidthPx = trackSize.width.toFloat()
+                val pillWidthPx = with(density) { 64.dp.toPx() }
+                val horizontalMarginPx = with(density) { 4.dp.toPx() }
+                val pillTopPx = with(density) { (if (slimNav) 10.dp else 8.dp).toPx() }
+                val pillHeightPx = with(density) { (if (slimNav) 36.dp else 34.dp).toPx() }
+                val isRtl = layoutDirection == LayoutDirection.Rtl
+                val targetBounds = if (selectedIndex >= 0 && trackWidthPx > 0f) {
+                    computeDockedPillBoundsPx(
+                        trackWidthPx = trackWidthPx,
+                        itemCount = items.size,
+                        selectedIndex = selectedIndex,
+                        pillWidthPx = pillWidthPx,
+                        horizontalMarginPx = horizontalMarginPx,
+                        isRtl = isRtl,
+                    )
+                } else {
+                    null
+                }
+                val targetCornerPx = with(density) {
+                    (if (activeItemPressed) 10.dp else (if (slimNav) 18.dp else 17.dp)).toPx()
+                }
+                val pillState = rememberStretchyPillController(
+                    targetBounds = targetBounds,
+                    targetCornerPx = targetCornerPx,
+                    reducedMotion = reducedMotion,
+                    cornerSpec = spatialFloatSpec,
+                )
+
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(if (slimNav) 56.dp else 68.dp)
-                        .padding(horizontal = 8.dp),
+                        .padding(horizontal = 8.dp)
+                        .onSizeChanged { trackSize = it },
                 ) {
-                    val trackWidthPx = with(density) { maxWidth.toPx() }
-                    val pillWidthPx = with(density) { 64.dp.toPx() }
-                    val horizontalMarginPx = with(density) { 4.dp.toPx() }
-                    val pillTopPx = with(density) { (if (slimNav) 10.dp else 8.dp).toPx() }
-                    val pillHeightPx = with(density) { (if (slimNav) 36.dp else 34.dp).toPx() }
-                    val isRtl = layoutDirection == LayoutDirection.Rtl
-                    val targetBounds = if (selectedIndex >= 0) {
-                        computeDockedPillBoundsPx(
-                            trackWidthPx = trackWidthPx,
-                            itemCount = items.size,
-                            selectedIndex = selectedIndex,
-                            pillWidthPx = pillWidthPx,
-                            horizontalMarginPx = horizontalMarginPx,
-                            isRtl = isRtl,
-                        )
-                    } else {
-                        null
-                    }
-                    val targetCornerPx = with(density) {
-                        (if (activeItemPressed) 10.dp else (if (slimNav) 18.dp else 17.dp)).toPx()
-                    }
-                    val pillState = rememberStretchyPillController(
-                        targetBounds = targetBounds,
-                        targetCornerPx = targetCornerPx,
-                        reducedMotion = reducedMotion,
-                        cornerSpec = spatialFloatSpec,
-                    )
-
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
                             .drawBehind {
-                                if (selectedIndex >= 0) {
+                                if (selectedIndex >= 0 && pillState.initialized) {
                                     val left = pillState.leftPx.value
                                     val right = pillState.rightPx.value
                                     val width = (right - left).coerceAtLeast(0f)
@@ -1538,43 +1547,47 @@ fun ExpressiveFloatingNavigationBar(
             border = BorderStroke(1.dp, borderColor),
             shadowElevation = 8.dp,
         ) {
-            BoxWithConstraints(
+            var trackSize by remember { mutableStateOf(IntSize.Zero) }
+            val trackWidthPx = trackSize.width.toFloat()
+            val pillHeightPx = trackSize.height.toFloat()
+            val spacingPx = with(density) { 6.dp.toPx() }
+            val isRtl = layoutDirection == LayoutDirection.Rtl
+            val targetBounds = if (selectedIndex >= 0 && trackWidthPx > 0f) {
+                computeFloatingPillBoundsPx(
+                    trackWidthPx = trackWidthPx,
+                    itemCount = items.size,
+                    selectedIndex = selectedIndex,
+                    spacingPx = spacingPx,
+                    isRtl = isRtl,
+                )
+            } else {
+                null
+            }
+            val fallbackHeightPx = with(density) { (if (slimNav) 44.dp else 52.dp).toPx() }
+            val resolvedHeightPx = if (pillHeightPx > 0f) pillHeightPx else fallbackHeightPx
+            val targetCornerPx = if (activeItemPressed) {
+                with(density) { 14.dp.toPx() }
+            } else {
+                resolvedHeightPx / 2f
+            }
+            val pillState = rememberStretchyPillController(
+                targetBounds = targetBounds,
+                targetCornerPx = targetCornerPx,
+                reducedMotion = reducedMotion,
+                cornerSpec = spatialFloatSpec,
+            )
+
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(6.dp),
+                    .padding(6.dp)
+                    .onSizeChanged { trackSize = it },
             ) {
-                val trackWidthPx = with(density) { maxWidth.toPx() }
-                val pillHeightPx = with(density) { maxHeight.toPx() }
-                val spacingPx = with(density) { 6.dp.toPx() }
-                val isRtl = layoutDirection == LayoutDirection.Rtl
-                val targetBounds = if (selectedIndex >= 0) {
-                    computeFloatingPillBoundsPx(
-                        trackWidthPx = trackWidthPx,
-                        itemCount = items.size,
-                        selectedIndex = selectedIndex,
-                        spacingPx = spacingPx,
-                        isRtl = isRtl,
-                    )
-                } else {
-                    null
-                }
-                val targetCornerPx = if (activeItemPressed) {
-                    with(density) { 14.dp.toPx() }
-                } else {
-                    pillHeightPx / 2f
-                }
-                val pillState = rememberStretchyPillController(
-                    targetBounds = targetBounds,
-                    targetCornerPx = targetCornerPx,
-                    reducedMotion = reducedMotion,
-                    cornerSpec = spatialFloatSpec,
-                )
-
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
                         .drawBehind {
-                            if (selectedIndex >= 0) {
+                            if (selectedIndex >= 0 && pillState.initialized && size.height > 0f) {
                                 val left = pillState.leftPx.value
                                 val right = pillState.rightPx.value
                                 val width = (right - left).coerceAtLeast(0f)
@@ -1583,7 +1596,7 @@ fun ExpressiveFloatingNavigationBar(
                                     drawRoundRect(
                                         color = pillColor,
                                         topLeft = Offset(left, 0f),
-                                        size = Size(width, pillHeightPx),
+                                        size = Size(width, size.height),
                                         cornerRadius = CornerRadius(corner, corner),
                                     )
                                 }

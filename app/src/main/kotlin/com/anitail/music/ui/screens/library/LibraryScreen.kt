@@ -7,7 +7,6 @@
 package com.anitail.music.ui.screens.library
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
@@ -44,7 +42,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -433,47 +430,31 @@ fun LibraryScreen(
                 },
                 modifier = Modifier.fillMaxSize(),
             ) {
-                val currentGridView = isGridView
-                Crossfade(
-                    targetState = isGridView,
-                    animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
-                    label = "libraryLayout",
-                ) { gridMode ->
-                    val gridState = if (gridMode == currentGridView) {
-                        activeGridState
-                    } else {
-                        remember(currentGridView, activeGridState) {
-                            LazyGridState(
-                                activeGridState.firstVisibleItemIndex,
-                                activeGridState.firstVisibleItemScrollOffset,
-                            )
+                val gridMode = isGridView
+                val gridState = activeGridState
+                val safeColumns = gridColumns.coerceIn(LibraryGridColumnsRange)
+                val gap = if (gridMode) (14 - safeColumns * 2).dp else 8.dp
+                val reorderState = rememberReorderableLazyGridState(
+                    lazyGridState = gridState,
+                    scrollThresholdPadding = PaddingValues(
+                        top = topPadding,
+                        bottom = bottomPadding + 96.dp,
+                    ),
+                    scrollMoveMode = ScrollMoveMode.INSERT,
+                ) { from, to ->
+                    if (reorderEnabled) {
+                        val fromItem = displayedEntries.firstOrNull { it.reorderKey == from.key }
+                        val toItem = displayedEntries.firstOrNull { it.reorderKey == to.key }
+                        if (fromItem != null && toItem != null) {
+                            moveEntry(fromItem, toItem)
                         }
                     }
-                    val safeColumns = gridColumns.coerceIn(LibraryGridColumnsRange)
-                    val gap = if (gridMode) (14 - safeColumns * 2).dp else 8.dp
+                }
+                val reorderScrollConnection = remember(reorderState) {
+                    LibraryReorderScrollConnection { reorderState.isAnyItemDragging }
+                }
 
-                    key(gridMode) {
-                        val reorderState = rememberReorderableLazyGridState(
-                            lazyGridState = gridState,
-                            scrollThresholdPadding = PaddingValues(
-                                top = topPadding,
-                                bottom = bottomPadding + 96.dp,
-                            ),
-                            scrollMoveMode = ScrollMoveMode.INSERT,
-                        ) { from, to ->
-                            if (reorderEnabled) {
-                                val fromItem = displayedEntries.firstOrNull { it.reorderKey == from.key }
-                                val toItem = displayedEntries.firstOrNull { it.reorderKey == to.key }
-                                if (fromItem != null && toItem != null) {
-                                    moveEntry(fromItem, toItem)
-                                }
-                            }
-                        }
-                        val reorderScrollConnection = remember(reorderState) {
-                            LibraryReorderScrollConnection { reorderState.isAnyItemDragging }
-                        }
-
-                        LazyVerticalGrid(
+                LazyVerticalGrid(
                             columns = if (gridMode) GridCells.Fixed(safeColumns) else GridCells.Fixed(1),
                             state = gridState,
                             contentPadding = PaddingValues(
@@ -908,8 +889,6 @@ fun LibraryScreen(
                                     }
                                 }
                             }
-                        }
-                    }
                 }
             }
         }

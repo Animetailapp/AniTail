@@ -12,7 +12,6 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -63,6 +62,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -280,8 +280,11 @@ internal fun ExploreChartSectionShelf(
         )
         when (kind) {
             ChartShelfKind.SONG_PAGER -> {
+                val chartSongs = remember(section.items) {
+                    section.items.filterIsInstance<SongItem>()
+                }
                 ExploreChartSongPager(
-                    songs = section.items.filterIsInstance<SongItem>(),
+                    songs = chartSongs,
                     currentSongId = currentSongId,
                     isPlaying = isPlaying,
                     onSongClick = actions.onItemClick,
@@ -453,54 +456,53 @@ internal fun ExploreChartSongPager(
 ) {
     if (songs.isEmpty()) return
     val rowCount = minOf(4, songs.size)
-    val columns = songs.chunked(rowCount)
+    val columns = remember(songs, rowCount) { songs.chunked(rowCount) }
     val pagerState = rememberPagerState { columns.size }
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val pageWidth = ((screenWidthDp.dp - 32.dp) * if (screenWidthDp >= 640) 0.46f else 0.9f)
+        .coerceAtLeast(220.dp)
 
-    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        val pageWidth = ((maxWidth - 32.dp) * if (maxWidth >= 640.dp) 0.46f else 0.9f)
-            .coerceAtLeast(220.dp)
-        HorizontalPager(
-            state = pagerState,
-            pageSize = PageSize.Fixed(pageWidth),
-            flingBehavior = PagerDefaults.flingBehavior(state = pagerState),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            pageSpacing = 12.dp,
+    HorizontalPager(
+        state = pagerState,
+        pageSize = PageSize.Fixed(pageWidth),
+        flingBehavior = PagerDefaults.flingBehavior(state = pagerState),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        pageSpacing = 12.dp,
+        modifier = modifier.fillMaxWidth(),
+    ) { pageIndex ->
+        val columnSongs = columns[pageIndex]
+        Column(
             modifier = Modifier.fillMaxWidth(),
-        ) { pageIndex ->
-            val columnSongs = columns[pageIndex]
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                columnSongs.forEachIndexed { rowIndex, song ->
-                    val rank = song.chartPosition ?: (pageIndex * rowCount + rowIndex + 1)
-                    val isCurrent = song.id == currentSongId
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = rank.toString(),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isCurrent) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.width(26.dp),
-                        )
-                        ArtistSongRow(
-                            item = song,
-                            isCurrent = isCurrent,
-                            isPlaying = isPlaying && isCurrent,
-                            onClick = { onSongClick(song) },
-                            onLongClick = { onSongMenu(song) },
-                            onShowMenu = { onSongMenu(song) },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            columnSongs.forEachIndexed { rowIndex, song ->
+                val rank = song.chartPosition ?: (pageIndex * rowCount + rowIndex + 1)
+                val isCurrent = song.id == currentSongId
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = rank.toString(),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isCurrent) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.width(26.dp),
+                    )
+                    ArtistSongRow(
+                        item = song,
+                        isCurrent = isCurrent,
+                        isPlaying = isPlaying && isCurrent,
+                        onClick = { onSongClick(song) },
+                        onLongClick = { onSongMenu(song) },
+                        onShowMenu = { onSongMenu(song) },
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
         }

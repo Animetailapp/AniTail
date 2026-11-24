@@ -31,7 +31,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +44,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.anitail.music.LocalPlayerAwareWindowInsets
@@ -63,23 +63,23 @@ fun ExploreScreen(
     chartsViewModel: ChartsViewModel = hiltViewModel(),
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
-    val isPlaying by playerConnection.isPlaying.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
+    val isPlaying by playerConnection.isPlaying.collectAsStateWithLifecycle()
+    val mediaMetadata by playerConnection.mediaMetadata.collectAsStateWithLifecycle()
 
-    val explorePage by exploreViewModel.explorePage.collectAsState()
-    val isExploreLoading by exploreViewModel.isLoading.collectAsState()
-    val exploreError by exploreViewModel.error.collectAsState()
+    val explorePage by exploreViewModel.explorePage.collectAsStateWithLifecycle()
+    val isExploreLoading by exploreViewModel.isLoading.collectAsStateWithLifecycle()
+    val exploreError by exploreViewModel.error.collectAsStateWithLifecycle()
 
-    val chartsPage by chartsViewModel.chartsPage.collectAsState()
-    val isChartsLoading by chartsViewModel.isLoading.collectAsState()
-    val chartsError by chartsViewModel.error.collectAsState()
+    val chartsPage by chartsViewModel.chartsPage.collectAsStateWithLifecycle()
+    val isChartsLoading by chartsViewModel.isLoading.collectAsStateWithLifecycle()
+    val chartsError by chartsViewModel.error.collectAsStateWithLifecycle()
 
     val listState = rememberLazyListState()
     var selectedChip by rememberSaveable { mutableStateOf<ExploreFilterChip?>(null) }
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val scrollToTop by backStackEntry?.savedStateHandle
-        ?.getStateFlow("scrollToTop", false)?.collectAsState() ?: return
+        ?.getStateFlow("scrollToTop", false)?.collectAsStateWithLifecycle() ?: return
 
     LaunchedEffect(Unit) {
         if (chartsPage == null) {

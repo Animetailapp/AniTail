@@ -608,7 +608,7 @@ fun BottomSheetPlayer(
     }
 
     LaunchedEffect(playbackState, isPlaying) {
-        if (playbackState == STATE_READY) {
+        if (playbackState == STATE_READY && isPlaying) {
             while (isActive) {
                 delay(100)
                 if (sliderPosition == null) {
@@ -781,8 +781,8 @@ fun BottomSheetPlayer(
         },
         collapsedContent = {
             MiniPlayer(
-                position = position,
-                duration = duration,
+                positionProvider = { position },
+                durationProvider = { duration },
                 pureBlack = pureBlack,
                 isPlayerCollapsed = state.isCollapsed,
                 onOpenPlayer = state::expandSoft,
