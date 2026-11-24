@@ -1235,4 +1235,5 @@
     <string name="move_down">Bajar</string>
     <string name="move_to_bottom">Mover al final</string>
     <string name="show_uploaded_playlist">Mostrar lista de subidas</string>
+    <string name="videos">Videos</string>
 </resources>

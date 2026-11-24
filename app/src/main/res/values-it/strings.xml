@@ -487,4 +487,5 @@
     <string name="move_down">Sposta in basso</string>
     <string name="move_to_bottom">Sposta in fondo</string>
     <string name="show_uploaded_playlist">Mostra playlist caricate</string>
+    <string name="videos">Video</string>
 </resources>
