@@ -488,4 +488,6 @@
     <string name="move_to_bottom">Sposta in fondo</string>
     <string name="show_uploaded_playlist">Mostra playlist caricate</string>
     <string name="videos">Video</string>
+    <string name="floating_navbar">Barra di navigazione inferiore flottante</string>
+    <string name="open_profile">Apri profilo</string>
 </resources>

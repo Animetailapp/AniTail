@@ -1236,4 +1236,6 @@
     <string name="move_to_bottom">Mover al final</string>
     <string name="show_uploaded_playlist">Mostrar lista de subidas</string>
     <string name="videos">Videos</string>
+    <string name="floating_navbar">Barra de navegación inferior flotante</string>
+    <string name="open_profile">Abrir perfil</string>
 </resources>

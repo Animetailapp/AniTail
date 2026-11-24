@@ -30,14 +30,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
@@ -50,21 +48,14 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialogDefaults
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
@@ -72,8 +63,6 @@ import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -90,7 +79,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -101,7 +89,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -132,23 +119,33 @@ import coil.request.ImageRequest
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.WatchEndpoint
+import com.anitail.innertube.utils.parseCookieString
+import com.anitail.music.constants.AccountChannelHandleKey
+import com.anitail.music.constants.AccountEmailKey
+import com.anitail.music.constants.AccountImageUrlKey
+import com.anitail.music.constants.AccountNameKey
 import com.anitail.music.constants.AppBarHeight
+import com.anitail.music.constants.AvatarSource
 import com.anitail.music.constants.DarkModeKey
 import com.anitail.music.constants.CustomThemeSeedColorKey
 import com.anitail.music.constants.DefaultOpenTabKey
 import com.anitail.music.constants.DisableScreenshotKey
+import com.anitail.music.constants.DiscordAvatarUrlKey
+import com.anitail.music.constants.DiscordNameKey
+import com.anitail.music.constants.DiscordUsernameKey
 import com.anitail.music.constants.DynamicIconKey
 import com.anitail.music.constants.DynamicThemeKey
+import com.anitail.music.constants.FloatingNavBarKey
 import com.anitail.music.constants.HighRefreshRateKey
+import com.anitail.music.constants.InnerTubeCookieKey
 import com.anitail.music.constants.MiniPlayerBottomSpacing
 import com.anitail.music.constants.MiniPlayerHeight
 import com.anitail.music.constants.NavigationBarAnimationSpec
-import com.anitail.music.constants.NavigationBarHeight
 import com.anitail.music.constants.PauseSearchHistoryKey
+import com.anitail.music.constants.PreferredAvatarSourceKey
 import com.anitail.music.constants.PureBlackKey
 import com.anitail.music.constants.SearchSource
 import com.anitail.music.constants.SearchSourceKey
-import com.anitail.music.constants.SlimNavBarHeight
 import com.anitail.music.constants.SlimNavBarKey
 import com.anitail.music.constants.ShowLyricsKey
 import com.anitail.music.constants.StopMusicOnTaskClearKey
@@ -168,11 +165,17 @@ import com.anitail.music.playback.queues.YouTubeQueue
 import com.anitail.music.services.AutoBackupWorker
 import com.anitail.music.ui.component.BottomSheetMenu
 import com.anitail.music.ui.component.BottomSheetPage
+import com.anitail.music.ui.component.ExpressiveAccountMenuPopup
+import com.anitail.music.ui.component.ExpressiveBrandLogoBadge
+import com.anitail.music.ui.component.ExpressiveFloatingNavigationBar
+import com.anitail.music.ui.component.ExpressiveMainTopAppBar
+import com.anitail.music.ui.component.ExpressiveShortNavigationBar
 import com.anitail.music.ui.component.IconButton
 import com.anitail.music.ui.component.LocalBottomSheetPageState
 import com.anitail.music.ui.component.LocalMenuState
 import com.anitail.music.ui.component.TopSearch
 import com.anitail.music.ui.component.rememberBottomSheetState
+import com.anitail.music.ui.component.resolveActiveNavBarHeightDp
 import com.anitail.music.ui.component.shimmer.ShimmerTheme
 import com.anitail.music.ui.menu.YouTubeSongMenu
 import com.anitail.music.ui.player.BottomSheetPlayer
@@ -576,6 +579,7 @@ class MainActivity : AppCompatActivity() {
 
                     val navigationItems = remember { Screens.MainScreens }
                     val (slimNav) = rememberPreference(SlimNavBarKey, defaultValue = false)
+                    val (floatingNav) = rememberPreference(FloatingNavBarKey, defaultValue = false)
                     val (useNewMiniPlayerDesign) = rememberPreference(
                         UseNewMiniPlayerDesignKey,
                         defaultValue = true
@@ -655,16 +659,23 @@ class MainActivity : AppCompatActivity() {
                                     !active
                         }
 
+                    val activeNavHeight =
+                        resolveActiveNavBarHeightDp(
+                            isTelevision = isTelevision,
+                            floatingNav = floatingNav,
+                            slimNav = slimNav,
+                        ).dp
+
                     fun getNavPadding(): Dp {
                         return if (shouldShowNavigationBar && !isTelevision) {
-                            if (slimNav) SlimNavBarHeight else NavigationBarHeight
+                            activeNavHeight
                         } else {
                             0.dp
                         }
                     }
 
                     val navigationBarHeight by animateDpAsState(
-                        targetValue = if (shouldShowNavigationBar && !isTelevision) NavigationBarHeight else 0.dp,
+                        targetValue = if (shouldShowNavigationBar && !isTelevision) activeNavHeight else 0.dp,
                         animationSpec = NavigationBarAnimationSpec,
                         label = "",
                     )
@@ -685,11 +696,12 @@ class MainActivity : AppCompatActivity() {
                         remember(
                             bottomInset,
                             shouldShowNavigationBar,
+                            activeNavHeight,
                             playerBottomSheetState.isDismissed,
                             useNewMiniPlayerDesign
                         ) {
                             var bottom = bottomInset
-                            if (shouldShowNavigationBar) bottom += NavigationBarHeight
+                            if (shouldShowNavigationBar) bottom += activeNavHeight
                             if (!playerBottomSheetState.isDismissed) bottom += MiniPlayerHeight + (if (useNewMiniPlayerDesign) MiniPlayerBottomSpacing else 0.dp)
                             windowsInsets
                                 .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)
@@ -889,118 +901,130 @@ class MainActivity : AppCompatActivity() {
                         LocalSyncUtils provides syncUtils,
                         LocalIsInPipMode provides isInPipModeState.value,
                     ) {
+                        val (accountName) = rememberPreference(AccountNameKey, defaultValue = "")
+                        val (accountEmail) = rememberPreference(AccountEmailKey, defaultValue = "")
+                        val (accountChannelHandle) = rememberPreference(AccountChannelHandleKey, defaultValue = "")
+                        val (innerTubeCookie, onInnerTubeCookieChange) = rememberPreference(InnerTubeCookieKey, defaultValue = "")
+                        val (accountImageUrl) = rememberPreference(AccountImageUrlKey, defaultValue = "")
+                        val (discordAvatarUrl) = rememberPreference(DiscordAvatarUrlKey, defaultValue = "")
+                        val (discordUsername) = rememberPreference(DiscordUsernameKey, defaultValue = "")
+                        val (discordName) = rememberPreference(DiscordNameKey, defaultValue = "")
+                        val (preferredAvatarSource) = rememberEnumPreference(
+                            PreferredAvatarSourceKey,
+                            defaultValue = AvatarSource.YOUTUBE
+                        )
+                        val isYouTubeSignedIn = remember(innerTubeCookie) {
+                            "SAPISID" in parseCookieString(innerTubeCookie)
+                        }
+                        val avatarUrl = when (preferredAvatarSource) {
+                            AvatarSource.YOUTUBE -> accountImageUrl
+                            AvatarSource.DISCORD -> discordAvatarUrl
+                        }
+                        val accountDisplayName = when (preferredAvatarSource) {
+                            AvatarSource.YOUTUBE -> accountName.takeUnless { it.isBlank() || it == "Guest" }
+                                ?: discordUsername.takeIf { it.isNotBlank() }?.let { "@$it" }
+                                ?: ""
+                            AvatarSource.DISCORD -> discordName.takeIf { it.isNotBlank() }
+                                ?: discordUsername.takeIf { it.isNotBlank() }?.let { "@$it" }
+                                ?: accountName.takeUnless { it.isBlank() || it == "Guest" }
+                                ?: ""
+                        }
+                        val accountSubtitleHandle = when (preferredAvatarSource) {
+                            AvatarSource.YOUTUBE -> accountChannelHandle.ifBlank { accountEmail }
+                            AvatarSource.DISCORD -> discordUsername.takeIf { it.isNotBlank() }?.let { "@$it" }
+                                ?: accountChannelHandle.ifBlank { accountEmail }
+                        }
+                        val isAccountMenuSignedIn = isYouTubeSignedIn || discordUsername.isNotBlank()
+                        val hasUpdate = latestVersionName != BuildConfig.VERSION_NAME
+                        var showAccountMenu by rememberSaveable { mutableStateOf(false) }
+
+                        var lastTapTime by remember { mutableLongStateOf(0L) }
+                        var lastTappedIcon by remember { mutableStateOf<Int?>(null) }
+                        var navigateToExplore by remember { mutableStateOf(false) }
+                        val handleNavItemClick: (Screens) -> Unit = { screen ->
+                            val isSelected =
+                                navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true
+                            val currentTapTime = System.currentTimeMillis()
+                            val timeSinceLastTap = currentTapTime - lastTapTime
+                            val isDoubleTap =
+                                screen.titleId == R.string.explore &&
+                                    lastTappedIcon == R.string.explore &&
+                                    timeSinceLastTap < 300
+
+                            lastTapTime = currentTapTime
+                            lastTappedIcon = screen.titleId
+
+                            if (screen.titleId == R.string.explore) {
+                                if (isDoubleTap) {
+                                    onActiveChange(true)
+                                    navigateToExplore = false
+                                } else if (!isSelected) {
+                                    navigateToExplore = false
+                                    navigateToScreen(navController, screen)
+                                } else {
+                                    navigateToExplore = true
+                                    coroutineScope.launch {
+                                        delay(100)
+                                        if (navigateToExplore) {
+                                            navController.currentBackStackEntry?.savedStateHandle?.set(
+                                                "scrollToTop",
+                                                true
+                                            )
+                                            searchBarScrollBehavior.state.resetHeightOffset()
+                                        }
+                                    }
+                                }
+                            } else {
+                                if (isSelected) {
+                                    navController.currentBackStackEntry?.savedStateHandle?.set(
+                                        "scrollToTop",
+                                        true
+                                    )
+                                    coroutineScope.launch {
+                                        searchBarScrollBehavior.state.resetHeightOffset()
+                                    }
+                                } else {
+                                    navigateToScreen(navController, screen)
+                                }
+                            }
+                        }
+
                         Scaffold(
                             topBar = {
                                 if (shouldShowTopBar) {
-                                    TopAppBar(
-                                        title = {
-                                            when (navBackStackEntry?.destination?.route) {
-                                                Screens.Library.route -> {
-                                                    Text(
-                                                        text = stringResource(R.string.filter_library),
-                                                        style = MaterialTheme.typography.titleLarge,
-                                                        fontWeight = FontWeight.Bold,
-                                                    )
-                                                }
-                                                Screens.Explore.route -> {
-                                                    Text(
-                                                        text = stringResource(R.string.explore),
-                                                        style = MaterialTheme.typography.titleLarge,
-                                                        fontWeight = FontWeight.Bold,
-                                                    )
-                                                }
-                                                else -> {
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Image(
-                                                            painter = painterResource(R.drawable.ic_anitail),
-                                                            contentDescription = "App Logo",
-                                                            modifier = Modifier
-                                                                .size(22.dp)
-                                                        )
-                                                        Spacer(modifier = Modifier.width(8.dp))
-                                                        Text(
-                                                            text = stringResource(R.string.app_name),
-                                                            style = MaterialTheme.typography.titleLarge,
-                                                            fontWeight = FontWeight.Bold
-                                                        )
-                                                    }
-                                                }
+                                    ExpressiveMainTopAppBar(
+                                        currentRoute = navBackStackEntry?.destination?.route,
+                                        pureBlack = pureBlack,
+                                        hasUpdate = hasUpdate,
+                                        avatarUrl = avatarUrl,
+                                        scrollBehavior = searchBarScrollBehavior,
+                                        onHistoryClick = { navController.navigate("history") },
+                                        onSearchClick = { onActiveChange(true) },
+                                        onAvatarClick = { showAccountMenu = true },
+                                        accountMenuContent = {
+                                            if (showAccountMenu) {
+                                                ExpressiveAccountMenuPopup(
+                                                    displayName = accountDisplayName,
+                                                    accountHandle = accountSubtitleHandle,
+                                                    accountEmail = accountEmail,
+                                                    isYouTubeSignedIn = isYouTubeSignedIn,
+                                                    isSignedIn = isAccountMenuSignedIn,
+                                                    avatarUrl = avatarUrl,
+                                                    hasUpdate = hasUpdate,
+                                                    pureBlack = pureBlack,
+                                                    onDismiss = { showAccountMenu = false },
+                                                    onNavigate = { route ->
+                                                        showAccountMenu = false
+                                                        navController.navigate(route)
+                                                    },
+                                                    onLogout = {
+                                                        showAccountMenu = false
+                                                        onInnerTubeCookieChange("")
+                                                        App.forgetAccount(this@MainActivity)
+                                                    },
+                                                )
                                             }
                                         },
-                                        actions = {
-                                            IconButton(onClick = { navController.navigate("history") }) {
-                                                Icon(
-                                                    painter = painterResource(R.drawable.history),
-                                                    contentDescription = stringResource(R.string.history)
-                                                )
-                                            }
-                                            IconButton(onClick = { navController.navigate("stats") }) {
-                                                Icon(
-                                                    painter = painterResource(R.drawable.stats),
-                                                    contentDescription = stringResource(R.string.stats)
-                                                )
-                                            }
-                                            IconButton(onClick = { onActiveChange(true) }) {
-                                                Icon(
-                                                    painter = painterResource(R.drawable.search),
-                                                    contentDescription = stringResource(R.string.search)
-                                                )
-                                            }
-
-                                            // --- Avatar logic start ---
-                                            // Read avatar URLs directly from preferences to avoid instantiating HomeViewModel
-                                            val (accountImageUrl) = rememberPreference(com.anitail.music.constants.AccountImageUrlKey, defaultValue = "")
-                                            val (discordAvatarUrl) = rememberPreference(com.anitail.music.constants.DiscordAvatarUrlKey, defaultValue = "")
-                                            val (preferredAvatarSource) = rememberEnumPreference(
-                                                com.anitail.music.constants.PreferredAvatarSourceKey,
-                                                defaultValue = com.anitail.music.constants.AvatarSource.YOUTUBE
-                                            )
-
-                                            // Determine which avatar to use
-                                            val avatarUrl = when (preferredAvatarSource) {
-                                                com.anitail.music.constants.AvatarSource.YOUTUBE -> accountImageUrl
-                                                com.anitail.music.constants.AvatarSource.DISCORD -> discordAvatarUrl
-                                            }
-
-                                            IconButton(onClick = { navController.navigate("settings") }) {
-                                                BadgedBox(badge = {
-                                                    if (latestVersionName != BuildConfig.VERSION_NAME) {
-                                                        Badge()
-                                                    }
-                                                }) {
-                                                    if (!avatarUrl.isNullOrBlank()) {
-                                                        AsyncImage(
-                                                            model = avatarUrl,
-                                                            contentDescription = stringResource(R.string.settings),
-                                                            modifier = Modifier
-                                                                .size(28.dp)
-                                                                .clip(CircleShape),
-                                                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                                                            placeholder = painterResource(R.drawable.settings),
-                                                            error = painterResource(R.drawable.settings)
-                                                        )
-                                                    } else {
-                                                        Icon(
-                                                            painter = painterResource(R.drawable.settings),
-                                                            contentDescription = stringResource(R.string.settings),
-                                                            modifier = Modifier.size(24.dp)
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                            // --- Avatar logic end ---
-                                        },
-                                        scrollBehavior =
-                                        searchBarScrollBehavior,
-                                        colors = TopAppBarDefaults.topAppBarColors(
-                                            containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
-                                            scrolledContainerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
-                                            titleContentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurface,
-                                            actionIconContentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            navigationIconContentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
                                     )
                                 }
                                 if (active || navBackStackEntry?.destination?.route?.startsWith(
@@ -1183,113 +1207,61 @@ class MainActivity : AppCompatActivity() {
                                             navController = navController,
                                             pureBlack = pureBlack
                                         )
-                                        NavigationBar(
-                                            modifier = Modifier
+                                        if (!isTelevision && (navigationBarHeight > 0.dp || shouldShowNavigationBar)) {
+                                            val navModifier = Modifier
                                                 .align(Alignment.BottomCenter)
-                                                .height(bottomInset + getNavPadding())
+                                                .fillMaxWidth()
                                                 .offset {
-                                                    if (navigationBarHeight == 0.dp) {
+                                                    if (navigationBarHeight == 0.dp || activeNavHeight == 0.dp) {
                                                         IntOffset(
                                                             x = 0,
-                                                            y = (bottomInset + NavigationBarHeight).roundToPx(),
+                                                            y = (bottomInset + activeNavHeight).roundToPx(),
                                                         )
                                                     } else {
                                                         val slideOffset =
-                                                            (bottomInset + NavigationBarHeight) *
-                                                                    playerBottomSheetState.progress.coerceIn(
-                                                                        0f,
-                                                                        1f,
-                                                                    )
+                                                            (bottomInset + activeNavHeight) *
+                                                                playerBottomSheetState.progress.coerceIn(
+                                                                    0f,
+                                                                    1f,
+                                                                )
                                                         val hideOffset =
-                                                            (bottomInset + NavigationBarHeight) * (1 - navigationBarHeight / NavigationBarHeight)
+                                                            (bottomInset + activeNavHeight) * (1 - navigationBarHeight / activeNavHeight)
                                                         IntOffset(
                                                             x = 0,
                                                             y = (slideOffset + hideOffset).roundToPx(),
                                                         )
                                                     }
-                                                },
-                                            containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
-                                            contentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                                        ) {
-                                            var lastTapTime by remember { mutableLongStateOf(0L) }
-                                            var lastTappedIcon by remember { mutableStateOf<Int?>(null) }
-                                            var navigateToExplore by remember { mutableStateOf(false) }
-                                            navigationItems.fastForEach { screen ->
-                                                val isSelected =
-                                                    navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true
-
-                                                NavigationBarItem(
-                                                    modifier = Modifier.tvFocusable(
-                                                        shape = RoundedCornerShape(12.dp),
-                                                    ),
-                                                    selected = isSelected,
-                                                    icon = {
-                                                        Icon(
-                                                            painter = painterResource(
-                                                                id = if (isSelected) screen.iconIdActive else screen.iconIdInactive
-                                                            ),
-                                                            contentDescription = null,
-                                                        )
-                                                    },
-                                                    label = {
-                                                        if (!slimNav) {
-                                                            Text(
-                                                                text = stringResource(screen.titleId),
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis
-                                                            )
-                                                        }
-                                                    },
-                                                    onClick = {
-                                                        val currentTapTime = System.currentTimeMillis()
-                                                        val timeSinceLastTap =
-                                                            currentTapTime - lastTapTime
-                                                        val isDoubleTap =
-                                                            screen.titleId == R.string.explore &&
-                                                                    lastTappedIcon == R.string.explore &&
-                                                                    timeSinceLastTap < 300
-
-                                                        lastTapTime = currentTapTime
-                                                        lastTappedIcon = screen.titleId
-
-                                                        if (screen.titleId == R.string.explore) {
-                                                            if (isDoubleTap) {
-                                                                onActiveChange(true)
-                                                                navigateToExplore = false
-                                                            } else {
-                                                                navigateToExplore = true
-                                                                coroutineScope.launch {
-                                                                    delay(100)
-                                                                    if (navigateToExplore) {
-                                                                        if (isSelected) {
-                                                                            navController.currentBackStackEntry?.savedStateHandle?.set(
-                                                                                "scrollToTop",
-                                                                                true
-                                                                            )
-                                                                        } else {
-                                                                            navigateToScreen(navController, screen)
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        } else {
-                                                            if (isSelected) {
-                                                                navController.currentBackStackEntry?.savedStateHandle?.set(
-                                                                    "scrollToTop",
-                                                                    true
-                                                                )
-                                                                coroutineScope.launch {
-                                                                    searchBarScrollBehavior.state.resetHeightOffset()
-                                                                }
-                                                            } else {
-                                                                navigateToScreen(navController, screen)
-                                                            }
-                                                        }
-                                                    },
+                                                }
+                                            val isScreenSelected: (Screens) -> Boolean = { screen ->
+                                                navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true
+                                            }
+                                            if (floatingNav) {
+                                                ExpressiveFloatingNavigationBar(
+                                                    items = navigationItems,
+                                                    isSelected = isScreenSelected,
+                                                    slimNav = slimNav,
+                                                    pureBlack = pureBlack,
+                                                    bottomInset = bottomInset,
+                                                    onItemClick = handleNavItemClick,
+                                                    modifier = navModifier,
+                                                )
+                                            } else {
+                                                ExpressiveShortNavigationBar(
+                                                    items = navigationItems,
+                                                    isSelected = isScreenSelected,
+                                                    slimNav = slimNav,
+                                                    pureBlack = pureBlack,
+                                                    bottomInset = bottomInset,
+                                                    onItemClick = handleNavItemClick,
+                                                    modifier = navModifier,
                                                 )
                                             }
                                         }
-                                        val baseBg = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
+                                        val baseBg = when {
+                                            floatingNav -> Color.Transparent
+                                            pureBlack -> Color.Black
+                                            else -> MaterialTheme.colorScheme.surfaceContainer
+                                        }
                                         val insetBg = if (playerBottomSheetState.progress > 0f) Color.Transparent else baseBg
 
                                         Box(
@@ -1312,18 +1284,13 @@ class MainActivity : AppCompatActivity() {
                                         containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
                                         contentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                         header = {
-                                            Image(
-                                                painter = painterResource(R.drawable.ic_anitail),
-                                                contentDescription = "App Logo",
-                                                modifier = Modifier
-                                                    .padding(top = 16.dp, bottom = 32.dp)
-                                                    .size(32.dp)
+                                            ExpressiveBrandLogoBadge(
+                                                size = 36.dp,
+                                                iconSize = 20.dp,
+                                                modifier = Modifier.padding(top = 16.dp, bottom = 32.dp),
                                             )
                                         }
                                     ) {
-                                        var lastTapTime by remember { mutableLongStateOf(0L) }
-                                        var lastTappedIcon by remember { mutableStateOf<Int?>(null) }
-                                        var navigateToExplore by remember { mutableStateOf(false) }
                                         navigationItems.fastForEach { screen ->
                                             val isSelected =
                                                 navBackStackEntry?.destination?.hierarchy?.any { it.route == screen.route } == true
@@ -1348,52 +1315,7 @@ class MainActivity : AppCompatActivity() {
                                                         overflow = TextOverflow.Ellipsis
                                                     )
                                                 },
-                                                onClick = {
-                                                    val currentTapTime = System.currentTimeMillis()
-                                                    val timeSinceLastTap =
-                                                        currentTapTime - lastTapTime
-                                                    val isDoubleTap =
-                                                        screen.titleId == R.string.explore &&
-                                                                lastTappedIcon == R.string.explore &&
-                                                                timeSinceLastTap < 300
-
-                                                    lastTapTime = currentTapTime
-                                                    lastTappedIcon = screen.titleId
-
-                                                    if (screen.titleId == R.string.explore) {
-                                                        if (isDoubleTap) {
-                                                            onActiveChange(true)
-                                                            navigateToExplore = false
-                                                        } else {
-                                                            navigateToExplore = true
-                                                            coroutineScope.launch {
-                                                                delay(100)
-                                                                if (navigateToExplore) {
-                                                                    if (isSelected) {
-                                                                        navController.currentBackStackEntry?.savedStateHandle?.set(
-                                                                            "scrollToTop",
-                                                                            true
-                                                                        )
-                                                                    } else {
-                                                                        navigateToScreen(navController, screen)
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    } else {
-                                                        if (isSelected) {
-                                                            navController.currentBackStackEntry?.savedStateHandle?.set(
-                                                                "scrollToTop",
-                                                                true
-                                                            )
-                                                            coroutineScope.launch {
-                                                                searchBarScrollBehavior.state.resetHeightOffset()
-                                                            }
-                                                        } else {
-                                                            navigateToScreen(navController, screen)
-                                                        }
-                                                    }
-                                                }
+                                                onClick = { handleNavItemClick(screen) }
                                             )
                                         }
                                     }
