@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
@@ -31,6 +32,14 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
 private val dataStoreScope = kotlinx.coroutines.CoroutineScope(SupervisorJob() + Dispatchers.IO)
 private val dataStoreStateFlows =
     ConcurrentHashMap<DataStore<Preferences>, StateFlow<Preferences>>()
+private val optimisticPreferenceOverrides =
+    ConcurrentHashMap<Preferences.Key<*>, MutableState<Any?>>()
+
+private object UnsetPreferenceSentinel
+
+@Suppress("UNCHECKED_CAST")
+private fun <T> optimisticPreferenceState(key: Preferences.Key<T>): MutableState<Any?> =
+    optimisticPreferenceOverrides.getOrPut(key) { mutableStateOf<Any?>(UnsetPreferenceSentinel) }
 
 private fun DataStore<Preferences>.cachedPreferences(): StateFlow<Preferences> =
     dataStoreStateFlows.getOrPut(this) {
@@ -91,22 +100,31 @@ fun <T> rememberPreference(
 ): MutableState<T> {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val optimisticState = remember(key) { optimisticPreferenceState(key) }
 
     val state =
-        remember {
+        remember(key) {
             context.dataStore.data
                 .map { it[key] ?: defaultValue }
                 .distinctUntilChanged()
         }.collectAsState(context.dataStore[key] ?: defaultValue)
 
-    return remember {
+    return remember(key) {
         object : MutableState<T> {
+            @Suppress("UNCHECKED_CAST")
             override var value: T
-                get() = state.value
+                get() {
+                    val overrideVal = optimisticState.value
+                    return if (overrideVal !== UnsetPreferenceSentinel) overrideVal as T else state.value
+                }
                 set(value) {
+                    optimisticState.value = value
                     coroutineScope.launch {
                         context.dataStore.edit {
                             it[key] = value
+                        }
+                        if (optimisticState.value == value) {
+                            optimisticState.value = UnsetPreferenceSentinel
                         }
                     }
                 }
@@ -123,27 +141,15 @@ inline fun <reified T : Enum<T>> rememberEnumPreference(
     key: Preferences.Key<String>,
     defaultValue: T,
 ): MutableState<T> {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
+    val (rawValue, setRawValue) = rememberPreference(key = key, defaultValue = defaultValue.name)
+    val enumValue = remember(rawValue) { rawValue.toEnum(defaultValue = defaultValue) }
 
-    val initialValue = context.dataStore[key].toEnum(defaultValue = defaultValue)
-    val state =
-        remember {
-            context.dataStore.data
-                .map { it[key].toEnum(defaultValue = defaultValue) }
-                .distinctUntilChanged()
-        }.collectAsState(initialValue)
-
-    return remember {
+    return remember(key) {
         object : MutableState<T> {
             override var value: T
-                get() = state.value
+                get() = enumValue
                 set(value) {
-                    coroutineScope.launch {
-                        context.dataStore.edit {
-                            it[key] = value.name
-                        }
-                    }
+                    setRawValue(value.name)
                 }
 
             override fun component1() = value
