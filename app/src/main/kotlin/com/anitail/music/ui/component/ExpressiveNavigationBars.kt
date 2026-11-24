@@ -181,6 +181,25 @@ internal fun segmentedGroupShape(
     return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
 }
 
+@Composable
+private fun horizontalConnectedTileShape(
+    isLeading: Boolean,
+    pressed: Boolean,
+    outer: Dp = 20.dp,
+    inner: Dp = 6.dp,
+): Shape {
+    val reducedMotion = rememberArtistReducedMotion()
+    val spec = if (reducedMotion) snap<Dp>() else MaterialTheme.motionScheme.fastSpatialSpec()
+    val startCorner by animateDpAsState(if (isLeading || pressed) outer else inner, spec, label = "tileStartCorner")
+    val endCorner by animateDpAsState(if (!isLeading || pressed) outer else inner, spec, label = "tileEndCorner")
+    return RoundedCornerShape(
+        topStart = startCorner,
+        bottomStart = startCorner,
+        topEnd = endCorner,
+        bottomEnd = endCorner,
+    )
+}
+
 /**
  * Staggered spatial entrance for stacked expressive groups.
  */
@@ -248,7 +267,6 @@ fun ExpressiveMainTopAppBar(
     hasUpdate: Boolean,
     avatarUrl: String?,
     scrollBehavior: TopAppBarScrollBehavior,
-    onHistoryClick: () -> Unit,
     onSearchClick: () -> Unit,
     onAvatarClick: () -> Unit,
     accountMenuContent: @Composable () -> Unit = {},
@@ -348,18 +366,6 @@ fun ExpressiveMainTopAppBar(
     }
 
     val actionsContent: @Composable RowScope.() -> Unit = {
-        if (currentRoute == Screens.Home.route) {
-            IconButton(
-                onClick = onHistoryClick,
-                shapes = IconButtonDefaults.shapes(),
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.history),
-                    contentDescription = stringResource(R.string.history),
-                )
-            }
-        }
-
         IconButton(
             onClick = onSearchClick,
             shapes = IconButtonDefaults.shapes(),
@@ -636,25 +642,25 @@ fun ExpressiveAccountMenuPopup(
                         }
                     }
 
-                    Column(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .expressiveEntrance(1),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        ExpressiveMenuNavigationRow(
+                        ExpressiveMenuConnectedTile(
                             title = stringResource(R.string.history),
                             iconRes = R.drawable.history,
-                            first = true,
-                            last = false,
+                            isLeading = true,
                             onClick = { dismissWith { onNavigate("history") } },
+                            modifier = Modifier.weight(1f),
                         )
-                        ExpressiveMenuNavigationRow(
+                        ExpressiveMenuConnectedTile(
                             title = stringResource(R.string.stats),
                             iconRes = R.drawable.stats,
-                            first = false,
-                            last = true,
+                            isLeading = false,
                             onClick = { dismissWith { onNavigate("stats") } },
+                            modifier = Modifier.weight(1f),
                         )
                     }
 
@@ -871,6 +877,72 @@ private fun AccountMenuHeroRow(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ExpressiveMenuConnectedTile(
+    title: String,
+    @DrawableRes iconRes: Int,
+    isLeading: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val reducedMotion = rememberArtistReducedMotion()
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val shape = horizontalConnectedTileShape(isLeading = isLeading, pressed = pressed)
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = if (reducedMotion) snap<Float>() else MaterialTheme.motionScheme.fastSpatialSpec<Float>(),
+        label = "accountConnectedTileScale",
+    )
+    val containerColor by animateColorAsState(
+        targetValue = if (pressed) colorScheme.secondaryContainer else colorScheme.surfaceContainer,
+        label = "accountConnectedTileBg",
+    )
+
+    Column(
+        modifier = modifier
+            .heightIn(min = 76.dp)
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
+            .clip(shape)
+            .background(containerColor)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(),
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(colorScheme.secondaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                tint = colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

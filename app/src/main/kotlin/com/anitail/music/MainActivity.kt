@@ -973,7 +973,6 @@ class MainActivity : AppCompatActivity() {
                                         latestVersionName = latestVersionName,
                                         pureBlack = pureBlack,
                                         scrollBehavior = searchBarScrollBehavior,
-                                        onHistoryClick = { navController.navigate("history") },
                                         onSearchClick = { onActiveChange(true) },
                                         onNavigate = { route -> navController.navigate(route) },
                                         onLogout = { App.forgetAccount(this@MainActivity) },
@@ -1751,7 +1750,6 @@ private fun MainTopAppBarSection(
     latestVersionName: String,
     pureBlack: Boolean,
     scrollBehavior: TopAppBarScrollBehavior,
-    onHistoryClick: () -> Unit,
     onSearchClick: () -> Unit,
     onNavigate: (String) -> Unit,
     onLogout: () -> Unit,
@@ -1799,7 +1797,6 @@ private fun MainTopAppBarSection(
         hasUpdate = hasUpdate,
         avatarUrl = avatarUrl,
         scrollBehavior = scrollBehavior,
-        onHistoryClick = onHistoryClick,
         onSearchClick = onSearchClick,
         onAvatarClick = { showAccountMenu = true },
         accountMenuContent = {
