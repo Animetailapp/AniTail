@@ -193,8 +193,8 @@ fun DiscordSettings(
         val token = DiscordTokenStore.retrieveSuspend()
         if (token != null) {
             discordAccessToken = token
-            if (!DiscordRpcManager.isAuthorized()) {
-                DiscordRpcManager.reconnectWithToken(token)
+            if (!DiscordRpcManager.isReady()) {
+                DiscordRpcManager.ensureConnected()
             }
         }
     }

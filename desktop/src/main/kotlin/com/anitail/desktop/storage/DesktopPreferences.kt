@@ -324,6 +324,9 @@ class DesktopPreferences private constructor(
     private val _discordRefreshToken = MutableStateFlow("")
     val discordRefreshToken: StateFlow<String> = _discordRefreshToken.asStateFlow()
 
+    private val _discordTokenExpiryEpochMillis = MutableStateFlow(0L)
+    val discordTokenExpiryEpochMillis: StateFlow<Long> = _discordTokenExpiryEpochMillis.asStateFlow()
+
     private val _discordName = MutableStateFlow("")
     val discordName: StateFlow<String> = _discordName.asStateFlow()
 
@@ -696,6 +699,17 @@ class DesktopPreferences private constructor(
         scheduleSave()
     }
 
+    fun setDiscordTokenExpiryEpochMillis(value: Long) = updatePref(_discordTokenExpiryEpochMillis, value)
+
+    fun clearDiscordSession() {
+        setDiscordToken("")
+        setDiscordRefreshToken("")
+        setDiscordTokenExpiryEpochMillis(0L)
+        setDiscordName("")
+        setDiscordUsername("")
+        setDiscordAvatarUrl("")
+    }
+
     fun setDiscordName(value: String) = updatePref(_discordName, value)
 
     fun setDiscordUsername(value: String) = updatePref(_discordUsername, value)
@@ -873,6 +887,7 @@ class DesktopPreferences private constructor(
         _proxyPassword.value = ""
         _discordToken.value = ""
         _discordRefreshToken.value = ""
+        _discordTokenExpiryEpochMillis.value = 0L
         _spotifyAccessToken.value = ""
         _spotifyRefreshToken.value = ""
         _spotifyTokenExpiryEpochMillis.value = 0L
@@ -1003,6 +1018,7 @@ class DesktopPreferences private constructor(
                 legacyJsonKey = "discordRefreshToken",
                 secureKey = SensitiveKeys.DISCORD_REFRESH_TOKEN,
             )
+            _discordTokenExpiryEpochMillis.value = json.optLong("discordTokenExpiryEpochMillis", 0L)
             _discordName.value = json.optString("discordName", "")
             _discordUsername.value = json.optString("discordUsername", "")
             _discordAvatarUrl.value =
@@ -1298,6 +1314,7 @@ class DesktopPreferences private constructor(
                 put("discordName", _discordName.value)
                 put("discordUsername", _discordUsername.value)
                 put("discordAvatarUrl", _discordAvatarUrl.value)
+                put("discordTokenExpiryEpochMillis", _discordTokenExpiryEpochMillis.value)
                 put("discordInfoDismissed", _discordInfoDismissed.value)
                 put("discordRPCEnable", _enableDiscordRPC.value)
                 put("discordAdvancedMode", _discordAdvancedMode.value)
@@ -1401,6 +1418,12 @@ class DesktopPreferences private constructor(
                     it.load()
                     INSTANCE = it
                 }
+            }
+        }
+
+        internal fun createForTest(filePath: Path, secureStore: SecureSecretsStore): DesktopPreferences {
+            return DesktopPreferences(filePath = filePath, secureStore = secureStore).also {
+                it.load()
             }
         }
 

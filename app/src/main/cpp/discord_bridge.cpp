@@ -13,6 +13,7 @@ DiscordBridge g_discordBridge;
 
 jclass DiscordBridge::discordRpcManagerClass_ = nullptr;
 jmethodID DiscordBridge::onNativeStatusChangedMethod_ = nullptr;
+jmethodID DiscordBridge::onNativeTokenExpiredMethod_ = nullptr;
 
 DiscordBridge::DiscordBridge()
     : client_(nullptr), ready_(false), authorized_(false), appId_(0), javaVm_(nullptr) {
@@ -26,7 +27,7 @@ DiscordBridge::~DiscordBridge() {
 
 bool DiscordBridge::Init(int64_t appId) {
     LOGI("Init called with appId=%lld", (long long)appId);
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (client_) {
         LOGI("Init: client already exists, destroying first");
         DestroyUnlocked();
@@ -41,7 +42,7 @@ bool DiscordBridge::Init(int64_t appId) {
             [this](discordpp::Client::Status status,
                    discordpp::Client::Error error,
                    int32_t errorDetail) {
-                std::lock_guard<std::mutex> lock(mutex_);
+                std::lock_guard<std::recursive_mutex> lock(mutex_);
                 const char* statusStr = "Unknown";
                 switch (status) {
                     case discordpp::Client::Status::Connecting:    statusStr = "Connecting"; break;
@@ -73,6 +74,11 @@ bool DiscordBridge::Init(int64_t appId) {
                         LOGW("STATUS: Disconnected while previously ready (err=%s)", errorStr);
                     }
                     ready_ = false;
+                    if (errorDetail == 4004 || errorDetail == 401) {
+                        LOGW("STATUS: Disconnected due to auth failure (errorDetail=%d), clearing authorized_",
+                             errorDetail);
+                        authorized_ = false;
+                    }
                 } else if (status == discordpp::Client::Status::Disconnecting) {
                     LOGI("STATUS: Disconnecting...");
                 } else if (status == discordpp::Client::Status::Reconnecting) {
@@ -84,8 +90,17 @@ bool DiscordBridge::Init(int64_t appId) {
                 } else if (status == discordpp::Client::Status::Connected) {
                     LOGI("STATUS: Connected (not yet ready)");
                 }
-                FireNativeStatusCallback(static_cast<int>(status), ready_, authorized_);
+                FireNativeStatusCallback(
+                    static_cast<int>(status),
+                    static_cast<int>(error),
+                    errorDetail,
+                    ready_,
+                    authorized_);
             });
+        client_->SetTokenExpirationCallback([this]() {
+            LOGW("SDK TokenExpirationCallback fired");
+            FireNativeTokenExpiredCallback();
+        });
         LOGI("Init: success");
         return true;
     } catch (const std::exception& e) {
@@ -105,7 +120,7 @@ void DiscordBridge::Authorize() {
     LOGI("Authorize called (client_=%s, authorized_=%s)",
          client_ ? "exists" : "null",
          authorized_ ? "true" : "false");
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (!client_) {
         LOGE("Authorize: no client, aborting");
         return;
@@ -214,7 +229,9 @@ void DiscordBridge::DoGetToken(
     }
 }
 
-void DiscordBridge::FireNativeStatusCallback(int statusCode, bool ready, bool authorized) {
+void DiscordBridge::FireNativeStatusCallback(
+    int statusCode, int errorCode, int errorDetail, bool ready, bool authorized
+) {
     if (!javaVm_) return;
     JNIEnv* env = nullptr;
     int getEnvStat = javaVm_->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
@@ -228,7 +245,36 @@ void DiscordBridge::FireNativeStatusCallback(int statusCode, bool ready, bool au
     }
 
     if (discordRpcManagerClass_ && onNativeStatusChangedMethod_) {
-        env->CallStaticVoidMethod(discordRpcManagerClass_, onNativeStatusChangedMethod_, statusCode, ready, authorized);
+        env->CallStaticVoidMethod(
+            discordRpcManagerClass_,
+            onNativeStatusChangedMethod_,
+            statusCode,
+            errorCode,
+            errorDetail,
+            ready,
+            authorized);
+    }
+
+    if (needsDetach) {
+        javaVm_->DetachCurrentThread();
+    }
+}
+
+void DiscordBridge::FireNativeTokenExpiredCallback() {
+    if (!javaVm_) return;
+    JNIEnv* env = nullptr;
+    int getEnvStat = javaVm_->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    bool needsDetach = false;
+    if (getEnvStat == JNI_EDETACHED) {
+        JavaVMAttachArgs args = {JNI_VERSION_1_6, "DiscordTokenExpiredCallback", nullptr};
+        if (javaVm_->AttachCurrentThread(&env, &args) != JNI_OK) return;
+        needsDetach = true;
+    } else if (getEnvStat != JNI_OK) {
+        return;
+    }
+
+    if (discordRpcManagerClass_ && onNativeTokenExpiredMethod_) {
+        env->CallStaticVoidMethod(discordRpcManagerClass_, onNativeTokenExpiredMethod_);
     }
 
     if (needsDetach) {
@@ -245,7 +291,7 @@ void DiscordBridge::SetActivity(
     const char* button1Label, const char* button1Url,
     const char* button2Label, const char* button2Url
 ) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (!client_) { LOGW("SetActivity: no client, skipping"); return; }
     if (!ready_) {
         LOGW("SetActivity: not ready (ready_=false), skipping activity for name=%s",
@@ -323,7 +369,7 @@ void DiscordBridge::SetActivity(
 }
 
 void DiscordBridge::SetOnlineStatus(int statusType) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (!client_) { LOGW("SetOnlineStatus: no client, skipping"); return; }
     if (!ready_) { LOGW("SetOnlineStatus: not ready, skipping"); return; }
     LOGI("SetOnlineStatus: setting status to %d", statusType);
@@ -347,7 +393,7 @@ void DiscordBridge::SetOnlineStatus(int statusType) {
 }
 
 void DiscordBridge::Clear() {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (!client_) {
         LOGW("Clear: no client, skipping");
         return;
@@ -384,7 +430,7 @@ void DiscordBridge::Shutdown() {
          ready_ ? "true" : "false",
          authorized_ ? "true" : "false",
          client_ ? "exists" : "null");
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (!client_) {
         LOGW("Shutdown: no client, nothing to do");
         return;
@@ -409,12 +455,8 @@ void DiscordBridge::SetTokenAndConnect(const char* token) {
          ready_ ? "true" : "false",
          authorized_ ? "true" : "false");
     if (!token) { LOGE("SetTokenAndConnect: null token"); return; }
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (!client_) { LOGE("SetTokenAndConnect: no client"); return; }
-    if (authorized_) {
-        LOGW("SetTokenAndConnect: already authorized, skipping");
-        return;
-    }
     try {
         LOGI("SetTokenAndConnect: calling client_->UpdateToken(Bearer, token_len=%zu)...",
              strlen(token));
@@ -422,14 +464,20 @@ void DiscordBridge::SetTokenAndConnect(const char* token) {
             discordpp::AuthorizationTokenType::Bearer,
             std::string(token),
             [this](discordpp::ClientResult result) {
+                std::lock_guard<std::recursive_mutex> lk(mutex_);
                 if (result.Successful()) {
-                    std::lock_guard<std::mutex> lk(mutex_);
                     authorized_ = true;
                     LOGI("SetTokenAndConnect: UpdateToken succeeded, authorized_=true");
+                    if (client_ && !ready_) {
+                        LOGI("SetTokenAndConnect: calling client_->Connect()...");
+                        client_->Connect();
+                    }
                 } else {
+                    authorized_ = false;
                     LOGE("SetTokenAndConnect: UpdateToken FAILED: err=%s errCode=%d retryable=%s",
                          result.Error().c_str(), result.ErrorCode(),
                          result.Retryable() ? "true" : "false");
+                    FireNativeStatusCallback(0, 1, result.ErrorCode(), ready_, false);
                 }
             }
         );
@@ -444,7 +492,7 @@ void DiscordBridge::SetTokenAndConnect(const char* token) {
 void DiscordBridge::Connect() {
     LOGI("Connect called (ready_=%s, authorized_=%s)",
          ready_ ? "true" : "false", authorized_ ? "true" : "false");
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (!client_) { LOGE("Connect: no client"); return; }
     if (ready_) {
         LOGW("Connect: already ready, skipping");
@@ -505,7 +553,7 @@ void DiscordBridge::Destroy() {
          ready_ ? "true" : "false",
          authorized_ ? "true" : "false",
          client_ ? "exists" : "null");
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
     DestroyUnlocked();
 }
 
@@ -523,9 +571,13 @@ Java_com_anitail_music_discord_DiscordRpcManager_nativeInit(
     if (localClass) {
         jclass globalClass = static_cast<jclass>(env->NewGlobalRef(localClass));
         DiscordBridge::SetDiscordRpcManagerClass(env, globalClass);
-        jmethodID method = env->GetStaticMethodID(localClass, "onNativeStatusChanged", "(IZZ)V");
+        jmethodID method = env->GetStaticMethodID(localClass, "onNativeStatusChanged", "(IIIZZ)V");
         if (method) {
             DiscordBridge::SetOnNativeStatusChangedMethod(method);
+        }
+        jmethodID expMethod = env->GetStaticMethodID(localClass, "onNativeTokenExpired", "()V");
+        if (expMethod) {
+            DiscordBridge::SetOnNativeTokenExpiredMethod(expMethod);
         }
         env->DeleteLocalRef(localClass);
     }
