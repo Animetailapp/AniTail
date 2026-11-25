@@ -899,6 +899,10 @@ constructor(
         // Discord account
         DiscordTokenStore.init(context)
         DiscordTokenStore.retrieve()?.let { accounts["discordToken"] = it }
+        DiscordTokenStore.retrieveRefreshToken()?.let { accounts["discordRefreshToken"] = it }
+        DiscordTokenStore.retrieveExpiresAt().takeIf { it > 0L }?.let {
+            accounts["discordTokenExpiresAt"] = it.toString()
+        }
         prefs[DiscordUsernameKey]?.let {
             accounts["discordUsername"] = it
         }
@@ -982,6 +986,16 @@ constructor(
                 accountsMap["discordToken"]?.let {
                     DiscordTokenStore.init(context)
                     DiscordTokenStore.store(decodeBase64(it))
+                }
+                accountsMap["discordRefreshToken"]?.let {
+                    DiscordTokenStore.init(context)
+                    DiscordTokenStore.storeRefreshToken(decodeBase64(it))
+                }
+                accountsMap["discordTokenExpiresAt"]?.let {
+                    decodeBase64(it).toLongOrNull()?.let { exp ->
+                        DiscordTokenStore.init(context)
+                        DiscordTokenStore.storeExpiresAt(exp)
+                    }
                 }
                 accountsMap["discordUsername"]?.let {
                     prefs[DiscordUsernameKey] = decodeBase64(it)

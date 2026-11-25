@@ -20,6 +20,8 @@ import com.anitail.music.playback.StreamUrlCache
 import com.anitail.music.utils.cipher.CipherDeobfuscator
 import com.anitail.music.utils.potoken.PoTokenGenerator
 import com.anitail.music.utils.potoken.PoTokenResult
+import com.metrolist.innertubex.sabr.SabrBootstrap
+import com.metrolist.innertubex.sabr.SabrVideoVariant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,6 +41,8 @@ object YTPlayerUtils {
     private val poTokenGenerator = PoTokenGenerator()
 
     private const val WEB_REMIX_FAILURE_TTL_MS = 5 * 60 * 1000L
+    private const val LEGACY_VIDEO_RANGE_CHUNK_BYTES = 2 * 1024 * 1024L
+    private val cipherRefreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val webRemixFailures = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     fun markWebRemixFailed(videoId: String) {
@@ -60,7 +64,38 @@ object YTPlayerUtils {
         InnerTubeXPlayer.clearStreamClientFailures()
     }
 
-    private val cipherRefreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private fun YouTubeClient.needsNTransform(): Boolean =
+        useWebPoTokens ||
+            clientName in listOf(
+                "WEB",
+                "WEB_REMIX",
+                "WEB_CREATOR",
+                "TVHTML5",
+                "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+            )
+
+    private suspend fun prepareLegacyStreamUrl(
+        rawUrl: String,
+        client: YouTubeClient,
+        poToken: PoTokenResult?,
+    ): String {
+        if (!client.needsNTransform()) return rawUrl
+
+        return try {
+            var resolvedUrl = CipherDeobfuscator.transformNParamInUrl(rawUrl)
+            val streamingToken = poToken?.streamingDataPoToken
+            if (client.useWebPoTokens && streamingToken != null) {
+                val separator = if ("?" in resolvedUrl) "&" else "?"
+                resolvedUrl = "${resolvedUrl}${separator}pot=${Uri.encode(streamingToken)}"
+            }
+            resolvedUrl
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "N-transform or pot append failed: ${e.message}")
+            rawUrl
+        }
+    }
 
     /**
      * The main client is used for metadata and initial streams.
@@ -112,7 +147,54 @@ object YTPlayerUtils {
         val requireBoundedRange: Boolean = false,
         val rangeChunkSizeBytes: Long = 0L,
         val useRangeChunks: Boolean = false,
-    )
+        val videoUrl: String? = null,
+        val videoWidth: Int? = null,
+        val videoHeight: Int? = null,
+        val videoMimeType: String? = null,
+        val videoCodecs: String? = null,
+        val videoBitrate: Int? = null,
+        val videoItag: Int? = null,
+        val videoContentLengthBytes: Long? = null,
+        val sabrBootstrap: SabrBootstrap? = null,
+        val sabrVideoBootstrap: SabrBootstrap? = null,
+        val availableVideoHeights: List<Int> = emptyList(),
+        val isHls: Boolean = false,
+    ) {
+        val isSabr: Boolean
+            get() = sabrBootstrap != null
+
+        val hasSabrVideo: Boolean
+            get() = sabrVideoBootstrap?.selectedVideoFormat != null
+
+        val hasDirectVideo: Boolean
+            get() = !videoUrl.isNullOrBlank() && !videoUrl.startsWith("sabr-video://")
+
+        val hasVideo: Boolean
+            get() = hasDirectVideo || hasSabrVideo || isHlsStream
+
+        val isMuxedVideo: Boolean
+            get() = !videoUrl.isNullOrBlank() && videoUrl == streamUrl
+
+        val isHlsStream: Boolean
+            get() =
+                isHls ||
+                    format.mimeType.contains("mpegurl", ignoreCase = true) ||
+                    videoMimeType.orEmpty().contains("mpegurl", ignoreCase = true) ||
+                    streamUrl.substringBefore('?').endsWith(".m3u8", ignoreCase = true) ||
+                    videoUrl.orEmpty().substringBefore('?').endsWith(".m3u8", ignoreCase = true)
+
+        fun withSabrVideoVariant(variant: SabrVideoVariant): PlaybackData =
+            copy(
+                sabrVideoBootstrap = checkNotNull(sabrVideoBootstrap).withVideoVariant(variant),
+                videoItag = variant.format.itag,
+                videoWidth = variant.width,
+                videoHeight = variant.height,
+                videoMimeType = variant.mimeType,
+                videoCodecs = null,
+                videoBitrate = variant.bitrate,
+                videoContentLengthBytes = variant.contentLengthBytes,
+            )
+    }
 
     /**
      * Custom player response intended to use for playback.
@@ -126,20 +208,118 @@ object YTPlayerUtils {
         connectivityManager: ConnectivityManager,
         targetItag: Int = 0,
     ): Result<PlaybackData> {
-        val innertubexResult = InnerTubeXPlayer.playerResponseForPlayback(
-            videoId = videoId,
-            playlistId = playlistId,
-            audioQuality = audioQuality,
-            connectivityManager = connectivityManager,
+        val requestedContainer = InnerTubeXPlayer.targetAudioContainerForItag(targetItag)
+        var cachedInnerTubeXResult: Result<PlaybackData>? = null
+        return resolvePlaybackWithTargetItag(
             targetItag = targetItag,
+            requestedContainer = requestedContainer,
+            resolveInnerTubeX = {
+                InnerTubeXPlayer.playerResponseForPlayback(
+                    videoId = videoId,
+                    playlistId = playlistId,
+                    audioQuality = audioQuality,
+                    connectivityManager = connectivityManager,
+                    targetItag = targetItag,
+                ).also { cachedInnerTubeXResult = it }
+            },
+            resolveLegacy = { requireExactTargetItag, preferredContainer ->
+                playerResponseForPlaybackLegacy(
+                    videoId = videoId,
+                    playlistId = playlistId,
+                    audioQuality = audioQuality,
+                    connectivityManager = connectivityManager,
+                    targetItag = targetItag,
+                    requireExactTargetItag = requireExactTargetItag,
+                    preferredContainer = preferredContainer,
+                    hasInnerTubeXFallback = cachedInnerTubeXResult?.isSuccess == true,
+                )
+            },
         )
-        if (innertubexResult.isSuccess) {
-            Timber.tag(logTag).d("Successfully obtained playback data via InnerTubeX for videoId: $videoId")
-            return innertubexResult
-        }
-        Timber.tag(logTag).w(innertubexResult.exceptionOrNull(), "InnerTubeX resolution failed for $videoId; falling back to legacy pipeline")
+    }
 
-        return runCatching {
+    internal suspend fun resolvePlaybackWithTargetItag(
+        targetItag: Int,
+        requestedContainer: InnerTubeXPlayer.TargetAudioContainer?,
+        resolveInnerTubeX: suspend () -> Result<PlaybackData>,
+        resolveLegacy: suspend (
+            requireExactTargetItag: Boolean,
+            preferredContainer: InnerTubeXPlayer.TargetAudioContainer?,
+        ) -> Result<PlaybackData>,
+    ): Result<PlaybackData> {
+        val innertubexResult = resolveInnerTubeX()
+        if (targetItag <= 0) {
+            if (innertubexResult.isSuccess) {
+                Timber.tag(logTag).d("Successfully obtained playback data via InnerTubeX")
+                return innertubexResult
+            }
+            Timber.tag(logTag).w(
+                innertubexResult.exceptionOrNull(),
+                "InnerTubeX resolution failed; falling back to legacy pipeline",
+            )
+            return resolveLegacy(false, null)
+        }
+
+        val innertubexData = innertubexResult.getOrNull()
+        if (innertubexData != null && innertubexData.format.itag == targetItag) {
+            Timber.tag(logTag).d("Successfully obtained exact targetItag=%d via InnerTubeX", targetItag)
+            return Result.success(innertubexData)
+        }
+
+        val innerTubeXContainerFallback =
+            innertubexData?.takeIf {
+                requestedContainer != null &&
+                    InnerTubeXPlayer.matchesTargetContainer(it.format.mimeType, requestedContainer)
+            }
+
+        val exactLegacyResult = resolveLegacy(true, requestedContainer)
+        if (exactLegacyResult.isSuccess) {
+            return exactLegacyResult
+        }
+
+        if (innerTubeXContainerFallback != null) {
+            Timber.tag(logTag).w(
+                exactLegacyResult.exceptionOrNull(),
+                "Exact targetItag=%d unavailable in legacy pipeline; using container-matched InnerTubeX stream itag=%d (%s)",
+                targetItag,
+                innerTubeXContainerFallback.format.itag,
+                innerTubeXContainerFallback.format.mimeType,
+            )
+            return Result.success(innerTubeXContainerFallback)
+        }
+
+        if (requestedContainer != null) {
+            val containerLegacyResult = resolveLegacy(false, requestedContainer)
+            if (containerLegacyResult.isSuccess) {
+                return containerLegacyResult
+            }
+        }
+
+        if (innertubexData != null) {
+            Timber.tag(logTag).w(
+                exactLegacyResult.exceptionOrNull(),
+                "Requested targetItag=%d (%s) unavailable; falling back to InnerTubeX stream itag=%d (%s)",
+                targetItag,
+                requestedContainer,
+                innertubexData.format.itag,
+                innertubexData.format.mimeType,
+            )
+            return Result.success(innertubexData)
+        }
+
+        return exactLegacyResult.exceptionOrNull()?.let { Result.failure(it) }
+            ?: innertubexResult
+    }
+
+    private suspend fun playerResponseForPlaybackLegacy(
+        videoId: String,
+        playlistId: String? = null,
+        audioQuality: AudioQuality,
+        connectivityManager: ConnectivityManager,
+        targetItag: Int = 0,
+        requireExactTargetItag: Boolean = false,
+        preferredContainer: InnerTubeXPlayer.TargetAudioContainer? = null,
+        hasInnerTubeXFallback: Boolean = false,
+    ): Result<PlaybackData> = runCatching {
             Timber.tag(logTag).d("Fetching player response for videoId: $videoId, playlistId: $playlistId")
 
         // 1. Check StreamUrlCache first
@@ -225,7 +405,8 @@ object YTPlayerUtils {
         var streamUrl: String? = null
         var streamExpiresInSeconds: Int? = null
         var streamPlayerResponse: PlayerResponse? = null
-        var successClient: YouTubeClient = MAIN_CLIENT
+        var resolvedSuccessClient: YouTubeClient? = null
+        val requireValidatedStream = targetItag > 0 || preferredContainer != null
 
         for (clientIndex in (-1 until STREAM_FALLBACK_CLIENTS.size)) {
             // reset for each client
@@ -274,10 +455,12 @@ object YTPlayerUtils {
 
                 format =
                     findFormat(
-                        response,
-                        audioQuality,
-                        connectivityManager,
-                        targetItag,
+                        playerResponse = response,
+                        audioQuality = audioQuality,
+                        connectivityManager = connectivityManager,
+                        targetItag = targetItag,
+                        requireExactTargetItag = requireExactTargetItag,
+                        preferredContainer = preferredContainer,
                     )
 
                 if (format == null) {
@@ -295,44 +478,31 @@ object YTPlayerUtils {
 
                 // Apply n-transform and PoToken for web clients
                 val currentClient = client
-                val needsNTransform = currentClient.useWebPoTokens ||
-                    currentClient.clientName in listOf("WEB", "WEB_REMIX", "WEB_CREATOR", "TVHTML5")
-
-                if (needsNTransform) {
-                    try {
-                        streamUrl = CipherDeobfuscator.transformNParamInUrl(streamUrl)
-                        val needsPoToken = currentClient.useWebPoTokens && poToken?.streamingDataPoToken != null
-                        if (needsPoToken) {
-                            val separator = if ("?" in streamUrl) "&" else "?"
-                            streamUrl = "${streamUrl}${separator}pot=${Uri.encode(poToken.streamingDataPoToken)}"
-                        }
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Timber.tag(TAG).e(e, "N-transform or pot append failed: ${e.message}")
-                    }
-                }
+                val needsNTransform = currentClient.needsNTransform()
+                streamUrl = prepareLegacyStreamUrl(streamUrl, currentClient, poToken)
 
                 streamExpiresInSeconds = response.streamingData?.expiresInSeconds ?: 21600
                 Timber.tag(logTag).d("Stream expires in: $streamExpiresInSeconds seconds")
 
-                if (clientIndex == STREAM_FALLBACK_CLIENTS.size - 1) {
+                if (clientIndex == STREAM_FALLBACK_CLIENTS.size - 1 &&
+                    !(requireValidatedStream && hasInnerTubeXFallback)
+                ) {
                     /** skip [validateStatus] for last client */
                     Timber.tag(logTag).d("Using last fallback client without validation: ${client.clientName}")
-                    successClient = client
+                    resolvedSuccessClient = client
                     break
                 }
 
-                if (currentClient.clientName == "WEB_REMIX") {
+                if (currentClient.clientName == "WEB_REMIX" && !requireValidatedStream) {
                     Timber.tag(logTag).d("WEB_REMIX - skipping HEAD validation, letting ExoPlayer try directly")
-                    successClient = currentClient
+                    resolvedSuccessClient = currentClient
                     break
                 }
 
                 if (validateStatus(streamUrl, currentClient.streamHeaders())) {
                     // working stream found
                     Timber.tag(logTag).d("Stream validated successfully with client: ${currentClient.clientName}")
-                    successClient = currentClient
+                    resolvedSuccessClient = currentClient
                     break
                 } else {
                     Timber.tag(logTag).d("Stream validation failed for client: ${currentClient.clientName}")
@@ -377,6 +547,7 @@ object YTPlayerUtils {
             throw Exception("Could not find stream url")
         }
 
+        val successClient = resolvedSuccessClient ?: throw Exception("Stream validation failed for all clients")
         val streamHeaders = successClient.streamHeaders()
 
         // Cache in StreamUrlCache
@@ -401,6 +572,242 @@ object YTPlayerUtils {
             streamHeaders = streamHeaders,
         )
     }
+
+    suspend fun playerResponseForVideoPlayback(
+        videoId: String,
+        playlistId: String? = null,
+        audioQuality: AudioQuality,
+        maxVideoHeight: Int? = null,
+        connectivityManager: ConnectivityManager,
+        isLive: Boolean? = null,
+        isExplicit: Boolean? = null,
+    ): Result<PlaybackData> {
+        val innertubexResult =
+            InnerTubeXPlayer.playerResponseForVideoPlayback(
+                videoId = videoId,
+                audioQuality = audioQuality,
+                connectivityManager = connectivityManager,
+                maxVideoHeight = maxVideoHeight,
+                isLive = isLive,
+                isExplicit = isExplicit,
+            )
+        if (innertubexResult.isSuccess && innertubexResult.getOrNull()?.hasVideo == true) {
+            Timber.tag(logTag).d("Successfully obtained video playback data via InnerTubeX for videoId: $videoId")
+            return innertubexResult
+        }
+        Timber.tag(logTag).w(
+            innertubexResult.exceptionOrNull(),
+            "InnerTubeX video resolution failed for $videoId; falling back to legacy pipeline",
+        )
+
+        return runCatching {
+            val signatureTimestamp = getSignatureTimestampOrNull(videoId)
+            val isLoggedIn = YouTube.cookie != null
+            val sessionId = YouTube.visitorData
+            val webPoToken =
+                if (sessionId != null) {
+                    runCatching { poTokenGenerator.getWebClientPoToken(videoId, sessionId) }.getOrNull()
+                } else {
+                    null
+                }
+
+            val videoFallbackClients =
+                listOf(
+                    IOS,
+                    TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+                    MOBILE,
+                    WEB,
+                    WEB_CREATOR,
+                    MAIN_CLIENT,
+                    ANDROID_VR_NO_AUTH,
+                )
+
+            var audioConfig: PlayerResponse.PlayerConfig.AudioConfig? = null
+            var videoDetails: PlayerResponse.VideoDetails? = null
+            var playbackTracking: PlayerResponse.PlaybackTracking? = null
+
+            for (client in videoFallbackClients) {
+                if (client.loginRequired && !isLoggedIn && YouTube.cookie == null) continue
+                val clientSigTimestamp = if (client.useSignatureTimestamp) signatureTimestamp else null
+                val clientPoToken = if (client.useWebPoTokens) webPoToken?.playerRequestPoToken else null
+                val response =
+                    try {
+                        YouTube.player(
+                            videoId = videoId,
+                            playlistId = playlistId,
+                            client = client,
+                            signatureTimestamp = clientSigTimestamp,
+                            poToken = clientPoToken,
+                        ).getOrNull()
+                    } catch (_: Exception) {
+                        null
+                    } ?: continue
+
+                if (!isPlayable(response.playabilityStatus.status)) continue
+                audioConfig = audioConfig ?: response.playerConfig?.audioConfig
+                videoDetails = videoDetails ?: response.videoDetails
+                playbackTracking = playbackTracking ?: response.playbackTracking
+                val streamingData = response.streamingData ?: continue
+                val headers = client.streamHeaders()
+                val expiresIn = streamingData.expiresInSeconds.coerceAtLeast(1)
+
+                val allVideoFormats =
+                    (streamingData.adaptiveFormats + streamingData.formats.orEmpty())
+                        .filter { !it.isAudio && (it.height ?: 0) > 0 }
+                val availableHeights =
+                    allVideoFormats.mapNotNull { it.height?.takeIf { h -> h > 0 } }.distinct().sorted()
+
+                // 1. Try separate adaptive video + audio
+                val adaptiveVideos = streamingData.adaptiveFormats.filter { !it.isAudio && (it.height ?: 0) > 0 }
+                val chosenVideo = selectLegacyVideoFormat(adaptiveVideos, maxVideoHeight)
+                val chosenAudio = findFormat(response, audioQuality, connectivityManager)
+                if (chosenVideo != null && chosenAudio != null) {
+                    val rawVideoUrl = findUrlOrNull(chosenVideo, videoId)
+                    val rawAudioUrl = findUrlOrNull(chosenAudio, videoId)
+                    val videoUrl = rawVideoUrl?.let { prepareLegacyStreamUrl(it, client, webPoToken) }
+                    val audioUrl = rawAudioUrl?.let { prepareLegacyStreamUrl(it, client, webPoToken) }
+                    if (!videoUrl.isNullOrBlank() &&
+                        !audioUrl.isNullOrBlank() &&
+                        validateStatus(videoUrl, headers) &&
+                        validateStatus(audioUrl, headers)
+                    ) {
+                        return@runCatching PlaybackData(
+                            audioConfig = audioConfig,
+                            videoDetails = videoDetails,
+                            playbackTracking = playbackTracking,
+                            format = chosenAudio,
+                            streamUrl = audioUrl,
+                            streamExpiresInSeconds = expiresIn,
+                            streamClient = client.clientName,
+                            streamHeaders = headers,
+                            requireBoundedRange = true,
+                            rangeChunkSizeBytes = LEGACY_VIDEO_RANGE_CHUNK_BYTES,
+                            useRangeChunks = true,
+                            videoUrl = videoUrl,
+                            videoWidth = chosenVideo.width,
+                            videoHeight = chosenVideo.height,
+                            videoMimeType = chosenVideo.mimeType.substringBefore(';'),
+                            videoCodecs =
+                                chosenVideo.mimeType
+                                    .substringAfter("codecs=", "")
+                                    .removeSurrounding("\"")
+                                    .takeIf { it.isNotBlank() },
+                            videoBitrate = chosenVideo.bitrate,
+                            videoItag = chosenVideo.itag,
+                            videoContentLengthBytes = chosenVideo.contentLength,
+                            availableVideoHeights = availableHeights,
+                        )
+                    }
+                }
+
+                // 2. Try muxed formats
+                val muxedVideos = streamingData.formats.orEmpty().filter { !it.isAudio && (it.height ?: 0) > 0 }
+                val chosenMuxed = selectLegacyVideoFormat(muxedVideos, maxVideoHeight)
+                if (chosenMuxed != null) {
+                    val muxedUrl =
+                        findUrlOrNull(chosenMuxed, videoId)?.let {
+                            prepareLegacyStreamUrl(it, client, webPoToken)
+                        }
+                    if (!muxedUrl.isNullOrBlank() && validateStatus(muxedUrl, headers)) {
+                        return@runCatching PlaybackData(
+                            audioConfig = audioConfig,
+                            videoDetails = videoDetails,
+                            playbackTracking = playbackTracking,
+                            format = chosenMuxed,
+                            streamUrl = muxedUrl,
+                            streamExpiresInSeconds = expiresIn,
+                            streamClient = client.clientName,
+                            streamHeaders = headers,
+                            requireBoundedRange = true,
+                            rangeChunkSizeBytes = LEGACY_VIDEO_RANGE_CHUNK_BYTES,
+                            useRangeChunks = true,
+                            videoUrl = muxedUrl,
+                            videoWidth = chosenMuxed.width,
+                            videoHeight = chosenMuxed.height,
+                            videoMimeType = chosenMuxed.mimeType.substringBefore(';'),
+                            videoCodecs =
+                                chosenMuxed.mimeType
+                                    .substringAfter("codecs=", "")
+                                    .removeSurrounding("\"")
+                                    .takeIf { it.isNotBlank() },
+                            videoBitrate = chosenMuxed.bitrate,
+                            videoItag = chosenMuxed.itag,
+                            videoContentLengthBytes = chosenMuxed.contentLength,
+                            availableVideoHeights = availableHeights,
+                        )
+                    }
+                }
+
+                // 3. Try HLS manifest (e.g. IOS / live broadcasts)
+                val hlsUrl = streamingData.hlsManifestUrl?.takeIf { it.isNotBlank() }
+                if (hlsUrl != null) {
+                    val placeholderFormat =
+                        chosenAudio ?: PlayerResponse.StreamingData.Format(
+                            itag = 0,
+                            url = hlsUrl,
+                            mimeType = "application/x-mpegURL",
+                            bitrate = 0,
+                            width = null,
+                            height = maxVideoHeight,
+                            contentLength = null,
+                            quality = "hls",
+                            fps = null,
+                            qualityLabel = maxVideoHeight?.let { "${it}p" },
+                            averageBitrate = null,
+                            audioQuality = null,
+                            approxDurationMs = null,
+                            audioSampleRate = null,
+                            audioChannels = null,
+                            loudnessDb = null,
+                            lastModified = null,
+                            signatureCipher = null,
+                        )
+                    return@runCatching PlaybackData(
+                        audioConfig = audioConfig,
+                        videoDetails = videoDetails,
+                        playbackTracking = playbackTracking,
+                        format = placeholderFormat,
+                        streamUrl = hlsUrl,
+                        streamExpiresInSeconds = expiresIn,
+                        streamClient = client.clientName,
+                        streamHeaders = headers,
+                        videoUrl = hlsUrl,
+                        videoHeight = maxVideoHeight,
+                        videoMimeType = "application/x-mpegURL",
+                        availableVideoHeights = availableHeights,
+                        isHls = true,
+                    )
+                }
+            }
+
+            throw PlaybackException(
+                "No playable video stream available",
+                innertubexResult.exceptionOrNull(),
+                PlaybackException.ERROR_CODE_REMOTE_ERROR,
+            )
+        }
+    }
+
+    private fun selectLegacyVideoFormat(
+        formats: List<PlayerResponse.StreamingData.Format>,
+        maxVideoHeight: Int?,
+    ): PlayerResponse.StreamingData.Format? {
+        val candidates = formats.filter { !it.isAudio && (it.height ?: 0) > 0 }
+        if (candidates.isEmpty()) return null
+        val nonAv1 = candidates.filterNot { it.mimeType.contains("av01", ignoreCase = true) }.ifEmpty { candidates }
+        val withinCap =
+            if (maxVideoHeight != null) {
+                nonAv1.filter { (it.height ?: 0) <= maxVideoHeight }.ifEmpty { nonAv1 }
+            } else {
+                nonAv1.filter { (it.height ?: 0) <= 2160 }.ifEmpty { nonAv1 }
+            }
+        return withinCap.maxWithOrNull(
+            compareBy<PlayerResponse.StreamingData.Format>(
+                { it.height ?: 0 },
+                { if (it.mimeType.contains("mp4", ignoreCase = true)) 1 else 0 },
+                { it.bitrate },
+            ),
+        )
     }
 
     /**
@@ -446,6 +853,25 @@ object YTPlayerUtils {
         audioQuality: AudioQuality,
         connectivityManager: ConnectivityManager,
         targetItag: Int = 0,
+        requireExactTargetItag: Boolean = false,
+        preferredContainer: InnerTubeXPlayer.TargetAudioContainer? = null,
+    ): PlayerResponse.StreamingData.Format? =
+        findFormat(
+            playerResponse = playerResponse,
+            audioQuality = audioQuality,
+            isMetered = connectivityManager.isActiveNetworkMetered,
+            targetItag = targetItag,
+            requireExactTargetItag = requireExactTargetItag,
+            preferredContainer = preferredContainer,
+        )
+
+    internal fun findFormat(
+        playerResponse: PlayerResponse,
+        audioQuality: AudioQuality,
+        isMetered: Boolean,
+        targetItag: Int = 0,
+        requireExactTargetItag: Boolean = false,
+        preferredContainer: InnerTubeXPlayer.TargetAudioContainer? = null,
     ): PlayerResponse.StreamingData.Format? {
         if (targetItag > 0) {
             val exactFormat = playerResponse.streamingData?.adaptiveFormats?.find { it.itag == targetItag }
@@ -453,20 +879,34 @@ object YTPlayerUtils {
                 Timber.tag(logTag).d("Using exact format itag: $targetItag")
                 return exactFormat
             }
+            if (requireExactTargetItag) {
+                Timber.tag(logTag).d("Requested exact itag $targetItag not found on this client")
+                return null
+            }
             Timber.tag(logTag).w("Requested itag $targetItag not found, falling back to auto")
         }
 
-        Timber.tag(logTag).d("Finding format with audioQuality: $audioQuality, network metered: ${connectivityManager.isActiveNetworkMetered}")
+        Timber.tag(logTag).d("Finding format with audioQuality: $audioQuality, network metered: $isMetered")
 
-        val format = playerResponse.streamingData?.adaptiveFormats
+        val candidates = playerResponse.streamingData?.adaptiveFormats
             ?.filter { it.isAudio }
-            ?.maxByOrNull {
-                it.bitrate * when (audioQuality) {
-                    AudioQuality.AUTO -> if (connectivityManager.isActiveNetworkMetered) -1 else 1
-                    AudioQuality.HIGH -> 1
-                    AudioQuality.LOW -> -1
-                } + (if (it.mimeType.startsWith("audio/webm")) 10240 else 0) // prefer opus stream
+            ?.let { audioFormats ->
+                if (preferredContainer != null) {
+                    audioFormats.filter {
+                        InnerTubeXPlayer.matchesTargetContainer(it.mimeType, preferredContainer)
+                    }
+                } else {
+                    audioFormats
+                }
             }
+
+        val format = candidates?.maxByOrNull {
+            it.bitrate * when (audioQuality) {
+                AudioQuality.AUTO -> if (isMetered) -1 else 1
+                AudioQuality.HIGH -> 1
+                AudioQuality.LOW -> -1
+            } + (if (it.mimeType.startsWith("audio/webm")) 10240 else 0) // prefer opus stream
+        }
 
         if (format != null) {
             Timber.tag(logTag).d("Selected format: ${format.mimeType}, bitrate: ${format.bitrate}")
@@ -519,6 +959,8 @@ object YTPlayerUtils {
                 ?.filter { it.isAudio }
                 ?.forEach { format ->
                     if (uniqueFormats.containsKey(format.itag)) return@forEach
+
+                    InnerTubeXPlayer.rememberFormatMimeType(format.itag, format.mimeType)
 
                     val codec = when {
                         format.mimeType.contains("opus", ignoreCase = true) -> "OPUS"

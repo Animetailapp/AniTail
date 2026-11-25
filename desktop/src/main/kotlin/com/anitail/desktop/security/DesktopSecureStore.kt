@@ -5,6 +5,7 @@ import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.charset.StandardCharsets
+import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermission
@@ -75,8 +76,11 @@ private class FileBackedSecureStore(
     private val lock = Any()
     private val encoder = Base64.getEncoder()
     private val decoder = Base64.getDecoder()
+    private var cachedEntries: MutableMap<String, String>? = null
+    private val decryptedCache = mutableMapOf<String, String>()
 
     override fun get(key: String): String? = synchronized(lock) {
+        decryptedCache[key]?.let { return@synchronized it }
         val entries = readEntriesLocked()
         val encoded = entries[key] ?: return@synchronized null
         val encrypted = runCatching { decoder.decode(encoded) }.getOrNull() ?: return@synchronized null
@@ -85,45 +89,63 @@ private class FileBackedSecureStore(
             writeEntriesLocked(entries)
             return@synchronized null
         }
-        decrypted.toString(StandardCharsets.UTF_8)
+        decrypted.toString(StandardCharsets.UTF_8).also { decryptedCache[key] = it }
     }
 
     override fun put(key: String, value: String) = synchronized(lock) {
         val entries = readEntriesLocked()
         if (value.isEmpty()) {
-            entries.remove(key)
-            writeEntriesLocked(entries)
+            val hadEntry = entries.remove(key) != null
+            decryptedCache.remove(key)
+            if (hadEntry) {
+                writeEntriesLocked(entries)
+            }
+            return@synchronized
+        }
+        if (decryptedCache[key] == value && entries.containsKey(key)) {
             return@synchronized
         }
         val encrypted = cipher.encrypt(value.toByteArray(StandardCharsets.UTF_8))
         entries[key] = encoder.encodeToString(encrypted)
+        decryptedCache[key] = value
         writeEntriesLocked(entries)
     }
 
     override fun remove(key: String) = synchronized(lock) {
         val entries = readEntriesLocked()
-        entries.remove(key)
-        writeEntriesLocked(entries)
+        val removedEntry = entries.remove(key) != null
+        decryptedCache.remove(key)
+        if (removedEntry) {
+            writeEntriesLocked(entries)
+        }
     }
 
     override fun clearAll() = synchronized(lock) {
+        cachedEntries = mutableMapOf()
+        decryptedCache.clear()
         if (Files.exists(storeFile)) {
             Files.delete(storeFile)
         }
     }
 
     private fun readEntriesLocked(): MutableMap<String, String> {
-        if (!Files.exists(storeFile)) return mutableMapOf()
-        val raw = runCatching { Files.readString(storeFile, StandardCharsets.UTF_8) }.getOrDefault("")
-        if (raw.isBlank()) return mutableMapOf()
-        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return mutableMapOf()
-        val entries = mutableMapOf<String, String>()
-        val iterator = json.keys()
-        while (iterator.hasNext()) {
-            val key = iterator.next()
-            entries[key] = json.optString(key, "")
+        cachedEntries?.let { return it }
+        val loaded = mutableMapOf<String, String>()
+        if (Files.exists(storeFile)) {
+            val raw = runCatching { Files.readString(storeFile, StandardCharsets.UTF_8) }.getOrDefault("")
+            if (raw.isNotBlank()) {
+                val json = runCatching { JSONObject(raw) }.getOrNull()
+                if (json != null) {
+                    val iterator = json.keys()
+                    while (iterator.hasNext()) {
+                        val key = iterator.next()
+                        loaded[key] = json.optString(key, "")
+                    }
+                }
+            }
         }
-        return entries
+        cachedEntries = loaded
+        return loaded
     }
 
     private fun writeEntriesLocked(entries: Map<String, String>) {
@@ -134,10 +156,13 @@ private class FileBackedSecureStore(
             }
             return
         }
+        val isNewFile = !Files.exists(storeFile)
         val json = JSONObject()
         entries.forEach { (key, value) -> json.put(key, value) }
         Files.writeString(storeFile, json.toString(2), StandardCharsets.UTF_8)
-        setOwnerOnlyPermissions(storeFile)
+        if (isNewFile) {
+            setOwnerOnlyPermissions(storeFile)
+        }
     }
 }
 
@@ -200,6 +225,12 @@ private fun ensureParentDirectory(path: Path) {
     }
 }
 
+private val supportsPosixPermissions: Boolean by lazy {
+    runCatching {
+        FileSystems.getDefault().supportedFileAttributeViews().contains("posix")
+    }.getOrDefault(false)
+}
+
 private fun setOwnerOnlyPermissions(path: Path) {
     runCatching {
         val file = path.toFile()
@@ -209,10 +240,12 @@ private fun setOwnerOnlyPermissions(path: Path) {
         file.setReadable(true, true)
         file.setWritable(true, true)
     }
-    runCatching {
-        Files.setPosixFilePermissions(
-            path,
-            EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE),
-        )
+    if (supportsPosixPermissions) {
+        runCatching {
+            Files.setPosixFilePermissions(
+                path,
+                EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE),
+            )
+        }
     }
 }

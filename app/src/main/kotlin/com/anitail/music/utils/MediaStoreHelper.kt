@@ -33,12 +33,23 @@ class MediaStoreHelper(private val context: Context) {
             "opus" to "audio/opus",
             "m4a" to "audio/mp4",
             "mp4" to "audio/mp4",
+            "weba" to "audio/webm",
             "webm" to "audio/webm",
             "ogg" to "audio/ogg",
             "mp3" to "audio/mpeg",
             "aac" to "audio/aac",
             "flac" to "audio/flac"
         )
+
+        internal fun normalizeAudioFileName(fileName: String, mimeType: String): String {
+            val normalizedMime = mimeType.substringBefore(";").trim()
+            if (normalizedMime.equals("audio/webm", ignoreCase = true) &&
+                fileName.endsWith(".webm", ignoreCase = true)
+            ) {
+                return fileName.dropLast(5) + ".weba"
+            }
+            return fileName
+        }
     }
 
     /**
@@ -64,12 +75,13 @@ class MediaStoreHelper(private val context: Context) {
         year: Int? = null
     ): Uri? = withContext(Dispatchers.IO) {
         try {
-            val sanitizedFileName = sanitizeFileName(fileName)
+            val normalizedMimeType = mimeType.substringBefore(";").trim().ifBlank { "audio/mp4" }
+            val sanitizedFileName = normalizeAudioFileName(sanitizeFileName(fileName), normalizedMimeType)
             val contentResolver = context.contentResolver
 
             Timber.d("=== MediaStore Save Starting ===")
             Timber.d("File: $sanitizedFileName")
-            Timber.d("MIME: $mimeType")
+            Timber.d("MIME: $normalizedMimeType")
             Timber.d("Title: $title")
             Timber.d("Artist: $artist")
             Timber.d("Android SDK: ${Build.VERSION.SDK_INT}")
@@ -84,9 +96,10 @@ class MediaStoreHelper(private val context: Context) {
             val relativePath = buildRelativePathInternal(artist = sanitizedArtist, album = album)
             Timber.d("RELATIVE_PATH: $relativePath")
 
+            val nowSeconds = System.currentTimeMillis() / 1000
             val contentValues = ContentValues().apply {
                 put(MediaStore.Audio.Media.DISPLAY_NAME, sanitizedFileName)
-                put(MediaStore.Audio.Media.MIME_TYPE, mimeType)
+                put(MediaStore.Audio.Media.MIME_TYPE, normalizedMimeType)
                 put(MediaStore.Audio.Media.TITLE, title)
                 put(MediaStore.Audio.Media.ARTIST, artist)
                 put(MediaStore.Audio.Media.ALBUM_ARTIST, artist)
@@ -94,8 +107,8 @@ class MediaStoreHelper(private val context: Context) {
                 durationMs?.let { put(MediaStore.Audio.Media.DURATION, it) }
                 year?.let { put(MediaStore.Audio.Media.YEAR, it) }
                 put(MediaStore.Audio.Media.IS_MUSIC, 1)
-                put(MediaStore.Audio.Media.DATE_ADDED, System.currentTimeMillis() / 1000)
-                put(MediaStore.Audio.Media.DATE_MODIFIED, System.currentTimeMillis() / 1000)
+                put(MediaStore.Audio.Media.DATE_ADDED, nowSeconds)
+                put(MediaStore.Audio.Media.DATE_MODIFIED, nowSeconds)
 
                 // Set relative path for Android 10+ (API 29+)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -112,7 +125,49 @@ class MediaStoreHelper(private val context: Context) {
 
             Timber.d("Audio collection URI: $audioCollection")
 
-            val audioUri = contentResolver.insert(audioCollection, contentValues)
+            val insertedAudioUri = runCatching {
+                contentResolver.insert(audioCollection, contentValues)
+            }.onFailure { error ->
+                Timber.w(
+                    error,
+                    "Failed to insert MediaStore.Audio entry for %s (%s)",
+                    sanitizedFileName,
+                    normalizedMimeType
+                )
+            }.getOrNull()
+
+            var isDownloadsFallback = false
+            var targetRelativePath = relativePath
+            val audioUri = if (insertedAudioUri != null) {
+                insertedAudioUri
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                normalizedMimeType.equals("audio/webm", ignoreCase = true)
+            ) {
+                isDownloadsFallback = true
+                targetRelativePath = "${Environment.DIRECTORY_DOWNLOADS}/$ANITAIL_FOLDER_NAME/$sanitizedArtist"
+                val downloadsCollection =
+                    MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                val downloadsValues = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, sanitizedFileName)
+                    put(MediaStore.Downloads.MIME_TYPE, normalizedMimeType)
+                    put(MediaStore.Downloads.DATE_ADDED, nowSeconds)
+                    put(MediaStore.Downloads.DATE_MODIFIED, nowSeconds)
+                    put(MediaStore.Downloads.RELATIVE_PATH, targetRelativePath)
+                    put(MediaStore.Downloads.IS_PENDING, 1)
+                }
+                Timber.d("Falling back to MediaStore.Downloads for audio/webm: $targetRelativePath/$sanitizedFileName")
+                runCatching {
+                    contentResolver.insert(downloadsCollection, downloadsValues)
+                }.onFailure { error ->
+                    Timber.e(
+                        error,
+                        "Fallback MediaStore.Downloads insert failed for %s",
+                        sanitizedFileName
+                    )
+                }.getOrNull()
+            } else {
+                null
+            }
 
             if (audioUri == null) {
                 Timber.e("❌ Failed to create MediaStore entry for: $sanitizedFileName")
@@ -135,15 +190,23 @@ class MediaStoreHelper(private val context: Context) {
 
             // Mark file as ready (remove IS_PENDING flag)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                contentValues.clear()
-                contentValues.put(MediaStore.Audio.Media.IS_PENDING, 0)
-                val updateCount = contentResolver.update(audioUri, contentValues, null, null)
+                val pendingValues = ContentValues().apply {
+                    put(
+                        if (isDownloadsFallback) {
+                            MediaStore.Downloads.IS_PENDING
+                        } else {
+                            MediaStore.Audio.Media.IS_PENDING
+                        },
+                        0
+                    )
+                }
+                val updateCount = contentResolver.update(audioUri, pendingValues, null, null)
                 Timber.d("✓ Marked as ready (IS_PENDING=0), updated $updateCount row(s)")
             }
 
             Timber.d("=== MediaStore Save Complete ===")
             Timber.d("✓ Successfully saved to MediaStore: $audioUri")
-            Timber.d("✓ Location: $relativePath/$sanitizedFileName")
+            Timber.d("✓ Location: $targetRelativePath/$sanitizedFileName")
             audioUri
 
         } catch (e: Exception) {

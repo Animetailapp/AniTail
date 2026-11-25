@@ -26,6 +26,8 @@ import com.metrolist.innertubex.extraction.YtConfigParser
 import com.metrolist.innertubex.extraction.YtConfigParserImpl
 import com.metrolist.innertubex.extraction.generateClientPlaybackNonce
 import com.metrolist.innertubex.extraction.strategy.PoTokenProviderKind
+import com.metrolist.innertubex.sabr.SabrBootstrap
+import io.ktor.client.HttpClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -34,9 +36,17 @@ import kotlin.time.Clock
 
 /** The stream extraction entry point powered by InnerTubeX for AniTail. */
 object InnerTubeXPlayer {
+    internal enum class TargetAudioContainer {
+        MP4,
+        WEBM,
+    }
+
     private const val TAG = "InnerTubeXPlayer"
     private const val STREAM_CLIENT_FAILURE_TTL_MS = 5 * 60 * 1000L
     private const val DEFAULT_STREAM_TTL_SECONDS = 5 * 60
+    private val MP4_AUDIO_ITAGS = setOf(139, 140, 141, 256, 258, 327, 328, 599)
+    private val LOW_MP4_AUDIO_ITAGS = setOf(139, 599)
+    private val WEBM_AUDIO_ITAGS = setOf(249, 250, 251, 600, 774)
 
     @Volatile
     private var applicationContext: Context? = null
@@ -46,6 +56,73 @@ object InnerTubeXPlayer {
 
     private val bundleMutex = Mutex()
     private val streamClientFailures = java.util.concurrent.ConcurrentHashMap<String, FailedStreamClients>()
+    private val observedItagMimeTypes = java.util.concurrent.ConcurrentHashMap<Int, String>()
+
+    internal fun rememberFormatMimeType(
+        itag: Int,
+        mimeType: String,
+    ) {
+        if (itag > 0 && mimeType.isNotBlank()) {
+            observedItagMimeTypes[itag] = mimeType
+        }
+    }
+
+    internal fun clearObservedFormatMimeTypes() {
+        observedItagMimeTypes.clear()
+    }
+
+    internal fun targetAudioContainerForItag(targetItag: Int): TargetAudioContainer? {
+        if (targetItag <= 0) return null
+        val observedMime = observedItagMimeTypes[targetItag]
+        if (!observedMime.isNullOrBlank()) {
+            return when {
+                observedMime.contains("mp4", ignoreCase = true) ||
+                    observedMime.contains("m4a", ignoreCase = true) -> TargetAudioContainer.MP4
+                observedMime.contains("webm", ignoreCase = true) ||
+                    observedMime.contains("opus", ignoreCase = true) -> TargetAudioContainer.WEBM
+                else -> null
+            }
+        }
+        return when (targetItag) {
+            in MP4_AUDIO_ITAGS -> TargetAudioContainer.MP4
+            in WEBM_AUDIO_ITAGS -> TargetAudioContainer.WEBM
+            else -> null
+        }
+    }
+
+    internal fun resolveInnerTubeXAudioQuality(
+        audioQuality: AudioQuality,
+        connectivityManager: ConnectivityManager?,
+        targetItag: Int,
+    ): InnerTubeXAudioQuality {
+        if (targetItag <= 0) {
+            return audioQuality.toInnerTubeX(connectivityManager)
+        }
+        if (targetItag in LOW_MP4_AUDIO_ITAGS) {
+            return InnerTubeXAudioQuality.LOW
+        }
+        return when (targetAudioContainerForItag(targetItag)) {
+            TargetAudioContainer.MP4 -> InnerTubeXAudioQuality.MP4
+            TargetAudioContainer.WEBM -> InnerTubeXAudioQuality.AUTO
+            null -> audioQuality.toInnerTubeX(connectivityManager)
+        }
+    }
+
+    internal fun matchesTargetContainer(
+        mimeType: String?,
+        container: TargetAudioContainer?,
+    ): Boolean {
+        if (container == null) return true
+        val value = mimeType ?: return false
+        return when (container) {
+            TargetAudioContainer.MP4 ->
+                value.contains("audio/mp4", ignoreCase = true) ||
+                    value.contains("mp4a", ignoreCase = true)
+            TargetAudioContainer.WEBM ->
+                value.contains("audio/webm", ignoreCase = true) ||
+                    value.contains("opus", ignoreCase = true)
+        }
+    }
 
     @Synchronized
     fun initialize(context: Context) {
@@ -70,12 +147,6 @@ object InnerTubeXPlayer {
         allowBoundedRange: Boolean = true,
     ): Result<YTPlayerUtils.PlaybackData> =
         try {
-            // Check StreamUrlCache first
-            val cachedStream = StreamUrlCache.get(videoId, targetItag)
-            if (cachedStream != null) {
-                Timber.tag(TAG).d("Using valid cached stream URL from StreamUrlCache for $videoId")
-            }
-
             val hints =
                 contentHints.copy(
                     isUploaded =
@@ -88,15 +159,26 @@ object InnerTubeXPlayer {
                     allowBoundedRange = allowBoundedRange,
                 )
             val excludedClients = failedStreamClients(videoId)
-            val resolvedQuality = audioQuality.toInnerTubeX(connectivityManager)
+            val targetContainer = targetAudioContainerForItag(targetItag)
+            val resolvedQuality = resolveInnerTubeXAudioQuality(audioQuality, connectivityManager, targetItag)
             val stream =
                 requireNotNull(
                     resolveWithClientFallback(excludedClients) { clients, useLowQuality ->
+                        val effectiveQuality =
+                            if (useLowQuality) {
+                                if (targetContainer == TargetAudioContainer.WEBM) {
+                                    resolvedQuality
+                                } else {
+                                    InnerTubeXAudioQuality.LOW
+                                }
+                            } else {
+                                resolvedQuality
+                            }
                         bundle().extractor.extract(
                             videoId = videoId,
                             hints = hints,
                             excludedClients = clients,
-                            audioQuality = if (useLowQuality) InnerTubeXAudioQuality.LOW else resolvedQuality,
+                            audioQuality = effectiveQuality,
                             clientPlaybackNonce = generateClientPlaybackNonce(),
                         )
                     },
@@ -130,6 +212,67 @@ object InnerTubeXPlayer {
         } catch (error: Exception) {
             Result.failure(error)
         }
+
+    suspend fun playerResponseForVideoPlayback(
+        videoId: String,
+        audioQuality: AudioQuality,
+        connectivityManager: ConnectivityManager?,
+        maxVideoHeight: Int? = null,
+        isLive: Boolean? = null,
+        isExplicit: Boolean? = null,
+        allowBoundedRange: Boolean = true,
+    ): Result<YTPlayerUtils.PlaybackData> =
+        try {
+            val hints =
+                ContentHints(
+                    isExplicit = isExplicit,
+                    isLive = isLive,
+                    wantVideo = true,
+                    maxVideoHeight = maxVideoHeight,
+                ).withStreamCapabilities(
+                    allowHls = true,
+                    allowSabr = true,
+                    allowBoundedRange = allowBoundedRange,
+                )
+            val excludedClients = failedStreamClients(videoId)
+            val resolvedQuality = audioQuality.toInnerTubeX(connectivityManager)
+            val stream =
+                requireNotNull(
+                    resolveWithClientFallback(excludedClients) { clients, useLowQuality ->
+                        bundle().extractor.extract(
+                            videoId = videoId,
+                            hints = hints,
+                            excludedClients = clients,
+                            audioQuality = if (useLowQuality) InnerTubeXAudioQuality.LOW else resolvedQuality,
+                            clientPlaybackNonce = generateClientPlaybackNonce(),
+                        )
+                    },
+                ) { "InnerTubeX returned no playable video stream" }
+
+            val playbackData = stream.toPlaybackData()
+            if (!playbackData.hasVideo) {
+                Result.failure(IllegalStateException("InnerTubeX stream has no video track"))
+            } else {
+                Result.success(playbackData)
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: StreamResolveException) {
+            val cause = error.cause
+            Result.failure(
+                if (error.reason == StreamResolveException.Reason.NETWORK && cause != null) {
+                    cause
+                } else {
+                    error
+                },
+            )
+        } catch (error: Exception) {
+            Result.failure(error)
+        }
+
+    fun sabrHttpClient(): HttpClient = YouTube.extractionTransport().sabrHttpClient
+
+    fun innertubeLogger(): InnerTubeLogger = logger
 
     internal fun markStreamClientFailed(
         videoId: String,
@@ -361,6 +504,19 @@ object InnerTubeXPlayer {
             } else {
                 "${mimeType.orEmpty()}; codecs=\"$codecs\""
             }
+        val resolvedStreamUrl =
+            if (audioUrl.isNotBlank()) {
+                audioUrl
+            } else if (sabrBootstrap != null) {
+                "anitail://sabr/$videoId"
+            } else {
+                ""
+            }
+        val hlsDetected =
+            mimeType?.contains("mpegurl", ignoreCase = true) == true ||
+                videoMimeType?.contains("mpegurl", ignoreCase = true) == true ||
+                audioUrl.substringBefore('?').endsWith(".m3u8", ignoreCase = true) ||
+                videoUrl?.substringBefore('?')?.endsWith(".m3u8", ignoreCase = true) == true
         return YTPlayerUtils.PlaybackData(
             audioConfig =
                 if (loudnessDb != null || perceptualLoudnessDb != null) {
@@ -417,7 +573,7 @@ object InnerTubeXPlayer {
                     lastModified = null,
                     signatureCipher = null,
                 ),
-            streamUrl = audioUrl,
+            streamUrl = resolvedStreamUrl,
             streamExpiresInSeconds =
                 expiresAt
                     ?.let { ((it.toEpochMilliseconds() - Clock.System.now().toEpochMilliseconds()) / 1000L).toInt() }
@@ -428,6 +584,18 @@ object InnerTubeXPlayer {
             requireBoundedRange = this.requireBoundedRange,
             rangeChunkSizeBytes = this.rangeChunkSizeBytes,
             useRangeChunks = this.useRangeChunks,
+            videoUrl = this.videoUrl,
+            videoWidth = this.videoWidth,
+            videoHeight = this.videoHeight,
+            videoMimeType = this.videoMimeType,
+            videoCodecs = this.videoCodecs,
+            videoBitrate = this.videoBitrate,
+            videoItag = this.videoItag,
+            videoContentLengthBytes = this.videoContentLengthBytes,
+            sabrBootstrap = this.sabrBootstrap,
+            sabrVideoBootstrap = this.sabrVideoBootstrap,
+            availableVideoHeights = this.availableVideoHeights,
+            isHls = hlsDetected,
         )
     }
 }

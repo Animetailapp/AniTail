@@ -181,6 +181,7 @@
 -keepclassmembers class com.anitail.music.discord.** {
     native <methods>;
     *** onNativeStatusChanged(...);
+    *** onNativeTokenExpired(...);
 }
 -keep class com.discord.socialsdk.** { *; }
 -dontwarn com.discord.socialsdk.**

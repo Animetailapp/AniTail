@@ -22,7 +22,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.verticalDrag
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -332,9 +331,11 @@ fun ExperimentalLyrics(
     var lastMainMaxSeen by remember(lyrics, lines) { mutableIntStateOf(-1) }
     var smoothPositionForSync by remember { mutableLongStateOf(0L) }
 
-    LaunchedEffect(lyrics, lines) {
-        if (lyrics.isNullOrEmpty() || lines.isEmpty()) {
-            activeLineIndices = emptySet()
+    LaunchedEffect(lyrics, lines, showLyrics) {
+        if (!showLyrics || lyrics.isNullOrEmpty() || lines.isEmpty()) {
+            if (lyrics.isNullOrEmpty() || lines.isEmpty()) {
+                activeLineIndices = emptySet()
+            }
             return@LaunchedEffect
         }
         
@@ -490,11 +491,23 @@ fun ExperimentalLyrics(
         onDispose { activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 
-    BoxWithConstraints(
+    var viewportHeightPx by remember {
+        mutableFloatStateOf(with(density) { (configuration.screenHeightDp.dp * 0.55f).toPx() })
+    }
+
+    Box(
         contentAlignment = Alignment.TopCenter,
-        modifier = modifier.fillMaxSize().padding(bottom = 12.dp)
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(bottom = 12.dp)
+                .onSizeChanged { size ->
+                    if (showLyrics && size.height > 0) {
+                        viewportHeightPx = size.height.toFloat()
+                    }
+                },
     ) {
-        val maxHeightPx = constraints.maxHeight.toFloat()
+        val maxHeightPx = viewportHeightPx
         val anchorY = maxHeightPx * LYRICS_ANCHOR_RATIO
         val lineHeightPx = with(density) { LYRICS_ITEM_FALLBACK_HEIGHT_DP.toPx() }
         val indicatorHeightPx = with(density) { 72.dp.toPx() }
@@ -767,7 +780,8 @@ fun ExperimentalLyrics(
                                         index = index, item = item, isSynced = isSynced,
                                         isActiveLine = isActiveLine,
                                         bgVisible = bgVisible, isSelected = selectedIndices.contains(index),
-                                        isSelectionModeActive = isSelectionModeActive, currentPositionState = currentPositionState,
+                                        isSelectionModeActive = isSelectionModeActive,
+                                        currentPositionState = if (isActiveLine || bgVisible) currentPositionState else 0L,
                                         lyricsOffset = (currentSong?.song?.lyricsOffset ?: 0).toLong(),
                                         playerConnection = playerConnection, lyricsTextSize = 36f, lyricsLineSpacing = 1.3f,
                                         expressiveAccent = expressiveAccent, lyricsTextPosition = lyricsTextPosition,

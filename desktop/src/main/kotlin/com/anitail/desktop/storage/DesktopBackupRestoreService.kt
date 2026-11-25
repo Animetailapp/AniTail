@@ -304,6 +304,10 @@ internal class DesktopBackupRestoreService(
 
         preferences.discordToken.value.takeIf { it.isNotBlank() }
             ?.let { accounts["discordToken"] = it }
+        preferences.discordRefreshToken.value.takeIf { it.isNotBlank() }
+            ?.let { accounts["discordRefreshToken"] = it }
+        preferences.discordTokenExpiryEpochMillis.value.takeIf { it > 0L }
+            ?.let { accounts["discordTokenExpiresAt"] = it.toString() }
         preferences.discordUsername.value.takeIf { it.isNotBlank() }
             ?.let { accounts["discordUsername"] = it }
         preferences.discordName.value.takeIf { it.isNotBlank() }
@@ -371,6 +375,10 @@ internal class DesktopBackupRestoreService(
         decoded["lastFmUsername"]?.let { preferences.setLastFmUsername(it) }
 
         decoded["discordToken"]?.let { preferences.setDiscordToken(it) }
+        decoded["discordRefreshToken"]?.let { preferences.setDiscordRefreshToken(it) }
+        decoded["discordTokenExpiresAt"]?.toLongOrNull()?.let {
+            preferences.setDiscordTokenExpiryEpochMillis(it)
+        }
         decoded["discordUsername"]?.let { preferences.setDiscordUsername(it) }
         decoded["discordName"]?.let { preferences.setDiscordName(it) }
         decoded["discordAvatarUrl"]?.let { preferences.setDiscordAvatarUrl(it) }

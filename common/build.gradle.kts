@@ -17,7 +17,7 @@ kotlin {
         namespace = "com.anitail.shared"
         compileSdk {
             version = release(37) {
-                minorApiLevel = 1
+                minorApiLevel = 2
             }
         }
         minSdk = 23

@@ -5,6 +5,7 @@ import com.anitail.desktop.security.DesktopSecureStore
 import com.anitail.desktop.security.SecureSecretsStore
 import com.anitail.desktop.security.SensitiveKeys
 import com.anitail.desktop.YouTube
+import com.anitail.innertube.utils.sanitizeCookieString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -51,10 +52,11 @@ class DesktopAuthService(
                 key = SensitiveKeys.YOUTUBE_DATA_SYNC_ID,
                 legacyValue = legacyDataSyncId,
             )
-            val cookie = readSensitiveValue(
+            val rawCookie = readSensitiveValue(
                 key = SensitiveKeys.YOUTUBE_COOKIE,
                 legacyValue = legacyCookie,
             )
+            val cookie = sanitizeCookieString(rawCookie)
 
             val loaded = AuthCredentials(
                 visitorData = visitorData,
@@ -78,7 +80,10 @@ class DesktopAuthService(
                 YouTube.cookie = null
             }
 
-            // Si hubo migracion desde JSON antiguo, sanear archivo público.
+            // Si hubo migración o si el cookie requirió saneamiento, actualizar almacén persistente
+            if (rawCookie != null && rawCookie != cookie) {
+                persistSensitiveValue(SensitiveKeys.YOUTUBE_COOKIE, cookie)
+            }
             if (legacyVisitorData != null || legacyDataSyncId != null || legacyCookie != null) {
                 persistPublicAccountInfo(_credentials)
             }
@@ -94,15 +99,19 @@ class DesktopAuthService(
      * Guarda credenciales: sensibles en almacén seguro, datos de perfil en JSON.
      */
     suspend fun saveCredentials(credentials: AuthCredentials) = withContext(Dispatchers.IO) {
-        _credentials = credentials.takeIf { it.hasAnyValue() }
+        val sanitizedCredentials = credentials.copy(
+            cookie = sanitizeCookieString(credentials.cookie),
+            dataSyncId = normalizeDataSyncId(credentials.dataSyncId),
+        )
+        _credentials = sanitizedCredentials.takeIf { it.hasAnyValue() }
 
-        YouTube.visitorData = credentials.visitorData
-        YouTube.dataSyncId = normalizeDataSyncId(credentials.dataSyncId)
-        YouTube.cookie = credentials.cookie
+        YouTube.visitorData = sanitizedCredentials.visitorData
+        YouTube.dataSyncId = sanitizedCredentials.dataSyncId
+        YouTube.cookie = sanitizedCredentials.cookie
 
-        persistSensitiveValue(SensitiveKeys.YOUTUBE_VISITOR_DATA, credentials.visitorData)
-        persistSensitiveValue(SensitiveKeys.YOUTUBE_DATA_SYNC_ID, credentials.dataSyncId)
-        persistSensitiveValue(SensitiveKeys.YOUTUBE_COOKIE, credentials.cookie)
+        persistSensitiveValue(SensitiveKeys.YOUTUBE_VISITOR_DATA, sanitizedCredentials.visitorData)
+        persistSensitiveValue(SensitiveKeys.YOUTUBE_DATA_SYNC_ID, sanitizedCredentials.dataSyncId)
+        persistSensitiveValue(SensitiveKeys.YOUTUBE_COOKIE, sanitizedCredentials.cookie)
 
         persistPublicAccountInfo(_credentials)
     }
@@ -144,6 +153,21 @@ class DesktopAuthService(
         val updated = (_credentials ?: AuthCredentials()).copy(visitorData = visitorData)
         saveCredentials(updated)
     }
+
+    /**
+     * Actualiza dataSyncId y refresca la información del canal activo.
+     */
+    suspend fun switchChannel(dataSyncId: String?): AccountInfo? {
+        val normalized = dataSyncId?.substringBefore("||")?.trim()?.takeIf { it.isNotBlank() }
+        val updated = (_credentials ?: AuthCredentials()).copy(dataSyncId = normalized)
+        saveCredentials(updated)
+        return refreshAccountInfo()
+    }
+
+    suspend fun fetchChannels(): Result<List<com.anitail.innertube.models.YouTubeChannelAccount>> =
+        withContext(Dispatchers.IO) {
+            com.anitail.innertube.YouTube.accountChannels()
+        }
 
     /**
      * Actualiza dataSyncId.

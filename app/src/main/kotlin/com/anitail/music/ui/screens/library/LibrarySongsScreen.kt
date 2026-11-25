@@ -293,9 +293,9 @@ fun LibrarySongsScreen(
                                         playerConnection.player.togglePlayPause()
                                     } else {
                                         playerConnection.playQueue(
-                                            ListQueue(
+                                            ListQueue.fromSongs(
                                                 title = context.getString(R.string.queue_all_songs),
-                                                items = songs.map { it.toMediaItem() },
+                                                songs = songs,
                                                 startIndex = index,
                                             ),
                                         )

@@ -64,6 +64,8 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.geometry.Offset
@@ -142,6 +144,9 @@ fun LyricsPanel(
     onSetSongRomanizeLyrics: (Boolean) -> Unit,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    embedded: Boolean = false,
+    contentColor: Color? = null,
+    accentColor: Color? = null,
 ) {
     val preferences = remember { DesktopPreferences.getInstance() }
     fun copyToClipboard(text: String) {
@@ -524,37 +529,33 @@ fun LyricsPanel(
     var reportedAtFrameNanos by remember { mutableLongStateOf(0L) }
     var romanizedLineByIndex by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
 
-    LaunchedEffect(currentPositionMs) {
+    val shouldExtrapolateFrames = isPlaying &&
+        lyricsResult?.hasSyncedLyrics == true &&
+        lyricsAnimationStyle == LyricsAnimationStylePreference.KARAOKE
+
+    LaunchedEffect(currentPositionMs, shouldExtrapolateFrames) {
         reportedPlaybackPositionMs = (currentPositionMs + KaraokeLeadMs).toFloat()
         reportedAtFrameNanos = 0L
-        if (!isPlaying) {
+        if (!shouldExtrapolateFrames) {
             renderPlaybackPositionMs = reportedPlaybackPositionMs
         }
     }
 
-    LaunchedEffect(isPlaying) {
+    LaunchedEffect(shouldExtrapolateFrames) {
+        if (!shouldExtrapolateFrames) return@LaunchedEffect
         while (true) {
             androidx.compose.runtime.withFrameNanos { now ->
                 if (reportedAtFrameNanos == 0L) {
                     reportedAtFrameNanos = now
                 }
 
-                val extrapolatedPosition = if (isPlaying) {
-                    val elapsedSinceReportMs = ((now - reportedAtFrameNanos) / 1_000_000f).coerceAtLeast(0f)
-                    reportedPlaybackPositionMs + elapsedSinceReportMs
-                } else {
-                    reportedPlaybackPositionMs
-                }
-
-                if (!isPlaying) {
-                    renderPlaybackPositionMs = extrapolatedPosition
-                } else {
-                    val backwardDelta = renderPlaybackPositionMs - extrapolatedPosition
-                    renderPlaybackPositionMs = when {
-                        extrapolatedPosition >= renderPlaybackPositionMs -> extrapolatedPosition
-                        backwardDelta <= PlaybackJitterToleranceMs -> renderPlaybackPositionMs
-                        else -> extrapolatedPosition
-                    }
+                val elapsedSinceReportMs = ((now - reportedAtFrameNanos) / 1_000_000f).coerceAtLeast(0f)
+                val extrapolatedPosition = reportedPlaybackPositionMs + elapsedSinceReportMs
+                val backwardDelta = renderPlaybackPositionMs - extrapolatedPosition
+                renderPlaybackPositionMs = when {
+                    extrapolatedPosition >= renderPlaybackPositionMs -> extrapolatedPosition
+                    backwardDelta <= PlaybackJitterToleranceMs -> renderPlaybackPositionMs
+                    else -> extrapolatedPosition
                 }
             }
         }
@@ -611,17 +612,23 @@ fun LyricsPanel(
         if (currentLineIndex < 0 || lyricsResult?.parsedLines?.isEmpty() != false) return@LaunchedEffect
 
         val shouldAnimate = lyricsSmoothScroll || lyricsAnimationStyle == LyricsAnimationStylePreference.APPLE
+        val viewportHeight = listState.layoutInfo.viewportSize.height
+        val centerOffset = if (viewportHeight > 0) {
+            -(viewportHeight / 3).coerceAtLeast(120)
+        } else {
+            -200
+        }
         isProgrammaticScroll = true
         try {
             if (shouldAnimate) {
                 listState.animateScrollToItem(
                     index = currentLineIndex,
-                    scrollOffset = -200,
+                    scrollOffset = centerOffset,
                 )
             } else {
                 listState.scrollToItem(
                     index = currentLineIndex,
-                    scrollOffset = -200,
+                    scrollOffset = centerOffset,
                 )
             }
         } finally {
@@ -629,11 +636,19 @@ fun LyricsPanel(
         }
     }
 
+    val resolvedBaseTextColor = contentColor ?: MaterialTheme.colorScheme.onSurface
+    val resolvedAccentColor = accentColor ?: if (embedded && contentColor != null) {
+        contentColor
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        tonalElevation = 4.dp,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(if (embedded) 0.dp else 16.dp),
+        tonalElevation = if (embedded) 0.dp else 4.dp,
+        color = if (embedded) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = resolvedBaseTextColor,
     ) {
         Column(
             modifier = Modifier
@@ -843,13 +858,24 @@ fun LyricsPanel(
                                 modifier = Modifier.fillMaxSize(),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                itemsIndexed(lines) { index, line ->
+                                itemsIndexed(
+                                    items = lines,
+                                    key = { index, _ -> index },
+                                ) { index, line ->
+                                    val isActiveLine = currentLineIndex == index
                                     val nextTimestamp = lines.getOrNull(index + 1)?.timestampMs
                                         ?: (line.timestampMs + 2500L)
                                     val lineDuration = (nextTimestamp - line.timestampMs).coerceAtLeast(1L)
-                                    val karaokeProgress = if (currentLineIndex == index) {
+                                    val karaokeProgress = if (isActiveLine) {
                                         ((renderPlaybackPositionMs - line.timestampMs) / lineDuration.toFloat())
                                             .coerceIn(0f, 1f)
+                                    } else {
+                                        0f
+                                    }
+                                    val activePlaybackPosition = if (
+                                        isActiveLine && lyricsAnimationStyle == LyricsAnimationStylePreference.KARAOKE
+                                    ) {
+                                        renderPlaybackPositionMs
                                     } else {
                                         0f
                                     }
@@ -858,8 +884,8 @@ fun LyricsPanel(
                                         romanizedText = romanizedLineByIndex[index],
                                         lineIndex = index,
                                         currentLineIndex = currentLineIndex,
-                                        isActive = index == currentLineIndex,
-                                        playbackPositionMs = renderPlaybackPositionMs,
+                                        isActive = isActiveLine,
+                                        playbackPositionMs = activePlaybackPosition,
                                         canSeek = lyricsClick && lyricsResult?.hasSyncedLyrics == true,
                                         animationStyle = lyricsAnimationStyle,
                                         useGlowEffect = useGlowEffect,
@@ -884,6 +910,8 @@ fun LyricsPanel(
                                             }
                                         },
                                         onClick = { onSeek(line.timestampMs) },
+                                        activeTextColor = resolvedAccentColor,
+                                        baseTextColor = resolvedBaseTextColor,
                                     )
                                 }
                             }
@@ -1397,10 +1425,12 @@ private fun LyricLineItem(
     onToggleSelection: () -> Unit,
     onLongPress: () -> Unit,
     onClick: () -> Unit,
+    activeTextColor: Color = MaterialTheme.colorScheme.primary,
+    baseTextColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     val distance = if (currentLineIndex < 0) Int.MAX_VALUE else abs(lineIndex - currentLineIndex)
     val targetAlpha = when (animationStyle) {
-        LyricsAnimationStylePreference.NONE -> 1f
+        LyricsAnimationStylePreference.NONE -> if (isActive || currentLineIndex < 0) 1f else 0.72f
         LyricsAnimationStylePreference.FADE -> when (distance) {
             0 -> 1f
             1 -> 0.7f
@@ -1409,7 +1439,7 @@ private fun LyricLineItem(
         LyricsAnimationStylePreference.SLIDE -> when (distance) {
             0 -> 1f
             1 -> 0.68f
-            else -> 0.3f
+            else -> 0.32f
         }
         LyricsAnimationStylePreference.GLOW -> when (distance) {
             0 -> 1f
@@ -1431,13 +1461,13 @@ private fun LyricLineItem(
 
     val targetScale = when {
         !isActive -> 1f
-        animationStyle == LyricsAnimationStylePreference.NONE -> 1f
-        animationStyle == LyricsAnimationStylePreference.FADE -> 1.02f
-        animationStyle == LyricsAnimationStylePreference.SLIDE -> 1.03f
-        animationStyle == LyricsAnimationStylePreference.KARAOKE -> 1.05f
+        animationStyle == LyricsAnimationStylePreference.NONE -> 1.02f
+        animationStyle == LyricsAnimationStylePreference.FADE -> 1.04f
+        animationStyle == LyricsAnimationStylePreference.SLIDE -> 1.05f
+        animationStyle == LyricsAnimationStylePreference.KARAOKE -> 1.06f
         animationStyle == LyricsAnimationStylePreference.GLOW -> 1.08f
         animationStyle == LyricsAnimationStylePreference.APPLE -> 1.1f
-        else -> 1f
+        else -> 1.04f
     }
 
     val targetTranslateX = when (animationStyle) {
@@ -1457,25 +1487,25 @@ private fun LyricLineItem(
 
     val animationSpec = if (smoothScroll || animationStyle == LyricsAnimationStylePreference.APPLE) {
         spring<Float>(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessLow,
+            dampingRatio = 0.74f,
+            stiffness = 260f,
         )
     } else {
         tween(durationMillis = 220)
     }
 
     val alpha by animateFloatAsState(targetValue = targetAlpha, animationSpec = animationSpec, label = LyricAlphaLabel)
-    val scale by animateFloatAsState(targetValue = targetScale, animationSpec = animationSpec, label = LyricScaleLabel)
+    val scale by animateFloatAsState(
+        targetValue = targetScale,
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = 280f),
+        label = LyricScaleLabel,
+    )
     val translateX by animateFloatAsState(
         targetValue = targetTranslateX,
         animationSpec = tween(durationMillis = 220, easing = LinearEasing),
         label = LyricOffsetLabel,
     )
-    val animatedKaraokeProgress by animateFloatAsState(
-        targetValue = if (isActive) karaokeProgress else 0f,
-        animationSpec = tween(durationMillis = 16, easing = LinearEasing),
-        label = LyricKaraokeProgressLabel,
-    )
+    val animatedKaraokeProgress = if (isActive) karaokeProgress else 0f
 
     val pulseAnim = remember { Animatable(0f) }
     LaunchedEffect(isActive, animationStyle, useGlowEffect) {
@@ -1497,36 +1527,47 @@ private fun LyricLineItem(
     }
     val pulseProgress = pulseAnim.value
     val pulsedScale = if (isActive && useGlowEffect) {
-        scale * (1f + (0.02f * pulseProgress))
+        scale * (1f + (0.018f * pulseProgress))
     } else {
         scale
     }
 
     val textColor by animateColorAsState(
         targetValue = if (isActive) {
-            MaterialTheme.colorScheme.primary
+            activeTextColor
         } else {
-            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+            baseTextColor.copy(alpha = 0.75f)
         },
         label = LyricColorLabel,
     )
 
     val backgroundColor by animateColorAsState(
         targetValue = when {
-            isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-            isActive -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
+            isSelected -> activeTextColor.copy(alpha = 0.22f)
+            isActive -> activeTextColor.copy(alpha = 0.14f)
             else -> Color.Transparent
         },
         label = LyricBackgroundLabel,
     )
 
+    val scalePivotX = when (textAlign) {
+        TextAlign.Center -> 0.5f
+        TextAlign.End, TextAlign.Right -> 1f
+        else -> 0f
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .alpha(alpha)
-            .scale(pulsedScale)
+            .graphicsLayer {
+                this.alpha = alpha
+                scaleX = pulsedScale
+                scaleY = pulsedScale
+                transformOrigin = TransformOrigin(scalePivotX, 0.5f)
+                clip = false
+            }
             .offset { IntOffset(translateX.roundToInt(), 0) }
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
             .combinedClickable(
                 enabled = true,
@@ -1541,52 +1582,41 @@ private fun LyricLineItem(
                     onLongPress()
                 },
             )
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
-        val lyricStyle = if (isActive && useGlowEffect) {
+        val lyricStyle = if (isActive && (useGlowEffect || animationStyle == LyricsAnimationStylePreference.GLOW)) {
             MaterialTheme.typography.bodyLarge.copy(
                 shadow = Shadow(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.45f + (0.2f * pulseProgress)),
-                    blurRadius = 16f + (8f * pulseProgress),
+                    color = activeTextColor.copy(alpha = 0.48f + (0.22f * pulseProgress)),
+                    blurRadius = 18f + (8f * pulseProgress),
                 ),
             )
         } else {
             MaterialTheme.typography.bodyLarge
         }
 
-        val wordTimestamps = line.wordTimestamps
-        if (isActive && animationStyle == LyricsAnimationStylePreference.KARAOKE && !wordTimestamps.isNullOrEmpty()) {
-            val inactiveWordColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-            val wordByWordText = buildAnnotatedString {
-                wordTimestamps.forEachIndexed { wordIndex, word ->
-                    val hasStarted = playbackPositionMs >= word.startMs
-                    val wordStyle = if (hasStarted) {
-                        SpanStyle(color = MaterialTheme.colorScheme.primary)
-                    } else {
-                        SpanStyle(color = inactiveWordColor)
-                    }
-                    withStyle(wordStyle) {
-                        append(word.text)
-                    }
-                    if (wordIndex != wordTimestamps.lastIndex) {
-                        append(" ")
+        Column(modifier = Modifier.fillMaxWidth()) {
+            val wordTimestamps = line.wordTimestamps
+            if (isActive && animationStyle == LyricsAnimationStylePreference.KARAOKE && !wordTimestamps.isNullOrEmpty()) {
+                val inactiveWordColor = baseTextColor.copy(alpha = 0.55f)
+                val wordByWordText = buildAnnotatedString {
+                    wordTimestamps.forEachIndexed { wordIndex, word ->
+                        val hasStarted = playbackPositionMs >= word.startMs
+                        val wordStyle = if (hasStarted) {
+                            SpanStyle(color = activeTextColor)
+                        } else {
+                            SpanStyle(color = inactiveWordColor)
+                        }
+                        withStyle(wordStyle) {
+                            append(word.text)
+                        }
+                        if (wordIndex != wordTimestamps.lastIndex) {
+                            append(" ")
+                        }
                     }
                 }
-            }
-            Text(
-                text = wordByWordText,
-                fontSize = fontSizeSp.sp,
-                textAlign = textAlign,
-                fontWeight = FontWeight.ExtraBold,
-                fontFamily = customFont ?: FontFamily.Default,
-                style = lyricStyle,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        } else if (isActive && animationStyle == LyricsAnimationStylePreference.KARAOKE) {
-            Box(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = line.text,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
+                    text = wordByWordText,
                     fontSize = fontSizeSp.sp,
                     textAlign = textAlign,
                     fontWeight = FontWeight.ExtraBold,
@@ -1594,47 +1624,60 @@ private fun LyricLineItem(
                     style = lyricStyle,
                     modifier = Modifier.fillMaxWidth(),
                 )
+            } else if (isActive && animationStyle == LyricsAnimationStylePreference.KARAOKE) {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = line.text,
+                        color = baseTextColor.copy(alpha = 0.65f),
+                        fontSize = fontSizeSp.sp,
+                        textAlign = textAlign,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = customFont ?: FontFamily.Default,
+                        style = lyricStyle,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        text = line.text,
+                        color = activeTextColor,
+                        fontSize = fontSizeSp.sp,
+                        textAlign = textAlign,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = customFont ?: FontFamily.Default,
+                        style = lyricStyle,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .drawWithContent {
+                                clipRect(right = size.width * animatedKaraokeProgress) {
+                                    this@drawWithContent.drawContent()
+                                }
+                            },
+                    )
+                }
+            } else {
                 Text(
                     text = line.text,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = textColor,
                     fontSize = fontSizeSp.sp,
                     textAlign = textAlign,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
                     fontFamily = customFont ?: FontFamily.Default,
                     style = lyricStyle,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .drawWithContent {
-                            clipRect(right = size.width * animatedKaraokeProgress) {
-                                this@drawWithContent.drawContent()
-                            }
-                        },
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
-        } else {
-            Text(
-                text = line.text,
-                color = textColor,
-                fontSize = fontSizeSp.sp,
-                textAlign = textAlign,
-                fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
-                fontFamily = customFont ?: FontFamily.Default,
-                style = lyricStyle,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
 
-        if (!romanizedText.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = romanizedText,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.68f),
-                fontSize = (fontSizeSp * 0.72f).sp,
-                textAlign = textAlign,
-                fontWeight = FontWeight.Normal,
-                fontFamily = customFont ?: FontFamily.Default,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (!romanizedText.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = romanizedText,
+                    color = activeTextColor.copy(alpha = 0.75f),
+                    fontSize = (fontSizeSp * 0.72f).sp,
+                    textAlign = textAlign,
+                    fontWeight = FontWeight.Normal,
+                    fontFamily = customFont ?: FontFamily.Default,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }
@@ -2125,8 +2168,9 @@ private fun loadRemoteImageBuffered(url: String?): BufferedImage? {
         URI(url).toURL().openStream().use { stream -> ImageIO.read(stream) }
     }.getOrNull() ?: runCatching {
         val bytes = URI(url).toURL().readBytes()
-        val skiaImage = SkiaImage.makeFromEncoded(bytes)
-        val pngData = skiaImage.encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG, 100) ?: return@runCatching null
+        val pngData = SkiaImage.makeFromEncoded(bytes).use { skiaImage ->
+            skiaImage.encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG, 100)
+        } ?: return@runCatching null
         ImageIO.read(ByteArrayInputStream(pngData.bytes))
     }.getOrNull()
 }

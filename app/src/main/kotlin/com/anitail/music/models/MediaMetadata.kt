@@ -1,10 +1,16 @@
 package com.anitail.music.models
 
 import androidx.compose.runtime.Immutable
+import com.anitail.innertube.models.Album as InnerTubeAlbum
+import com.anitail.innertube.models.Artist as InnerTubeArtist
 import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.music.db.entities.Song
 import com.anitail.music.db.entities.SongEntity
+import com.anitail.music.playback.video.isLiveType
+import com.anitail.music.playback.video.isOfficialVideoType
+import com.anitail.music.playback.video.isUploadedType
+import com.anitail.music.playback.video.isVideoType
 import com.anitail.music.ui.utils.resize
 
 import kotlinx.serialization.Serializable
@@ -23,7 +29,26 @@ data class MediaMetadata(
     val explicit: Boolean = false,
     val liked: Boolean = false,
     val isEpisode: Boolean = false,
+    val musicVideoType: String? = null,
 ) {
+    val isLocalTrack: Boolean
+        get() = id.startsWith("LOCAL_") || id.startsWith("local_")
+
+    val isVideoSong: Boolean
+        get() = !isUploadedType(musicVideoType) && isVideoType(musicVideoType)
+
+    val isOfficialMusicVideo: Boolean
+        get() = isOfficialVideoType(musicVideoType)
+
+    val isLive: Boolean
+        get() = isLiveType(musicVideoType) && duration <= 0
+
+    val canSwitchToMusicVideo: Boolean
+        get() = !isVideoSong && !isUploadedType(musicVideoType) && !isLocalTrack && !isEpisode
+
+    val canSwitchToAudioTrack: Boolean
+        get() = isVideoSong && !isUploadedType(musicVideoType) && !isLocalTrack && !isEpisode
+
     @Serializable
     data class Artist(
         val id: String?,
@@ -46,6 +71,23 @@ data class MediaMetadata(
             albumName = album?.title,
             artistName = artistName,
             explicit = explicit,
+            isEpisode = isEpisode,
+        )
+
+    fun toSongItem() =
+        SongItem(
+            id = id,
+            title = title,
+            artists =
+                artists.map { InnerTubeArtist(name = it.name, id = it.id) }.ifEmpty {
+                    listOfNotNull(artistName?.takeIf { it.isNotBlank() }?.let { InnerTubeArtist(name = it, id = null) })
+                },
+            album = album?.let { InnerTubeAlbum(name = it.title, id = it.id) },
+            duration = duration.takeIf { it > 0 },
+            musicVideoType = musicVideoType,
+            thumbnail = thumbnailUrl.orEmpty(),
+            explicit = explicit,
+            setVideoId = setVideoId,
             isEpisode = isEpisode,
         )
 }
@@ -102,7 +144,8 @@ fun SongItem.toMediaMetadata() =
         },
         explicit = explicit,
         setVideoId = setVideoId,
-        isEpisode = isEpisode
+        isEpisode = isEpisode,
+        musicVideoType = musicVideoType,
     )
 
 fun EpisodeItem.toMediaMetadata() = asSongItem().toMediaMetadata()

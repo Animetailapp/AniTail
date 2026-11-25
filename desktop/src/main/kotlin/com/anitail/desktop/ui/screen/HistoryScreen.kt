@@ -14,11 +14,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -33,6 +36,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +45,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -71,6 +76,7 @@ import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.screen.library.SelectionDownloadState
 import com.anitail.desktop.ui.screen.library.resolveSelectionDownloadState
+import com.anitail.desktop.sync.syncHistoryPageToDatabase
 import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.Artist
 import com.anitail.innertube.models.SongItem
@@ -115,15 +121,14 @@ fun HistoryScreen(
     val listState = rememberLazyListState()
     val preferences = remember { DesktopPreferences.getInstance() }
 
-    val songs by database.songs.collectAsState(initial = emptyList())
+    val songsById by database.songsById.collectAsState()
     val events by database.events.collectAsState(initial = emptyList())
     val playlists by database.allPlaylists().collectAsState(initial = emptyList())
     val songArtistMaps by database.songArtistMaps.collectAsState(initial = emptyList())
     val downloadStates by downloadService.downloadStates.collectAsState()
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
 
-    val songsById = remember(songs) { songs.associateBy { it.id } }
-    val downloadedIds = remember(downloadedSongs) { downloadedSongs.map { it.songId }.toSet() }
+    val downloadedIds = remember(downloadedSongs) { downloadedSongs.mapTo(HashSet()) { it.songId } }
     val swipeToSong by preferences.swipeToSong.collectAsState()
 
     var historySource by remember { mutableStateOf(HistorySource.LOCAL) }
@@ -136,10 +141,15 @@ fun HistoryScreen(
     var detailsItem by remember { mutableStateOf<LibraryItem?>(null) }
     var historyPage by remember { mutableStateOf<HistoryPage?>(null) }
     var isRemoteLoading by remember { mutableStateOf(false) }
+    var remoteError by remember { mutableStateOf<String?>(null) }
 
     val isLoggedIn = remember(YouTube.cookie) {
         val cookie = YouTube.cookie.orEmpty()
-        cookie.isNotBlank() && "SAPISID" in parseCookieString(cookie)
+        if (cookie.isBlank()) false
+        else {
+            val map = parseCookieString(cookie)
+            "SAPISID" in map || "__Secure-3PAPISID" in map || "__Secure-1PAPISID" in map || cookie.length > 20
+        }
     }
 
     LaunchedEffect(isSearching) {
@@ -151,14 +161,36 @@ fun HistoryScreen(
     LaunchedEffect(isLoggedIn) {
         if (!isLoggedIn) {
             historySource = HistorySource.LOCAL
+            return@LaunchedEffect
+        }
+        // Pre-carga inmediata de historial remoto y sincronización a base de datos (igual que Metrolist)
+        isRemoteLoading = true
+        remoteError = null
+        val result = withContext(Dispatchers.IO) { YouTube.musicHistory() }
+        val page = result.getOrNull()
+        historyPage = page
+        result.exceptionOrNull()?.let {
+            remoteError = "${it::class.simpleName}: ${it.message}"
+        }
+        isRemoteLoading = false
+        page?.let { p ->
+            withContext(Dispatchers.IO) {
+                syncHistoryPageToDatabase(p, database)
+            }
         }
     }
 
-    LaunchedEffect(historySource, isLoggedIn) {
-        if (historySource != HistorySource.REMOTE || !isLoggedIn) return@LaunchedEffect
-        isRemoteLoading = true
-        historyPage = withContext(Dispatchers.IO) { YouTube.musicHistory().getOrNull() }
-        isRemoteLoading = false
+    LaunchedEffect(historySource) {
+        if (historySource == HistorySource.REMOTE && isLoggedIn && historyPage == null) {
+            isRemoteLoading = true
+            remoteError = null
+            val result = withContext(Dispatchers.IO) { YouTube.musicHistory() }
+            historyPage = result.getOrNull()
+            result.exceptionOrNull()?.let {
+                remoteError = "${it::class.simpleName}: ${it.message}"
+            }
+            isRemoteLoading = false
+        }
     }
 
     val groupedEvents = remember(events, songsById, query.text) {
@@ -175,15 +207,20 @@ fun HistoryScreen(
         wrappedItemsMap.values.flatten()
     }
 
-    val selectedItems = remember(allWrappedItems, selectionMode) {
-        if (!selectionMode) emptyList() else allWrappedItems.filter { it.isSelected }
+    val selectedItems by remember(allWrappedItems, selectionMode) {
+        derivedStateOf {
+            if (!selectionMode) emptyList() else allWrappedItems.filter { it.isSelected }
+        }
     }
 
-    val selectionDownloadState = resolveSelectionDownloadState(
-        songIds = selectedItems.map { it.entry.song.id },
-        downloadStates = downloadStates,
-        downloadedSongs = downloadedSongs,
-    )
+    val selectedSongIds = remember(selectedItems) { selectedItems.map { it.entry.song.id } }
+    val selectionDownloadState = remember(selectedSongIds, downloadStates, downloadedSongs) {
+        resolveSelectionDownloadState(
+            songIds = selectedSongIds,
+            downloadStates = downloadStates,
+            downloadedSongs = downloadedSongs,
+        )
+    }
 
     val allLiked = selectedItems.isNotEmpty() && selectedItems.all { it.entry.song.liked }
 
@@ -366,6 +403,10 @@ fun HistoryScreen(
                     DropdownMenu(
                         expanded = selectionMenuExpanded,
                         onDismissRequest = { selectionMenuExpanded = false },
+                        modifier = Modifier
+                            .widthIn(min = 240.dp, max = 320.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainer),
                     ) {
                         DropdownMenuItem(
                             text = { Text(stringResource("play")) },
@@ -528,7 +569,7 @@ fun HistoryScreen(
                     } else if (filteredRemoteSections.isNullOrEmpty()) {
                         item {
                             Text(
-                                text = stringResource("history_empty"),
+                                text = stringResource("history_empty") + (remoteError?.let { "\n$it" } ?: ""),
                                 modifier = Modifier.padding(horizontal = 16.dp),
                             )
                         }
@@ -546,8 +587,8 @@ fun HistoryScreen(
                                 val menuExpanded = remember(song.id) { mutableStateOf(false) }
                                 val itemEntity = songsById[song.id] ?: song.toSongEntity(inLibrary = false)
                                 val libraryItem = itemEntity.toLibraryItem()
-                                val menuActions = remember(song.id, songArtistMaps, downloadStates, downloadedSongs) {
-                                    buildBrowseSongMenuActions(
+                                val menuActions = remember(song.id, songArtistMaps, downloadStates, downloadedSongs, song.historyRemoveToken) {
+                                    val base = buildBrowseSongMenuActions(
                                         strings = strings,
                                         libraryItem = libraryItem,
                                         songItem = song,
@@ -566,6 +607,29 @@ fun HistoryScreen(
                                         onShowDetails = { detailsItem = it },
                                         copyToClipboard = ::copyToClipboard,
                                     )
+                                    val token = song.historyRemoveToken
+                                    if (!token.isNullOrBlank()) {
+                                        base + ContextMenuAction(
+                                            label = strings.get("delete"),
+                                            icon = IconAssets.delete(),
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    withContext(Dispatchers.IO) {
+                                                        YouTube.feedback(listOf(token))
+                                                    }
+                                                    historyPage = historyPage?.copy(
+                                                        sections = historyPage?.sections?.map { s ->
+                                                            if (s.title == section.title) {
+                                                                s.copy(songs = s.songs.filterNot { it.id == song.id })
+                                                            } else s
+                                                        }?.filter { it.songs.isNotEmpty() }
+                                                    )
+                                                }
+                                            },
+                                        )
+                                    } else {
+                                        base
+                                    }
                                 }
                                 Box {
                                     LibrarySongListItem(
@@ -579,12 +643,11 @@ fun HistoryScreen(
                                             if (song.id == playerState.currentItem?.id) {
                                                 playerState.togglePlayPause()
                                             } else {
-                                                coroutineScope.launch {
-                                                    val result = YouTube.next(WatchEndpoint(videoId = song.id)).getOrNull()
-                                                        ?: return@launch
-                                                    val plan = buildRadioQueuePlan(libraryItem, result)
-                                                    playerState.playQueue(plan.items, plan.startIndex)
+                                                val sectionSongs = section.songs.map { s ->
+                                                    (songsById[s.id] ?: s.toSongEntity(inLibrary = false)).toLibraryItem()
                                                 }
+                                                val songIndex = sectionSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                                                playerState.playQueue(sectionSongs, songIndex)
                                             }
                                         },
                                         onMenuClick = { menuExpanded.value = true },

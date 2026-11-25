@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.HorizontalDivider
@@ -52,6 +53,7 @@ fun ItemContextMenu(
         onDismissRequest = onDismiss,
         offset = offset,
         modifier = Modifier
+            .widthIn(min = 320.dp, max = 360.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer),
     ) {
@@ -89,6 +91,14 @@ private fun ItemContextMenuHeader(item: LibraryItem) {
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
+        RemoteImage(
+            url = item.artworkUrl,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(6.dp)),
+            shape = RoundedCornerShape(6.dp),
+        )
+        Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = item.title,

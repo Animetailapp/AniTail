@@ -1,6 +1,15 @@
 <resources>
     <!-- App -->
     <string name="app_name">AniTail Music</string>
+    <string name="cast">Cast to TV and speakers</string>
+    <string name="video_viewer">Video viewer</string>
+    <string name="open_miniplayer">Open mini player</string>
+    <string name="close_miniplayer">Close mini player</string>
+    <string name="fullscreen">Fullscreen</string>
+    <string name="exit_fullscreen">Exit fullscreen</string>
+    <string name="miniplayer">Mini player</string>
+    <string name="enter_focus_mode">Focus mode</string>
+    <string name="exit_focus_mode">Exit focus mode</string>
 
     <!-- Bottom navigation -->
     <string name="home">Home</string>
@@ -1197,4 +1206,106 @@
     <string name="hide_status_bar_fullscreen">Hide status bar on fullscreen</string>
     <string name="hide_status_bar_fullscreen_desc">Hide the status bar when lyrics fullscreen mode is active</string>
     <string name="drag_to_reorder">Drag to reorder</string>
+    <string name="show_more">Show more</string>
+    <string name="show_less">Show less</string>
+    <string name="artist_lastfm_listeners">Last.fm listeners</string>
+    <string name="artist_lastfm_scrobbles">Last.fm scrobbles</string>
+    <string name="artist_monthly_audience">Monthly audience</string>
+    <string name="artist_lastfm_biography">Last.fm biography</string>
+    <string name="artist_lastfm_read_more">Read more on Last.fm</string>
+    <string name="artist_similar_artists">Similar artists</string>
+    <string name="genres">Genres</string>
+    <string name="no_bio_title">No biography available</string>
+    <string name="no_bio_hint">No biography was found for this artist. You can check their Last.fm profile for more info.</string>
+    <string name="could_not_load_info">Could not load info</string>
+    <string name="lastfm_profile_hint">Unable to fetch artist details from Last.fm right now. You can open their Last.fm profile directly.</string>
+    <string name="lastfm_link_text">Open on Last.fm</string>
+    <string name="save_photo">Save photo</string>
+    <string name="photo_saved">Photo saved</string>
+    <string name="total_views">Total views</string>
+    <string name="artist_photo_details_unavailable">Photo details are unavailable</string>
+    <string name="artist_photo_uploaded">Uploaded on %1$s</string>
+    <string name="artist_photo_view_on_lastfm">View on Last.fm</string>
+    <string name="brand_lastfm">Last.fm</string>
+    <string name="latest_release">Latest release</string>
+    <string name="latest_episode">Latest episode</string>
+
+    <!-- Music video playback -->
+    <string name="video">Video</string>
+    <string name="play_music_videos">Play music videos</string>
+    <string name="play_music_videos_description">Show the video for songs that have one (uses more data)</string>
+    <string name="show_player_video_button">Audio/video picker</string>
+    <string name="show_player_video_button_desc">Show the song/video switcher in the player</string>
+    <string name="music_video_quality">Music video quality</string>
+    <string name="music_video_quality_desc">Default resolution for music videos</string>
+    <string name="music_video_quality_auto">Auto</string>
+    <string name="music_video_quality_resolution" translatable="false">%1$sp</string>
+    <string name="music_video_resolution">Video resolution</string>
+    <string name="music_video_resolution_desc">Change the resolution for this music video</string>
+    <string name="music_video_resolution_current">Currently playing</string>
+    <string name="music_video_cache">Music video cache</string>
+    <string name="clear_music_video_cache">Clear music video cache</string>
+    <string name="clear_music_video_cache_desc">Remove cached song-to-video resolution matches</string>
+    <string name="clear_music_video_cache_dialog">Clear all cached music video resolutions?</string>
+    <string name="play_videos_in_mini_player">Play videos in mini player</string>
+    <string name="play_videos_in_mini_player_desc">Show music video preview inside the mini player</string>
+    <string name="enter_pip">Enter picture-in-picture</string>
+    <string name="enter_fullscreen">Enter fullscreen</string>
+    <string name="music_video_not_found">No music video is available for this track.</string>
+    <string name="music_video_unavailable">The music video could not be played.</string>
+    <string name="music_track_unavailable">The audio track could not be played.</string>
+    <string name="subtitles">Subtitles</string>
+
+    <!-- Expressive Artist -->
+    <string name="error_occurred">An error occurred</string>
+    <string name="artist_refresh">Refresh artist</string>
+    <string name="artist_actions">Artist actions</string>
+    <string name="from_your_library">From your library</string>
+    <string name="artist_subscriber_count">%1$s subscribers</string>
+    <string name="monthly_audience_short">monthly audience</string>
+    <string name="artist_play_all">Play all</string>
+    <string name="see_all">See all</string>
+    <string name="artist_photo_position">%1$d of %2$d</string>
+    <string name="artist_photo_open_original">Open original</string>
+    <string name="artist_photo_content_description">Photo of %1$s</string>
+    <string name="artist_photo_view_author">View uploader\'s Last.fm profile</string>
+    <string name="saved">Saved</string>
+    <string name="action_download">Download</string>
+
+    <!-- Expressive Library -->
+    <string name="chip_content_description">%1$s, chip</string>
+    <string name="tracks">Tracks</string>
+    <string name="podcasts">Podcasts</string>
+    <string name="my_top_100">My top 100</string>
+    <string name="uploaded_playlist_name">Uploaded</string>
+    <string name="library_favorite_songs">Favorite songs</string>
+    <string name="library_offline_songs">Offline songs</string>
+    <string name="library_top_songs">Your top songs</string>
+    <string name="library_cached_songs">Cached songs</string>
+    <string name="library_uploaded_songs">Your uploaded songs</string>
+    <string name="library_local_songs">Local songs</string>
+    <string name="library_empty">Your library is empty</string>
+    <string name="library_load_failed">Could not load your library. Check your connection and try again.</string>
+    <string name="search_no_results">No results found</string>
+    <string name="new_playlist">New playlist</string>
+    <string name="hide_from_library_local">Hide locally</string>
+    <string name="hidden_library_items">Hidden library items</string>
+    <string name="restore_hidden_library_items">Restore hidden items</string>
+    <string name="library_sort_updated">Updated</string>
+    <string name="history_sort_listening_time">Listening time</string>
+    <string name="manual">Manual</string>
+    <string name="sort_options">Sort options</string>
+    <string name="grid_view">Grid</string>
+    <string name="list_view">List</string>
+    <string name="playlist_direction_ascending">Direction: ascending</string>
+    <string name="playlist_direction_descending">Direction: descending</string>
+    <string name="playlist_reorder">Reorder</string>
+    <string name="move_to_top">Move to top</string>
+    <string name="move_up">Move up</string>
+    <string name="move_down">Move down</string>
+    <string name="move_to_bottom">Move to bottom</string>
+    <string name="show_uploaded_playlist">Show uploaded playlist</string>
+    <string name="videos">Videos</string>
+    <string name="floating_navbar">Floating bottom navigation bar</string>
+    <string name="open_profile">Open profile</string>
 </resources>

@@ -1,4 +1,15 @@
 <resources>
+    <!-- Controles del reproductor -->
+    <string name="cast">Reproducir en TV y altavoces</string>
+    <string name="video_viewer">Visor de vídeo</string>
+    <string name="open_miniplayer">Abrir mini reproductor</string>
+    <string name="close_miniplayer">Cerrar mini reproductor</string>
+    <string name="fullscreen">Pantalla completa</string>
+    <string name="exit_fullscreen">Salir de pantalla completa</string>
+    <string name="miniplayer">Mini reproductor</string>
+    <string name="enter_focus_mode">Modo enfoque</string>
+    <string name="exit_focus_mode">Salir del modo enfoque</string>
+
     <!-- Navegación inferior -->
     <string name="home">Inicio</string>
     <string name="songs">Canciones</string>
@@ -1125,4 +1136,106 @@
     <string name="hide_status_bar_fullscreen">Ocultar barra de estado en pantalla completa</string>
     <string name="hide_status_bar_fullscreen_desc">Ocultar la barra de estado cuando el modo de letras a pantalla completa esté activo</string>
     <string name="drag_to_reorder">Arrastra para reordenar</string>
+    <string name="show_more">Mostrar más</string>
+    <string name="show_less">Mostrar menos</string>
+    <string name="artist_lastfm_listeners">Oyentes en Last.fm</string>
+    <string name="artist_lastfm_scrobbles">Scrobbles en Last.fm</string>
+    <string name="artist_monthly_audience">Audiencia mensual</string>
+    <string name="artist_lastfm_biography">Biografía de Last.fm</string>
+    <string name="artist_lastfm_read_more">Leer más en Last.fm</string>
+    <string name="artist_similar_artists">Artistas similares</string>
+    <string name="genres">Géneros</string>
+    <string name="no_bio_title">Sin biografía disponible</string>
+    <string name="no_bio_hint">No se encontró una biografía para este artista. Puedes consultar su perfil en Last.fm para más información.</string>
+    <string name="could_not_load_info">No se pudo cargar la información</string>
+    <string name="lastfm_profile_hint">No se pudieron obtener los detalles del artista desde Last.fm en este momento. Puedes abrir su perfil directamente.</string>
+    <string name="lastfm_link_text">Abrir en Last.fm</string>
+    <string name="save_photo">Guardar foto</string>
+    <string name="photo_saved">Foto guardada</string>
+    <string name="total_views">Reproducciones totales</string>
+    <string name="artist_photo_details_unavailable">Los detalles de la foto no están disponibles</string>
+    <string name="artist_photo_uploaded">Subida el %1$s</string>
+    <string name="artist_photo_view_on_lastfm">Ver en Last.fm</string>
+    <string name="brand_lastfm">Last.fm</string>
+    <string name="latest_release">Última versión</string>
+    <string name="latest_episode">Último episodio</string>
+
+    <!-- Reproducción de videos musicales -->
+    <string name="video">Video</string>
+    <string name="play_music_videos">Reproducir videos musicales</string>
+    <string name="play_music_videos_description">Muestra el video de las canciones que tengan uno (usa más datos)</string>
+    <string name="show_player_video_button">Selector de audio/video</string>
+    <string name="show_player_video_button_desc">Muestra el selector de canción/video en el reproductor</string>
+    <string name="music_video_quality">Calidad de video musical</string>
+    <string name="music_video_quality_desc">Resolución predeterminada para videos musicales</string>
+    <string name="music_video_quality_auto">Automática</string>
+    <string name="music_video_resolution">Resolución de video</string>
+    <string name="music_video_resolution_desc">Cambiar la resolución de este video musical</string>
+    <string name="music_video_resolution_current">Reproduciendo ahora</string>
+    <string name="music_video_cache">Caché de videos musicales</string>
+    <string name="clear_music_video_cache">Limpiar caché de videos musicales</string>
+    <string name="clear_music_video_cache_desc">Elimina las coincidencias guardadas entre canciones y videos</string>
+    <string name="clear_music_video_cache_dialog">¿Limpiar todas las asociaciones en caché de videos musicales?</string>
+    <string name="play_videos_in_mini_player">Reproducir videos en el minireproductor</string>
+    <string name="play_videos_in_mini_player_desc">Muestra la vista previa del video dentro del minireproductor</string>
+    <string name="enter_pip">Modo imagen en imagen</string>
+    <string name="enter_fullscreen">Pantalla completa</string>
+    <string name="music_video_not_found">No hay video musical disponible para esta canción.</string>
+    <string name="music_video_unavailable">No se pudo reproducir el video musical.</string>
+    <string name="music_track_unavailable">No se pudo reproducir la pista de audio.</string>
+    <string name="subtitles">Subtítulos</string>
+
+    <!-- Expressive Artist -->
+    <string name="error_occurred">Ha ocurrido un error</string>
+    <string name="artist_refresh">Actualizar artista</string>
+    <string name="artist_actions">Acciones del artista</string>
+    <string name="from_your_library">De tu biblioteca</string>
+    <string name="artist_subscriber_count">%1$s suscriptores</string>
+    <string name="monthly_audience_short">audiencia mensual</string>
+    <string name="artist_play_all">Reproducir todo</string>
+    <string name="see_all">Ver todo</string>
+    <string name="artist_photo_position">%1$d de %2$d</string>
+    <string name="artist_photo_open_original">Abrir original</string>
+    <string name="artist_photo_content_description">Foto de %1$s</string>
+    <string name="artist_photo_view_author">Ver el perfil de Last.fm de quien ha subido el contenido</string>
+    <string name="saved">Guardado</string>
+    <string name="action_download">Descargar</string>
+
+    <!-- Expressive Library -->
+    <string name="chip_content_description">%1$s, chip</string>
+    <string name="tracks">Canciones</string>
+    <string name="podcasts">Podcasts</string>
+    <string name="filter_local">Local</string>
+    <string name="my_top_100">Mi top 100</string>
+    <string name="uploaded_playlist_name">Subidas</string>
+    <string name="library_favorite_songs">Canciones favoritas</string>
+    <string name="library_offline_songs">Canciones sin conexión</string>
+    <string name="library_top_songs">Tus canciones más escuchadas</string>
+    <string name="library_cached_songs">Canciones en caché</string>
+    <string name="library_uploaded_songs">Tus canciones subidas</string>
+    <string name="library_local_songs">Canciones locales</string>
+    <string name="library_empty">Tu biblioteca está vacía</string>
+    <string name="library_load_failed">No se pudo cargar tu biblioteca. Comprueba tu conexión y vuelve a intentarlo.</string>
+    <string name="search_no_results">No se han encontrado resultados</string>
+    <string name="new_playlist">Nueva playlist</string>
+    <string name="hide_from_library_local">Ocultar localmente</string>
+    <string name="hidden_library_items">Elementos ocultos de la biblioteca</string>
+    <string name="restore_hidden_library_items">Restaurar elementos ocultos</string>
+    <string name="library_sort_updated">Actualizado</string>
+    <string name="history_sort_listening_time">Tiempo de escucha</string>
+    <string name="manual">Manual</string>
+    <string name="sort_options">Opciones de orden</string>
+    <string name="grid_view">Cuadrícula</string>
+    <string name="list_view">Lista</string>
+    <string name="playlist_direction_ascending">Dirección: ascendente</string>
+    <string name="playlist_direction_descending">Dirección: descendente</string>
+    <string name="playlist_reorder">Reordenar</string>
+    <string name="move_to_top">Mover al principio</string>
+    <string name="move_up">Subir</string>
+    <string name="move_down">Bajar</string>
+    <string name="move_to_bottom">Mover al final</string>
+    <string name="show_uploaded_playlist">Mostrar lista de subidas</string>
+    <string name="videos">Videos</string>
+    <string name="floating_navbar">Barra de navegación inferior flotante</string>
+    <string name="open_profile">Abrir perfil</string>
 </resources>

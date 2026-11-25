@@ -27,7 +27,11 @@
         <intent>
             <action android:name="android.media.action.DISPLAY_AUDIO_EFFECT_CONTROL_PANEL" />
         </intent>
-    </queries>    <application
+    </queries>
+
+    <!-- PiP is explicitly user-entered and replaces the player layout, so automatic entry and a persistent source rect do not apply. -->
+    <application
+        tools:ignore="PictureInPictureIssue"
         android:name=".App"
         android:allowBackup="true"
         android:appCategory="audio"
@@ -108,6 +112,8 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:supportsPictureInPicture="true"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
             android:theme="@style/Theme.Anitail"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>

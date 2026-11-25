@@ -17,9 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,31 +38,24 @@ fun HideOnScrollFAB(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Detectar dirección del scroll
-    var previousIndex by remember { mutableStateOf(0) }
-    var previousOffset by remember { mutableStateOf(0) }
-    var isScrollingUp by remember { mutableStateOf(true) }
-
-    val firstVisibleIndex = lazyListState.firstVisibleItemIndex
-    val firstVisibleOffset = lazyListState.firstVisibleItemScrollOffset
-
-    // Comparar con valores anteriores para determinar dirección
-    val scrollingUp by remember {
+    val showFab by remember(lazyListState, visible) {
+        var previousIndex = lazyListState.firstVisibleItemIndex
+        var previousOffset = lazyListState.firstVisibleItemScrollOffset
+        var isScrollingUp = true
         derivedStateOf {
-            if (firstVisibleIndex != previousIndex) {
-                isScrollingUp = firstVisibleIndex < previousIndex
-                previousIndex = firstVisibleIndex
-                previousOffset = firstVisibleOffset
-            } else if (firstVisibleOffset != previousOffset) {
-                isScrollingUp = firstVisibleOffset < previousOffset
-                previousOffset = firstVisibleOffset
+            val currentIndex = lazyListState.firstVisibleItemIndex
+            val currentOffset = lazyListState.firstVisibleItemScrollOffset
+            if (currentIndex != previousIndex) {
+                isScrollingUp = currentIndex < previousIndex
+                previousIndex = currentIndex
+                previousOffset = currentOffset
+            } else if (currentOffset != previousOffset) {
+                isScrollingUp = currentOffset < previousOffset
+                previousOffset = currentOffset
             }
-            isScrollingUp
+            visible && (isScrollingUp || currentIndex == 0)
         }
     }
-
-    // Mostrar FAB cuando: hay contenido Y (scroll hacia arriba O está al inicio)
-    val showFab = visible && (scrollingUp || lazyListState.firstVisibleItemIndex == 0)
 
     AnimatedVisibility(
         visible = showFab,

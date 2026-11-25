@@ -8,6 +8,7 @@ import com.anitail.innertube.models.YouTubeLocale
 import com.anitail.innertube.models.body.*
 import com.anitail.innertube.models.response.NextResponse
 import com.anitail.innertube.utils.parseCookieString
+import com.anitail.innertube.utils.sanitizeCookieString
 import com.anitail.innertube.utils.sha1
 import io.ktor.client.*
 import io.ktor.client.call.body
@@ -22,6 +23,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.put
 import java.net.Proxy
 import java.io.IOException
 import kotlinx.coroutines.delay
@@ -36,12 +38,14 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 @OptIn(ExperimentalEncodingApi::class)
 class InnerTube {
     private var httpClient = createClient()
+    private var sabrHttpClient = createSabrClient()
     private var innerTubeX = com.metrolist.innertubex.InnerTube(httpClient)
     private var transportGeneration = 0L
 
     class ExtractionTransport internal constructor(
         val innerTube: com.metrolist.innertubex.InnerTube,
         val httpClient: HttpClient,
+        val sabrHttpClient: HttpClient,
         val generation: Long,
     )
 
@@ -49,6 +53,7 @@ class InnerTube {
         ExtractionTransport(
             innerTube = innerTubeX,
             httpClient = httpClient,
+            sabrHttpClient = sabrHttpClient,
             generation = transportGeneration,
         )
 
@@ -72,41 +77,40 @@ class InnerTube {
         }
     var cookie: String? = null
         set(value) {
-            field = value
-            cookieMap = if (value == null) emptyMap() else parseCookieString(value)
-            innerTubeX.cookie = value
+            val sanitized = sanitizeCookieString(value)
+            field = sanitized
+            cookieMap = if (sanitized == null) emptyMap() else parseCookieString(sanitized)
+            innerTubeX.cookie = sanitized
         }
     private var cookieMap = emptyMap<String, String>()
 
     var proxy: Proxy? = null
         set(value) {
             field = value
-            httpClient.close()
-            httpClient = createClient()
-            innerTubeX = com.metrolist.innertubex.InnerTube(httpClient).also { replacement ->
-                replacement.locale = com.metrolist.innertubex.models.YouTubeLocale(gl = locale.gl, hl = locale.hl)
-                replacement.cookie = cookie
-                replacement.visitorData = visitorData
-                replacement.dataSyncId = dataSyncId
-            }
-            transportGeneration++
+            rebuildHttpClients()
         }
     
     var proxyAuth: String? = null
         set(value) {
             field = value
             if (proxy != null) {
-                httpClient.close()
-                httpClient = createClient()
-                innerTubeX = com.metrolist.innertubex.InnerTube(httpClient).also { replacement ->
-                    replacement.locale = com.metrolist.innertubex.models.YouTubeLocale(gl = locale.gl, hl = locale.hl)
-                    replacement.cookie = cookie
-                    replacement.visitorData = visitorData
-                    replacement.dataSyncId = dataSyncId
-                }
-                transportGeneration++
+                rebuildHttpClients()
             }
         }
+
+    private fun rebuildHttpClients() {
+        httpClient.close()
+        sabrHttpClient.close()
+        httpClient = createClient()
+        sabrHttpClient = createSabrClient()
+        innerTubeX = com.metrolist.innertubex.InnerTube(httpClient).also { replacement ->
+            replacement.locale = com.metrolist.innertubex.models.YouTubeLocale(gl = locale.gl, hl = locale.hl)
+            replacement.cookie = cookie
+            replacement.visitorData = visitorData
+            replacement.dataSyncId = dataSyncId
+        }
+        transportGeneration++
+    }
 
     init {
         innerTubeX.locale = com.metrolist.innertubex.models.YouTubeLocale(gl = locale.gl, hl = locale.hl)
@@ -114,6 +118,41 @@ class InnerTube {
 
     var useLoginForBrowse: Boolean = false
     var autoAcceptYouTubeTerms: Boolean = false
+
+    private fun OkHttpConfig.configureSharedEngine(enableCache: Boolean) {
+        config {
+            connectionPool(
+                okhttp3.ConnectionPool(
+                    10, // maxIdleConnections
+                    5, // keepAliveDuration
+                    java.util.concurrent.TimeUnit.MINUTES
+                )
+            )
+            connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            protocols(listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))
+            retryOnConnectionFailure(true)
+            if (enableCache) {
+                cache(
+                    okhttp3.Cache(
+                        directory = java.io.File(System.getProperty("java.io.tmpdir"), "http_cache"),
+                        maxSize = 50L * 1024L * 1024L // 50 MB
+                    )
+                )
+            }
+            this@InnerTube.proxy?.let { proxyConfig ->
+                proxy(proxyConfig)
+            }
+            this@InnerTube.proxyAuth?.let { auth ->
+                proxyAuthenticator { _, response ->
+                    response.request.newBuilder()
+                        .header("Proxy-Authorization", auth)
+                        .build()
+                }
+            }
+        }
+    }
 
     @OptIn(ExperimentalSerializationApi::class)
     private fun createClient() = HttpClient(OkHttp) {
@@ -132,51 +171,8 @@ class InnerTube {
             deflate(0.8F)
         }
 
-        // Enhanced network configuration for better performance
         engine {
-            config {
-                // Connection pool settings for better connection reuse
-                connectionPool(
-                    okhttp3.ConnectionPool(
-                        10, // maxIdleConnections
-                        5, // keepAliveDuration
-                        java.util.concurrent.TimeUnit.MINUTES
-                    )
-                )
-                
-                // Timeout configurations
-                connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-                writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
-                
-                // Enable HTTP/2 for better performance
-                protocols(listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))
-                
-                // Retry on connection failure
-                retryOnConnectionFailure(true)
-                
-                // Cache configuration for better performance
-                cache(
-                    okhttp3.Cache(
-                        directory = java.io.File(System.getProperty("java.io.tmpdir"), "http_cache"),
-                        maxSize = 50L * 1024L * 1024L // 50 MB
-                    )
-                )
-                
-                // Apply proxy configuration
-                this@InnerTube.proxy?.let { proxyConfig ->
-                    proxy(proxyConfig)
-                }
-                
-                // Apply proxy authentication
-                this@InnerTube.proxyAuth?.let { auth ->
-                    proxyAuthenticator { _, response ->
-                        response.request.newBuilder()
-                            .header("Proxy-Authorization", auth)
-                            .build()
-                    }
-                }
-            }
+            configureSharedEngine(enableCache = true)
         }
 
         // Request timeout configuration
@@ -192,6 +188,20 @@ class InnerTube {
             header("Accept", "application/json")
             header("Accept-Language", "en-US,en;q=0.9")
             header("Cache-Control", "no-cache")
+        }
+    }
+
+    /** Dedicated streaming client for SABR requests without requestTimeoutMillis or JSON default headers. */
+    private fun createSabrClient() = HttpClient(OkHttp) {
+        expectSuccess = false
+
+        engine {
+            configureSharedEngine(enableCache = false)
+        }
+
+        install(HttpTimeout) {
+            connectTimeoutMillis = 30000
+            socketTimeoutMillis = 60000
         }
     }
 
@@ -499,6 +509,29 @@ class InnerTube {
         httpClient.post("account/account_menu") {
             ytClient(client, setLogin = true)
             setBody(AccountMenuBody(client.toContext(locale, visitorData, dataSyncId)))
+        }
+    }
+
+    suspend fun accountsList(client: YouTubeClient) = withRetry {
+        httpClient.post("account/accounts_list") {
+            ytClient(client, setLogin = true)
+            setBody(
+                kotlinx.serialization.json.buildJsonObject {
+                    put("context", Json.encodeToJsonElement(
+                        Context.serializer(),
+                        client.toContext(locale, visitorData, dataSyncId),
+                    ))
+                    put("callType", "ACCOUNT_MENU_REQUEST_TYPE_MANAGE")
+                    put(
+                        "accountReadMask",
+                        kotlinx.serialization.json.buildJsonObject {
+                            put("returnOwner", true)
+                            put("returnBrandAccounts", true)
+                            put("returnPersonaAccounts", true)
+                        },
+                    )
+                },
+            )
         }
     }
 

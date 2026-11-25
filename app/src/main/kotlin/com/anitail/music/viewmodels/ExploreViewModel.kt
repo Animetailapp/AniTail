@@ -15,6 +15,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -28,7 +29,21 @@ constructor(
 ) : ViewModel() {
     val explorePage = MutableStateFlow<ExplorePage?>(null)
 
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading = _isLoading.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error = _error.asStateFlow()
+
+    fun refresh() {
+        viewModelScope.launch(Dispatchers.IO) {
+            load()
+        }
+    }
+
     private suspend fun load() {
+        _isLoading.value = true
+        _error.value = null
         YouTube
             .explore()
             .onSuccess { page ->
@@ -61,9 +76,11 @@ constructor(
                                 firstArtistKey
                             }.filterExplicit(context.dataStore.get(HideExplicitKey, false)),
                     )
-            }.onFailure {
-                reportException(it)
+            }.onFailure { throwable ->
+                reportException(throwable)
+                _error.value = throwable.message ?: "Failed to load explore"
             }
+        _isLoading.value = false
     }
 
     init {

@@ -281,7 +281,7 @@ private fun FormatBadge(
 
 private fun formatCodecLabel(format: AudioFormatOption): String {
     val extension = when {
-        format.mimeType.contains("webm", ignoreCase = true) -> ".webm"
+        format.mimeType.contains("webm", ignoreCase = true) -> ".weba"
         format.mimeType.contains("mp4", ignoreCase = true) -> ".m4a"
         format.mimeType.contains("mpeg", ignoreCase = true) -> ".mp3"
         else -> ".audio"

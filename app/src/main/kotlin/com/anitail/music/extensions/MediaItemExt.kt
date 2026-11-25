@@ -8,7 +8,6 @@ import com.anitail.innertube.models.SongItem
 import com.anitail.music.db.entities.Song
 import com.anitail.music.models.MediaMetadata
 import com.anitail.music.models.toMediaMetadata
-import timber.log.Timber
 
 val MediaItem.metadata: MediaMetadata?
     get() = localConfiguration?.tag as? MediaMetadata
@@ -20,13 +19,6 @@ fun Song.toMediaItem(): MediaItem {
             !song.mediaStoreUri.isNullOrEmpty() -> song.mediaStoreUri
             else -> song.id
         }
-
-    Timber.d(
-        "MediaItemExt: Song.toMediaItem() id=%s isLocal=%s uri=%s",
-        song.id,
-        song.isLocal,
-        resolvedUri,
-    )
 
     return MediaItem
         .Builder()

@@ -1,33 +1,44 @@
+@file:OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3ExpressiveApi::class,
+    ExperimentalFoundationApi::class,
+)
+
 package com.anitail.music.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
+import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
-import androidx.compose.material3.carousel.rememberCarouselState
+import com.anitail.innertube.models.AlbumItem
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.YTItem
 import com.anitail.music.R
@@ -39,6 +50,9 @@ import kotlin.math.min
 internal fun SpeedDialSection(
     items: List<YTItem>,
     maxWidth: Dp,
+    currentSongId: String? = null,
+    currentAlbumId: String? = null,
+    isPlaying: Boolean = false,
     onItemClick: (YTItem) -> Unit,
     onSurpriseClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -49,49 +63,51 @@ internal fun SpeedDialSection(
         prepared
     }
     val pages = remember(displayItems) { displayItems.chunked(9) }
-    val pagerState = rememberLazyListState()
-    val currentPage by remember(pagerState, pages.size) {
-        derivedStateOf { pagerState.firstVisibleItemIndex.coerceAtMost((pages.size - 1).coerceAtLeast(0)) }
-    }
-    val pageWidth = maxWidth - 32.dp
+    val pagerState = rememberPagerState { pages.size }
+    val pageWidth = (maxWidth - 32.dp).coerceAtLeast(220.dp)
     val tileSize = (pageWidth - 16.dp) / 3
 
-    androidx.compose.foundation.layout.Column(modifier = modifier) {
-        LazyRow(
+    Column(modifier = modifier) {
+        HorizontalPager(
             state = pagerState,
-            flingBehavior = rememberSnapFlingBehavior(pagerState),
+            flingBehavior = PagerDefaults.flingBehavior(state = pagerState),
             contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            items(
-                count = pages.size,
-                key = { "speed_dial_page_$it" },
-            ) { pageIndex ->
-                val pageItems = pages[pageIndex]
-                androidx.compose.foundation.layout.Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.width(pageWidth),
-                ) {
-                    repeat(3) { rowIndex ->
-                        androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            repeat(3) { columnIndex ->
-                                val tileIndex = rowIndex * 3 + columnIndex
-                                if (tileIndex >= pageItems.size) {
-                                    Spacer(modifier = Modifier.size(tileSize))
+            pageSpacing = 12.dp,
+            key = { "speed_dial_page_$it" },
+            modifier = Modifier.fillMaxWidth(),
+        ) { pageIndex ->
+            val pageItems = pages[pageIndex]
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                repeat(3) { rowIndex ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        repeat(3) { columnIndex ->
+                            val tileIndex = rowIndex * 3 + columnIndex
+                            if (tileIndex >= pageItems.size) {
+                                Spacer(modifier = Modifier.size(tileSize))
+                            } else {
+                                val pageItem = pageItems[tileIndex]
+                                if (pageItem == null) {
+                                    SpeedDialSurpriseTile(
+                                        onClick = onSurpriseClick,
+                                        modifier = Modifier.size(tileSize),
+                                    )
                                 } else {
-                                    val pageItem = pageItems[tileIndex]
-                                    if (pageItem == null) {
-                                        SpeedDialSurpriseTile(
-                                            onClick = onSurpriseClick,
-                                            modifier = Modifier.size(tileSize),
-                                        )
-                                    } else {
-                                        SpeedDialTile(
-                                            item = pageItem,
-                                            onClick = { onItemClick(pageItem) },
-                                            modifier = Modifier.size(tileSize),
-                                        )
+                                    val isTileActive = when (pageItem) {
+                                        is SongItem -> pageItem.id == currentSongId
+                                        is EpisodeItem -> pageItem.id == currentSongId
+                                        is AlbumItem -> pageItem.id == currentAlbumId || pageItem.browseId == currentAlbumId
+                                        else -> false
                                     }
+                                    SpeedDialTile(
+                                        item = pageItem,
+                                        isActive = isTileActive,
+                                        isPlaying = isPlaying && isTileActive,
+                                        onClick = { onItemClick(pageItem) },
+                                        modifier = Modifier.size(tileSize),
+                                    )
                                 }
                             }
                         }
@@ -104,7 +120,7 @@ internal fun SpeedDialSection(
 
         PagerDots(
             pageCount = pages.size,
-            currentPage = currentPage,
+            currentPage = pagerState.currentPage,
             modifier = Modifier.align(Alignment.CenterHorizontally),
         )
     }
@@ -122,7 +138,7 @@ internal fun CommunityPlaylistsSection(
     modifier: Modifier = Modifier,
 ) {
     val rowState = rememberLazyListState()
-    val cardWidth = maxWidth - 90.dp
+    val cardWidth = (maxWidth - 76.dp).coerceIn(260.dp, 360.dp)
 
     LazyRow(
         state = rowState,
@@ -175,37 +191,41 @@ internal fun DailyDiscoverSection(
             emphasizeContent = index == carouselState.currentItem,
             modifier = Modifier
                 .height(360.dp)
-                .maskClip(RoundedCornerShape(30.dp)),
+                .maskClip(RoundedCornerShape(28.dp)),
         )
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 internal fun LazyListScope.SpeedDialBlock(
     speedDialItems: List<YTItem>,
     maxWidth: Dp,
+    currentSongId: String? = null,
+    currentAlbumId: String? = null,
+    isPlaying: Boolean = false,
     onItemClick: (YTItem) -> Unit,
     onSurpriseClick: () -> Unit,
 ) {
     if (speedDialItems.isEmpty()) return
 
-    item(key = "speed_dial_title") {
-        HomeSectionHeader(
+    item(key = "speed_dial_title", contentType = "home_section_header") {
+        HomeExpressiveSectionHeader(
             title = stringResource(R.string.speed_dial),
         )
     }
 
-    item(key = "speed_dial_content") {
+    item(key = "speed_dial_content", contentType = "home_speed_dial") {
         SpeedDialSection(
             items = speedDialItems,
             maxWidth = maxWidth,
+            currentSongId = currentSongId,
+            currentAlbumId = currentAlbumId,
+            isPlaying = isPlaying,
             onItemClick = onItemClick,
             onSurpriseClick = onSurpriseClick,
         )
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 internal fun LazyListScope.CommunityPlaylistsBlock(
     playlists: List<CommunityPlaylistItem>?,
     maxWidth: Dp,
@@ -217,13 +237,13 @@ internal fun LazyListScope.CommunityPlaylistsBlock(
 ) {
     if (playlists.isNullOrEmpty()) return
 
-    item(key = "community_playlists_title") {
-        HomeSectionHeader(
+    item(key = "community_playlists_title", contentType = "home_section_header") {
+        HomeExpressiveSectionHeader(
             title = stringResource(R.string.from_the_community),
         )
     }
 
-    item(key = "community_playlists_content") {
+    item(key = "community_playlists_content", contentType = "home_community") {
         CommunityPlaylistsSection(
             playlists = playlists,
             maxWidth = maxWidth,
@@ -236,7 +256,6 @@ internal fun LazyListScope.CommunityPlaylistsBlock(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 internal fun LazyListScope.DailyDiscoverBlock(
     discoverItems: List<DailyDiscoverItem>?,
     maxWidth: Dp,
@@ -244,12 +263,12 @@ internal fun LazyListScope.DailyDiscoverBlock(
 ) {
     if (discoverItems.isNullOrEmpty()) return
 
-    item(key = "daily_discover_title") {
-        HomeSectionHeader(
+    item(key = "daily_discover_title", contentType = "home_section_header") {
+        HomeExpressiveSectionHeader(
             title = stringResource(R.string.daily_discover),
         )
     }
-    item(key = "daily_discover_content") {
+    item(key = "daily_discover_content", contentType = "home_daily_discover") {
         DailyDiscoverSection(
             discoverItems = discoverItems,
             maxWidth = maxWidth,

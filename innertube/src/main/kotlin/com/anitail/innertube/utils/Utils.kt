@@ -65,15 +65,66 @@ fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x
 
 fun sha1(str: String): String = MessageDigest.getInstance("SHA-1").digest(str.toByteArray()).toHex()
 
-fun parseCookieString(cookie: String): Map<String, String> =
-    cookie.split("; ")
+/**
+ * Sanitizes a YouTube/InnerTube cookie string by stripping any token prefixes
+ * (such as ***INNERTUBE COOKIE*** = or *INNERTUBE COOKIE* =), DevTools header labels,
+ * wrapping quotes, and leading delimiters.
+ */
+fun sanitizeCookieString(raw: String?): String? {
+    if (raw.isNullOrBlank()) return null
+    var cleaned = raw.trim()
+
+    // If multiline token or block was passed, find the line containing the actual cookie or SAPISID
+    if (cleaned.contains('\n')) {
+        val lines = cleaned.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val cookieLine = lines.firstOrNull { line ->
+            line.contains("SAPISID=", ignoreCase = true) ||
+                line.contains("__Secure-", ignoreCase = true) ||
+                line.contains("INNERTUBE COOKIE", ignoreCase = true)
+        } ?: lines.firstOrNull() ?: ""
+        cleaned = cookieLine
+    }
+
+    // Strip any prefix like ***INNERTUBE COOKIE***, *INNERTUBE COOKIE*, INNERTUBE COOKIE
+    if (cleaned.contains("INNERTUBE COOKIE", ignoreCase = true)) {
+        cleaned = cleaned.substringAfter("INNERTUBE COOKIE")
+            .trimStart('*', ' ', '\t')
+    }
+
+    // Strip leading "Cookie:" or "cookie:" if copied directly from DevTools headers
+    if (cleaned.startsWith("Cookie:", ignoreCase = true)) {
+        cleaned = cleaned.substringAfter(":").trim()
+    }
+
+    // Strip leading '=' if remaining
+    if (cleaned.startsWith("=")) {
+        cleaned = cleaned.removePrefix("=").trim()
+    }
+
+    // Strip wrapping quotes
+    if (cleaned.startsWith("\"") && cleaned.endsWith("\"") && cleaned.length > 1) {
+        cleaned = cleaned.substring(1, cleaned.length - 1).trim()
+    }
+
+    return cleaned.ifBlank { null }
+}
+
+fun parseCookieString(cookie: String): Map<String, String> {
+    val clean = sanitizeCookieString(cookie) ?: return emptyMap()
+    return clean.split(';')
+        .map { it.trim() }
         .filter { it.isNotEmpty() }
         .mapNotNull { part ->
             val splitIndex = part.indexOf('=')
             if (splitIndex == -1) null
-            else part.substring(0, splitIndex) to part.substring(splitIndex + 1)
+            else {
+                val key = part.substring(0, splitIndex).trim()
+                val value = part.substring(splitIndex + 1).trim()
+                if (key.isNotEmpty()) key to value else null
+            }
         }
         .toMap()
+}
 
 fun String.parseTime(): Int? {
     try {

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.pages.ChartsPage
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -22,10 +23,19 @@ class ChartsViewModel @Inject constructor() : ViewModel() {
     val error = _error.asStateFlow()
 
     fun loadCharts() {
-        viewModelScope.launch {
+        if (_isLoading.value) return
+        fetchCharts()
+    }
+
+    fun refresh() {
+        fetchCharts()
+    }
+
+    private fun fetchCharts() {
+        viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
             _error.value = null
-            
+
             YouTube.getChartsPage()
                 .onSuccess { page ->
                     _chartsPage.value = page
@@ -33,13 +43,14 @@ class ChartsViewModel @Inject constructor() : ViewModel() {
                 .onFailure { e ->
                     _error.value = "Failed to load charts: ${e.message}"
                 }
-            
+
             _isLoading.value = false
         }
     }
 
     fun loadMore() {
-        viewModelScope.launch {
+        if (_isLoading.value) return
+        viewModelScope.launch(Dispatchers.IO) {
             _chartsPage.value?.continuation?.let { continuation ->
                 _isLoading.value = true
                 YouTube.getChartsPage(continuation)

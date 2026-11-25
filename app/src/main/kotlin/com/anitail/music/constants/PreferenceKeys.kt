@@ -19,6 +19,7 @@ val DensityScaleKey = floatPreferencesKey("density_scale_factor")
 val CustomDensityScaleKey = floatPreferencesKey("custom_density_scale_value")
 val DefaultOpenTabKey = stringPreferencesKey("defaultOpenTab")
 val SlimNavBarKey = booleanPreferencesKey("slimNavBar")
+val FloatingNavBarKey = booleanPreferencesKey("floatingNavBar")
 val GridItemsSizeKey = stringPreferencesKey("gridItemSize")
 val SliderStyleKey = stringPreferencesKey("sliderStyle")
 val SwipeToSongKey = booleanPreferencesKey("SwipeToSong")
@@ -131,6 +132,35 @@ val NotificationButtonTypeKey = stringPreferencesKey("notificationButtonType")
 val EnableBackupUploadKey = booleanPreferencesKey("enableBackupUpload")
 val EnableCastKey = booleanPreferencesKey("enableCast")
 
+enum class MusicVideoQuality {
+    AUTO,
+    P2160,
+    P1440,
+    P1080,
+    P720,
+    P480,
+    P360,
+}
+
+val MusicVideoQuality.targetHeight: Int?
+    get() =
+        when (this) {
+            MusicVideoQuality.AUTO -> null
+            MusicVideoQuality.P2160 -> 2160
+            MusicVideoQuality.P1440 -> 1440
+            MusicVideoQuality.P1080 -> 1080
+            MusicVideoQuality.P720 -> 720
+            MusicVideoQuality.P480 -> 480
+            MusicVideoQuality.P360 -> 360
+        }
+
+val MusicVideoPlaybackEnabledKey = booleanPreferencesKey("musicVideoPlaybackEnabled")
+val ShowPlayerVideoButtonKey = booleanPreferencesKey("showPlayerVideoButton")
+val MusicVideoQualityKey = stringPreferencesKey("musicVideoQuality")
+val VideoViewerVisibleKey = booleanPreferencesKey("videoViewerVisible")
+val PlayVideosInMiniPlayerKey = booleanPreferencesKey("playVideosInMiniPlayer")
+val MusicVideoCacheJsonKey = stringPreferencesKey("musicVideoCacheJson")
+
 enum class NotificationButtonType {
     CLOSE,
     LIKE,
@@ -235,6 +265,11 @@ val ShowDownloadedPlaylistKey = booleanPreferencesKey("show_downloaded_playlist"
 val ShowTopPlaylistKey = booleanPreferencesKey("show_top_playlist")
 val ShowCachedPlaylistKey = booleanPreferencesKey("show_cached_playlist")
 val ShowLocalPlaylistKey = booleanPreferencesKey("show_local_playlist")
+val ShowUploadedPlaylistKey = booleanPreferencesKey("show_uploaded_playlist")
+val LibraryGridColumnsKey = intPreferencesKey("library_grid_columns")
+val LibraryManualOrderKey = stringPreferencesKey("library_manual_order")
+val LibraryHiddenItemsKey = stringPreferencesKey("library_hidden_items")
+val LibrarySortingMapKey = stringPreferencesKey("library_sorting_map")
 
 enum class LibraryViewType {
     LIST,

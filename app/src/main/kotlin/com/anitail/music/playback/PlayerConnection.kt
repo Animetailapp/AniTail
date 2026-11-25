@@ -10,7 +10,9 @@ import androidx.media3.common.Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM
 import androidx.media3.common.Player.REPEAT_MODE_OFF
 import androidx.media3.common.Player.STATE_ENDED
 import androidx.media3.common.Timeline
+import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
+import com.anitail.music.constants.MusicVideoQuality
 import com.anitail.music.db.MusicDatabase
 import com.anitail.music.extensions.currentMetadata
 import com.anitail.music.extensions.getCurrentQueueIndex
@@ -79,6 +81,13 @@ class PlayerConnection(
     val error = MutableStateFlow<PlaybackException?>(null)
     val waitingForNetworkConnection = service.waitingForNetworkConnection
 
+    val isVideoModeActive = service.videoModeController.isVideoModeActive
+    val isVideoModeResolving = service.videoModeController.isVideoModeResolving
+    val isVideoViewerVisible = service.videoModeController.isVideoViewerVisible
+    val currentVideoPlaybackData = service.videoModeController.currentVideoPlaybackData
+    val videoErrorEvent = service.videoModeController.videoErrorEvent
+    val videoSize = MutableStateFlow(player.videoSize)
+
 
     init {
         attachPlayer(attachedPlayer)
@@ -100,6 +109,7 @@ class PlayerConnection(
         playWhenReady.value = attachedPlayer.playWhenReady
         mediaMetadata.value = attachedPlayer.currentMetadata
         queueTitle.value = service.queueTitle
+        videoSize.value = attachedPlayer.videoSize
         queueWindows.value = attachedPlayer.getQueueWindows()
         currentWindowIndex.value = attachedPlayer.getCurrentQueueIndex()
         currentMediaItemIndex.value = attachedPlayer.currentMediaItemIndex
@@ -213,7 +223,12 @@ class PlayerConnection(
         mediaMetadata.value = mediaItem?.metadata
         currentMediaItemIndex.value = player.currentMediaItemIndex
         currentWindowIndex.value = player.getCurrentQueueIndex()
+        videoSize.value = player.videoSize
         updateCanSkipPreviousAndNext()
+    }
+
+    override fun onVideoSizeChanged(videoSize: VideoSize) {
+        this.videoSize.value = videoSize
     }
 
     override fun onTimelineChanged(
@@ -268,6 +283,18 @@ class PlayerConnection(
             canSkipPrevious.value = false
             canSkipNext.value = false
         }
+    }
+
+    fun toggleVideoMode() {
+        service.videoModeController.toggleVideoMode()
+    }
+
+    fun setVideoMode(wantVideo: Boolean) {
+        service.videoModeController.setVideoMode(wantVideo)
+    }
+
+    fun changeMusicVideoResolution(quality: MusicVideoQuality) {
+        service.videoModeController.changeMusicVideoResolution(quality)
     }
 
     fun dispose() {

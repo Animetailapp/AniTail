@@ -1,11 +1,23 @@
 package com.anitail.desktop.ui.screen
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -31,6 +43,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -43,7 +56,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import kotlin.math.roundToInt
 import androidx.compose.ui.unit.dp
 import com.anitail.desktop.db.DesktopDatabase
 import com.anitail.desktop.db.entities.PlaylistEntity
@@ -73,6 +93,7 @@ import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.PlayingIndicatorBox
 import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.component.rememberExpressiveAvatarShape
 import com.anitail.desktop.ui.screen.library.GridThumbnailHeight
 import com.anitail.desktop.ui.screen.library.SongSortType
 import com.anitail.desktop.ui.screen.library.sortSongs
@@ -88,6 +109,7 @@ import java.net.URI
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.launch
 
 private val SectionSpacing = 12.dp
@@ -96,6 +118,11 @@ private val StatsThumbnailCornerRadius = 6.dp
 private sealed class StatsPlaylistRequest {
     data class Single(val target: BrowseSongTarget) : StatsPlaylistRequest()
     data class Collection(val songs: List<SongEntity>) : StatsPlaylistRequest()
+}
+
+private enum class StatsViewMode {
+    CAPSULE,
+    EXPLORER,
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -138,7 +165,7 @@ fun StatsScreen(
     var detailsItem by remember { mutableStateOf<LibraryItem?>(null) }
 
     val firstEvent = remember(events) { events.minByOrNull { it.timestamp } }
-    val currentDate = LocalDateTime.now()
+    val currentDate = remember(events.size) { LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES) }
 
     val weeklyDates = remember(currentDate, firstEvent) {
         if (firstEvent == null) {
@@ -226,6 +253,25 @@ fun StatsScreen(
 
     val mostPlayedSongs = remember(songStats) { songStats.map { it.song } }
     val mostPlayedSongItems = remember(mostPlayedSongs) { mostPlayedSongs.map { it.toLibraryItem() } }
+    val periodInsights = remember(events, songsById, songArtistMaps, fromMs, toMs) {
+        computePeriodInsights(
+            events = events,
+            songsById = songsById,
+            songArtistMaps = songArtistMaps,
+            fromTimeMs = fromMs,
+            toTimeMs = toMs,
+        )
+    }
+    val capsuleOverview = remember(events, songsById, songArtistMaps, artistsById) {
+        buildSoundCapsuleOverview(
+            events = events,
+            songsById = songsById,
+            songArtistMaps = songArtistMaps,
+            artistsById = artistsById,
+        )
+    }
+    var viewMode by remember { mutableStateOf(StatsViewMode.EXPLORER) }
+    var capsuleSubView by remember { mutableStateOf<CapsuleSubView>(CapsuleSubView.Overview) }
 
     fun copyToClipboard(text: String) {
         Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null)
@@ -312,14 +358,86 @@ fun StatsScreen(
         )
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            contentPadding = WindowInsets.systemBars
-                .only(WindowInsetsSides.Horizontal)
-                .asPaddingValues(),
-            modifier = Modifier.fillMaxSize(),
-        ) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopAppBar(
+            title = {
+                Text(
+                    text = if (viewMode == StatsViewMode.CAPSULE) {
+                        stringResource("sound_capsule_title")
+                    } else {
+                        stringResource("stats")
+                    },
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                )
+            },
+            navigationIcon = {
+                IconButton(
+                    onClick = {
+                        if (viewMode == StatsViewMode.CAPSULE && capsuleSubView !is CapsuleSubView.Overview) {
+                            capsuleSubView = CapsuleSubView.Overview
+                        } else {
+                            onBack()
+                        }
+                    },
+                ) {
+                    Icon(imageVector = IconAssets.arrowBack(), contentDescription = stringResource("back"))
+                }
+            },
+            actions = {
+                StatsModeToggle(
+                    selectedMode = viewMode,
+                    onSelectMode = { mode ->
+                        viewMode = mode
+                        if (mode == StatsViewMode.CAPSULE) {
+                            capsuleSubView = CapsuleSubView.Overview
+                        }
+                    },
+                    modifier = Modifier.padding(end = 12.dp),
+                )
+            },
+            modifier = Modifier.background(MaterialTheme.colorScheme.background),
+        )
+
+        AnimatedContent(
+            targetState = viewMode,
+            transitionSpec = {
+                (scaleIn(
+                    initialScale = 0.97f,
+                    animationSpec = spring(dampingRatio = 0.86f, stiffness = 420f),
+                ) + fadeIn(animationSpec = tween(220)))
+                    .togetherWith(
+                        scaleOut(
+                            targetScale = 0.97f,
+                            animationSpec = spring(dampingRatio = 0.86f, stiffness = 420f),
+                        ) + fadeOut(animationSpec = tween(160)),
+                    )
+            },
+            label = "StatsViewModeTransition",
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        ) { mode ->
+            when (mode) {
+                StatsViewMode.CAPSULE -> {
+                    SoundCapsulePane(
+                        overview = capsuleOverview,
+                        songsById = songsById,
+                        playerState = playerState,
+                        onOpenArtist = onOpenArtist,
+                        onSearchArtist = { name -> onOpenArtist(name, name) },
+                        onCopySummary = ::copyToClipboard,
+                        subView = capsuleSubView,
+                        onNavigateSubView = { capsuleSubView = it },
+                    )
+                }
+
+                StatsViewMode.EXPLORER -> {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            state = listState,
+                            contentPadding = WindowInsets.systemBars
+                                .only(WindowInsetsSides.Horizontal)
+                                .asPaddingValues(),
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
             item { Spacer(modifier = Modifier.height(SectionSpacing)) }
 
             item {
@@ -353,10 +471,76 @@ fun StatsScreen(
                 )
             }
 
+            item(key = "periodSummary") {
+                AnimatedContent(
+                    targetState = selectedOption to indexChips,
+                    transitionSpec = {
+                        (scaleIn(
+                            initialScale = 0.98f,
+                            animationSpec = spring(dampingRatio = 0.86f, stiffness = 420f),
+                        ) + fadeIn(animationSpec = tween(220)))
+                            .togetherWith(
+                                scaleOut(
+                                    targetScale = 0.98f,
+                                    animationSpec = spring(dampingRatio = 0.86f, stiffness = 420f),
+                                ) + fadeOut(animationSpec = tween(140)),
+                            )
+                    },
+                    label = "StatsPeriodSummaryTransition",
+                ) { _ ->
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    ) {
+                        StatsPeriodSummaryRow(
+                            insights = periodInsights,
+                            topArtist = artistStats.firstOrNull(),
+                            topSong = songStats.firstOrNull(),
+                            onOpenArtist = { artist -> onOpenArtist(artist.id, artist.name) },
+                            onPlayTopSong = { song ->
+                                val item = song.toLibraryItem()
+                                if (playerState.currentItem?.id == item.id) {
+                                    playerState.togglePlayPause()
+                                } else {
+                                    playerState.playQueue(mostPlayedSongItems, startIndex = 0)
+                                }
+                            },
+                        )
+                        if (periodInsights.totalPlays > 0) {
+                            StatsActivityAndHabitsRow(insights = periodInsights)
+                        }
+                    }
+                }
+            }
+
             item(key = "mostPlayedSongs") {
-                NavigationTitle(
-                    title = "${songStats.size} ${stringResource("songs")}",
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        NavigationTitle(
+                            title = "${songStats.size} ${stringResource("songs")}",
+                        )
+                    }
+                    if (mostPlayedSongs.isNotEmpty()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(end = 16.dp),
+                        ) {
+                            StatsHeaderActionPill(
+                                icon = IconAssets.play(),
+                                label = stringResource("play"),
+                                onClick = { playerState.playQueue(mostPlayedSongItems, startIndex = 0) },
+                            )
+                            StatsHeaderActionPill(
+                                icon = IconAssets.playlistAdd(),
+                                label = stringResource("add_to_playlist"),
+                                onClick = { playlistRequest = StatsPlaylistRequest.Collection(mostPlayedSongs) },
+                            )
+                        }
+                    }
+                }
 
                 LazyRow {
                     itemsIndexed(
@@ -469,7 +653,7 @@ fun StatsScreen(
                                 title = "${index + 1}. ${artist.name}",
                                 subtitle = subtitle,
                                 thumbnailUrl = artist.thumbnailUrl,
-                                shape = CircleShape,
+                                shape = rememberExpressiveAvatarShape(artist.id),
                                 isActive = false,
                                 isPlaying = false,
                                 modifier = Modifier.combinedClickable(
@@ -592,29 +776,595 @@ fun StatsScreen(
             }
         }
 
-        if (mostPlayedSongs.isNotEmpty()) {
-            HideOnScrollFAB(
-                visible = true,
-                lazyListState = listState,
-                onClick = {
-                    val shuffled = mostPlayedSongItems.shuffled()
-                    playerState.shuffleEnabled = true
-                    playerState.playQueue(shuffled, 0)
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(24.dp),
+                        if (mostPlayedSongs.isNotEmpty()) {
+                            HideOnScrollFAB(
+                                visible = true,
+                                lazyListState = listState,
+                                onClick = {
+                                    val shuffled = mostPlayedSongItems.shuffled()
+                                    playerState.shuffleEnabled = true
+                                    playerState.playQueue(shuffled, 0)
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(24.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsModeToggle(
+    selectedMode: StatsViewMode,
+    onSelectMode: (StatsViewMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier.border(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            shape = RoundedCornerShape(999.dp),
+        ),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(3.dp),
+        ) {
+            StatsModePill(
+                label = stringResource("stats"),
+                selected = selectedMode == StatsViewMode.EXPLORER,
+                onClick = { onSelectMode(StatsViewMode.EXPLORER) },
+            )
+            StatsModePill(
+                label = stringResource("sound_capsule_title"),
+                selected = selectedMode == StatsViewMode.CAPSULE,
+                onClick = { onSelectMode(StatsViewMode.CAPSULE) },
             )
         }
+    }
+}
 
-        TopAppBar(
-            title = { Text(stringResource("stats")) },
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(imageVector = IconAssets.arrowBack(), contentDescription = stringResource("back"))
+@Composable
+private fun StatsPeriodSummaryRow(
+    insights: PeriodInsights,
+    topArtist: ArtistStatsEntry?,
+    topSong: SongStatsEntry?,
+    onOpenArtist: (com.anitail.desktop.db.entities.ArtistEntity) -> Unit,
+    onPlayTopSong: (SongEntity) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+            modifier = Modifier.weight(1f),
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            ) {
+                Text(
+                    text = stringResource("time_listened"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                )
+                Text(
+                    text = makeTimeString(insights.totalTimeMs).ifBlank { "0s" },
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "${insights.activeDays}d • ${insights.longestStreakDays}d",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+            modifier = Modifier.weight(1f),
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            ) {
+                Text(
+                    text = stringResource("songs"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                )
+                Text(
+                    text = pluralStringResource("n_time", insights.totalPlays, insights.totalPlays),
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "${insights.uniqueSongs} ${stringResource("songs").lowercase()} • ${insights.uniqueArtists} ${stringResource("artists").lowercase()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.78f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
+        if (topArtist != null) {
+            val shape = rememberExpressiveAvatarShape(topArtist.artist.id)
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f),
+                modifier = Modifier
+                    .weight(1.1f)
+                    .clip(RoundedCornerShape(18.dp))
+                    .clickable { onOpenArtist(topArtist.artist) },
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                ) {
+                    RemoteImage(
+                        url = topArtist.artist.thumbnailUrl,
+                        shape = shape,
+                        modifier = Modifier.size(48.dp).clip(shape),
+                    )
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            text = stringResource("sound_capsule_top_artist"),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
+                        )
+                        Text(
+                            text = topArtist.artist.name,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = pluralStringResource("n_time", topArtist.songCount, topArtist.songCount),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.78f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
-            },
-            modifier = Modifier.background(MaterialTheme.colorScheme.background),
+            }
+        }
+
+        if (topSong != null) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier
+                    .weight(1.1f)
+                    .clip(RoundedCornerShape(18.dp))
+                    .clickable { onPlayTopSong(topSong.song) },
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                ) {
+                    RemoteImage(
+                        url = topSong.song.thumbnailUrl,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)),
+                    )
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            text = stringResource("sound_capsule_top_song"),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = topSong.song.title,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = pluralStringResource("n_time", topSong.songCountListened, topSong.songCountListened),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsActivityAndHabitsRow(
+    insights: PeriodInsights,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val wide = maxWidth >= 780.dp
+        if (wide) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                StatsActivityChartCard(
+                    buckets = insights.activityBuckets,
+                    modifier = Modifier.weight(1.35f),
+                )
+                StatsListeningHabitsCard(
+                    insights = insights,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatsActivityChartCard(
+                    buckets = insights.activityBuckets,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                StatsListeningHabitsCard(
+                    insights = insights,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsActivityChartCard(
+    buckets: List<PeriodActivityBucket>,
+    modifier: Modifier = Modifier,
+) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    val maxMinutes = remember(buckets) {
+        buckets.maxOfOrNull { it.playTimeMs / 60_000f }?.coerceAtLeast(1f) ?: 1f
+    }
+    var hoveredIndex by remember(buckets) { mutableStateOf<Int?>(null) }
+
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = modifier.border(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+            RoundedCornerShape(18.dp),
+        ),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(16.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = stringResource("time_listened"),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                val activeBucket = hoveredIndex?.let { buckets.getOrNull(it) }
+                if (activeBucket != null) {
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = primaryColor.copy(alpha = 0.16f),
+                    ) {
+                        Text(
+                            text = "${activeBucket.label} • ${makeTimeString(activeBucket.playTimeMs).ifBlank { "0s" }} (${activeBucket.playCount})",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = primaryColor,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
+
+            if (buckets.isEmpty()) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                ) {
+                    Text(
+                        text = stringResource("sound_capsule_no_data"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(128.dp)
+                        .pointerInput(buckets.size) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    when (event.type) {
+                                        PointerEventType.Move,
+                                        PointerEventType.Press,
+                                        -> {
+                                            val x = event.changes.firstOrNull()?.position?.x ?: continue
+                                            val count = buckets.size.coerceAtLeast(1)
+                                            val idx = ((x / size.width.coerceAtLeast(1)) * count)
+                                                .toInt()
+                                                .coerceIn(0, count - 1)
+                                            hoveredIndex = idx
+                                        }
+
+                                        PointerEventType.Exit -> hoveredIndex = null
+                                        else -> Unit
+                                    }
+                                }
+                            }
+                        },
+                ) {
+                    val drawHeight = size.height - 8f
+                    drawLine(dividerColor, Offset(0f, drawHeight), Offset(size.width, drawHeight), strokeWidth = 1.5f)
+                    drawLine(dividerColor, Offset(0f, drawHeight / 2f), Offset(size.width, drawHeight / 2f), strokeWidth = 1f)
+
+                    val count = buckets.size.coerceAtLeast(1)
+                    val stepX = size.width / count
+                    val barWidth = (stepX * 0.56f).coerceIn(4f, 28f)
+                    buckets.forEachIndexed { index, bucket ->
+                        val minutes = bucket.playTimeMs / 60_000f
+                        val barHeight = if (minutes > 0f) {
+                            ((minutes / maxMinutes) * drawHeight).coerceAtLeast(6f)
+                        } else {
+                            4f
+                        }
+                        val left = index * stepX + (stepX - barWidth) / 2f
+                        val isHovered = hoveredIndex == index
+                        drawRoundRect(
+                            color = if (isHovered) secondaryColor else primaryColor,
+                            topLeft = Offset(left, drawHeight - barHeight),
+                            size = Size(barWidth, barHeight),
+                            cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f),
+                        )
+                    }
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    val labels = when {
+                        buckets.size <= 4 -> buckets.map { it.label }
+                        else -> listOf(
+                            buckets.first().label,
+                            buckets[buckets.size / 2].label,
+                            buckets.last().label,
+                        )
+                    }
+                    labels.forEach { label ->
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsListeningHabitsCard(
+    insights: PeriodInsights,
+    modifier: Modifier = Modifier,
+) {
+    val maxPeriodMs = remember(insights.periodBreakdown) {
+        insights.periodBreakdown.values.maxOrNull()?.coerceAtLeast(1L) ?: 1L
+    }
+    val dominantPeriod = remember(insights.periodBreakdown) {
+        insights.periodBreakdown.maxByOrNull { it.value }?.key ?: ListeningPeriod.NIGHT
+    }
+
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = modifier.border(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+            RoundedCornerShape(18.dp),
+        ),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(16.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = periodLabelText(dominantPeriod),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
+                )
+                insights.peakHour?.let { hour ->
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                    ) {
+                        Text(
+                            text = String.format("%02d:00", hour),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
+
+            ListeningPeriod.entries.forEach { period ->
+                val ms = insights.periodBreakdown[period] ?: 0L
+                val targetProgress = (ms.toFloat() / maxPeriodMs.toFloat()).coerceIn(0f, 1f)
+                val animatedProgress by animateFloatAsState(
+                    targetValue = targetProgress,
+                    animationSpec = spring(dampingRatio = 0.85f, stiffness = 320f),
+                    label = "stats_habit_${period.name}",
+                )
+                val isDominant = period == dominantPeriod
+                val mins = (ms / 60_000L).toInt()
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = periodLabelText(period),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (isDominant) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = stringResource("sound_capsule_minutes_short", mins),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(7.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(animatedProgress)
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(
+                                    if (isDominant) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                                    },
+                                ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun periodLabelText(period: ListeningPeriod): String =
+    when (period) {
+        ListeningPeriod.MORNING -> stringResource("sound_capsule_period_morning")
+        ListeningPeriod.AFTERNOON -> stringResource("sound_capsule_period_afternoon")
+        ListeningPeriod.EVENING -> stringResource("sound_capsule_period_evening")
+        ListeningPeriod.NIGHT -> stringResource("sound_capsule_period_night")
+    }
+
+@Composable
+private fun StatsHeaderActionPill(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(15.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatsModePill(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val containerColor = if (selected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        androidx.compose.ui.graphics.Color.Transparent
+    }
+    val contentColor = if (selected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(containerColor)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            ),
+            color = contentColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

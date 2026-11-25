@@ -5,6 +5,7 @@ import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.FlingBehavior
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.horizontalScroll
@@ -25,9 +26,11 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -51,6 +54,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -67,6 +71,7 @@ import com.anitail.desktop.db.mapper.extractVideoId
 import com.anitail.desktop.db.mapper.toLibraryItem
 import com.anitail.desktop.db.mapper.toSongArtistMaps
 import com.anitail.desktop.db.mapper.toSongEntity
+import com.anitail.desktop.db.relations.indexPrimaryArtistIdBySongId
 import com.anitail.desktop.db.relations.primaryArtistIdForSong
 import com.anitail.desktop.download.DesktopDownloadService
 import com.anitail.desktop.download.DownloadState
@@ -84,6 +89,7 @@ import com.anitail.desktop.ui.component.NavigationTitle
 import com.anitail.desktop.ui.component.PlayingIndicatorBox
 import com.anitail.desktop.ui.component.PlaylistPickerDialog
 import com.anitail.desktop.ui.component.RemoteImage
+import com.anitail.desktop.ui.component.rememberExpressiveAvatarShape
 import com.anitail.desktop.ui.component.ShimmerQuickPicksGrid
 import com.anitail.desktop.ui.component.ShimmerSectionRow
 import com.anitail.desktop.i18n.LocalStrings
@@ -96,7 +102,9 @@ import com.anitail.desktop.YouTube
 import com.anitail.innertube.models.AlbumItem
 import com.anitail.innertube.models.Artist
 import com.anitail.innertube.models.ArtistItem
+import com.anitail.innertube.models.EpisodeItem
 import com.anitail.innertube.models.PlaylistItem
+import com.anitail.innertube.models.PodcastItem
 import com.anitail.innertube.models.SongItem
 import com.anitail.innertube.models.YTItem
 import com.anitail.innertube.models.WatchEndpoint
@@ -166,7 +174,13 @@ fun HomeScreen(
     val forgottenFavoritesLazyGridState = rememberLazyGridState()
     val coroutineScope = rememberCoroutineScope()
     val downloadedSongs by downloadService.downloadedSongs.collectAsState()
+    val downloadedSongIds = remember(downloadedSongs) {
+        downloadedSongs.mapTo(HashSet(downloadedSongs.size)) { it.songId }
+    }
     val downloadStates by downloadService.downloadStates.collectAsState()
+    val primaryArtistBySongId = remember(songArtistMaps) {
+        indexPrimaryArtistIdBySongId(songArtistMaps)
+    }
     var pendingPlaylistItem by remember { mutableStateOf<HomeSongTarget?>(null) }
     var detailsItem by remember { mutableStateOf<LibraryItem?>(null) }
     var pendingArtists by remember { mutableStateOf<List<Artist>>(emptyList()) }
@@ -200,7 +214,7 @@ fun HomeScreen(
         val artistCandidates = songItem?.artists
             ?.mapNotNull { artist -> artist.id?.let { Artist(artist.name, it) } }
             .orEmpty()
-        val libraryArtistId = songEntity?.let { primaryArtistIdForSong(libraryItem.id, songArtistMaps) }
+        val libraryArtistId = songEntity?.let { primaryArtistBySongId[libraryItem.id] }
         val hasArtist = if (songItem != null) {
             artistCandidates.isNotEmpty()
         } else {
@@ -223,7 +237,7 @@ fun HomeScreen(
             strings = strings,
             songId = libraryItem.id,
             downloadStates = downloadStates,
-            downloadedSongs = downloadedSongs,
+            downloadedSongIds = downloadedSongIds,
         )
         val isInLibrary = songEntity?.inLibrary != null
         val shareUrl = songItem?.shareLink ?: libraryItem.playbackUrl
@@ -306,13 +320,65 @@ fun HomeScreen(
         menuActionsForSong(libraryItem, song)
     }
 
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+    fun songMenuHeader(
+        libraryItem: LibraryItem,
+        songItem: SongItem?,
+    ): @Composable (onDismiss: () -> Unit) -> Unit = { onDismiss ->
+        val songEntity = songsById[libraryItem.id]
+        val subtitle = formatBulletSubtitle(
+            songItem?.artists?.joinToString { it.name } ?: libraryItem.artist,
+            (songItem?.duration?.toLong()?.times(1000L) ?: libraryItem.durationMs)
+                ?.takeIf { it > 0L }
+                ?.let { formatTime(it) },
+        ).orEmpty()
+        val shareUrl = songItem?.shareLink ?: libraryItem.playbackUrl
+        SongMenuHeader(
+            title = libraryItem.title,
+            subtitle = subtitle,
+            thumbnailUrl = songItem?.thumbnail ?: libraryItem.artworkUrl,
+            isLiked = songEntity?.liked == true,
+            onToggleLike = {
+                coroutineScope.launch {
+                    if (songEntity == null) {
+                        val entity = (songItem?.toSongEntity(inLibrary = true) ?: libraryItem.toSongEntity()).toggleLike()
+                        if (songItem != null) {
+                            database.insertSong(entity, songItem.toSongArtistMaps())
+                        } else {
+                            database.insertSong(entity)
+                        }
+                    } else {
+                        database.toggleSongLike(libraryItem.id)
+                    }
+                }
+            },
+            onPlayNext = { playerState.addToQueue(libraryItem, playNext = true) },
+            onAddToPlaylist = { pendingPlaylistItem = HomeSongTarget(libraryItem, songItem) },
+            onShare = { copyToClipboard(shareUrl) },
+            onDismiss = onDismiss,
+        )
+    }
+
+    val menuHeaderForSongItem: (SongItem) -> (@Composable (onDismiss: () -> Unit) -> Unit) = { song ->
+        songMenuHeader(songItemToLibraryItem(song), song)
+    }
+
+    val currentOnLoadMore by rememberUpdatedState(onLoadMore)
+    val currentIsLoadingMore by rememberUpdatedState(isLoadingMore)
+    val currentIsLoading by rememberUpdatedState(isLoading)
+    val currentIsRefreshing by rememberUpdatedState(isRefreshing)
+
+    LaunchedEffect(listState, homePage?.sections?.size, homePage?.continuation, selectedChip) {
+        snapshotFlow {
+            val layout = listState.layoutInfo
+            val total = layout.totalItemsCount
+            val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index
+            val nearEnd = lastVisible != null && total > 0 && lastVisible >= total - 3
+            nearEnd && !currentIsLoadingMore && !currentIsLoading && !currentIsRefreshing
+        }
             .distinctUntilChanged()
-            .collect { lastVisible ->
-                val total = listState.layoutInfo.totalItemsCount
-                if (lastVisible != null && total > 0 && lastVisible >= total - 3) {
-                    onLoadMore()
+            .collect { shouldLoad ->
+                if (shouldLoad) {
+                    currentOnLoadMore()
                 }
             }
     }
@@ -379,6 +445,7 @@ fun HomeScreen(
                         playerState = playerState,
                         onPrimary = { onLocalItemSelected(it) },
                         menuActions = { item -> menuActionsForSong(item, null) },
+                        menuHeader = { item -> songMenuHeader(item, null) },
                         rows = 4,
                         gridState = quickPicksLazyGridState,
                         flingBehavior = quickPicksFlingBehavior,
@@ -399,6 +466,7 @@ fun HomeScreen(
                         playerState = playerState,
                         onOpen = { onLocalItemSelected(it) },
                         menuActions = { item -> menuActionsForSong(item, null) },
+                        menuHeader = { item -> songMenuHeader(item, null) },
                     )
                 }
             } else if (isLoading && homePage == null) {
@@ -429,6 +497,7 @@ fun HomeScreen(
                         items = accountPlaylists,
                         onItemSelected = onItemSelected,
                         menuActionsForSong = menuActionsForSongItem,
+                        menuHeaderForSong = menuHeaderForSongItem,
                     )
                 }
             }
@@ -443,6 +512,7 @@ fun HomeScreen(
                         playerState = playerState,
                         onPrimary = { onLocalItemSelected(it) },
                         menuActions = { item -> menuActionsForSong(item, null) },
+                        menuHeader = { item -> songMenuHeader(item, null) },
                         rows = rows,
                         gridState = forgottenFavoritesLazyGridState,
                         flingBehavior = forgottenFavoritesFlingBehavior,
@@ -477,6 +547,7 @@ fun HomeScreen(
                         items = recommendation.items,
                         onItemSelected = onItemSelected,
                         menuActionsForSong = menuActionsForSongItem,
+                        menuHeaderForSong = menuHeaderForSongItem,
                     )
                 }
             }
@@ -582,8 +653,17 @@ fun HomeScreen(
             }
 
             // 6. Remote Sections (Rows/Grids)
-            homePage?.sections?.forEach { section ->
-                item {
+            homePage?.sections?.forEachIndexed { index, section ->
+                val sectionSongs = section.items.filterIsInstance<SongItem>()
+                val hasPlayableSongs = sectionSongs.isNotEmpty()
+                val isAllSongs = section.items.isNotEmpty() && section.items.all { it is SongItem }
+                val isSongGrid = (isAllSongs && section.items.size >= 4) ||
+                        section.title.equals("Quick picks", ignoreCase = true) ||
+                        section.title.contains("rápida", ignoreCase = true) ||
+                        section.title.contains("nuevo", ignoreCase = true) ||
+                        section.title.contains("listen again", ignoreCase = true)
+
+                item(key = "home_section_title_${section.endpoint?.browseId ?: section.title}_$index") {
                     val shape = if (section.items.all { it is ArtistItem }) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
                     NavigationTitle(
                         title = section.title.orEmpty(),
@@ -604,14 +684,19 @@ fun HomeScreen(
                                 else if (id == "FEmusic_charts") onNavigate("charts")
                                 else onNavigate("browse/$id")
                             } 
-                        }
+                        },
+                        onPlayAllClick = if (hasPlayableSongs) {
+                            {
+                                val librarySongs = sectionSongs.map { songItemToLibraryItem(it) }
+                                playerState.playQueue(librarySongs, startIndex = 0)
+                            }
+                        } else null,
                     )
                 }
-                item {
-                    val isGrid = section.title.equals("Quick picks", ignoreCase = true)
-                    if (isGrid) {
-                        val libraryItems = section.items.mapNotNull { it.toLibraryItem() }
-                        val songItemsById = section.items.filterIsInstance<SongItem>().associateBy { it.id }
+                item(key = "home_section_items_${section.endpoint?.browseId ?: section.title}_$index") {
+                    if (isSongGrid) {
+                        val libraryItems = remember(section.items) { section.items.mapNotNull { it.toLibraryItem() } }
+                        val songItemsById = remember(section.items) { section.items.filterIsInstance<SongItem>().associateBy { it.id } }
                         val sectionGridState = rememberLazyGridState()
                         val sectionSnapLayoutInfoProvider =
                             remember(sectionGridState, horizontalLazyGridItemWidthFactor) {
@@ -631,7 +716,11 @@ fun HomeScreen(
                                 val songItem = songItemsById[item.id] ?: return@menu emptyList()
                                 menuActionsForSong(item, songItem)
                             },
-                            rows = 4,
+                            menuHeader = { item ->
+                                val songItem = songItemsById[item.id]
+                                songMenuHeader(item, songItem)
+                            },
+                            rows = minOf(4, (libraryItems.size + 1) / 2).coerceAtLeast(1),
                             gridState = sectionGridState,
                             flingBehavior = sectionFlingBehavior,
                             itemWidth = horizontalLazyGridItemWidth,
@@ -641,12 +730,13 @@ fun HomeScreen(
                             items = section.items,
                             onItemSelected = onItemSelected,
                             menuActionsForSong = menuActionsForSongItem,
+                            menuHeaderForSong = menuHeaderForSongItem,
                         )
                     }
                 }
             }
             
-            if (isLoadingMore || isLoading || (homePage?.continuation != null && homePage.sections.isNotEmpty())) {
+            if (isLoadingMore || isLoading) {
                 item { ShimmerSectionRow() }
             }
         }
@@ -782,15 +872,17 @@ private fun HomeSectionRow(
     items: List<YTItem>,
     onItemSelected: (YTItem) -> Unit,
     menuActionsForSong: (SongItem) -> List<ContextMenuAction>,
+    menuHeaderForSong: (SongItem) -> (@Composable (onDismiss: () -> Unit) -> Unit),
 ) {
     LazyRow(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
     ) {
-        items(items) { item ->
+        itemsIndexed(items = items, key = { index, item -> "${item.id}_$index" }) { _, item ->
             HomeItemCard(
                 item = item,
                 onPrimary = { onItemSelected(item) },
                 menuActionsForSong = menuActionsForSong,
+                menuHeaderForSong = menuHeaderForSong,
             )
         }
     }
@@ -802,9 +894,10 @@ private fun HomeItemCard(
     item: YTItem,
     onPrimary: () -> Unit,
     menuActionsForSong: (SongItem) -> List<ContextMenuAction>,
+    menuHeaderForSong: (SongItem) -> (@Composable (onDismiss: () -> Unit) -> Unit),
 ) {
     val isArtist = item is ArtistItem
-    val shape = if (isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
+    val shape = if (isArtist) rememberExpressiveAvatarShape(item.id) else RoundedCornerShape(ThumbnailCornerRadius)
     val (title, subtitle) = when (item) {
         is SongItem -> item.title to item.artists.joinToString { it.name }
         is AlbumItem -> item.title to item.artists?.joinToString { it.name }.orEmpty()
@@ -814,49 +907,85 @@ private fun HomeItemCard(
     }
 
     val libraryItem = item.toLibraryItem()
-    val contextMenuItems = when (item) {
-        is SongItem -> toContextMenuItems(menuActionsForSong(item))
-        else -> {
-            if (libraryItem != null) {
-                listOf(ContextMenuItem(stringResource("open")) { onPrimary() })
-            } else {
-                emptyList()
-            }
+    if (item is SongItem && libraryItem != null) {
+        val menuExpanded = remember(item.id) { mutableStateOf(false) }
+        val menuActions = menuActionsForSong(item)
+        val menuHeader = menuHeaderForSong(item)
+        Box {
+            HomeItemCardContent(
+                thumbnailUrl = item.thumbnail,
+                shape = shape,
+                title = title,
+                subtitle = subtitle,
+                modifier = Modifier.combinedClickable(
+                    onClick = onPrimary,
+                    onLongClick = { menuExpanded.value = true },
+                ),
+            )
+            ItemContextMenu(
+                expanded = menuExpanded.value,
+                onDismiss = { menuExpanded.value = false },
+                item = libraryItem,
+                actions = menuActions,
+                headerContent = { menuHeader { menuExpanded.value = false } },
+            )
+        }
+    } else {
+        val contextMenuItems = if (libraryItem != null) {
+            listOf(ContextMenuItem(stringResource("open")) { onPrimary() })
+        } else {
+            emptyList()
+        }
+        ContextMenuArea(items = { contextMenuItems }) {
+            HomeItemCardContent(
+                thumbnailUrl = item.thumbnail,
+                shape = shape,
+                title = title,
+                subtitle = subtitle,
+                modifier = Modifier.clickable { onPrimary() },
+            )
         }
     }
+}
 
-    ContextMenuArea(items = { contextMenuItems }) {
-        Column(
-            modifier = Modifier
-                .width(GridThumbnailHeight)
-                .padding(12.dp)
-                .clickable { onPrimary() },
+@Composable
+private fun HomeItemCardContent(
+    thumbnailUrl: String?,
+    shape: androidx.compose.ui.graphics.Shape,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = Modifier
+            .width(GridThumbnailHeight)
+            .padding(12.dp)
+            .then(modifier),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(GridThumbnailHeight),
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.size(GridThumbnailHeight),
-            ) {
-                RemoteImage(
-                    url = item.thumbnail,
-                    modifier = Modifier.fillMaxSize(),
-                    shape = shape,
-                )
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            RemoteImage(
+                url = thumbnailUrl,
+                modifier = Modifier.fillMaxSize(),
+                shape = shape,
             )
         }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -867,6 +996,7 @@ private fun QuickPicksGrid(
     playerState: PlayerState,
     onPrimary: (LibraryItem) -> Unit,
     menuActions: (LibraryItem) -> List<ContextMenuAction>,
+    menuHeader: (LibraryItem) -> (@Composable (onDismiss: () -> Unit) -> Unit),
     rows: Int = 4,
     gridState: LazyGridState,
     flingBehavior: FlingBehavior,
@@ -884,12 +1014,13 @@ private fun QuickPicksGrid(
         horizontalArrangement = Arrangement.spacedBy(0.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        items(items) { item ->
+        gridItemsIndexed(items = items, key = { index, item -> "${item.id}_$index" }) { _, item ->
             QuickPickRowItem(
                 item = item,
                 playerState = playerState,
                 onPrimary = { onPrimary(item) },
                 menuActions = menuActions(item),
+                menuHeader = menuHeader(item),
                 itemWidth = itemWidth,
             )
         }
@@ -903,10 +1034,11 @@ private fun QuickPickRowItem(
     playerState: PlayerState,
     onPrimary: () -> Unit,
     menuActions: List<ContextMenuAction>,
+    menuHeader: @Composable (onDismiss: () -> Unit) -> Unit,
     itemWidth: Dp,
 ) {
     val isCurrentlyPlaying = playerState.currentItem?.id == item.id
-    val menuExpanded = remember(item.id) { androidx.compose.runtime.mutableStateOf(false) }
+    val menuExpanded = remember(item.id) { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
@@ -917,13 +1049,16 @@ private fun QuickPickRowItem(
                 if (isCurrentlyPlaying) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                 else MaterialTheme.colorScheme.surface
             )
-            .clickable {
-                if (isCurrentlyPlaying) {
-                    playerState.togglePlayPause()
-                } else {
-                    onPrimary()
-                }
-            }
+            .combinedClickable(
+                onClick = {
+                    if (isCurrentlyPlaying) {
+                        playerState.togglePlayPause()
+                    } else {
+                        onPrimary()
+                    }
+                },
+                onLongClick = { menuExpanded.value = true },
+            )
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -972,6 +1107,7 @@ private fun QuickPickRowItem(
                 onDismiss = { menuExpanded.value = false },
                 item = item,
                 actions = menuActions,
+                headerContent = { menuHeader { menuExpanded.value = false } },
             )
         }
     }
@@ -984,6 +1120,7 @@ private fun KeepListeningRow(
     playerState: PlayerState,
     onOpen: (LibraryItem) -> Unit,
     menuActions: (LibraryItem) -> List<ContextMenuAction>,
+    menuHeader: (LibraryItem) -> (@Composable (onDismiss: () -> Unit) -> Unit),
 ) {
     val rows = if (items.size > 6) 2 else 1
     val itemSpacing = 12.dp
@@ -1002,48 +1139,85 @@ private fun KeepListeningRow(
         horizontalArrangement = Arrangement.spacedBy(itemSpacing),
         verticalArrangement = Arrangement.spacedBy(itemSpacing),
     ) {
-        items(items) { item ->
+        gridItemsIndexed(items = items, key = { index, item -> "${item.id}_$index" }) { _, item ->
             val isArtist = item.playbackUrl.contains("/channel/")
-            val shape = if (isArtist) CircleShape else RoundedCornerShape(ThumbnailCornerRadius)
-            val contextMenuItems = toContextMenuItems(menuActions(item))
+            val isSong = !isArtist && !item.playbackUrl.contains("list=")
+            val shape = if (isArtist) rememberExpressiveAvatarShape(item.id) else RoundedCornerShape(ThumbnailCornerRadius)
+            val onItemClick = {
+                if (playerState.currentItem?.id == item.id) {
+                    playerState.togglePlayPause()
+                } else {
+                    onOpen(item)
+                }
+            }
 
-            ContextMenuArea(items = { contextMenuItems }) {
-                Column(
-                    modifier = Modifier
-                        .width(GridThumbnailHeight)
-                        .clickable {
-                            if (playerState.currentItem?.id == item.id) {
-                                playerState.togglePlayPause()
-                            } else {
-                                onOpen(item)
-                            }
-                        },
-                ) {
-                    Box {
-                        RemoteImage(
-                            url = item.artworkUrl,
-                            modifier = Modifier
-                                .size(GridThumbnailHeight)
-                                .clip(shape),
-                            shape = shape,
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        item.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+            if (isSong) {
+                val menuExpanded = remember(item.id) { mutableStateOf(false) }
+                val songMenuHeader = menuHeader(item)
+                Box {
+                    KeepListeningCardContent(
+                        item = item,
+                        shape = shape,
+                        modifier = Modifier.combinedClickable(
+                            onClick = onItemClick,
+                            onLongClick = { menuExpanded.value = true },
+                        ),
                     )
-                    Text(
-                        item.artist,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
+                    ItemContextMenu(
+                        expanded = menuExpanded.value,
+                        onDismiss = { menuExpanded.value = false },
+                        item = item,
+                        actions = menuActions(item),
+                        headerContent = { songMenuHeader { menuExpanded.value = false } },
+                    )
+                }
+            } else {
+                val contextMenuItems = toContextMenuItems(menuActions(item))
+                ContextMenuArea(items = { contextMenuItems }) {
+                    KeepListeningCardContent(
+                        item = item,
+                        shape = shape,
+                        modifier = Modifier.clickable(onClick = onItemClick),
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun KeepListeningCardContent(
+    item: LibraryItem,
+    shape: androidx.compose.ui.graphics.Shape,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = Modifier
+            .width(GridThumbnailHeight)
+            .then(modifier),
+    ) {
+        Box {
+            RemoteImage(
+                url = item.artworkUrl,
+                modifier = Modifier
+                    .size(GridThumbnailHeight)
+                    .clip(shape),
+                shape = shape,
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            item.title,
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            item.artist,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
     }
 }
 
@@ -1100,7 +1274,22 @@ fun resolveDownloadMenuState(
     downloadStates: Map<String, DownloadState>,
     downloadedSongs: List<DownloadedSong>,
 ): DownloadMenuState {
-    val isDownloaded = downloadedSongs.any { it.songId == songId }
+    val downloadedIds = downloadedSongs.mapTo(HashSet(downloadedSongs.size)) { it.songId }
+    return resolveDownloadMenuState(
+        strings = strings,
+        songId = songId,
+        downloadStates = downloadStates,
+        downloadedSongIds = downloadedIds,
+    )
+}
+
+fun resolveDownloadMenuState(
+    strings: StringResolver,
+    songId: String,
+    downloadStates: Map<String, DownloadState>,
+    downloadedSongIds: Set<String>,
+): DownloadMenuState {
+    val isDownloaded = songId in downloadedSongIds
     val status = downloadStates[songId]?.status
     val isDownloading = status == DownloadStatus.DOWNLOADING || status == DownloadStatus.QUEUED
     val label = when {

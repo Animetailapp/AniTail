@@ -28,13 +28,13 @@ fun sortSongs(
     val collator = Collator.getInstance(Locale.getDefault()).apply {
         strength = Collator.PRIMARY
     }
-    val sorted = when (sortType) {
-        SongSortType.CREATE_DATE -> songs.sortedBy { songCreateDate(it) }
-        SongSortType.NAME -> songs.sortedWith(compareBy(collator) { it.title })
-        SongSortType.ARTIST -> songs.sortedWith(compareBy(collator) { it.artistName.orEmpty() })
-        SongSortType.PLAY_TIME -> songs.sortedBy { it.totalPlayTime }
+    val baseComparator: Comparator<SongEntity> = when (sortType) {
+        SongSortType.CREATE_DATE -> compareBy { songCreateDate(it) }
+        SongSortType.NAME -> compareBy(collator) { it.title }
+        SongSortType.ARTIST -> compareBy(collator) { it.artistName.orEmpty() }
+        SongSortType.PLAY_TIME -> compareBy { it.totalPlayTime }
     }
-    return if (descending) sorted.reversed() else sorted
+    return songs.sortedWith(if (descending) baseComparator.reversed() else baseComparator)
 }
 
 private fun songCreateDate(song: SongEntity): LocalDateTime {
@@ -50,13 +50,13 @@ fun sortPlaylists(
     val collator = Collator.getInstance(Locale.getDefault()).apply {
         strength = Collator.PRIMARY
     }
-    val sorted = when (sortType) {
-        PlaylistSortType.CREATE_DATE -> playlists.sortedBy { it.createdAt ?: LocalDateTime.MIN }
-        PlaylistSortType.NAME -> playlists.sortedWith(compareBy(collator) { it.name })
-        PlaylistSortType.SONG_COUNT -> playlists.sortedBy { songCounts[it.id] ?: 0 }
-        PlaylistSortType.LAST_UPDATED -> playlists.sortedBy { it.lastUpdateTime ?: LocalDateTime.MIN }
+    val baseComparator: Comparator<PlaylistEntity> = when (sortType) {
+        PlaylistSortType.CREATE_DATE -> compareBy { it.createdAt ?: LocalDateTime.MIN }
+        PlaylistSortType.NAME -> compareBy(collator) { it.name }
+        PlaylistSortType.SONG_COUNT -> compareBy { songCounts[it.id] ?: 0 }
+        PlaylistSortType.LAST_UPDATED -> compareBy { it.lastUpdateTime ?: LocalDateTime.MIN }
     }
-    return if (descending) sorted.reversed() else sorted
+    return playlists.sortedWith(if (descending) baseComparator.reversed() else baseComparator)
 }
 
 fun sortAlbums(
@@ -69,16 +69,16 @@ fun sortAlbums(
     val collator = Collator.getInstance(Locale.getDefault()).apply {
         strength = Collator.PRIMARY
     }
-    val sorted = when (sortType) {
-        AlbumSortType.CREATE_DATE -> albums.sortedBy { it.inLibrary ?: it.bookmarkedAt ?: LocalDateTime.MIN }
-        AlbumSortType.NAME -> albums.sortedWith(compareBy(collator) { it.title })
-        AlbumSortType.ARTIST -> albums.sortedWith(compareBy(collator) { artistNames[it.id].orEmpty() })
-        AlbumSortType.YEAR -> albums.sortedBy { it.year ?: 0 }
-        AlbumSortType.SONG_COUNT -> albums.sortedBy { it.songCount }
-        AlbumSortType.LENGTH -> albums.sortedBy { it.duration }
-        AlbumSortType.PLAY_TIME -> albums.sortedBy { playTimeByAlbum[it.id] ?: 0L }
+    val baseComparator: Comparator<AlbumEntity> = when (sortType) {
+        AlbumSortType.CREATE_DATE -> compareBy { it.inLibrary ?: it.bookmarkedAt ?: LocalDateTime.MIN }
+        AlbumSortType.NAME -> compareBy(collator) { it.title }
+        AlbumSortType.ARTIST -> compareBy(collator) { artistNames[it.id].orEmpty() }
+        AlbumSortType.YEAR -> compareBy { it.year ?: 0 }
+        AlbumSortType.SONG_COUNT -> compareBy { it.songCount }
+        AlbumSortType.LENGTH -> compareBy { it.duration }
+        AlbumSortType.PLAY_TIME -> compareBy { playTimeByAlbum[it.id] ?: 0L }
     }
-    return if (descending) sorted.reversed() else sorted
+    return albums.sortedWith(if (descending) baseComparator.reversed() else baseComparator)
 }
 
 fun sortArtists(
@@ -91,13 +91,13 @@ fun sortArtists(
     val collator = Collator.getInstance(Locale.getDefault()).apply {
         strength = Collator.PRIMARY
     }
-    val sorted = when (sortType) {
-        ArtistSortType.CREATE_DATE -> artists.sortedBy { it.bookmarkedAt ?: LocalDateTime.MIN }
-        ArtistSortType.NAME -> artists.sortedWith(compareBy(collator) { it.name })
-        ArtistSortType.SONG_COUNT -> artists.sortedBy { songCountByArtist[it.id] ?: 0 }
-        ArtistSortType.PLAY_TIME -> artists.sortedBy { playTimeByArtist[it.id] ?: 0L }
+    val baseComparator: Comparator<ArtistEntity> = when (sortType) {
+        ArtistSortType.CREATE_DATE -> compareBy { it.bookmarkedAt ?: LocalDateTime.MIN }
+        ArtistSortType.NAME -> compareBy(collator) { it.name }
+        ArtistSortType.SONG_COUNT -> compareBy { songCountByArtist[it.id] ?: 0 }
+        ArtistSortType.PLAY_TIME -> compareBy { playTimeByArtist[it.id] ?: 0L }
     }
-    return if (descending) sorted.reversed() else sorted
+    return artists.sortedWith(if (descending) baseComparator.reversed() else baseComparator)
 }
 
 sealed interface LibraryMixEntry {
@@ -136,10 +136,10 @@ fun sortMixEntries(
     val collator = Collator.getInstance(Locale.getDefault()).apply {
         strength = Collator.PRIMARY
     }
-    val sorted = when (sortType) {
-        MixSortType.CREATE_DATE -> entries.sortedBy { it.createDate ?: LocalDateTime.MIN }
-        MixSortType.LAST_UPDATED -> entries.sortedBy { it.lastUpdated ?: LocalDateTime.MIN }
-        MixSortType.NAME -> entries.sortedWith(compareBy(collator) { it.name })
+    val baseComparator: Comparator<LibraryMixEntry> = when (sortType) {
+        MixSortType.CREATE_DATE -> compareBy { it.createDate ?: LocalDateTime.MIN }
+        MixSortType.LAST_UPDATED -> compareBy { it.lastUpdated ?: LocalDateTime.MIN }
+        MixSortType.NAME -> compareBy(collator) { it.name }
     }
-    return if (descending) sorted.reversed() else sorted
+    return entries.sortedWith(if (descending) baseComparator.reversed() else baseComparator)
 }

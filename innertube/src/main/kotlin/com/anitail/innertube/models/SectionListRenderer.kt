@@ -47,5 +47,13 @@ data class SectionListRenderer(
         val musicResponsiveHeaderRenderer: MusicResponsiveHeaderRenderer? = null,
         val musicEditablePlaylistDetailHeaderRenderer: MusicEditablePlaylistDetailHeaderRenderer? = null,
         val gridRenderer: GridRenderer? = null,
+        val continuationItemRenderer: ContinuationItemRenderer? = null,
     )
 }
+
+fun List<SectionListRenderer.Content>.getContinuation(): String? =
+    firstOrNull { it.continuationItemRenderer != null }
+        ?.continuationItemRenderer
+        ?.continuationEndpoint
+        ?.continuationCommand
+        ?.token

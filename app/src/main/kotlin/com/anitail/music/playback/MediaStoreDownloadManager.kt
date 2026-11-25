@@ -117,6 +117,50 @@ constructor(
         private const val SEGMENTED_DOWNLOAD_BALANCED_SEGMENTS = 3
         private const val CONNECT_TIMEOUT_MS = 60_000
         private const val READ_TIMEOUT_MS = 120_000
+        private const val DEFAULT_USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+        internal fun extensionFromMimeType(mimeType: String): String {
+            return when {
+                mimeType.contains("audio/mpeg", ignoreCase = true) -> "mp3"
+                mimeType.contains("audio/webm", ignoreCase = true) -> "weba"
+                mimeType.contains("audio/ogg", ignoreCase = true) -> "ogg"
+                mimeType.contains("audio/mp4", ignoreCase = true) -> "m4a"
+                mimeType.contains("audio/aac", ignoreCase = true) -> "aac"
+                mimeType.contains("audio/flac", ignoreCase = true) -> "flac"
+                else -> "m4a"
+            }
+        }
+
+        internal fun buildDownloadRequestHeaders(
+            streamHeaders: Map<String, String>,
+            rangeHeader: String? = null,
+        ): Map<String, String> {
+            val result = LinkedHashMap<String, String>()
+            val seenLowerKeys = HashSet<String>()
+
+            streamHeaders.forEach { (key, value) ->
+                if (key.isBlank() || key.equals("Range", ignoreCase = true)) {
+                    return@forEach
+                }
+                result[key] = value
+                seenLowerKeys += key.lowercase()
+            }
+
+            if ("user-agent" !in seenLowerKeys) {
+                result["User-Agent"] = DEFAULT_USER_AGENT
+            }
+            if ("accept" !in seenLowerKeys) {
+                result["Accept"] = "*/*"
+            }
+            if ("accept-language" !in seenLowerKeys) {
+                result["Accept-Language"] = "en-US,en;q=0.9"
+            }
+            if (rangeHeader != null) {
+                result["Range"] = rangeHeader
+            }
+            return result
+        }
     }
 
     /**
@@ -522,6 +566,7 @@ constructor(
 
                     val format = playbackData.format
                     val downloadUrl = playbackData.streamUrl
+                    val requestHeaders = playbackData.streamHeaders
                     val expectedContentLength = format.contentLength?.takeIf { it > 0L }
                     val resumeFromBytes = tempFile.takeIf { it.exists() }?.length() ?: 0L
 
@@ -530,7 +575,8 @@ constructor(
                         outputFile = tempFile,
                         songId = song.id,
                         startByte = resumeFromBytes,
-                        expectedContentLength = expectedContentLength
+                        expectedContentLength = expectedContentLength,
+                        requestHeaders = requestHeaders,
                     )
 
                     val downloadedBytes = tempFile.takeIf { it.exists() }?.length() ?: 0L
@@ -698,6 +744,7 @@ constructor(
         songId: String,
         startByte: Long,
         expectedContentLength: Long?,
+        requestHeaders: Map<String, String> = emptyMap(),
     ) =
         withContext(Dispatchers.IO) {
             val canAttemptSegmented =
@@ -710,7 +757,8 @@ constructor(
                         url = url,
                         outputFile = outputFile,
                         songId = songId,
-                        expectedContentLength = expectedContentLength
+                        expectedContentLength = expectedContentLength,
+                        requestHeaders = requestHeaders,
                     )
                     return@withContext
                 } catch (cancel: CancellationException) {
@@ -725,17 +773,15 @@ constructor(
             }
 
             val connection = URL(url).openConnection() as HttpURLConnection
+            val headersToApply = buildDownloadRequestHeaders(
+                streamHeaders = requestHeaders,
+                rangeHeader = if (startByte > 0L) "bytes=$startByte-" else null,
+            )
 
             // Configure connection for YouTube
             connection.apply {
-                setRequestProperty(
-                    "User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                )
-                setRequestProperty("Accept", "*/*")
-                setRequestProperty("Accept-Language", "en-US,en;q=0.9")
-                if (startByte > 0L) {
-                    setRequestProperty("Range", "bytes=$startByte-")
+                headersToApply.forEach { (key, value) ->
+                    setRequestProperty(key, value)
                 }
                 connectTimeout = CONNECT_TIMEOUT_MS
                 readTimeout = READ_TIMEOUT_MS
@@ -848,8 +894,9 @@ constructor(
         outputFile: File,
         songId: String,
         expectedContentLength: Long,
+        requestHeaders: Map<String, String> = emptyMap(),
     ) = coroutineScope {
-        val totalBytes = fetchSegmentedDownloadTotalBytes(url, expectedContentLength)
+        val totalBytes = fetchSegmentedDownloadTotalBytes(url, expectedContentLength, requestHeaders)
             ?: throw IllegalStateException("Segmented download unsupported for this stream")
         if (totalBytes < MIN_SEGMENTED_DOWNLOAD_SIZE_BYTES) {
             throw IllegalStateException("Segmented download not needed for small files")
@@ -893,14 +940,14 @@ constructor(
                 val expectedSegmentBytes = (segmentEnd - segmentStart + 1L).coerceAtLeast(0L)
 
                 val connection = URL(url).openConnection() as HttpURLConnection
+                val headersToApply = buildDownloadRequestHeaders(
+                    streamHeaders = requestHeaders,
+                    rangeHeader = "bytes=$segmentStart-$segmentEnd",
+                )
                 connection.apply {
-                    setRequestProperty(
-                        "User-Agent",
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                    )
-                    setRequestProperty("Accept", "*/*")
-                    setRequestProperty("Accept-Language", "en-US,en;q=0.9")
-                    setRequestProperty("Range", "bytes=$segmentStart-$segmentEnd")
+                    headersToApply.forEach { (key, value) ->
+                        setRequestProperty(key, value)
+                    }
                     connectTimeout = CONNECT_TIMEOUT_MS
                     readTimeout = READ_TIMEOUT_MS
                     instanceFollowRedirects = true
@@ -987,16 +1034,17 @@ constructor(
     private fun fetchSegmentedDownloadTotalBytes(
         url: String,
         expectedContentLength: Long,
+        requestHeaders: Map<String, String> = emptyMap(),
     ): Long? {
         val probeConnection = URL(url).openConnection() as HttpURLConnection
+        val headersToApply = buildDownloadRequestHeaders(
+            streamHeaders = requestHeaders,
+            rangeHeader = "bytes=0-0",
+        )
         probeConnection.apply {
-            setRequestProperty(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            )
-            setRequestProperty("Accept", "*/*")
-            setRequestProperty("Accept-Language", "en-US,en;q=0.9")
-            setRequestProperty("Range", "bytes=0-0")
+            headersToApply.forEach { (key, value) ->
+                setRequestProperty(key, value)
+            }
             connectTimeout = CONNECT_TIMEOUT_MS
             readTimeout = READ_TIMEOUT_MS
             instanceFollowRedirects = true
@@ -1264,18 +1312,6 @@ constructor(
         val rootUri = runCatching { Uri.parse(customDownloadPathUri) }.getOrNull() ?: return false
         val root = DocumentFile.fromTreeUri(context, rootUri) ?: return false
         return root.canWrite()
-    }
-
-    private fun extensionFromMimeType(mimeType: String): String {
-        return when {
-            mimeType.contains("audio/mpeg") -> "mp3"
-            mimeType.contains("audio/webm") -> "webm"
-            mimeType.contains("audio/ogg") -> "ogg"
-            mimeType.contains("audio/mp4") -> "m4a"
-            mimeType.contains("audio/aac") -> "aac"
-            mimeType.contains("audio/flac") -> "flac"
-            else -> "m4a"
-        }
     }
 
     private fun markCancelRequested(songId: String) {

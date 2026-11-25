@@ -15,7 +15,7 @@ android {
     namespace = "com.anitail.music"
     compileSdk {
         version = release(37) {
-            minorApiLevel = 1
+            minorApiLevel = 2
         }
     }
     defaultConfig {
@@ -230,6 +230,8 @@ dependencies {
     implementation(libs.media3.session)
     implementation(libs.media3.okhttp)
     implementation(libs.media3.cast)
+    implementation(libs.media3.ui)
+    implementation(libs.media3.hls)
     implementation(libs.play.services.cast) {
         version {
             strictly(libs.versions.playServicesCast.get())

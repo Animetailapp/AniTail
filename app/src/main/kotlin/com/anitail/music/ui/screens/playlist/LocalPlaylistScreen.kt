@@ -666,9 +666,9 @@ fun LocalPlaylistScreen(
                                                 playerConnection.player.togglePlayPause()
                                             } else {
                                                 playerConnection.playQueue(
-                                                    ListQueue(
+                                                    ListQueue.fromSongs(
                                                         title = playlistName,
-                                                        items = songs.map { it.song.toMediaItem() },
+                                                        songs = songs.map { it.song },
                                                         startIndex = songs.indexOfFirst { it.map.id == song.map.id },
                                                     ),
                                                 )
@@ -806,9 +806,9 @@ fun LocalPlaylistScreen(
                                                     playerConnection.player.togglePlayPause()
                                                 } else {
                                                     playerConnection.playQueue(
-                                                        ListQueue(
+                                                        ListQueue.fromSongs(
                                                             title = playlistName,
-                                                            items = songs.map { it.song.toMediaItem() },
+                                                            songs = songs.map { it.song },
                                                             startIndex = index,
                                                         ),
                                                     )

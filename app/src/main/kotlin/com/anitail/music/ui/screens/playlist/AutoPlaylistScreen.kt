@@ -122,8 +122,12 @@ fun AutoPlaylistScreen(
     val playerConnection = LocalPlayerConnection.current ?: return
     val isPlaying by playerConnection.isPlaying.collectAsState()
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
-    val playlist =
-        if (viewModel.playlist == "liked") stringResource(R.string.liked) else stringResource(R.string.offline)
+    val playlist = when (viewModel.playlist) {
+        "liked" -> stringResource(R.string.liked)
+        "downloaded" -> stringResource(R.string.offline)
+        "uploaded" -> stringResource(R.string.uploaded_playlist_name)
+        else -> stringResource(R.string.offline)
+    }
 
     val songs by viewModel.likedSongs.collectAsState(null)
     val playlistSongs = songs.orEmpty()
@@ -153,7 +157,14 @@ fun AutoPlaylistScreen(
     val playlistType = when (playlistId) {
         "liked" -> PlaylistType.LIKE
         "downloaded" -> PlaylistType.DOWNLOAD
+        "uploaded" -> PlaylistType.UPLOADED
         else -> PlaylistType.OTHER
+    }
+    val autoPlaylistCoverRes = when (playlistType) {
+        PlaylistType.LIKE -> R.drawable.library_cover_liked
+        PlaylistType.DOWNLOAD -> R.drawable.library_cover_downloaded
+        PlaylistType.UPLOADED -> R.drawable.library_cover_uploaded
+        PlaylistType.OTHER -> R.drawable.library_cover_liked
     }
 
     val wrappedSongs = remember(songs) {
@@ -256,9 +267,13 @@ fun AutoPlaylistScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (ytmSync) {
+        if (playlistType == PlaylistType.UPLOADED) {
             withContext(Dispatchers.IO) {
-                if (playlistType == PlaylistType.LIKE) viewModel.syncLikedSongs()
+                viewModel.syncUploadedSongs()
+            }
+        } else if (ytmSync && playlistType == PlaylistType.LIKE) {
+            withContext(Dispatchers.IO) {
+                viewModel.syncLikedSongs()
             }
         }
     }
@@ -341,18 +356,22 @@ fun AutoPlaylistScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier
-                                        .size(AlbumThumbnailSize)
-                                        .clip(RoundedCornerShape(ThumbnailCornerRadius))
-                                        .fillMaxWidth(),
-                                ) {
-                                    AsyncImage(
-                                        model = playlistSongs[0].thumbnailUrl,
-                                        contentDescription = null,
+                                        contentAlignment = Alignment.Center,
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(ThumbnailCornerRadius)),
+                                            .size(AlbumThumbnailSize)
+                                            .clip(RoundedCornerShape(ThumbnailCornerRadius))
+                                            .fillMaxWidth(),
+                                    ) {
+                                        val coverModel = playlistSongs.firstOrNull()?.thumbnailUrl?.takeIf { it.isNotBlank() }
+                                            ?: autoPlaylistCoverRes
+                                        AsyncImage(
+                                            model = coverModel,
+                                            contentDescription = null,
+                                            placeholder = painterResource(autoPlaylistCoverRes),
+                                            error = painterResource(autoPlaylistCoverRes),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(ThumbnailCornerRadius)),
                                         )
                                     }
 
@@ -571,9 +590,9 @@ fun AutoPlaylistScreen(
                                             playerConnection.player.togglePlayPause()
                                         } else {
                                             playerConnection.playQueue(
-                                                ListQueue(
+                                                ListQueue.fromSongs(
                                                     title = playlist,
-                                                    items = playlistSongs.map { it.toMediaItem() },
+                                                    songs = playlistSongs,
                                                     startIndex = playlistSongs.indexOfFirst { it.id == songWrapper.item.id }
                                                 ),
                                             )
@@ -739,5 +758,5 @@ fun AutoPlaylistScreen(
 }
 
 enum class PlaylistType {
-    LIKE, DOWNLOAD, OTHER
+    LIKE, DOWNLOAD, UPLOADED, OTHER
 }
