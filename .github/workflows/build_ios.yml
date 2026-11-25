@@ -25,18 +25,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: ios-${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  group: ios-${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   build_ios:
     name: iOS App & Unsigned IPA
     runs-on: macos-26
-    timeout-minutes: 45
+    timeout-minutes: 120
     env:
       ANITAIL_IOS_ONLY: "true"
-      GRADLE_OPTS: >-
-        -Dorg.gradle.jvmargs="-XX:MaxRAMPercentage=70.0 -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC -Dkotlin.daemon.jvm.options=-XX:MaxRAMPercentage=70.0"
       ORG_GRADLE_PROJECT_org.gradle.workers.max: "2"
       ORG_GRADLE_PROJECT_kotlin.compiler.execution.strategy: "in-process"
 
@@ -55,6 +53,15 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
         with:
           cache-cleanup: on-success
+
+      - name: Configure Gradle memory limits for macOS runner
+        run: |
+          mkdir -p ~/.gradle
+          cat <<'EOF' >> ~/.gradle/gradle.properties
+          org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC -Dsun.zip.disableMemoryMapping=true -Dsun.io.useCanonCaches=false
+          kotlin.daemon.jvm.options=-Xmx2g
+          kotlin.native.jvmArgs=-Xmx3g
+          EOF
 
       - name: Cache Kotlin Native
         uses: actions/cache@v6
