@@ -34,26 +34,30 @@ public:
 
     static jclass GetDiscordRpcManagerClass() { return discordRpcManagerClass_; }
     static jmethodID GetOnNativeStatusChangedMethod() { return onNativeStatusChangedMethod_; }
+    static jmethodID GetOnNativeTokenExpiredMethod() { return onNativeTokenExpiredMethod_; }
     static void SetDiscordRpcManagerClass(JNIEnv* env, jclass clazz) {
         if (discordRpcManagerClass_) env->DeleteGlobalRef(discordRpcManagerClass_);
         discordRpcManagerClass_ = clazz;
     }
     static void SetOnNativeStatusChangedMethod(jmethodID method) { onNativeStatusChangedMethod_ = method; }
+    static void SetOnNativeTokenExpiredMethod(jmethodID method) { onNativeTokenExpiredMethod_ = method; }
 
 private:
     void DestroyUnlocked();
     void DoGetToken(std::string code, std::string redirectUri, std::string codeVerifier);
-    void FireNativeStatusCallback(int statusCode, bool ready, bool authorized);
+    void FireNativeStatusCallback(int statusCode, int errorCode, int errorDetail, bool ready, bool authorized);
+    void FireNativeTokenExpiredCallback();
 
     discordpp::Client* client_;
     std::atomic<bool> ready_;
     std::atomic<bool> authorized_;
-    mutable std::mutex mutex_;
+    mutable std::recursive_mutex mutex_;
     int64_t appId_;
     JavaVM* javaVm_;
 
     static jclass discordRpcManagerClass_;
     static jmethodID onNativeStatusChangedMethod_;
+    static jmethodID onNativeTokenExpiredMethod_;
 };
 
 extern DiscordBridge g_discordBridge;

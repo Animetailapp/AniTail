@@ -1,6 +1,7 @@
 package com.anitail.desktop.util
 
 import com.anitail.desktop.auth.DesktopDiscordService
+import com.anitail.desktop.auth.DiscordInvalidTokenException
 import com.anitail.desktop.storage.DesktopPreferences
 import com.anitail.shared.model.LibraryItem
 import kotlinx.coroutines.CoroutineScope
@@ -28,11 +29,60 @@ class DesktopDiscordRPC(
     private val tokenProvider: () -> String = { "" },
     private val refreshTokenProvider: () -> String = { "" },
     private val onTokenRefreshed: (String, String) -> Unit = { _, _ -> },
+    private val expiryEpochMillisProvider: () -> Long = { 0L },
+    private val tokenRefresher: ((String?) -> DesktopDiscordService.DesktopRefreshOutcome)? = null,
+    private val onAuthInvalidated: () -> Unit = {},
 ) {
     private var gatewayClient: DiscordGatewayClient? = null
     private var activeToken: String = ""
 
     private fun currentToken(): String = tokenProvider().trim()
+
+    private fun performTokenRefresh(failedToken: String?): DesktopDiscordService.DesktopRefreshOutcome {
+        tokenRefresher?.let { refresher ->
+            return refresher(failedToken)
+        }
+        val refresh = refreshTokenProvider().trim()
+        if (refresh.isBlank()) {
+            return DesktopDiscordService.DesktopRefreshOutcome.InvalidToken
+        }
+        val result = DesktopDiscordService.refreshToken(refresh)
+        return result.fold(
+            onSuccess = { refreshed ->
+                val nextRefresh = refreshed.refreshToken.ifBlank { refresh }
+                onTokenRefreshed(refreshed.accessToken, nextRefresh)
+                DesktopDiscordService.DesktopRefreshOutcome.Refreshed(refreshed.copy(refreshToken = nextRefresh))
+            },
+            onFailure = { err ->
+                if (err is DiscordInvalidTokenException) {
+                    DesktopDiscordService.DesktopRefreshOutcome.InvalidToken
+                } else {
+                    DesktopDiscordService.DesktopRefreshOutcome.TransientFailure
+                }
+            },
+        )
+    }
+
+    private fun ensureFreshToken(): String {
+        var token = currentToken()
+        if (token.isEmpty()) return ""
+        if (DesktopDiscordService.shouldRefreshProactively(System.currentTimeMillis(), expiryEpochMillisProvider()) &&
+            refreshTokenProvider().trim().isNotEmpty()
+        ) {
+            when (val out = performTokenRefresh(null)) {
+                is DesktopDiscordService.DesktopRefreshOutcome.Refreshed -> {
+                    token = out.result.accessToken.trim()
+                }
+                is DesktopDiscordService.DesktopRefreshOutcome.InvalidToken -> {
+                    closeRPC()
+                    onAuthInvalidated()
+                    return ""
+                }
+                is DesktopDiscordService.DesktopRefreshOutcome.TransientFailure -> Unit
+            }
+        }
+        return token
+    }
 
     fun isRpcRunning(): Boolean {
         val token = currentToken()
@@ -40,7 +90,7 @@ class DesktopDiscordRPC(
     }
 
     fun connect(): Boolean {
-        val token = currentToken()
+        val token = ensureFreshToken()
         if (token.isEmpty()) {
             closeRPC()
             return false
@@ -57,10 +107,14 @@ class DesktopDiscordRPC(
         DiscordGatewayClient(
             applicationId = APPLICATION_ID,
             initialToken = token,
-            refreshTokenProvider = refreshTokenProvider,
-            onTokenRefreshed = { newAccess, newRefresh ->
+            expiryEpochMillisProvider = expiryEpochMillisProvider,
+            tokenRefresher = { failedToken -> performTokenRefresh(failedToken) },
+            onTokenUpdated = { newAccess ->
                 activeToken = newAccess
-                onTokenRefreshed(newAccess, newRefresh)
+            },
+            onAuthInvalidated = {
+                closeRPC()
+                onAuthInvalidated()
             },
         )
 
@@ -78,7 +132,7 @@ class DesktopDiscordRPC(
         timeEnd: Long,    // milliseconds
     ) = withContext(Dispatchers.IO) {
         val _ = runCatching {
-            val token = currentToken()
+            val token = ensureFreshToken()
             if (token.isEmpty()) return@runCatching
 
             if (gatewayClient == null || activeToken != token) {
@@ -210,8 +264,10 @@ class DesktopDiscordRPC(
 private class DiscordGatewayClient(
     private val applicationId: String,
     initialToken: String,
-    private val refreshTokenProvider: () -> String,
-    private val onTokenRefreshed: (String, String) -> Unit,
+    private val expiryEpochMillisProvider: () -> Long,
+    private val tokenRefresher: (String?) -> DesktopDiscordService.DesktopRefreshOutcome,
+    private val onTokenUpdated: (String) -> Unit,
+    private val onAuthInvalidated: () -> Unit,
 ) {
     @Volatile private var token: String = initialToken
     private val httpClient = OkHttpClient.Builder()
@@ -233,6 +289,18 @@ private class DiscordGatewayClient(
     private var heartbeatJob: Job? = null
 
     fun isConnected(): Boolean = connected && webSocket != null
+
+    private fun tryRefreshToken(failedToken: String?): DesktopDiscordService.DesktopRefreshOutcome {
+        val outcome = tokenRefresher(failedToken)
+        if (outcome is DesktopDiscordService.DesktopRefreshOutcome.Refreshed) {
+            val newAccess = outcome.result.accessToken.trim()
+            if (newAccess.isNotBlank()) {
+                token = newAccess
+                onTokenUpdated(newAccess)
+            }
+        }
+        return outcome
+    }
 
     fun connect(): Boolean {
         if (closed) return false
@@ -267,16 +335,20 @@ private class DiscordGatewayClient(
                     heartbeatJob?.cancel()
                     if (closed) return
                     if (code == 4004) {
-                        val refresh = refreshTokenProvider().trim()
-                        if (refresh.isNotEmpty()) {
-                            scope.launch {
-                                val refreshed = DesktopDiscordService.refreshToken(refresh).getOrNull()
-                                if (refreshed != null && refreshed.accessToken.isNotBlank()) {
-                                    token = refreshed.accessToken
-                                    onTokenRefreshed(refreshed.accessToken, refreshed.refreshToken)
+                        val failed = token
+                        scope.launch {
+                            when (tryRefreshToken(failed)) {
+                                is DesktopDiscordService.DesktopRefreshOutcome.Refreshed -> {
                                     sessionId = null
                                     sequence = null
                                     connect()
+                                }
+                                is DesktopDiscordService.DesktopRefreshOutcome.InvalidToken -> {
+                                    closed = true
+                                    onAuthInvalidated()
+                                }
+                                is DesktopDiscordService.DesktopRefreshOutcome.TransientFailure -> {
+                                    scheduleReconnect()
                                 }
                             }
                         }
@@ -322,11 +394,41 @@ private class DiscordGatewayClient(
         if (imageUrl.startsWith("mp:")) return imageUrl
         assetCache[imageUrl]?.let { return it }
 
+        val firstToken = token
+        var (statusCode, resolved) = executeExternalAssetRequest(
+            imageUrl = imageUrl,
+            bearerToken = DesktopDiscordService.formatBearerToken(firstToken),
+        )
+
+        if (statusCode == 401) {
+            when (val out = tryRefreshToken(firstToken)) {
+                is DesktopDiscordService.DesktopRefreshOutcome.Refreshed -> {
+                    resolved = executeExternalAssetRequest(
+                        imageUrl = imageUrl,
+                        bearerToken = DesktopDiscordService.formatBearerToken(out.result.accessToken),
+                    ).second
+                }
+                is DesktopDiscordService.DesktopRefreshOutcome.InvalidToken -> {
+                    closed = true
+                    onAuthInvalidated()
+                    return null
+                }
+                is DesktopDiscordService.DesktopRefreshOutcome.TransientFailure -> Unit
+            }
+        }
+
+        if (resolved != null) {
+            if (assetCache.size >= 100) assetCache.clear()
+            assetCache[imageUrl] = resolved
+        }
+        return resolved
+    }
+
+    private fun executeExternalAssetRequest(imageUrl: String, bearerToken: String): Pair<Int, String?> {
         val body = JSONObject().apply {
             put("urls", JSONArray().put(imageUrl))
         }.toString().toRequestBody("application/json".toMediaType())
 
-        val bearerToken = if (token.startsWith("Bearer ", ignoreCase = true)) token else "Bearer $token"
         val request = Request.Builder()
             .url("https://discord.com/api/v9/applications/$applicationId/external-assets")
             .post(body)
@@ -335,21 +437,15 @@ private class DiscordGatewayClient(
             .header("X-Super-Properties", SuperProperties.superPropertiesBase64)
             .build()
 
-        val resolved = runCatching {
+        return runCatching {
             httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@use null
+                if (!response.isSuccessful) return@use response.code to null
                 val raw = response.body.string()
                 val arr = JSONArray(raw)
                 val path = arr.optJSONObject(0)?.optString("external_asset_path").orEmpty()
-                if (path.isNotBlank()) "mp:$path" else null
+                response.code to (if (path.isNotBlank()) "mp:$path" else null)
             }
-        }.getOrNull()
-
-        if (resolved != null) {
-            if (assetCache.size >= 100) assetCache.clear()
-            assetCache[imageUrl] = resolved
-        }
-        return resolved
+        }.getOrElse { -1 to null }
     }
 
     fun close() {
@@ -400,6 +496,13 @@ private class DiscordGatewayClient(
                     sequence = null
                 }
                 scope.launch {
+                    if (DesktopDiscordService.shouldRefreshProactively(System.currentTimeMillis(), expiryEpochMillisProvider())) {
+                        if (tryRefreshToken(null) is DesktopDiscordService.DesktopRefreshOutcome.InvalidToken) {
+                            closed = true
+                            onAuthInvalidated()
+                            return@launch
+                        }
+                    }
                     delay(1500)
                     if (!closed && isConnected()) sendIdentify(ws)
                 }
@@ -427,7 +530,7 @@ private class DiscordGatewayClient(
     }
 
     private fun sendIdentify(ws: WebSocket) {
-        val bearerToken = if (token.startsWith("Bearer ", ignoreCase = true)) token else "Bearer $token"
+        val bearerToken = DesktopDiscordService.formatBearerToken(token)
         val msg = JSONObject().apply {
             put("op", 2)
             put("d", JSONObject().apply {
@@ -445,10 +548,11 @@ private class DiscordGatewayClient(
     }
 
     private fun sendResume(ws: WebSocket) {
+        val bearerToken = DesktopDiscordService.formatBearerToken(token)
         val msg = JSONObject().apply {
             put("op", 6)
             put("d", JSONObject().apply {
-                put("token", token)
+                put("token", bearerToken)
                 put("session_id", sessionId)
                 put("seq", sequence ?: 0L)
             })

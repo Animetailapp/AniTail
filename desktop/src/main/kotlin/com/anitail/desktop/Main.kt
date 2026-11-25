@@ -162,6 +162,7 @@ import com.anitail.desktop.ui.screen.SettingsDialogOverlay
 import com.anitail.desktop.ui.screen.SettingsScreen
 import com.anitail.desktop.ui.screen.StatsScreen
 import com.anitail.desktop.ui.screen.songItemToLibraryItem
+import com.anitail.desktop.auth.DesktopDiscordService
 import com.anitail.desktop.util.DesktopDiscordRPC
 import com.anitail.desktop.home.HomeDiscoveryService
 import com.anitail.desktop.model.CommunityPlaylistItem
@@ -760,9 +761,26 @@ private fun FrameWindowScope.AniTailDesktopApp(
                         preferences.setDiscordToken(access)
                         if (refresh.isNotBlank()) preferences.setDiscordRefreshToken(refresh)
                     },
+                    expiryEpochMillisProvider = { preferences.discordTokenExpiryEpochMillis.value },
+                    tokenRefresher = { failed ->
+                        DesktopDiscordService.refreshStoredToken(preferences, failedAccessToken = failed)
+                    },
+                    onAuthInvalidated = {
+                        preferences.clearDiscordSession()
+                    },
                 )
                 discordRPC = rpc
                 discordRpcController = com.anitail.desktop.rpc.DesktopPlayerRpcController(rpc)
+            }
+            if (preferences.discordToken.value.isNotBlank()) {
+                kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    val profile = DesktopDiscordService.fetchProfileWithAutoRefresh(preferences)
+                    if (profile != null) {
+                        preferences.setDiscordName(profile.name)
+                        preferences.setDiscordUsername(profile.username)
+                        preferences.setDiscordAvatarUrl(profile.avatarUrl.orEmpty())
+                    }
+                }
             }
         } else {
             val controller = discordRpcController

@@ -131,6 +131,12 @@ internal fun DiscordSettingsScreen(
                         if (result.refreshToken.isNotBlank()) {
                             preferences.setDiscordRefreshToken(result.refreshToken)
                         }
+                        preferences.setDiscordTokenExpiryEpochMillis(
+                            DesktopDiscordService.computeExpiresAtMillis(
+                                System.currentTimeMillis(),
+                                result.expiresInSec,
+                            ),
+                        )
                         preferences.setDiscordName(profile.name)
                         preferences.setDiscordUsername(profile.username)
                         preferences.setDiscordAvatarUrl(profile.avatarUrl.orEmpty())
@@ -151,7 +157,30 @@ internal fun DiscordSettingsScreen(
     }
 
     fun testConnection() {
-        applyDiscordToken(discordToken)
+        val token = discordToken.trim()
+        if (token.isEmpty()) return
+        if (token == preferences.discordToken.value.trim() && preferences.discordRefreshToken.value.isNotBlank()) {
+            scope.launch {
+                isTesting = true
+                testResult = null
+                authError = null
+                val profile = withContext(Dispatchers.IO) {
+                    DesktopDiscordService.fetchProfileWithAutoRefresh(preferences)
+                }
+                if (profile != null) {
+                    preferences.setDiscordName(profile.name)
+                    preferences.setDiscordUsername(profile.username)
+                    preferences.setDiscordAvatarUrl(profile.avatarUrl.orEmpty())
+                    testResult = true
+                } else {
+                    authError = "No se pudo verificar el perfil de Discord"
+                    testResult = false
+                }
+                isTesting = false
+            }
+        } else {
+            applyDiscordToken(token)
+        }
     }
 
     SettingsSubScreen(
@@ -405,11 +434,7 @@ internal fun DiscordSettingsScreen(
                         Spacer(modifier = Modifier.weight(1f))
                         TextButton(
                             onClick = {
-                                preferences.setDiscordToken("")
-                                preferences.setDiscordRefreshToken("")
-                                preferences.setDiscordName("")
-                                preferences.setDiscordUsername("")
-                                preferences.setDiscordAvatarUrl("")
+                                preferences.clearDiscordSession()
                                 testResult = null
                             },
                         ) {

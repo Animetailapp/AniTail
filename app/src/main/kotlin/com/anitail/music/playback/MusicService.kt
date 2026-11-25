@@ -396,12 +396,17 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                         Timber.tag("DiscordSvc").i("SCREEN_ON: removing disconnect delay")
                         screenOffHandler.removeCallbacks(screenOffTimeout)
                         if (this@MusicService::player.isInitialized &&
-                            player.isPlaying && DiscordRpcManager.isReady()) {
-                            currentSong.value?.let { song ->
-                                Timber.tag("DiscordSvc").i("SCREEN_ON: updating RPC")
-                                scope.launch {
-                                    updateDiscordRPC(song)
+                            player.isPlaying && discordRpcEnabled) {
+                            if (DiscordRpcManager.isReady()) {
+                                currentSong.value?.let { song ->
+                                    Timber.tag("DiscordSvc").i("SCREEN_ON: updating RPC")
+                                    scope.launch {
+                                        updateDiscordRPC(song)
+                                    }
                                 }
+                            } else if (DiscordRpcManager.getAccessToken() != null) {
+                                Timber.tag("DiscordSvc").i("SCREEN_ON: ensuring Discord RPC reconnection")
+                                DiscordRpcManager.ensureConnected()
                             }
                         }
                     }
@@ -785,8 +790,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                             }
                             val token = DiscordRpcManager.getAccessToken()
                             if (token != null) {
-                                Timber.tag("DiscordSvc").i("RPC toggle: has stored token, reconnecting")
-                                DiscordRpcManager.reconnectWithToken(token)
+                                Timber.tag("DiscordSvc").i("RPC toggle: has stored token, ensuring connection")
+                                DiscordRpcManager.ensureConnected()
                             } else {
                                 Timber.tag("DiscordSvc").w("RPC toggle: enabled but no token stored")
                             }
@@ -801,8 +806,8 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
             }
 
         DiscordRpcManager.accessTokenFlow.collectLatest(scope) { token ->
-                Timber.tag("DiscordSvc").i("Token change: hasToken=%s, initialized=%s, authorized=%s, enabled=%s",
-                    token != null, DiscordRpcManager.isInitialized(), DiscordRpcManager.isAuthorized(), discordRpcEnabled)
+                Timber.tag("DiscordSvc").i("Token change: hasToken=%s, initialized=%s, authorized=%s, ready=%s, enabled=%s",
+                    token != null, DiscordRpcManager.isInitialized(), DiscordRpcManager.isAuthorized(), DiscordRpcManager.isReady(), discordRpcEnabled)
                 if (token == null) {
                     if (DiscordRpcManager.isReady()) {
                         Timber.tag("DiscordSvc").i("Token change: empty token, disconnecting")
@@ -818,11 +823,11 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
                     Timber.tag("DiscordSvc").i("Token change: initializing")
                     DiscordRpcManager.init(this@MusicService)
                 }
-                if (!DiscordRpcManager.isAuthorized()) {
-                    Timber.tag("DiscordSvc").i("Token change: reconnecting with token")
-                    DiscordRpcManager.reconnectWithToken(token)
+                if (!DiscordRpcManager.isReady()) {
+                    Timber.tag("DiscordSvc").i("Token change: ensuring connection")
+                    DiscordRpcManager.ensureConnected()
                 } else {
-                    Timber.tag("DiscordSvc").i("Token change: already authorized, skipping reconnect")
+                    Timber.tag("DiscordSvc").i("Token change: already ready, skipping reconnect")
                 }
             }
 
@@ -2215,6 +2220,14 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
         showMediaNotification()
       }
     }
+
+    if (events.contains(Player.EVENT_IS_PLAYING_CHANGED) && discordRpcEnabled) {
+      currentSong.value?.let { song ->
+        scope.launch {
+          updateDiscordRPC(song)
+        }
+      }
+    }
   }
 
   override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
@@ -3330,7 +3343,13 @@ class MusicService : MediaLibraryService(), Player.Listener, PlaybackStatsListen
   }
 
   private suspend fun updateDiscordRPC(song: Song) {
-      if (!discordRpcEnabled || !DiscordRpcManager.isReady()) return
+      if (!discordRpcEnabled) return
+      if (!DiscordRpcManager.isReady()) {
+          if (DiscordRpcManager.getAccessToken() != null) {
+              DiscordRpcManager.ensureConnected()
+          }
+          return
+      }
 
       try {
           // Snapshot player state on the main thread (ExoPlayer requirement)

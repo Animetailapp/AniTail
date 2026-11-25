@@ -1,5 +1,6 @@
 package com.anitail.desktop.auth
 
+import com.anitail.desktop.storage.DesktopPreferences
 import com.sun.jna.platform.win32.Advapi32Util
 import com.sun.jna.platform.win32.WinReg
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,11 @@ data class DiscordAuthResult(
     val scope: String,
 )
 
+class DiscordInvalidTokenException(
+    val httpCode: Int,
+    message: String,
+) : IllegalStateException(message)
+
 object DesktopDiscordService {
     const val DISCORD_APP_ID = "1359660031183818955"
     private const val DISCORD_URI_SCHEME = "discord-$DISCORD_APP_ID"
@@ -47,9 +53,41 @@ object DesktopDiscordService {
     private const val DISCORD_OAUTH_AUTHORIZE = "https://discord.com/oauth2/authorize"
     private const val DISCORD_OAUTH_TOKEN = "https://discord.com/api/v10/oauth2/token"
     private const val DISCORD_SCOPES = "identify openid sdk.social_layer_presence"
+    const val PROACTIVE_REFRESH_MARGIN_MS = 24L * 60L * 60L * 1000L
+    const val REFRESH_FAILURE_COOLDOWN_MS = 30_000L
 
     private val client = OkHttpClient.Builder().build()
     private val random = SecureRandom()
+    private val refreshLock = Any()
+    @Volatile private var lastRefreshFailureAt = 0L
+
+    sealed class DesktopRefreshOutcome {
+        data class Refreshed(val result: DiscordAuthResult) : DesktopRefreshOutcome()
+        data object InvalidToken : DesktopRefreshOutcome()
+        data object TransientFailure : DesktopRefreshOutcome()
+    }
+
+    sealed class ProfileFetchOutcome {
+        data class Success(val profile: DiscordProfile, val accessToken: String) : ProfileFetchOutcome()
+        data object Unauthorized : ProfileFetchOutcome()
+        data object TransientError : ProfileFetchOutcome()
+    }
+
+    fun computeExpiresAtMillis(nowMillis: Long, expiresInSec: Long): Long =
+        if (expiresInSec > 0L) nowMillis + expiresInSec * 1000L else 0L
+
+    fun shouldRefreshProactively(nowMillis: Long, expiresAtMillis: Long): Boolean =
+        expiresAtMillis > 0L && nowMillis + PROACTIVE_REFRESH_MARGIN_MS >= expiresAtMillis
+
+    fun formatBearerToken(rawToken: String): String {
+        val trimmed = rawToken.trim()
+        if (trimmed.isEmpty()) return ""
+        return if (trimmed.startsWith("Bearer ", ignoreCase = true)) {
+            "Bearer ${trimmed.substring(7).trim()}"
+        } else {
+            "Bearer $trimmed"
+        }
+    }
 
     fun createAuthSession(): DiscordAuthSession {
         val verifierBytes = ByteArray(64).also { random.nextBytes(it) }
@@ -106,6 +144,62 @@ object DesktopDiscordService {
         )
     }
 
+    fun refreshStoredToken(
+        preferences: DesktopPreferences,
+        failedAccessToken: String? = null,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): DesktopRefreshOutcome {
+        synchronized(refreshLock) {
+            val currentAccess = preferences.discordToken.value.trim()
+            val currentRefresh = preferences.discordRefreshToken.value.trim()
+            val currentExpiry = preferences.discordTokenExpiryEpochMillis.value
+
+            if (failedAccessToken != null &&
+                currentAccess.isNotBlank() &&
+                currentAccess != failedAccessToken.trim() &&
+                !shouldRefreshProactively(nowMillis, currentExpiry)
+            ) {
+                return DesktopRefreshOutcome.Refreshed(
+                    DiscordAuthResult(
+                        accessToken = currentAccess,
+                        refreshToken = currentRefresh,
+                        expiresInSec = ((currentExpiry - nowMillis) / 1000L).coerceAtLeast(0L),
+                        scope = DISCORD_SCOPES,
+                    ),
+                )
+            }
+
+            if (currentRefresh.isBlank()) {
+                return DesktopRefreshOutcome.InvalidToken
+            }
+
+            if (failedAccessToken == null &&
+                nowMillis - lastRefreshFailureAt < REFRESH_FAILURE_COOLDOWN_MS
+            ) {
+                return DesktopRefreshOutcome.TransientFailure
+            }
+
+            val refreshResult = refreshToken(currentRefresh)
+            refreshResult.onSuccess { refreshed ->
+                val nextRefresh = refreshed.refreshToken.ifBlank { currentRefresh }
+                val nextExpiry = computeExpiresAtMillis(System.currentTimeMillis(), refreshed.expiresInSec)
+                lastRefreshFailureAt = 0L
+                preferences.setDiscordToken(refreshed.accessToken)
+                preferences.setDiscordRefreshToken(nextRefresh)
+                preferences.setDiscordTokenExpiryEpochMillis(nextExpiry)
+                return DesktopRefreshOutcome.Refreshed(refreshed.copy(refreshToken = nextRefresh))
+            }.onFailure { err ->
+                if (err is DiscordInvalidTokenException) {
+                    preferences.clearDiscordSession()
+                    return DesktopRefreshOutcome.InvalidToken
+                }
+                lastRefreshFailureAt = System.currentTimeMillis()
+                return DesktopRefreshOutcome.TransientFailure
+            }
+            return DesktopRefreshOutcome.TransientFailure
+        }
+    }
+
     private fun performTokenExchange(params: Map<String, String>): DiscordAuthResult {
         val form = FormBody.Builder().apply {
             params.forEach { (k, v) -> add(k, v) }
@@ -120,8 +214,14 @@ object DesktopDiscordService {
             val body = response.body.string()
             if (!response.isSuccessful) {
                 println("[DiscordAuth] Token exchange failed HTTP ${response.code}: $body")
+                if (response.code == 401 || (response.code == 400 && body.contains("invalid_grant", ignoreCase = true))) {
+                    throw DiscordInvalidTokenException(
+                        httpCode = response.code,
+                        message = "Discord OAuth token error HTTP ${response.code}: $body",
+                    )
+                }
+                error("Discord OAuth token error HTTP ${response.code}: $body")
             }
-            check(response.isSuccessful) { "Discord OAuth token error HTTP ${response.code}: $body" }
             val json = JSONObject(body)
             return DiscordAuthResult(
                 accessToken = json.optString("access_token"),
@@ -132,15 +232,11 @@ object DesktopDiscordService {
         }
     }
 
-    fun fetchProfile(token: String): DiscordProfile? {
+    fun fetchProfileDetailed(token: String): ProfileFetchOutcome {
         val trimmedToken = token.trim()
-        if (trimmedToken.isBlank()) return null
+        if (trimmedToken.isBlank()) return ProfileFetchOutcome.Unauthorized
 
-        val bearerHeader = if (trimmedToken.startsWith("Bearer ", ignoreCase = true)) {
-            trimmedToken
-        } else {
-            "Bearer $trimmedToken"
-        }
+        val bearerHeader = formatBearerToken(trimmedToken)
 
         val usersMeRequest = Request.Builder()
             .url("https://discord.com/api/v10/users/@me")
@@ -153,25 +249,77 @@ object DesktopDiscordService {
             .build()
 
         return runCatching {
+            var sawUnauthorized = false
             client.newCall(usersMeRequest).execute().use { response ->
                 val body = response.body.string()
                 if (response.isSuccessful && body.isNotBlank()) {
                     val user = JSONObject(body)
-                    return@runCatching parseProfile(user)
+                    return@runCatching ProfileFetchOutcome.Success(parseProfile(user), trimmedToken)
+                }
+                if (response.code == 401) {
+                    sawUnauthorized = true
                 }
                 println("[DiscordAuth] /users/@me HTTP ${response.code}: $body")
             }
             client.newCall(oauthMeRequest).execute().use { response ->
                 val body = response.body.string()
                 if (!response.isSuccessful || body.isBlank()) {
+                    if (response.code == 401) {
+                        sawUnauthorized = true
+                    }
                     println("[DiscordAuth] /oauth2/@me HTTP ${response.code}: $body")
-                    return@use null
+                    return@use if (sawUnauthorized) ProfileFetchOutcome.Unauthorized else ProfileFetchOutcome.TransientError
                 }
                 val root = JSONObject(body)
-                val user = root.optJSONObject("user") ?: return@use null
-                parseProfile(user)
+                val user = root.optJSONObject("user")
+                    ?: return@use if (sawUnauthorized) ProfileFetchOutcome.Unauthorized else ProfileFetchOutcome.TransientError
+                ProfileFetchOutcome.Success(parseProfile(user), trimmedToken)
             }
-        }.getOrNull()
+        }.getOrElse {
+            ProfileFetchOutcome.TransientError
+        }
+    }
+
+    fun fetchProfile(token: String): DiscordProfile? =
+        (fetchProfileDetailed(token) as? ProfileFetchOutcome.Success)?.profile
+
+    fun fetchProfileWithAutoRefresh(preferences: DesktopPreferences): DiscordProfile? {
+        var token = preferences.discordToken.value.trim()
+        if (token.isBlank()) return null
+
+        val expiry = preferences.discordTokenExpiryEpochMillis.value
+        val refresh = preferences.discordRefreshToken.value.trim()
+        if (shouldRefreshProactively(System.currentTimeMillis(), expiry) && refresh.isNotBlank()) {
+            when (val out = refreshStoredToken(preferences, failedAccessToken = null)) {
+                is DesktopRefreshOutcome.Refreshed -> token = out.result.accessToken
+                is DesktopRefreshOutcome.InvalidToken -> return null
+                is DesktopRefreshOutcome.TransientFailure -> Unit
+            }
+        }
+
+        return when (val first = fetchProfileDetailed(token)) {
+            is ProfileFetchOutcome.Success -> first.profile
+            is ProfileFetchOutcome.TransientError -> null
+            is ProfileFetchOutcome.Unauthorized -> {
+                when (val out = refreshStoredToken(preferences, failedAccessToken = token)) {
+                    is DesktopRefreshOutcome.Refreshed -> {
+                        when (val retry = fetchProfileDetailed(out.result.accessToken)) {
+                            is ProfileFetchOutcome.Success -> retry.profile
+                            is ProfileFetchOutcome.Unauthorized -> {
+                                preferences.clearDiscordSession()
+                                null
+                            }
+                            is ProfileFetchOutcome.TransientError -> null
+                        }
+                    }
+                    is DesktopRefreshOutcome.InvalidToken -> {
+                        preferences.clearDiscordSession()
+                        null
+                    }
+                    is DesktopRefreshOutcome.TransientFailure -> null
+                }
+            }
+        }
     }
 
     private fun parseProfile(user: JSONObject): DiscordProfile {

@@ -833,33 +833,39 @@ class HomeViewModel @Inject constructor(
             DiscordRpcManager.init(context)
             DiscordRpcManager.accessTokenFlow.collect { token ->
                 if (!token.isNullOrEmpty()) {
-                    runCatching {
-                            DiscordRpcManager.fetchCurrentUser(token)
-                        }.onSuccess { user ->
-                            if (user != null) {
-                                val dAvatar = user.avatar
-                                val dUsername = user.username
-                                val dName = user.name
-                                discordAvatarUrl.value = dAvatar
-                                discordUsername.value = dUsername
-                                discordName.value = dName
-                                try {
-                                    context.dataStore.edit { prefs ->
-                                        if (dUsername.isNotEmpty()) prefs[DiscordUsernameKey] = dUsername else prefs.remove(DiscordUsernameKey)
-                                        if (dName.isNotEmpty()) prefs[DiscordNameKey] = dName else prefs.remove(DiscordNameKey)
-                                        if (!dAvatar.isNullOrBlank()) prefs[DiscordAvatarUrlKey] = dAvatar else prefs.remove(DiscordAvatarUrlKey)
-                                    }
-                                } catch (_: Exception) {}
-                            } else {
-                                discordAvatarUrl.value = null
-                                discordUsername.value = null
-                                discordName.value = null
-                            }
-                        }.onFailure {
+                    when (val outcome = DiscordRpcManager.fetchCurrentUserWithOutcome(token)) {
+                        is DiscordRpcManager.UserFetchOutcome.Success -> {
+                            val user = outcome.user
+                            val dAvatar = user.avatar
+                            val dUsername = user.username
+                            val dName = user.name
+                            discordAvatarUrl.value = dAvatar
+                            discordUsername.value = dUsername
+                            discordName.value = dName
+                            try {
+                                context.dataStore.edit { prefs ->
+                                    if (dUsername.isNotEmpty()) prefs[DiscordUsernameKey] = dUsername else prefs.remove(DiscordUsernameKey)
+                                    if (dName.isNotEmpty()) prefs[DiscordNameKey] = dName else prefs.remove(DiscordNameKey)
+                                    if (!dAvatar.isNullOrBlank()) prefs[DiscordAvatarUrlKey] = dAvatar else prefs.remove(DiscordAvatarUrlKey)
+                                }
+                            } catch (_: Exception) {}
+                        }
+                        is DiscordRpcManager.UserFetchOutcome.Unauthorized -> {
                             discordAvatarUrl.value = null
                             discordUsername.value = null
                             discordName.value = null
+                            try {
+                                context.dataStore.edit { prefs ->
+                                    prefs.remove(DiscordUsernameKey)
+                                    prefs.remove(DiscordNameKey)
+                                    prefs.remove(DiscordAvatarUrlKey)
+                                }
+                            } catch (_: Exception) {}
                         }
+                        is DiscordRpcManager.UserFetchOutcome.TransientError -> {
+                            // Keep existing cached profile state when offline or Discord is temporarily unreachable
+                        }
+                    }
                 } else {
                     discordAvatarUrl.value = null
                     discordUsername.value = null

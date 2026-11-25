@@ -383,9 +383,14 @@ internal fun LegacyAccountSettingsScreen(
         scope.launch {
             isRefreshingDiscordProfile = true
             val profile = withContext(Dispatchers.IO) {
-                DesktopDiscordService.fetchProfile(sanitizedToken)
+                if (sanitizedToken == preferences.discordToken.value.trim()) {
+                    DesktopDiscordService.fetchProfileWithAutoRefresh(preferences)
+                } else {
+                    DesktopDiscordService.fetchProfile(sanitizedToken)
+                }
             }
             if (profile != null) {
+                preferences.setDiscordName(profile.name)
                 preferences.setDiscordUsername(profile.username)
                 preferences.setDiscordAvatarUrl(profile.avatarUrl.orEmpty())
                 discordSyncError = null
