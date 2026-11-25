@@ -154,6 +154,7 @@ object SettingsSearchOptions {
             sectionRes = R.string.misc
         ),
         option(context, "slim_navbar", R.string.slim_navbar, sectionRes = R.string.misc),
+        option(context, "floating_navbar", R.string.floating_navbar, sectionRes = R.string.misc),
         option(context, "grid_cell_size", R.string.grid_cell_size, sectionRes = R.string.misc),
         option(
             context,

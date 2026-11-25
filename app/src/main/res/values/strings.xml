@@ -1306,4 +1306,6 @@
     <string name="move_to_bottom">Move to bottom</string>
     <string name="show_uploaded_playlist">Show uploaded playlist</string>
     <string name="videos">Videos</string>
+    <string name="floating_navbar">Floating bottom navigation bar</string>
+    <string name="open_profile">Open profile</string>
 </resources>

@@ -4,6 +4,7 @@ import androidx.media3.common.MediaItem
 import com.anitail.innertube.YouTube
 import com.anitail.innertube.models.WatchEndpoint
 import com.anitail.music.db.entities.AlbumWithSongs
+import com.anitail.music.extensions.metadata
 import com.anitail.music.extensions.toMediaItem
 import com.anitail.music.models.MediaMetadata
 import kotlinx.coroutines.Dispatchers.IO
@@ -13,7 +14,10 @@ class LocalAlbumRadio(
     private val albumWithSongs: AlbumWithSongs,
     private val startIndex: Int = 0,
 ) : Queue {
-    override val preloadItem: MediaMetadata? = null
+    override val preloadMediaItem: MediaItem? =
+        albumWithSongs.songs.getOrNull(startIndex)?.toMediaItem()
+
+    override val preloadItem: MediaMetadata? = preloadMediaItem?.metadata
 
     private lateinit var playlistId: String
     private val endpoint: WatchEndpoint

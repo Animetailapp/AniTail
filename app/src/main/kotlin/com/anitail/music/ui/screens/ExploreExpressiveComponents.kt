@@ -12,7 +12,6 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -53,8 +52,11 @@ import androidx.compose.material3.carousel.CarouselDefaults
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +65,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -116,6 +119,7 @@ private val ExploreChipShelfHeight = 48.dp
 private val ExpressiveCardCornerRadius = 16.dp
 private val CarouselCardWidth = 152.dp
 
+@Stable
 internal class ExploreItemActions(
     val onItemClick: (YTItem) -> Unit,
     val onItemMenu: (YTItem) -> Unit,
@@ -132,115 +136,116 @@ internal fun rememberExploreItemActions(
     val haptic = LocalHapticFeedback.current
     val playerConnection = LocalPlayerConnection.current
     val coroutineScope = rememberCoroutineScope()
+    val latestCurrentSongId by rememberUpdatedState(currentSongId)
 
-    val openItem: (YTItem) -> Unit = { item ->
-        when (item) {
-            is SongItem -> {
-                if (item.id == currentSongId) {
-                    playerConnection?.player?.togglePlayPause()
-                } else {
-                    playerConnection?.playQueue(
-                        YouTubeQueue(
-                            endpoint = WatchEndpoint(videoId = item.id),
-                            preloadItem = item.toMediaMetadata(),
-                        ),
-                    )
-                }
-            }
-            is EpisodeItem -> {
-                val asSong = item.asSongItem()
-                if (asSong.id == currentSongId) {
-                    playerConnection?.player?.togglePlayPause()
-                } else {
-                    playerConnection?.playQueue(
-                        YouTubeQueue(
-                            endpoint = WatchEndpoint(videoId = asSong.id),
-                            preloadItem = asSong.toMediaMetadata(),
-                        ),
-                    )
-                }
-            }
-            is AlbumItem -> navController.navigate("album/${item.browseId}")
-            is ArtistItem -> navController.navigate("artist/${item.id}")
-            is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
-            is PodcastItem -> navController.navigate("online_podcast/${item.id}")
-        }
-    }
-
-    val openMenu: (YTItem) -> Unit = { item ->
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-        when (item) {
-            is SongItem -> menuState.show {
-                YouTubeSongMenu(
-                    song = item,
-                    navController = navController,
-                    onDismiss = menuState::dismiss,
-                )
-            }
-            is EpisodeItem -> menuState.show {
-                YouTubeSongMenu(
-                    song = item.asSongItem(),
-                    navController = navController,
-                    onDismiss = menuState::dismiss,
-                )
-            }
-            is AlbumItem -> menuState.show {
-                YouTubeAlbumMenu(
-                    albumItem = item,
-                    navController = navController,
-                    onDismiss = menuState::dismiss,
-                )
-            }
-            is ArtistItem -> menuState.show {
-                YouTubeArtistMenu(
-                    artist = item,
-                    onDismiss = menuState::dismiss,
-                )
-            }
-            is PlaylistItem -> menuState.show {
-                YouTubePlaylistMenu(
-                    playlist = item,
-                    coroutineScope = coroutineScope,
-                    onDismiss = menuState::dismiss,
-                )
-            }
-            is PodcastItem -> navController.navigate("online_podcast/${item.id}")
-        }
-    }
-
-    val playAlbum: (AlbumItem) -> Unit = { album ->
-        coroutineScope.launch(Dispatchers.IO) {
-            var albumWithSongs = database.albumWithSongs(album.browseId).first()
-            var fetchedSongs: List<SongItem> = emptyList()
-            if (albumWithSongs?.songs.isNullOrEmpty()) {
-                YouTube.album(album.browseId)
-                    .onSuccess { page ->
-                        fetchedSongs = page.songs
-                        runCatching { database.transaction { insert(page) } }
-                        albumWithSongs = database.albumWithSongs(album.browseId).first()
+    return remember(navController, playerConnection, database, menuState, haptic, coroutineScope) {
+        val openItem: (YTItem) -> Unit = { item ->
+            when (item) {
+                is SongItem -> {
+                    if (item.id == latestCurrentSongId) {
+                        playerConnection?.player?.togglePlayPause()
+                    } else {
+                        playerConnection?.playQueue(
+                            YouTubeQueue(
+                                endpoint = WatchEndpoint(videoId = item.id),
+                                preloadItem = item.toMediaMetadata(),
+                            ),
+                        )
                     }
-                    .onFailure { reportException(it) }
+                }
+                is EpisodeItem -> {
+                    val asSong = item.asSongItem()
+                    if (asSong.id == latestCurrentSongId) {
+                        playerConnection?.player?.togglePlayPause()
+                    } else {
+                        playerConnection?.playQueue(
+                            YouTubeQueue(
+                                endpoint = WatchEndpoint(videoId = asSong.id),
+                                preloadItem = asSong.toMediaMetadata(),
+                            ),
+                        )
+                    }
+                }
+                is AlbumItem -> navController.navigate("album/${item.browseId}")
+                is ArtistItem -> navController.navigate("artist/${item.id}")
+                is PlaylistItem -> navController.navigate("online_playlist/${item.id}")
+                is PodcastItem -> navController.navigate("online_podcast/${item.id}")
             }
-            val queue = albumWithSongs?.songs?.takeIf { it.isNotEmpty() }?.let { localSongs ->
-                ListQueue(
-                    title = album.title,
-                    items = localSongs.map { it.toMediaItem() },
-                )
-            } ?: fetchedSongs.takeIf { it.isNotEmpty() }?.let { remoteSongs ->
-                ListQueue(
-                    title = album.title,
-                    items = remoteSongs.map { it.toMediaMetadata().toMediaItem() },
-                )
+        }
+
+        val openMenu: (YTItem) -> Unit = { item ->
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            when (item) {
+                is SongItem -> menuState.show {
+                    YouTubeSongMenu(
+                        song = item,
+                        navController = navController,
+                        onDismiss = menuState::dismiss,
+                    )
+                }
+                is EpisodeItem -> menuState.show {
+                    YouTubeSongMenu(
+                        song = item.asSongItem(),
+                        navController = navController,
+                        onDismiss = menuState::dismiss,
+                    )
+                }
+                is AlbumItem -> menuState.show {
+                    YouTubeAlbumMenu(
+                        albumItem = item,
+                        navController = navController,
+                        onDismiss = menuState::dismiss,
+                    )
+                }
+                is ArtistItem -> menuState.show {
+                    YouTubeArtistMenu(
+                        artist = item,
+                        onDismiss = menuState::dismiss,
+                    )
+                }
+                is PlaylistItem -> menuState.show {
+                    YouTubePlaylistMenu(
+                        playlist = item,
+                        coroutineScope = coroutineScope,
+                        onDismiss = menuState::dismiss,
+                    )
+                }
+                is PodcastItem -> navController.navigate("online_podcast/${item.id}")
             }
-            if (queue != null && playerConnection != null) {
-                withContext(Dispatchers.Main) {
-                    playerConnection.playQueue(queue)
+        }
+
+        val playAlbum: (AlbumItem) -> Unit = { album ->
+            coroutineScope.launch(Dispatchers.IO) {
+                var albumWithSongs = database.albumWithSongs(album.browseId).first()
+                var fetchedSongs: List<SongItem> = emptyList()
+                if (albumWithSongs?.songs.isNullOrEmpty()) {
+                    YouTube.album(album.browseId)
+                        .onSuccess { page ->
+                            fetchedSongs = page.songs
+                            runCatching { database.transaction { insert(page) } }
+                            albumWithSongs = database.albumWithSongs(album.browseId).first()
+                        }
+                        .onFailure { reportException(it) }
+                }
+                val queue = albumWithSongs?.songs?.takeIf { it.isNotEmpty() }?.let { localSongs ->
+                    ListQueue.fromSongs(
+                        title = album.title,
+                        songs = localSongs,
+                    )
+                } ?: fetchedSongs.takeIf { it.isNotEmpty() }?.let { remoteSongs ->
+                    ListQueue(
+                        title = album.title,
+                        items = remoteSongs.map { it.toMediaMetadata().toMediaItem() },
+                    )
+                }
+                if (queue != null && playerConnection != null) {
+                    withContext(Dispatchers.Main) {
+                        playerConnection.playQueue(queue)
+                    }
                 }
             }
         }
-    }
 
-    return remember(navController, currentSongId, playerConnection) {
         ExploreItemActions(
             onItemClick = openItem,
             onItemMenu = openMenu,
@@ -280,8 +285,11 @@ internal fun ExploreChartSectionShelf(
         )
         when (kind) {
             ChartShelfKind.SONG_PAGER -> {
+                val chartSongs = remember(section.items) {
+                    section.items.filterIsInstance<SongItem>()
+                }
                 ExploreChartSongPager(
-                    songs = section.items.filterIsInstance<SongItem>(),
+                    songs = chartSongs,
                     currentSongId = currentSongId,
                     isPlaying = isPlaying,
                     onSongClick = actions.onItemClick,
@@ -453,54 +461,53 @@ internal fun ExploreChartSongPager(
 ) {
     if (songs.isEmpty()) return
     val rowCount = minOf(4, songs.size)
-    val columns = songs.chunked(rowCount)
+    val columns = remember(songs, rowCount) { songs.chunked(rowCount) }
     val pagerState = rememberPagerState { columns.size }
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val pageWidth = ((screenWidthDp.dp - 32.dp) * if (screenWidthDp >= 640) 0.46f else 0.9f)
+        .coerceAtLeast(220.dp)
 
-    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        val pageWidth = ((maxWidth - 32.dp) * if (maxWidth >= 640.dp) 0.46f else 0.9f)
-            .coerceAtLeast(220.dp)
-        HorizontalPager(
-            state = pagerState,
-            pageSize = PageSize.Fixed(pageWidth),
-            flingBehavior = PagerDefaults.flingBehavior(state = pagerState),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            pageSpacing = 12.dp,
+    HorizontalPager(
+        state = pagerState,
+        pageSize = PageSize.Fixed(pageWidth),
+        flingBehavior = PagerDefaults.flingBehavior(state = pagerState),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        pageSpacing = 12.dp,
+        modifier = modifier.fillMaxWidth(),
+    ) { pageIndex ->
+        val columnSongs = columns[pageIndex]
+        Column(
             modifier = Modifier.fillMaxWidth(),
-        ) { pageIndex ->
-            val columnSongs = columns[pageIndex]
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                columnSongs.forEachIndexed { rowIndex, song ->
-                    val rank = song.chartPosition ?: (pageIndex * rowCount + rowIndex + 1)
-                    val isCurrent = song.id == currentSongId
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = rank.toString(),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isCurrent) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.width(26.dp),
-                        )
-                        ArtistSongRow(
-                            item = song,
-                            isCurrent = isCurrent,
-                            isPlaying = isPlaying && isCurrent,
-                            onClick = { onSongClick(song) },
-                            onLongClick = { onSongMenu(song) },
-                            onShowMenu = { onSongMenu(song) },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            columnSongs.forEachIndexed { rowIndex, song ->
+                val rank = song.chartPosition ?: (pageIndex * rowCount + rowIndex + 1)
+                val isCurrent = song.id == currentSongId
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = rank.toString(),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isCurrent) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.width(26.dp),
+                    )
+                    ArtistSongRow(
+                        item = song,
+                        isCurrent = isCurrent,
+                        isPlaying = isPlaying && isCurrent,
+                        onClick = { onSongClick(song) },
+                        onLongClick = { onSongMenu(song) },
+                        onShowMenu = { onSongMenu(song) },
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
         }

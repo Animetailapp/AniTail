@@ -84,8 +84,8 @@ import kotlin.math.roundToInt
 
 @Composable
 fun MiniPlayer(
-    position: Long,
-    duration: Long,
+    positionProvider: () -> Long,
+    durationProvider: () -> Long,
     modifier: Modifier = Modifier,
     pureBlack: Boolean,
     isPlayerCollapsed: Boolean = true,
@@ -95,8 +95,8 @@ fun MiniPlayer(
 
     if (useNewMiniPlayerDesign) {
         NewMiniPlayer(
-            position = position,
-            duration = duration,
+            positionProvider = positionProvider,
+            durationProvider = durationProvider,
             modifier = modifier,
             pureBlack = pureBlack,
             isPlayerCollapsed = isPlayerCollapsed,
@@ -104,8 +104,8 @@ fun MiniPlayer(
         )
     } else {
         LegacyMiniPlayer(
-            position = position,
-            duration = duration,
+            positionProvider = positionProvider,
+            durationProvider = durationProvider,
             modifier = modifier,
             pureBlack = pureBlack,
             isPlayerCollapsed = isPlayerCollapsed,
@@ -116,8 +116,8 @@ fun MiniPlayer(
 
 @Composable
 private fun NewMiniPlayer(
-    position: Long,
-    duration: Long,
+    positionProvider: () -> Long,
+    durationProvider: () -> Long,
     modifier: Modifier = Modifier,
     pureBlack: Boolean,
     isPlayerCollapsed: Boolean = true,
@@ -269,15 +269,16 @@ private fun NewMiniPlayer(
                     modifier = Modifier.size(48.dp)
                 ) {
                     // Circular progress indicator around the play button
-                    if (duration > 0) {
-                        CircularProgressIndicator(
-                            progress = { (position.toFloat() / duration).coerceIn(0f, 1f) },
-                            modifier = Modifier.size(48.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 3.dp,
-                            trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                        )
-                    }
+                    CircularProgressIndicator(
+                        progress = {
+                            val dur = durationProvider()
+                            if (dur > 0L) (positionProvider().toFloat() / dur).coerceIn(0f, 1f) else 0f
+                        },
+                        modifier = Modifier.size(48.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 3.dp,
+                        trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                    )
 
                     // Play/Pause button
                     Box(
@@ -548,8 +549,8 @@ private fun NewMiniPlayer(
 
 @Composable
 private fun LegacyMiniPlayer(
-    position: Long,
-    duration: Long,
+    positionProvider: () -> Long,
+    durationProvider: () -> Long,
     modifier: Modifier = Modifier,
     pureBlack: Boolean,
     isPlayerCollapsed: Boolean = true,
@@ -675,7 +676,10 @@ private fun LegacyMiniPlayer(
             .tvClickable(onClick = onOpenPlayer)
     ) {
         LinearProgressIndicator(
-            progress = { (position.toFloat() / duration).coerceIn(0f, 1f) },
+            progress = {
+                val dur = durationProvider()
+                if (dur > 0L) (positionProvider().toFloat() / dur).coerceIn(0f, 1f) else 0f
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(2.dp)

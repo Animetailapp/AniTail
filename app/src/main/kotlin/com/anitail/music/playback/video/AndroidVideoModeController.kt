@@ -279,9 +279,15 @@ class AndroidVideoModeController(
         val generation = ++videoModeGeneration
         val expectedInstanceId = _playbackInstanceId.value
         val expectedSourceId = sourceMetadata.id
+        val transitionStartedAtMs = SystemClock.elapsedRealtime()
 
         videoModeJob?.cancel()
         _isVideoModeResolving.value = true
+        if (!wantVideo) {
+            // Immediately transition UI from video surface to cover art while ExoPlayer keeps
+            // playing uninterrupted, then swap the underlying media item once the fade settles.
+            setVideoViewerVisible(false)
+        }
 
         videoModeJob =
             scope.launch {
@@ -430,6 +436,12 @@ class AndroidVideoModeController(
                             positionMap = videoModePositionMap?.reversed()
                         }
 
+                        val remainingUiFadeMs =
+                            (VIDEO_EXIT_UI_SETTLE_MS - (SystemClock.elapsedRealtime() - transitionStartedAtMs))
+                                .coerceAtLeast(0L)
+                        if (remainingUiFadeMs > 0L) {
+                            delay(remainingUiFadeMs)
+                        }
                         if (!isCurrentTarget(generation, expectedInstanceId, expectedSourceId)) return@launch
 
                         val currentPosMs = preservePositionMs ?: getCurrentPositionMs()
@@ -453,7 +465,12 @@ class AndroidVideoModeController(
                                 isCommittingTransition = false
                             }
 
-                        if (!committed) return@launch
+                        if (!committed) {
+                            if (_isVideoModeActive.value) {
+                                setVideoViewerVisible(true)
+                            }
+                            return@launch
+                        }
 
                         videoModeSongId = null
                         videoModePositionMap = null
@@ -468,6 +485,9 @@ class AndroidVideoModeController(
                 } catch (e: Exception) {
                     Timber.tag(TAG).w(e, "Video mode transition failed wantVideo=$wantVideo")
                     if (isCurrentTarget(generation, expectedInstanceId, expectedSourceId)) {
+                        if (!wantVideo && _isVideoModeActive.value) {
+                            setVideoViewerVisible(true)
+                        }
                         if (wantVideo && (wasVideoModeActive || forceReloadSameQuality)) {
                             fallbackToAudioOnError()
                         } else if (!silent) {
@@ -687,5 +707,6 @@ class AndroidVideoModeController(
         private const val DEFAULT_ESTIMATED_BANDWIDTH_BPS = 4_000_000L
         private const val MAX_VIDEO_RETRIES = 2
         private const val VIDEO_ERROR_RETRY_WINDOW_MS = 30_000L
+        private const val VIDEO_EXIT_UI_SETTLE_MS = 220L
     }
 }

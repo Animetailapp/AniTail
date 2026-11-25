@@ -781,14 +781,16 @@ private fun LibraryArtworkSlot(
 ) {
     val baseShape = artistId?.let { artistArtworkShape(it) } ?: RoundedCornerShape(cornerRadius)
     val animatedShape = animatedCurrentSongArtworkShape(isCurrent = isCurrent, inactiveShape = baseShape)
-    val artworkRotation by rememberCurrentSongArtworkRotation(isCurrent = isCurrent, isPlaying = isPlaying)
-    val nonEmptyThumbnails = localThumbnails?.filter { it.isNotBlank() }.orEmpty()
+    val artworkRotationState = rememberCurrentSongArtworkRotation(isCurrent = isCurrent, isPlaying = isPlaying)
+    val nonEmptyThumbnails = remember(localThumbnails) {
+        localThumbnails?.filter { it.isNotBlank() }.orEmpty()
+    }
 
     Box(modifier) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { rotationZ = artworkRotation }
+                .then(if (isCurrent) Modifier.graphicsLayer { rotationZ = artworkRotationState.value } else Modifier)
                 .clip(animatedShape)
                 .background(MaterialTheme.colorScheme.secondaryContainer),
             contentAlignment = Alignment.Center,
@@ -796,7 +798,7 @@ private fun LibraryArtworkSlot(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { rotationZ = -artworkRotation },
+                    .then(if (isCurrent) Modifier.graphicsLayer { rotationZ = -artworkRotationState.value } else Modifier),
                 contentAlignment = Alignment.Center,
             ) {
                 when {

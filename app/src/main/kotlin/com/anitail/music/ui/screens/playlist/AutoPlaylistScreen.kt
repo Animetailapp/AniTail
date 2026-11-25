@@ -590,9 +590,9 @@ fun AutoPlaylistScreen(
                                             playerConnection.player.togglePlayPause()
                                         } else {
                                             playerConnection.playQueue(
-                                                ListQueue(
+                                                ListQueue.fromSongs(
                                                     title = playlist,
-                                                    items = playlistSongs.map { it.toMediaItem() },
+                                                    songs = playlistSongs,
                                                     startIndex = playlistSongs.indexOfFirst { it.id == songWrapper.item.id }
                                                 ),
                                             )

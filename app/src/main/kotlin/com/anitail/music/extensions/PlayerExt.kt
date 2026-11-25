@@ -33,9 +33,16 @@ fun Player.getQueueWindows(): List<Timeline.Window> {
     if (timeline.isEmpty) {
         return emptyList()
     }
-    val queue = ArrayDeque<Timeline.Window>()
     val queueSize = timeline.windowCount
+    if (!shuffleModeEnabled) {
+        val result = ArrayList<Timeline.Window>(queueSize)
+        for (i in 0 until queueSize) {
+            result.add(timeline.getWindow(i, Timeline.Window()))
+        }
+        return result
+    }
 
+    val queue = ArrayDeque<Timeline.Window>(queueSize)
     val currentMediaItemIndex: Int = currentMediaItemIndex
     queue.add(timeline.getWindow(currentMediaItemIndex, Timeline.Window()))
 
@@ -67,6 +74,9 @@ fun Player.getQueueWindows(): List<Timeline.Window> {
 fun Player.getCurrentQueueIndex(): Int {
     if (currentTimeline.isEmpty) {
         return -1
+    }
+    if (!shuffleModeEnabled) {
+        return currentMediaItemIndex
     }
     var index = 0
     var currentMediaItemIndex = currentMediaItemIndex

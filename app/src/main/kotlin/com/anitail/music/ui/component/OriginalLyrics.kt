@@ -552,9 +552,11 @@ fun OriginalLyrics(
         selectedIndices.clear()
     }
 
-    LaunchedEffect(lyrics) {
-        if (lyrics.isNullOrEmpty() || !lyricsTextLooksSynced(lyrics)) {
-            currentLineIndex = -1
+    LaunchedEffect(lyrics, showLyrics) {
+        if (!showLyrics || lyrics.isNullOrEmpty() || !lyricsTextLooksSynced(lyrics)) {
+            if (lyrics.isNullOrEmpty() || !lyricsTextLooksSynced(lyrics)) {
+                currentLineIndex = -1
+            }
             return@LaunchedEffect
         }
         while (isActive) {

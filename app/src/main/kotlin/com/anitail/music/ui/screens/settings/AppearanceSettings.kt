@@ -87,6 +87,7 @@ import com.anitail.music.constants.ShowTopPlaylistKey
 import com.anitail.music.constants.ShowUploadedPlaylistKey
 import com.anitail.music.constants.SliderStyle
 import com.anitail.music.constants.SliderStyleKey
+import com.anitail.music.constants.FloatingNavBarKey
 import com.anitail.music.constants.SlimNavBarKey
 import com.anitail.music.constants.SwipeSensitivityKey
 import com.anitail.music.constants.SwipeThumbnailKey
@@ -277,6 +278,10 @@ fun AppearanceSettings(
 
     val (slimNav, onSlimNavChange) = rememberPreference(
         SlimNavBarKey,
+        defaultValue = false
+    )
+    val (floatingNav, onFloatingNavChange) = rememberPreference(
+        FloatingNavBarKey,
         defaultValue = false
     )
 
@@ -982,7 +987,14 @@ fun AppearanceSettings(
             title = { Text(stringResource(R.string.slim_navbar)) },
             icon = { Icon(painterResource(R.drawable.nav_bar), null) },
             checked = slimNav,
-            onCheckedChange = onSlimNavChange
+            onCheckedChange = onSlimNavChange,
+        )
+
+        SwitchPreference(
+            title = { Text(stringResource(R.string.floating_navbar)) },
+            icon = { Icon(painterResource(R.drawable.nav_bar), null) },
+            checked = floatingNav,
+            onCheckedChange = onFloatingNavChange
         )
 
         EnumListPreference(
