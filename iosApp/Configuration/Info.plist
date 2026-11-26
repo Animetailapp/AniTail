@@ -58,10 +58,22 @@
         <string>UIInterfaceOrientationLandscapeLeft</string>
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>AniTail uses the microphone to recognize music playing nearby.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_fcast._tcp</string>
+        <string>_googlecast._tcp</string>
+        <string>_anitail-connect._tcp.</string>
+    </array>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>AniTail uses the local network to find nearby devices for Cast and Device Connect.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>
         <false/>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
     </dict>
 </dict>
 </plist>
