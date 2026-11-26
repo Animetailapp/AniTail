@@ -101,3 +101,12 @@ output-metadata.json
 client_secret.json
 client_secret_*.json
 desktop/src/main/resources/oauth/client_secret.json
+
+# iOS signing & local artifacts
+iosApp/ios herramientas/
+*.ipa
+*.p12
+*.p8
+*.cer
+*.mobileprovision
+*.certSigningRequest
