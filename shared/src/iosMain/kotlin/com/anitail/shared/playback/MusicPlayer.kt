@@ -92,6 +92,7 @@ import platform.AVFoundation.AVPlayerTimeControlStatusWaitingToPlayAtSpecifiedRa
 import platform.AVFoundation.AVURLAsset
 import platform.AVFoundation.CMTimeRangeValue
 import platform.AVFoundation.addPeriodicTimeObserverForInterval
+import platform.AVFoundation.asset
 import platform.AVFoundation.audioTimePitchAlgorithm
 import platform.AVFoundation.automaticallyWaitsToMinimizeStalling
 import platform.AVFoundation.currentItem
@@ -316,6 +317,7 @@ class MusicPlayer internal constructor(
         val resource: PlaybackResource?,
         val metadataDurationSeconds: Long?,
         val durationMs: Long,
+        val audioProcessingReady: Boolean,
         val audioTapInstalled: Boolean,
         val audioTapGain: MutableStateFlow<Float>,
         val pitchAvailability: MutableStateFlow<Boolean>,
@@ -760,6 +762,7 @@ class MusicPlayer internal constructor(
                             resource = _currentPlaybackResource.value,
                             metadataDurationSeconds = metadataDurationSeconds,
                             durationMs = _duration.value,
+                            audioProcessingReady = audioProcessingReady,
                             audioTapInstalled = audioTapInstalled,
                             audioTapGain = audioTapGain,
                             pitchAvailability = activePitchAvailability.value,
@@ -830,27 +833,7 @@ class MusicPlayer internal constructor(
         activePitchAvailability.value = reusablePrepared?.pitchAvailability ?: MutableStateFlow(canUseIosAudioProcessingTap(resource, url))
         audioProcessingReady = reusablePrepared?.audioProcessingReady ?: !canUseIosAudioProcessingTap(resource, url)
         if (reusablePrepared == null && !audioProcessingReady) {
-            installIosAudioProcessingTap(
-                scope,
-                asset,
-                playerItem,
-                audioTapGain,
-                playbackPitch,
-                activePitchAvailability.value,
-            ) { installed ->
-                scope.launch(Dispatchers.Main.immediate) {
-                    // currentItem may return a different Kotlin wrapper, so compare the native items.
-                    if (player.currentItem != playerItem) return@launch
-                    audioTapInstalled = installed
-                    audioProcessingReady = true
-                    applyPlaybackVolume()
-                    if (wantsPlayback && !isResourceReloadSeekPending) {
-                        configureAudioSession()
-                        player.play()
-                        if (_playbackSpeed.value != 1f) player.rate = _playbackSpeed.value
-                    }
-                }
-            }
+            prepareCurrentAudioProcessing(asset, playerItem)
         }
         observePlayerItem(playerItem)
         resource?.let { startSilenceAnalysis(song, it) }
@@ -908,6 +891,33 @@ class MusicPlayer internal constructor(
         }
         updateNowPlayingInfo()
         return true
+    }
+
+    private fun prepareCurrentAudioProcessing(
+        asset: AVAsset,
+        playerItem: AVPlayerItem,
+    ) {
+        installIosAudioProcessingTap(
+            scope,
+            asset,
+            playerItem,
+            audioTapGain,
+            playbackPitch,
+            activePitchAvailability.value,
+        ) { installed ->
+            scope.launch(Dispatchers.Main.immediate) {
+                // currentItem may return a different Kotlin wrapper, so compare the native items.
+                if (player.currentItem != playerItem) return@launch
+                audioTapInstalled = installed
+                audioProcessingReady = true
+                applyPlaybackVolume()
+                if (wantsPlayback && !isResourceReloadSeekPending) {
+                    configureAudioSession()
+                    player.play()
+                    if (_playbackSpeed.value != 1f) player.rate = _playbackSpeed.value
+                }
+            }
+        }
     }
 
     internal fun replacePlaybackResource(
@@ -1169,7 +1179,7 @@ class MusicPlayer internal constructor(
                     configureAudioSession()
                     player.play()
                 }
-                if (wantsPlayback && _playbackSpeed.value != 1f) {
+                if (wantsPlayback && audioProcessingReady && _playbackSpeed.value != 1f) {
                     player.rate = _playbackSpeed.value
                 }
             }
@@ -1863,6 +1873,7 @@ class MusicPlayer internal constructor(
         cleanupItemObservers()
         player.replaceCurrentItemWithPlayerItem(fallback.item)
         observePlayerItem(fallback.item)
+        audioProcessingReady = fallback.audioProcessingReady
         audioTapInstalled = fallback.audioTapInstalled
         audioTapGain = fallback.audioTapGain
         activePitchAvailability.value = fallback.pitchAvailability
@@ -1875,15 +1886,16 @@ class MusicPlayer internal constructor(
         pendingEofPlaybackInstanceId = null
         val instanceId = playbackInstanceId
         val generation = ++resourceReloadGeneration
+        isResourceReloadSeekPending = positionMs > 0L
+        if (!audioProcessingReady) prepareCurrentAudioProcessing(fallback.item.asset, fallback.item)
         if (positionMs > 0L) {
-            isResourceReloadSeekPending = true
             val targetTime = CMTimeMakeWithSeconds(positionMs.toDouble() / 1000.0, 600)
             val zeroCMTime = CMTimeMakeWithSeconds(0.0, 600)
             player.seekToTime(targetTime, toleranceBefore = zeroCMTime, toleranceAfter = zeroCMTime) {
                 if (generation == resourceReloadGeneration) {
                     isResourceReloadSeekPending = false
                     sampleChanges.trySend(Unit)
-                    if (wantsPlayback && playbackInstanceId == instanceId) {
+                    if (wantsPlayback && audioProcessingReady && playbackInstanceId == instanceId) {
                         configureAudioSession()
                         player.play()
                         if (_playbackSpeed.value != 1f) player.rate = _playbackSpeed.value
@@ -1892,7 +1904,7 @@ class MusicPlayer internal constructor(
             }
         } else {
             isResourceReloadSeekPending = false
-            if (wantsPlayback) {
+            if (wantsPlayback && audioProcessingReady) {
                 configureAudioSession()
                 player.play()
                 if (_playbackSpeed.value != 1f) player.rate = _playbackSpeed.value
