@@ -59,7 +59,7 @@ dependencies {
 
 
     implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.compose.material3:material3:1.14.0-alpha01+snapshot.integration-copy-compose-bd98b9024146-to-jb-main")
+    implementation("org.jetbrains.compose.material3:material3:1.14.0-alpha01+snapshot.integration-copy-compose-material3-5cef9f9741d-to-jb-main")
     implementation(libs.materialKolor) {
         exclude(group = "org.jetbrains.compose.material3")
         exclude(group = "org.jetbrains.compose.foundation")
