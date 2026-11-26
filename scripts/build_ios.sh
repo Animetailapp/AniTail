@@ -123,6 +123,9 @@ elif [[ "$mode" == "sim" ]]; then
     -derivedDataPath "$derived_data_dir" \
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGN_IDENTITY="" \
+    ENABLE_DEBUG_DYLIB=NO \
+    ARCHS=arm64 \
+    COMPILER_INDEX_STORE_ENABLE=NO \
     MARKETING_VERSION="$marketing_version" \
     CURRENT_PROJECT_VERSION="$build_version"
 
