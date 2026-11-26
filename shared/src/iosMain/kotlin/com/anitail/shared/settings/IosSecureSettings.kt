@@ -20,17 +20,35 @@ internal class IosSecureSettings(
         get() = keys.size
 
     override fun clear() {
-        secure.clear()
+        try {
+            secure.clear()
+        } catch (_: Throwable) {
+            // Unsigned simulator builds lack Keychain entitlements; fall back to delegate settings.
+        }
         delegate.clear()
     }
 
     override fun remove(key: String) {
-        if (key in secureSettingsKeys) secure.remove(key)
+        if (key in secureSettingsKeys) {
+            try {
+                secure.remove(key)
+            } catch (_: Throwable) {
+                // Fall back to delegate when Keychain entitlements are unavailable.
+            }
+        }
         delegate.remove(key)
     }
 
     override fun hasKey(key: String): Boolean =
-        if (key in secureSettingsKeys) runCatching { secure.hasKey(key) }.getOrDefault(false) else delegate.hasKey(key)
+        if (key in secureSettingsKeys) {
+            try {
+                secure.hasKey(key)
+            } catch (_: Throwable) {
+                delegate.hasKey(key)
+            }
+        } else {
+            delegate.hasKey(key)
+        }
 
     override fun putString(
         key: String,
@@ -40,8 +58,18 @@ internal class IosSecureSettings(
             delegate.putString(key, value)
             return
         }
-        secure.putString(key, value)
-        delegate.remove(key)
+        val storedInKeychain =
+            try {
+                secure.putString(key, value)
+                true
+            } catch (_: Throwable) {
+                false
+            }
+        if (storedInKeychain) {
+            delegate.remove(key)
+        } else {
+            delegate.putString(key, value)
+        }
     }
 
     override fun getString(
@@ -51,7 +79,11 @@ internal class IosSecureSettings(
 
     override fun getStringOrNull(key: String): String? =
         if (key in secureSettingsKeys) {
-            secure.getStringOrNull(key)
+            try {
+                secure.getStringOrNull(key)
+            } catch (_: Throwable) {
+                delegate.getStringOrNull(key)
+            }
         } else {
             delegate.getStringOrNull(key)
         }
@@ -59,8 +91,14 @@ internal class IosSecureSettings(
     private fun migratePlaintextSecrets() {
         secureSettingsKeys.forEach { key ->
             val plaintext = delegate.getStringOrNull(key) ?: return@forEach
-            if (!secure.hasKey(key)) secure.putString(key, plaintext)
-            delegate.remove(key)
+            val migrated =
+                try {
+                    if (!secure.hasKey(key)) secure.putString(key, plaintext)
+                    true
+                } catch (_: Throwable) {
+                    false
+                }
+            if (migrated) delegate.remove(key)
         }
     }
 }
