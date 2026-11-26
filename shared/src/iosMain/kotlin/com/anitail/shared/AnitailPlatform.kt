@@ -1,5 +1,6 @@
 package com.anitail.shared
 
+import com.anitail.shared.api.artwork.AnimatedArtworkService
 import com.anitail.shared.api.lastfm.LastFM
 import com.anitail.shared.auth.AuthManager
 import com.anitail.shared.backup.IosBackupRestoreManager
@@ -39,7 +40,8 @@ object AnitailPlatform {
                 module {
                     single<MusicDatabase> { getDatabaseBuilder(null).build() }
                     single<DatabaseDao> { get<MusicDatabase>().dao() }
-                    single { MusicPlayer() }
+                    single { AnimatedArtworkService(GlobalYouTube.client) }
+                    single { MusicPlayer(animatedArtworkService = get()) }
                 },
             )
         }
@@ -69,7 +71,7 @@ object AnitailPlatform {
         val database = getDatabaseBuilder(null).build()
         koin.declare(database)
         koin.declare(database.dao())
-        koin.declare(MusicPlayer())
+        koin.declare(MusicPlayer(animatedArtworkService = koin.get()))
         koin.declare(
             LyricsRepository(
                 lyricsClient = koin.get(),

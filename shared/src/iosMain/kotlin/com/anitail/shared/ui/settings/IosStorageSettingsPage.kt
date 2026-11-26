@@ -43,6 +43,7 @@ import com.anitail.shared.generated.resources.max_song_cache_size
 import com.anitail.shared.generated.resources.ok
 import com.anitail.shared.generated.resources.song_cache
 import com.anitail.shared.generated.resources.unlimited
+import com.anitail.shared.playback.IosNowPlayingAnimatedArtworkCache
 import com.anitail.shared.settings.Settings
 import com.anitail.shared.storage.IosAudioDownloadManager
 import com.anitail.shared.storage.ResizableImageDiskCache
@@ -248,6 +249,7 @@ fun IosStorageSettingsPage(
                                 withContext(Dispatchers.IO) {
                                     imageCache.clear()
                                     imageLoader.memoryCache?.clear()
+                                    IosNowPlayingAnimatedArtworkCache.clearInactive()
                                 }
                             }
                     }

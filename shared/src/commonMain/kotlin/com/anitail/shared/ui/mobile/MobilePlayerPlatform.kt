@@ -1,6 +1,5 @@
 package com.anitail.shared.ui.mobile
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,7 +25,6 @@ import com.anitail.shared.api.lyrics.LyricsUtils
 import com.anitail.shared.db.MusicDatabase
 import com.anitail.shared.db.entities.KIND_DOWNLOAD
 import com.anitail.shared.generated.resources.Res
-import com.anitail.shared.generated.resources.equalizer
 import com.anitail.shared.generated.resources.listen_together
 import com.anitail.shared.generated.resources.playback_pitch
 import com.anitail.shared.generated.resources.playback_speed
@@ -82,7 +80,7 @@ internal class MobilePlayerPlatform(
     override fun lyricsShareAction(viewModel: PlayerViewModel): ((String) -> Unit)? = shareLyrics(viewModel)
 
     override val supportsPictureInPicture = false
-    override val supportsVideoPlayback = false
+    override val supportsVideoPlayback = true
     override val supportsCasting = false
 
     @Composable
@@ -124,7 +122,7 @@ internal class MobilePlayerPlatform(
         useSurfaceView: Boolean,
         onFullscreenClick: (() -> Unit)?,
         onPiPClick: (() -> Unit)?,
-    ) = Box(modifier)
+    ) = MobileMusicVideoSurface(modifier, cornerRadius, fillContainer, showControls, onFullscreenClick)
 
     @Composable
     override fun AnimatedCoverVideo(

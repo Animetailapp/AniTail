@@ -19,7 +19,7 @@ import com.anitail.shared.db.entities.toSongItem
 import com.anitail.shared.db.upsertHistorySong
 import com.anitail.shared.db.withDatabaseTransaction
 import com.anitail.shared.generated.resources.Res
-import com.anitail.shared.generated.resources.foreign_import_failed
+import com.anitail.shared.generated.resources.foreign_import_error_generic
 import com.anitail.shared.generated.resources.foreign_import_success
 import com.anitail.shared.generated.resources.foreign_import_unsupported
 import com.anitail.shared.model.AlbumTiny
@@ -673,7 +673,7 @@ suspend fun Result<ForeignImportSummary>.foreignImportMessage(): String =
             if (it is UnsupportedForeignLibraryException) {
                 getString(Res.string.foreign_import_unsupported)
             } else {
-                getString(Res.string.foreign_import_failed, it.message.orEmpty())
+                getString(Res.string.foreign_import_error_generic)
             }
         },
     )

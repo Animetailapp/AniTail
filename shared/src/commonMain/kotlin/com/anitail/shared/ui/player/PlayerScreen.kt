@@ -523,6 +523,10 @@ fun PlayerScreen(
         ?: remember { mutableStateOf(false) }
     val playbackResource by playerConnection?.currentPlaybackResource?.collectWhilePlayerActive(isPlayerContentVisible && isScreenVisible)
         ?: remember { mutableStateOf(null) }
+    val videoPlaybackResource by playerConnection?.videoPlaybackResource?.collectWhilePlayerActive(
+        isPlayerContentVisible && isScreenVisible,
+    )
+        ?: remember { mutableStateOf(null) }
 
     LaunchedEffect(isPlayerContentVisible, isScreenVisible, playbackResource?.videoId, currentSong?.id) {
         val mediaId = playerConnection?.currentPlaybackResource?.value?.videoId
@@ -571,6 +575,8 @@ fun PlayerScreen(
                 videoPlaybackEnabled = Settings.shared.musicVideoPlaybackEnabled,
                 songId = currentSong?.id,
                 musicVideoType = currentSong?.musicVideoType,
+                isLocalSong = currentSong?.isLocal == true,
+                isUploadedSong = currentSong?.isUploaded == true,
             )
 
     var showPlayerMenu by remember { mutableStateOf(false) }
@@ -731,7 +737,7 @@ fun PlayerScreen(
         shouldShowMusicVideoSurface(
             isVideoModeActive = isVideoModeActive,
             isVideoViewerVisible = isVideoViewerVisible,
-            hasVideo = playbackResource?.hasVideo == true,
+            hasVideo = videoPlaybackResource?.hasVideo == true,
             presentationAllowed = playerContentState.isVisible,
         )
     val showVideoSurface =
@@ -1731,7 +1737,7 @@ fun PlayerScreen(
                                                         currentSong?.displayThumbnail != null &&
                                                         !(
                                                             isVideoModeActive &&
-                                                                playbackResource?.hasVideo == true &&
+                                                                videoPlaybackResource?.hasVideo == true &&
                                                                 bottomSheetState.isCollapsed
                                                         )
                                                     ) {
