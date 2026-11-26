@@ -102,6 +102,7 @@ import com.anitail.shared.update.IosUpdateNotice
 import com.anitail.shared.utils.ArtworkSizingInterceptor
 import com.anitail.shared.utils.Logger
 import com.anitail.shared.utils.formatHistoryMonth
+import com.anitail.shared.widget.IosNowPlayingWidget
 import com.anitail.shared.youtube.playback.IosPageBoundTokenHost
 import com.anitail.shared.youtube.playback.IosPlaybackNetworkMonitor
 import com.anitail.shared.youtube.playback.StreamResolver
@@ -211,6 +212,10 @@ fun AnitailIOSApp() {
             )
         }
     IosDiscordPresenceEffect(playbackController.state, player.playbackSpeed)
+    DisposableEffect(playbackController, player, appScope) {
+        IosNowPlayingWidget.bind(playbackController, player, appScope)
+        onDispose { IosNowPlayingWidget.unbind() }
+    }
     val listenTogetherClient = remember(appScope) { createHttpClient() }
     val listenTogetherMessages by rememberUpdatedState(listenTogetherPresentationMessages())
     val listenTogetherManager =

@@ -1,0 +1,8 @@
+#include "../Configuration/Config.xcconfig"
+
+PRODUCT_NAME = AniTailWidget
+PRODUCT_BUNDLE_IDENTIFIER = com.anitail.ios.widget
+CODE_SIGN_ENTITLEMENTS = AniTailWidget/AniTailWidget.entitlements
+INFOPLIST_FILE = AniTailWidget/Info.plist
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+SKIP_INSTALL = YES

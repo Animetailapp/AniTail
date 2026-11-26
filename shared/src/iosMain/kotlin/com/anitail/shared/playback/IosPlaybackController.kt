@@ -124,7 +124,7 @@ internal class IosPlaybackController(
         get() = !guestLocked && state.value.canSkipPrevious
 
     private var listenTogether: ListenTogetherManager? = null
-    private val guestLocked: Boolean get() = listenTogether?.isGuestPlaybackLocked == true
+    internal val guestLocked: Boolean get() = listenTogether?.isGuestPlaybackLocked == true
     private val inListenTogether: Boolean get() = listenTogether?.isInRoom?.value == true
 
     internal fun bindListenTogether(manager: ListenTogetherManager) {

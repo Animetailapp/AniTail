@@ -10,6 +10,7 @@ import MediaPlayer
 import Shared
 import SwiftUI
 import UIKit
+import WidgetKit
 
 @main
 struct AniTailApp: App {
@@ -20,6 +21,10 @@ struct AniTailApp: App {
         }
         configureAppAudioSession()
         IosNowPlayingAnimatedArtworkBridge.shared.register(provider: IosNowPlayingAnimatedArtworkHost())
+        IosNowPlayingWidget.shared.register(reloader: WidgetTimelineReloader())
+        if #available(iOS 17.0, *) {
+            PlaybackControlIntent.handler = { IosNowPlayingWidget.shared.handle(command: $0) }
+        }
         if UserDefaults.standard.object(forKey: "iosOnboardingComplete") == nil {
             let existingDatabase = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
                 .first?.appendingPathComponent("anitail/anitail.db")
@@ -44,6 +49,12 @@ struct AniTailApp: App {
         } catch {
             print("Audio session configuration error: \(error.localizedDescription)")
         }
+    }
+}
+
+private final class WidgetTimelineReloader: NSObject, IosWidgetTimelineReloader {
+    func reloadTimelines() {
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }
 

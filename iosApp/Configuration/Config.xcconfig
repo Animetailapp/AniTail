@@ -5,6 +5,7 @@
 
 PRODUCT_NAME = AniTail
 PRODUCT_BUNDLE_IDENTIFIER = com.anitail.ios
+ANITAIL_APP_GROUP_ID = group.com.anitail.ios
 CODE_SIGN_ENTITLEMENTS = Configuration/iosApp.entitlements
 INFOPLIST_PREPROCESS = YES
 INFOPLIST_PREFIX_HEADER = $(DERIVED_FILE_DIR)/AnitailVersion.h
