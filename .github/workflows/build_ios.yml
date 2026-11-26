@@ -41,11 +41,11 @@ jobs:
   build_ios:
     name: iOS App & Unsigned IPA
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'ipa' || inputs.target == 'both' }}
-    runs-on: macos-26
+    runs-on: macos-26-intel
     timeout-minutes: 120
     env:
       ANITAIL_IOS_ONLY: "true"
-      ORG_GRADLE_PROJECT_org.gradle.workers.max: "2"
+      ORG_GRADLE_PROJECT_org.gradle.workers.max: "4"
       ORG_GRADLE_PROJECT_kotlin.compiler.execution.strategy: "in-process"
 
     steps:
@@ -57,11 +57,12 @@ jobs:
         with:
           java-version: "21"
           distribution: "temurin"
-          architecture: aarch64
+          architecture: x64
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
           cache-cleanup: on-success
 
       - name: Configure Gradle memory limits for macOS runner
@@ -69,6 +70,8 @@ jobs:
           mkdir -p ~/.gradle
           cat <<'EOF' >> ~/.gradle/gradle.properties
           org.gradle.jvmargs=-Xmx8g -XX:MaxMetaspaceSize=1g -XX:+UseG1GC -XX:MaxHeapFreeRatio=30 -XX:MinHeapFreeRatio=10 -Dsun.zip.disableMemoryMapping=true -Dsun.io.useCanonCaches=false
+          org.gradle.caching=true
+          org.gradle.parallel=true
           kotlin.native.jvmArgs=-Xmx8g -XX:+UseG1GC -XX:MaxHeapFreeRatio=30 -XX:MinHeapFreeRatio=10
           EOF
 
