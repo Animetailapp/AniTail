@@ -10,7 +10,6 @@ import com.anitail.shared.playback.IosPlaybackController
 import com.anitail.shared.playback.MusicPlayer
 import com.anitail.shared.state.SongMetadataState
 import com.anitail.shared.ui.playback.PlaybackUiState
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -27,7 +26,6 @@ import kotlin.time.Clock
 
 private const val APP_GROUP_INFO_KEY = "AnitailWidgetAppGroupIdentifier"
 private const val SNAPSHOT_KEY = "AnitailWidgetSnapshot"
-private const val DEBUG_KEY = "AnitailWidgetDebug"
 private const val SEEK_TOLERANCE_MS = 2_000L
 
 interface IosWidgetTimelineReloader {
@@ -92,33 +90,24 @@ object IosNowPlayingWidget {
         this.player = player
         job =
             scope.launch {
-                try {
-                    defaults.setObject("bound", forKey = DEBUG_KEY)
-                    val labels =
-                        WidgetLabels(
-                            nowPlaying = getString(Res.string.now_playing),
-                            description = getString(Res.string.widget_description),
-                            playPause = getString(Res.string.play_pause),
-                            next = getString(Res.string.next),
-                            previous = getString(Res.string.previous),
-                        )
-                    var written: WidgetSnapshot? = null
-                    // Polled rather than collected: guest lock and skip availability change without a state emission.
-                    while (isActive) {
-                        val snapshot = controller.state.value.toSnapshot(controller, labels)
-                        if (written?.let(snapshot::matches) != true) {
-                            defaults.setObject(Json.encodeToString(snapshot), forKey = SNAPSHOT_KEY)
-                            defaults.setObject("written ${snapshot.updatedAtMs}", forKey = DEBUG_KEY)
-                            written = snapshot
-                            reloader?.reloadTimelines()
-                        }
-                        delay(1_000L)
+                val labels =
+                    WidgetLabels(
+                        nowPlaying = getString(Res.string.now_playing),
+                        description = getString(Res.string.widget_description),
+                        playPause = getString(Res.string.play_pause),
+                        next = getString(Res.string.next),
+                        previous = getString(Res.string.previous),
+                    )
+                var written: WidgetSnapshot? = null
+                // Polled rather than collected: guest lock and skip availability change without a state emission.
+                while (isActive) {
+                    val snapshot = controller.state.value.toSnapshot(controller, labels)
+                    if (written?.let(snapshot::matches) != true) {
+                        defaults.setObject(Json.encodeToString(snapshot), forKey = SNAPSHOT_KEY)
+                        written = snapshot
+                        reloader?.reloadTimelines()
                     }
-                } catch (error: CancellationException) {
-                    throw error
-                } catch (error: Throwable) {
-                    // Surfaced in the widget so a failed writer is visible without device logs.
-                    defaults.setObject("error ${error::class.simpleName}: ${error.message}", forKey = DEBUG_KEY)
+                    delay(1_000L)
                 }
             }
     }
