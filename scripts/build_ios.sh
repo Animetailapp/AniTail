@@ -133,6 +133,25 @@ elif [[ "$mode" == "sim" ]]; then
   if [[ -n "$app_path" && -d "$app_path" ]]; then
     rm -rf "$dist_dir/AniTail.app"
     cp -R "$app_path" "$dist_dir/AniTail.app"
+    # Ad-hoc sign with the App Group entitlement so iOS Simulator shares UserDefaults with the widget.
+    sim_entitlements="$(mktemp)"
+    cat >"$sim_entitlements" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>group.com.anitail.ios</string>
+    </array>
+</dict>
+</plist>
+EOF
+    if [[ -d "$dist_dir/AniTail.app/PlugIns/AniTailWidget.appex" ]]; then
+      codesign --force --sign - --entitlements "$sim_entitlements" "$dist_dir/AniTail.app/PlugIns/AniTailWidget.appex"
+    fi
+    codesign --force --sign - --entitlements "$sim_entitlements" "$dist_dir/AniTail.app"
+    rm -f "$sim_entitlements"
     echo "Simulator App bundle created: $dist_dir/AniTail.app"
   else
     echo "Error: Could not find built app bundle in derived data."
