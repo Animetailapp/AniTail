@@ -8,7 +8,7 @@ pluginManagement {
         maven { setUrl("https://packages.jetbrains.team/maven/p/cmp/dev") }
     }
     plugins {
-        id("org.jetbrains.compose") version "1.14.0-alpha01+snapshot.integration-copy-compose-material3-5cef9f9741d-to-jb-main"
+        id("org.jetbrains.compose") version "1.14.0-alpha01+snapshot.integration-copy-navigation3-aabfc05181b-to-jb-main"
         id("org.jetbrains.kotlin.plugin.compose") version "2.5.0-RC2"
     }
 }
