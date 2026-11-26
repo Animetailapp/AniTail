@@ -31,6 +31,17 @@ struct NowPlayingSnapshot: Decodable {
         return try? JSONDecoder().decode(NowPlayingSnapshot.self, from: Data(json.utf8))
     }
 
+    // Explains an empty widget: which step of the app-group hand-off is missing.
+    static func diagnostic() -> String {
+        guard let group = Bundle.main.object(forInfoDictionaryKey: "AnitailWidgetAppGroupIdentifier") as? String else {
+            return "sin clave de grupo"
+        }
+        guard let defaults = UserDefaults(suiteName: group) else { return "sin acceso al grupo" }
+        let debug = defaults.string(forKey: "AnitailWidgetDebug") ?? "la app no ha escrito"
+        if defaults.string(forKey: "AnitailWidgetSnapshot") == nil { return "sin datos: \(debug)" }
+        return "datos ilegibles: \(debug)"
+    }
+
     // Wall-clock span of the track while it advances; nil when paused, buffering or past its end.
     var playingInterval: ClosedRange<Date>? {
         guard rate > 0, durationMs > 0 else { return nil }
@@ -51,6 +62,12 @@ struct NowPlayingSnapshot: Decodable {
 struct NowPlayingEntry: TimelineEntry {
     let date = Date()
     let snapshot: NowPlayingSnapshot?
+    var diagnostic: String = ""
+
+    static func current() -> NowPlayingEntry {
+        let snapshot = NowPlayingSnapshot.load()
+        return NowPlayingEntry(snapshot: snapshot, diagnostic: snapshot == nil ? NowPlayingSnapshot.diagnostic() : "")
+    }
 }
 
 struct NowPlayingProvider: TimelineProvider {
@@ -59,11 +76,11 @@ struct NowPlayingProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (NowPlayingEntry) -> Void) {
-        completion(NowPlayingEntry(snapshot: .load()))
+        completion(.current())
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<NowPlayingEntry>) -> Void) {
-        let entry = NowPlayingEntry(snapshot: .load())
+        let entry = NowPlayingEntry.current()
         // The app reloads on every change; re-read at track end in case it was suspended meanwhile.
         let policy = entry.snapshot?.playingInterval.map { TimelineReloadPolicy.after($0.upperBound) } ?? .never
         completion(Timeline(entries: [entry], policy: policy))
@@ -75,7 +92,7 @@ struct NowPlayingWidget: Widget {
     var body: some WidgetConfiguration {
         let labels = NowPlayingSnapshot.load()?.labels
         return StaticConfiguration(kind: "AnitailNowPlayingWidget", provider: NowPlayingProvider()) { entry in
-            NowPlayingWidgetView(snapshot: entry.snapshot)
+            NowPlayingWidgetView(snapshot: entry.snapshot, diagnostic: entry.diagnostic)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName(labels?.nowPlaying ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "")
@@ -86,6 +103,7 @@ struct NowPlayingWidget: Widget {
 
 private struct NowPlayingWidgetView: View {
     let snapshot: NowPlayingSnapshot?
+    let diagnostic: String
 
     var body: some View {
         if let snapshot {
@@ -112,9 +130,18 @@ private struct NowPlayingWidgetView: View {
                 }
             }
         } else {
-            Image(systemName: "music.note")
-                .font(.largeTitle)
-                .foregroundStyle(.secondary)
+            VStack(spacing: 6) {
+                Image(systemName: "music.note")
+                    .font(.largeTitle)
+                    .foregroundStyle(.secondary)
+                if !diagnostic.isEmpty {
+                    Text(diagnostic)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(4)
+                }
+            }
         }
     }
 
